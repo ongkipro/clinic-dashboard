@@ -9,22 +9,31 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "docs:check": "python3 scripts/check-traceability.py docs/spec --tasks TASKS.md",
-    "docs:promotion": "for f in README.md AGENTS.md PRD.md TASKS.md PLAN.md STATUS.md DECISIONS.md ARCHITECTURE.md BUILD-LOG.md RELEASE.md OBSERVABILITY.md DESIGN.md design/brief.md; do test -s \"$f\" || { echo \"missing or empty: $f\"; exit 1; }; done; test -d .delivery || { echo 'missing: .delivery/'; exit 1; }; echo 'PASS promotion documents'"
+    "docs:promotion": "for f in README.md AGENTS.md PRD.md TASKS.md PLAN.md STATUS.md DECISIONS.md ARCHITECTURE.md BUILD-LOG.md RELEASE.md OBSERVABILITY.md DESIGN.md design/brief.md; do test -s \"$f\" || { echo \"missing or empty: $f\"; exit 1; }; done; test -d .delivery || { echo 'missing: .delivery/'; exit 1; }; echo 'PASS promotion documents'",
+    "db:migrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/db/migrate.ts",
+    "db:migrate:local": "DB_LOCAL=1 pnpm db:migrate",
+    "db:generate": "drizzle-kit generate",
+    "test": "vitest run"
   },
   "dependencies": {
+    "drizzle-orm": "0.45.4",
     "next": "16.4.3",
+    "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "drizzle-kit": "0.31.11",
     "eslint": "10.14.0",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "4.3.3",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
   },
   "engines": {
     "node": "26.13.0"

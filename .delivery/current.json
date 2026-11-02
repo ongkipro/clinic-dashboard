@@ -1,14 +1,23 @@
 {
-  "activeRun": null,
+  "activeRun": "RUN-20261102T133040Z-6443cf38",
+  "activeTask": "T-002",
+  "capability": "unattributed",
+  "job": "implementation",
   "lastRun": {
     "finishedAt": "2026-11-02T13:28:23Z",
     "result": "PASS",
     "runId": "RUN-20261102T132808Z-1ccf7f0d"
   },
-  "observedHead": "862307d1b41044cabd93187d62f645848c5f6d5f",
+  "model": "cc/claude-opus-5-5",
+  "observedHead": "5c02cc32b15b3adc4587bd248fbbee8fef33bcee",
   "observedState": "INTEGRATING",
   "project": "clinic-dashboard",
+  "provider": "9router-fantastico",
+  "reasoningEffort": "medium",
+  "requirement": "PR-1",
+  "risk": "R3",
   "schemaVersion": 1,
   "statusAuthority": "STATUS.md",
-  "updatedAt": "2026-11-02T13:28:23Z"
+  "updatedAt": "2026-11-02T13:41:26Z",
+  "worker": "pi"
 }

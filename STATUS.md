@@ -6,7 +6,7 @@ State: INTEGRATING
 Review-Risk: R3
 Independent-Review: PASS
 Primary-Worker: pi (9router-fantastico/cc/claude-opus-5-5)
-Independent-Reviewer: claude-code 2.1.316 (claude-opus-5-5, separate context; codex lane failed: sandbox bwrap error)
+Independent-Reviewer: claude-code 2.1.316 (claude-opus-5-5, separate context)
 Independent-Review-Head: UNSET
 
 ## Delivery state machine
@@ -23,29 +23,33 @@ Use `BLOCKED` only as an interruption state. Record the blocker and exact state 
 
 ## Current state
 
-M0 in progress. T-001 (repository bootstrap, PR-1) is implemented and verified locally; it waits for the owner to approve commit and push so the first GitHub Actions run can prove the "exit 0 in CI" part of Done-when.
+M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent review after each task, local commit per task; push only on explicit approval (not yet given, so no CI run exists).
 
-Built so far: Node 26.13.0 pinned (`devEngines`, Docker image), Next.js 16.4.3 with `output: "standalone"`, `compose.yaml` (PostgreSQL 16.15, loopback only), multi-stage non-root `Dockerfile`, `.github/workflows/ci.yml` (SHA-pinned actions, PostgreSQL service ready for later tests), `pnpm docs:promotion`. Versions and their reasons: `DECISIONS.md` DEC-005.
+| Task | Result | Commit |
+|---|---|---|
+| T-001 repository bootstrap | PASS locally; review APPROVE; CI proof pending push | `862307d` |
+| T-002 database core | PASS; R3 review APPROVE after fixes | this commit |
+
+Built so far: see `DECISIONS.md` DEC-005 (toolchain) and DEC-006 (database core); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
 ## Active work
 
-T-001, run `RUN-20261102T130612Z-c5339ef8`. Ledger risk escalated R2 → R3 (CI and Dockerfile); independent review APPROVE after fixes, boundary approved.
+None between tasks. Next: T-003 (RLS harness, R4).
 
-Carried forward (not in T-001 Allowed Paths):
-- Add `.dockerignore` (keeps `.env*`, `node_modules`, `docs/research/` out of the build context sent to Coolify) — needs a task or a Rules exception.
-- Copy `public/` into the runtime image once the folder exists.
-- Upgrade Next.js to 16.4.4 once it passes pnpm `minimumReleaseAge`.
+Carried forward (outside the owning task's Allowed Paths):
+- `.dockerignore` (build context excludes `.env*`, `node_modules`, `docs/research/`).
+- Runtime image does not yet ship `src/db/migrate.ts` and `drizzle/`, so migrations cannot run from the image; owner: the deploy/Dockerfile task.
+- CI has no `pnpm test` step yet (ci.yml belongs to T-004); add it there with `TEST_DATABASE_URL` pointing at the service.
+- Copy `public/` into the runtime image once it exists; upgrade Next.js to 16.4.4 after `minimumReleaseAge`.
+- Migrations from parallel worktrees must be regenerated on rebase (Drizzle skips an older `when`).
 
 ## Blockers
 
-None for M0. These open questions gate later milestones (see `docs/spec/02-PRD.md` §13 and `PLAN.md` gates):
-
-- Q-12: Numa job validation. It may change PR-7, PR-9, PR-14, PR-15, PR-18, PR-71 and PR-83.
-- G2 (first real patient): H-02d residency opinion, plus Q-08, Q-10, Q-11, Q-15, Q-17 and R-01.
-- G3 (journal export, VAT): Q-05 and Q-06 accountant and tax-adviser evidence in the compliance register.
+None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, PR-18, PR-71, PR-83), G2 (H-02d, Q-08, Q-10, Q-11, Q-15, Q-17, R-01), G3 (Q-05, Q-06). See `docs/spec/02-PRD.md` §13 and `PLAN.md`.
 
 ## Verification evidence
 
+- 2026-11-02 T-002: fresh database migrate, 16 tests on PostgreSQL 16.15 (contract checker with a negative fixture per rule; advisory-lock test fails 3/3 with the lock removed), `drizzle-kit check`, typecheck, lint, build, docs:check — all PASS (`.delivery/`).
 - 2026-11-02 T-001 (Node 26.13.0, clean `node_modules` and `.next`): install --frozen-lockfile, typecheck (`next typegen && tsc`), lint, build, `pnpm audit --prod`, docs:check (24 files, 653 declarations, 131 tasks, 0 findings), docs:promotion, actionlint, Docker image (HTTP 200, uid 1000), compose PostgreSQL 16.15 — all PASS, recorded as executed checks in `.delivery/`. CI run: pending push.
 
 - 2026-11-02 `project-check --full`: lint, build and delivery contract passed (bootstrap).
@@ -55,4 +59,4 @@ None for M0. These open questions gate later milestones (see `docs/spec/02-PRD.m
 
 ## Next verified action
 
-Owner: approve commit and push of T-001. Then record the CI run URL and conclusion in the ledger, finish the run, and start T-002 (database core, R3).
+Start T-003 (RLS harness: non-owner app role, per-transaction tenant context, scope map). R4: independent review before integration.
