@@ -61,9 +61,10 @@ export async function contractViolations(db: pg.ClientBase): Promise<string[]> {
     `select k.conname as name, k.conrelid::regclass::text as src,
             k.confrelid::regclass::text as dst, k.confdeltype as deltype,
             array(select sa.attname::text || '->' || da.attname::text
-                  from unnest(k.conkey, k.confkey) u(c, rc)
+                  from unnest(k.conkey, k.confkey) with ordinality u(c, rc, o)
                   join pg_attribute sa on sa.attrelid = k.conrelid and sa.attnum = u.c
-                  join pg_attribute da on da.attrelid = k.confrelid and da.attnum = u.rc) as pairs
+                  join pg_attribute da on da.attrelid = k.confrelid and da.attnum = u.rc
+                  order by u.o) as pairs
      from pg_constraint k join pg_namespace n on n.oid = k.connamespace
      where k.contype = 'f' and n.nspname not in ('pg_catalog','information_schema','drizzle')
      order by 2, 1`,
