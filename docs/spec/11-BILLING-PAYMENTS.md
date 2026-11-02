@@ -1,0 +1,119 @@
+# Billing, Payments, Ledger — Clinic Dashboard
+
+## Document Control
+
+| Field | Value |
+|---|---|
+| Accountable owner | Finance owner |
+| Status | In Review |
+| Version / updated | kit v0.7 / 2026-11-02 (history: review rounds 1–5, `docs/research/reviews/`) |
+| Sources | DECISION-REGISTER B-01–B-19, A-01–A-15, H-09; SESSION-HANDOFF §§3–4; COMPLIANCE research §2–3; CLINIC-SYSTEM-NEEDS research §6.3 |
+
+Two money domains exist and stay separate: (1) the **clinic's** money with its patients (this document's main subject); (2) the **vendor's** monthly server-fee billing of tenants (P-14, BILL-20).
+
+## Requirements — clinic money
+
+| ID | Rule | Owner | Source | Status |
+|---|---|---|---|---|
+| BILL-1 | Initial selected treatment is paid before it starts; products handed over after payment | Finance owner | B-01 | Decision |
+| BILL-2 | Partial payment on an invoice is allocated to items in proportion to value after discount, excluding tax; residual rupiah by largest remainder | Finance owner | B-07; Kliniknuma RG-04 | Decision |
+| BILL-3 | Additional treatment: may start before payment when FO confirms; paid from balance or by FO (incl. in-room EDC/QRIS); unpaid at close → patient receivable shown on next visit; owner write-off recorded; no booking block | Finance owner | B-01 | Decision |
+| BILL-4 | Consultation fee: charged when nothing bought; waived with a qualifying purchase on that visit; no retroactive waiver; re-charged from refund when all qualifying purchases fully refunded; not charged for package-session-only or eligible control visits without new complaint | Finance owner | B-02 | Decision |
+| BILL-5 | Free control: per item count and validity (default 1, until control date + 7 days); treatment-caused extra controls free | Finance owner | B-02 | Decision |
+| BILL-6 | Tax category per item (`exempt_medical`, `taxable_service`, `taxable_goods`, `non_object`) with basis; snapshot on line and per package session; VAT only while PKP; 12% × DPP 11/12 when taxable; VAT tax point is the earlier of payment received for, or delivery of, a taxable item (A-12); consumer prices are VAT-inclusive and the base is derived (fixed rule, not a setting); VAT computation for a PKP tenant is enabled only after the tax adviser's written advice (Q-05) is recorded | Finance owner | A-06, A-07, A-12; PMK 131/2024 | Adopted recommendation (pending tax adviser) |
+| BILL-7 | Package session value: equal split for single-treatment packages; proportional to normal prices for mixed packages | Finance owner | B-03 | Decision |
+| BILL-8 | Session redeemable only when cumulative payment covers its full allocated value; mixed packages: patient chooses within paid value and doctor's stages | Finance owner | B-03 | Decision |
+| BILL-9 | Minimum DP = first session value, or the greater of that and the package's optional Minimum DP %; installments enabled by default per package, no binding schedule, interest or late fee; an optional reminder-only schedule (PR-96) creates no receivable, journal, interest or entitlement | Finance owner | B-03 | Decision |
+| BILL-10 | Package validity required, default 365 days from purchase (SET-8: 30–1095 days); `validity_end` computed and snapshotted at sale; expiry or pre-expiry cancellation: paid-unused → patient balance, unpaid remainder cancelled (not debt), package closed | Finance owner | B-03 | Decision |
+| BILL-11 | Substitution only with doctor approval; unused session value is credit; higher difference paid; lower difference to balance; no sharing between patients unless the package template enables family sharing (PR-93): named beneficiaries redeem sessions; the package owner keeps ownership, refunds and the balance from expiry or cancellation (B-04); sharing creates no sale or cash; redemption posts performance once; commission follows the redemption like any session | Finance owner | B-03 | Decision |
+| BILL-12 | Patient balance never expires; pays any item; cash refund only as owner/manager-approved recorded exception (approver per tenant setting) | Finance owner | B-04 | Decision |
+| BILL-13 | Booking DP optional per treatment, default off; applied on arrival; patient change ≥ 24 h → balance; no-show or < 24 h → forfeited; clinic cancellation → balance, or cash refund on patient request without the B-04 exception approval (clinic-caused) | Finance owner | B-05 | Decision |
+| BILL-14 | Interrupted treatment: medical or clinic stop → not counted (reschedule free or move payment to balance); patient stop → counted, no refund; actual materials always recorded | Finance owner | B-06 | Decision |
+| BILL-15 | Commission (B-07 plus B-10, B-12, B-13, B-19): staff identity (not account) earns; role defaults + individual override (replaces); % or fixed per scope; % basis = allocated payment after discount excl. tax; fixed requires item fully paid; performer also requires counted completion; contributions: guiding BC, closing BC, new patient, performer; same person may earn each actual contribution once; monthly approval and mark-paid; refund reduces unpaid or deducts next month; rule snapshots; staff see own; consultation commission optional, default none, paid consultations only; doctors salaried outside system; deposit top-up alone earns nothing; guiding BC applies to all transactions under the care plan until completed or replaced, reassignment recorded; new-patient commission on first-visit transactions only; performer = who actually performed; no commission on written-off items; owner bonus separate; paid value moved to balance adjusts commission like a refund and later spending earns normally; deductions larger than next month carry forward; per-recipient export for the tax adviser | Finance owner | B-07, B-10, B-12, B-13, B-19, A-09 | Decision + adopted recommendation |
+| BILL-16 | Package sold at branch A redeemed at B: sales KPI and closing/guiding BC commission at A (BCs paid regardless of branch); execution, performer commission, materials and recognised revenue at B; packages and invoices carry `sold_branch_id` | Finance owner | B-08, B-17, A-04 | Adopted recommendation (pending accountant) |
+| BILL-17 | Payment methods: cash, QRIS, EDC card, bank transfer, payment link/VA through the payment port (mock adapter in Release 1; provider OPEN, Q-14), patient balance; the clinic is merchant of record with its own gateway account; item descriptions sent to gateways are generic (no treatment names); webhooks idempotent | Finance owner | Kliniknuma RG-39; H-09 | Decision (H-10) |
+| BILL-18 | Shift close per cashier per branch: expected by tender vs counted, variance with reason; any non-zero cash variance goes to the approvals inbox (fixed rule, no tolerance setting) | Finance owner | Kliniknuma TASK-038; B-16 | Adopted recommendation |
+| BILL-19 | Receipts numbered per branch per month, immutable, printable and sendable by WhatsApp link (no clinical content) | Finance owner | Kliniknuma UX-15 | Proposal |
+| BILL-21 | Refund of a product or treatment goes to patient balance by default; cash only as approved exception; consultation fee re-charged from the refund when every qualifying purchase is refunded | Finance owner | B-11, B-02 | Adopted recommendation |
+| BILL-22 | Additional treatment record: authorizing clinician, patient agreement, FO who released before payment, accountable collector; unpaid remainder → patient receivable after WhatsApp-bill fallback; WhatsApp bill shows amount, reference, clinic QRIS/bank and an authenticated link, never treatment names | Finance owner | B-01, B-18, W-05 | Adopted recommendation |
+| BILL-23 | Write-off: requested by FO/finance, approved by owner; owner may write off alone with reason; no commission on written-off items | Finance owner | B-14 | Adopted recommendation |
+| BILL-24 | Session lifecycle: available → reserved (booking/check-in) → redeemed only on counted outcome; medical or clinic stop returns it to available | Finance owner | B-15, B-06 | Adopted recommendation |
+| BILL-25 | Interrupted paid single treatment not continued, and cheaper substitution difference, move paid value to patient balance (entry types `from_interrupted_treatment`, `from_substitution`) | Finance owner | B-06, B-03, B-10 | Decision + adopted recommendation |
+| BILL-26 | Inventory at moving average cost per item per branch (A-13) | Finance owner | A-13 | Adopted recommendation (pending accountant) |
+| BILL-27 | Revenue is recognised only on performance (treatment counted, product handed over); every settlement first credits a contract liability per invoice line (A-11) | Finance owner | A-11 | Adopted recommendation (pending accountant) |
+| BILL-28 | Manual discounts (PR-72): limit evaluated per invoice line on the VAT-inclusive price, DPP and VAT derived after the discount (BILL-6); an approver approves only within their own limit, otherwise the owner; promo codes (PR-77) are pre-approved discounts, do not consume manual limits and are reported separately; a discount is locked once any payment is allocated to the line (a later change = refund to balance + new line); a pending discount blocks payment of that line only; a package discount scales session values pro rata (BILL-7); discounts reduce K3 and the commission basis as allocated | Finance owner | P-18 | Adopted recommendation |
+| BILL-29 | Mock adapter (PR-68) runs only in non-production environments and demo tenants; in a production tenant whose provider is still `mock`, QRIS/VA/link channels are hidden and only cash, EDC, transfer and balance are offered; a simulated payment or allocation never satisfies BILL-1, BILL-8, visit close or receivable checks and never enters K1, sub-ledgers or commission | Finance owner | H-10 | Decision |
+| BILL-30 | Supplier returns credit stock at moving average cost and create a supplier credit expectation; operational expenses post per BILL-37 (PR-75, PR-79) | Finance owner | P-18 | Adopted recommendation |
+| BILL-34 | Supplier payables (PR-90): a goods receipt credits **Goods received not invoiced (GRNI)**; the supplier invoice moves GRNI to Accounts payable (difference to purchase price variance); payment Dr AP / Cr Cash/Bank; an applied supplier credit note Dr AP / Cr Supplier receivable; each step once, idempotent, duplicate supplier-invoice numbers per supplier refused; supplier balance = invoices − payments − applied credits with a monthly roll-forward per supplier; reversals by credit note or payment reversal, never deletion; payment allocation is idempotent by key and concurrent payments cannot over-allocate an invoice | Finance owner | P-24 | Adopted recommendation (pending accountant) |
+| BILL-35 | Depot transfers inside a branch move quantity and value between depots at moving average cost with no expense or revenue; inter-branch transfers keep the existing posting | Finance owner | PR-89, A-13 | Adopted recommendation |
+| BILL-36 | Promo codes (PR-77): quota is reserved when the code is applied to an open invoice line, consumed when the line is paid, released on void, removal or refund to balance; usage rows are unique per invoice line (one promo per line) and reference the code version; a code version is immutable once used (edits create a new version); quota is released only on void or line removal before payment, or on a refund of the **full** line value (to cash or balance); any partial refund keeps the usage consumed; quota checks are atomic | Finance owner | P-24 | Adopted recommendation |
+| BILL-37 | Expenses (PR-79): recorded with amount, branch, category/account, business date, receipt, funding (petty cash, cash, bank, unpaid); posting Dr Branch expense / Cr funding (or, when unpaid, Accounts payable through a payable document of type `expense` created with the expense and linked to its supplier or payee; settlement Dr Accounts payable / Cr Cash/Bank through the same supplier-payment allocation flow, never a second expense); corrections by reversal | Finance owner | P-24 | Adopted recommendation (pending accountant) |
+
+## Requirements — vendor money (separate domain, P-14)
+
+| ID | Rule | Owner | Source | Status |
+|---|---|---|---|---|
+| BILL-20 | Vendor billing: no subscription plans; each live tenant pays a monthly server fee (default Rp1,000,000, VAT-exclusive) set per tenant with reason and effective month (vendor finance proposes, platform owner approves); a fee change must take effect in a month after the last issued invoice; issued invoices never change | Product owner (Paduka Ongki) | BR-4, PR-61 | Decision |
+| BILL-31 | Server-fee invoices: first = floor(fee of go-live month × days from go-live date inclusive to month end ÷ days in month), issued on go-live, due 10 days later; afterwards issued on the 1st, due on the 10th, in advance; states issued → paid / waived / credited; a waiver or credit note is a new document (vendor finance requests, platform owner approves, reason); suspended months are billed unless waived; at exit billing stops at the exit date and the advance-billed remainder is credited per day; a double settlement becomes a credit on the next invoice; Numa Klinik is billed from go-live like any tenant unless the owner records a pilot waiver (Q-16) | Product owner (Paduka Ongki) | P-14, P-20 | Decision |
+| BILL-32 | Server-fee payment attempts (TD-42): one open attempt per invoice with its own `reff_id` persisted before the AutoLaris call; a new attempt only after Advice proves the previous one expired or failed; an unknown create result is resolved by Advice, never by a new create; a late settlement on an expired attempt still settles the invoice once and any second settlement becomes a credit; paid = settled amount (+ recorded PPh 23 withholding slip if the tax adviser confirms it applies) ≥ invoice amount; AutoLaris channel fee shown from `list_payment` and borne as the vendor decides (Q-16) | Product owner (Paduka Ongki) | P-14; autolaris-h2h rules 4, 7, 8 | Decision |
+| BILL-33 | VAT on the server fee only when the vendor entity is PKP (12% × DPP 11/12); faktur issued by the vendor's own process outside the product; tax adviser confirms withholding and VAT treatment | Finance owner | S-04 | Unknown |
+
+## Posting Map Draft (accounting step 2; accountant must sign before journals are exported — A-02, A-14, PRD Q-06)
+
+Two event families (A-11). **Settlement** moves money into a liability; **performance** moves liability into revenue. VAT (A-12) is credited at the earlier of payment or delivery of a taxable item. Liabilities are carried net of VAT; patient balance is carried gross (what the patient may spend). Every posting row has a domain event in `18` TD-50.
+
+| Family | Event | Debit | Credit |
+|---|---|---|---|
+| Settlement | Payment allocated to an invoice line (treatment, product, consultation) | Cash/Bank by method (gateway/QRIS/EDC: Gateway clearing) | Contract liability — paid not delivered (+ VAT payable for the part of a taxable line whose VAT was not already recognised at an earlier delivery, PKP; the tax point is stored per line) |
+| Settlement | Payment collects a patient receivable | Cash/Bank or Gateway clearing | Patient receivable (no new revenue or VAT; commission uses the originating line allocation) |
+| Settlement | Payment allocated to a package | Cash/Bank | Contract liability — packages (+ VAT payable on taxable session share, PKP) |
+| Settlement | Balance top-up | Cash/Bank | Contract liability — patient balance (no VAT until used) |
+| Settlement | Balance used for an invoice line | Contract liability — patient balance | Contract liability — paid not delivered (+ VAT payable for taxable line, with matching reduction of the balance liability) |
+| Settlement | Balance used for a package installment | Contract liability — patient balance | Contract liability — packages (+ VAT as above) |
+| Settlement | Booking DP received | Cash/Bank | Contract liability — booking DP (+ VAT payable if the booked item is taxable, PKP; pending Q-05) |
+| Settlement | Gateway settlement received | Bank + Merchant fee expense | Gateway clearing |
+| Settlement | Booking DP applied on arrival | Contract liability — booking DP | Contract liability — paid not delivered |
+| Settlement | Booking DP forfeited | Contract liability — booking DP | Other income (A-10, pending accountant; VAT on forfeit pending Q-05) |
+| Settlement | Booking DP moved to balance | Contract liability — booking DP (+ VAT payable reversed with its document, or kept as `vat_settled` per tax advice) | Contract liability — patient balance (gross DP value) |
+| Cash out | Booking DP refunded after clinic cancellation (no B-04 exception approval) | Contract liability — booking DP (+ VAT payable reversed) | Cash/Bank |
+| Settlement | Unpaid remainder converted to receivable | Patient receivable | Contract liability — paid not delivered (VAT already credited at delivery if delivered first) |
+| Performance | Treatment counted / product handed over / consultation charged | Contract liability — paid not delivered | Revenue (executing branch) (+ VAT payable if delivered before payment, PKP) |
+| Performance | Package session counted | Contract liability — packages (session value) | Revenue (executing branch) |
+| Reclass | Package expiry or cancellation (paid-unused) | Contract liability — packages (net) + VAT payable (taxable share, PKP; VAT credit document) | Contract liability — patient balance (gross) |
+| Reclass | Interrupted paid single treatment not continued | Contract liability — paid not delivered (net) + VAT payable (taxable share, PKP; VAT credit document) | Contract liability — patient balance (gross) |
+| Reclass | Cheaper substitution difference | Contract liability — packages (net) + VAT payable (taxable share, PKP; VAT credit document) | Contract liability — patient balance (gross) |
+| Reclass | Refund of undelivered item to balance (default) | Contract liability — paid not delivered (net) + VAT payable (taxable share, PKP; VAT credit document) | Contract liability — patient balance (gross) |
+| Reversal | Refund of delivered item to balance | Revenue (+ VAT payable reversal, PKP) | Contract liability — patient balance |
+| Reversal | Consultation fee re-charged on full refund | Contract liability — patient balance (or refund liability) | Revenue — consultation |
+| Cash out | Cash refund exception | Contract liability — patient balance | Cash/Bank |
+| Credit | Write-off | Bad-debt expense | Patient receivable |
+| Stock | Material consumed / waste | Cost of materials / Waste expense (branch, moving average) | Inventory (branch) |
+| Stock | Goods receipt | Inventory (+ non-creditable input VAT) + VAT input (creditable share, PKP; pending Q-05) | Goods received not invoiced (GRNI); cash purchases without a supplier invoice: Cash |
+| Stock | Product handed over (and reverse on return) | Cost of goods sold (moving average) | Inventory (branch) |
+| Stock | Transfer A → B | Inventory B | Inventory A |
+| Inter-branch | Package sold at A, session counted at B | Contract liability — packages (A) → Inter-branch clearing (A) | Inter-branch clearing (B) → Revenue (B) |
+| Commission | Commission accrued | Commission expense | Commission payable |
+| Commission | Commission adjustment (refund or moved to balance) | Commission payable (or receivable from staff if paid) | Commission expense |
+| Commission | Commission paid | Commission payable | Cash/Bank |
+
+Additional rows pending accountant (A-02): **Goods receipt** — Dr Inventory / Cr GRNI (a cash purchase records a supplier invoice and payment at once, so GRNI is cleared in the same transaction and no AP remains); **Supplier invoice** — Dr GRNI (± Purchase price variance) / Cr Accounts payable; **Supplier payment** — Dr Accounts payable / Cr Cash/Bank; **Depot transfer** — Dr Inventory (depot B) / Cr Inventory (depot A), same value. **Supplier return** — Dr Supplier receivable (credit note) / Cr Inventory at moving average cost ± Purchase price variance; Cr VAT input when PKP. **Operational expense** (PR-79) — Dr Branch expense / Cr Petty cash, Cash, Bank, or Accounts payable (unpaid; settled later Dr AP / Cr Cash/Bank); reversal mirrors the original row.
+
+Notes: delivery before payment posts revenue once at delivery; the line's paid-not-delivered balance turns negative (unbilled receivable) until settled or converted to a receivable. If the tax adviser rules out a VAT reversal on moves to balance, the balance entry carries `vat_settled = true` and spending it creates no second VAT. Gateway fees are expenses, never a revenue reduction.
+
+Consequences: revenue never at payment; balance never becomes breakage income; cancelled unpaid package remainders are never receivables; each rupiah is recognised once even when it passes through balance.
+
+## Roll-forwards (accounting step 1)
+
+- Paid-not-delivered: opening + settlements (payments, balance used, DP applied, receivable conversions) − performance − reclass to balance − refunds = closing.
+- Package liability: opening + paid allocations (incl. balance used) − counted sessions − moved to balance (expiry, cancellation, cheaper substitution) − refunds = closing.
+- Patient balance: opening + top-ups + from expiry/cancel + from interrupted treatment + from substitution + refunds to balance + DP moved − used − cash refunded = closing.
+- VAT payable (PKP): opening + VAT at tax point (payment or earlier delivery) − VAT reversals (refunds, moves to balance) − input VAT credited − VAT paid = closing.
+- Gateway clearing: opening + gateway payments − settlements − fees = closing (should trend to zero).
+- Inter-branch clearing: nets to zero across branches each month.
+- Booking DP: opening + received − applied − forfeited − moved − refunded = closing.
+- Commission payable: opening + accrued − adjustments − paid = closing.
+- Receivables: opening + created − collected − written off = closing.
+
+## Exports
+
+Step 1: sub-ledger and transaction CSV (payments, invoices, liabilities, commissions per recipient, stock movements). Step 2 (after signed posting map): CSV journal (date, branch, account, debit, credit, reference). Coretax XML for PKP tenants (Must, PR-98, gated by tax-advice evidence).

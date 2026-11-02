@@ -1,0 +1,23 @@
+{
+  "activeRun": null,
+  "lastCheckpoint": {
+    "eventId": "442597b5273641df9bb76ca755c6318f",
+    "head": null,
+    "note": "Research consolidated into docs/research; planning folders retired to /data/backups",
+    "runId": null,
+    "state": "READY",
+    "time": "2026-11-02T09:04:33Z",
+    "type": "checkpoint"
+  },
+  "lastRun": {
+    "finishedAt": "2026-11-02T08:48:52Z",
+    "result": "PASS",
+    "runId": "RUN-20261102T084839Z-ae0a1e76"
+  },
+  "observedHead": null,
+  "observedState": "READY",
+  "project": "clinic-dashboard",
+  "schemaVersion": 1,
+  "statusAuthority": "STATUS.md",
+  "updatedAt": "2026-11-02T09:04:33Z"
+}

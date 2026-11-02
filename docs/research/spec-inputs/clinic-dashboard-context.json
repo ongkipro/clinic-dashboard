@@ -1,0 +1,26 @@
+{
+  "owner": "Product owner (Paduka Ongki)",
+  "facts": [
+    {"id":"CTX-1","dimension":"Product surface","statement":"Multi-tenant web SaaS for Indonesian beauty clinics: staff admin dashboard (front office, BC, doctor, room, pharmacy, cashier, manager, owner, finance, CS), public booking page; patient app deferred","status":"Decision","confidence":"High","evidence":"DECISION-REGISTER.md P-01, P-02; kliniknuma PRD REQ-001-REQ-023","owner":"Product owner","recheck_trigger":"Scope change in DECISION-REGISTER.md"},
+    {"id":"CTX-2","dimension":"Operating entities","statement":"Tenant = one brand = one legal entity (PT) with 1-5 branches in the first segment; vendor entity for NIB/PSE/Meta not yet named","status":"Decision","confidence":"High","evidence":"DECISION-REGISTER.md P-02-P-04, S-04","owner":"Product owner","recheck_trigger":"S-04 decided or segment change"},
+    {"id":"CTX-3","dimension":"Target markets","statement":"Indonesia only; staff and patients in Indonesia; WIB/WITA/WIT branches","status":"Decision","confidence":"High","evidence":"DECISION-REGISTER.md P-04","owner":"Product owner","recheck_trigger":"New country"},
+    {"id":"CTX-4","dimension":"Users and data subjects","statement":"Clinic staff, patients incl. minors via guardian; health data, clinical photos, NIK are specific personal data","status":"Observed","confidence":"High","evidence":"kliniknuma PRD Users table; UU 27/2022","owner":"Privacy owner","recheck_trigger":"New data category"},
+    {"id":"CTX-5","dimension":"Storage, processing, backup and support locations","statement":"Vultr Singapore + Coolify + Cloudflare chosen; clinical RME data and backups must be stored in Indonesia (Permenkes 24/2022 Pasal 20, 22); Indonesian provider not yet chosen","status":"Decision","confidence":"Medium","evidence":"DECISION-REGISTER.md H-01, H-02; COMPLIANCE research §5","owner":"Engineering owner","recheck_trigger":"H-02b provider chosen or legal opinion received"},
+    {"id":"CTX-6","dimension":"Processors","statement":"Meta WhatsApp Cloud API (we are Tech Provider), payment gateway (Midtrans first, Xendit second per kliniknuma RG-39), Cloudflare, Vultr, Indonesian host, SATUSEHAT (Kemenkes)","status":"Decision","confidence":"Medium","evidence":"DECISION-REGISTER.md W-01-W-03, S-01; kliniknuma PLAN RG-39","owner":"Engineering owner","recheck_trigger":"Provider change"},
+    {"id":"CTX-7","dimension":"Sector","statement":"Healthcare facility software (RME system under Permenkes 24/2022) for aesthetic clinics; vendor must register as PSE and SATUSEHAT RME provider","status":"Decision","confidence":"High","evidence":"DECISION-REGISTER.md S-01-S-03; COMPLIANCE research §4-5","owner":"Compliance owner","recheck_trigger":"Regulation change"},
+    {"id":"CTX-8","dimension":"Commerce, payment and tax roles","statement":"Clinic sells services/products/packages; patient balance, installments, booking DP; per-item VAT category; PKP threshold Rp4.8B; tenant pays SaaS subscription (model OPEN)","status":"Decision","confidence":"Medium","evidence":"DECISION-REGISTER.md B-01-B-05, A-01-A-08","owner":"Finance owner","recheck_trigger":"Accountant/tax review result"},
+    {"id":"CTX-9","dimension":"AI role","statement":"No AI diagnosis or skin analysis in release 1; optional on-demand AI summaries are deferred","status":"Decision","confidence":"High","evidence":"SESSION-HANDOFF §6 exclusions","owner":"Product owner","recheck_trigger":"AI feature proposed"},
+    {"id":"CTX-10","dimension":"Locales","statement":"Indonesian UI (id-ID), IDR integer rupiah, branch timezone","status":"Decision","confidence":"High","evidence":"kliniknuma PRD market context","owner":"Design owner","recheck_trigger":"New locale"},
+    {"id":"CTX-11","dimension":"Accessibility","statement":"WCAG 2.2 AA target; tablet touch targets >= 44px in clinical rooms","status":"Proposal","confidence":"Medium","evidence":"kliniknuma DESIGN.md UI-4","owner":"Design owner","recheck_trigger":"Pilot feedback"},
+    {"id":"CTX-12","dimension":"Contractual commitments","statement":"No SLA promised yet; pilot clinic not chosen","status":"Unknown","confidence":"Low","evidence":"SESSION-HANDOFF §8","owner":"Product owner","recheck_trigger":"Pilot contract"}
+  ],
+  "capabilities": {
+    "persistence": true,
+    "external-integration": true,
+    "multiple-components": true,
+    "maintained-deployment": true,
+    "schema-migration": true,
+    "production-service": true,
+    "business-commitments": true
+  }
+}

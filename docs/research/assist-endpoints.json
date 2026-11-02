@@ -1,0 +1,1145 @@
+{
+ "Absences": [
+  "staff/${e}"
+ ],
+ "AdminBookingRefundRequests": [
+  "approveRefund",
+  "getListRefund",
+  "getOnlineBookingRefundsByHospital",
+  "rejectRefund",
+  "requestOnlineBookingRefund",
+  "updateDetail"
+ ],
+ "AdminBookings": [
+  "accountBank",
+  "cancelDisburse",
+  "disburse",
+  "getList",
+  "getListOATransaction",
+  "listByDate",
+  "payAesta",
+  "withdrawDetail"
+ ],
+ "Akreditasi": [
+  "getData",
+  "getDataPerKriteria",
+  "getProgress",
+  "save"
+ ],
+ "AkreditasiPuskesmas": [
+  "getData",
+  "getDataPerKriteria",
+  "getProgress",
+  "save"
+ ],
+ "AnestesiBedahs": [
+  "streak/${e}"
+ ],
+ "AntrolFKTL": [
+  "checkInOnSite",
+  "dashboardBpjs",
+  "getLogsAntrol",
+  "getTaskId",
+  "resendTaskId",
+  "wsBpjs/referensiJadwalDokter"
+ ],
+ "AssesmentSedasiAnestesis": [
+  "insert",
+  "updateAssesmentSedasiAnestesi"
+ ],
+ "AssistPlus": [
+  "${e}/status",
+  "account-bank-history",
+  "activate-assistme",
+  "activate-assistme-v2",
+  "close",
+  "countGPOS",
+  "countOnlinePrescription",
+  "countProdia",
+  "countTeleconsult",
+  "hide",
+  "invitation-assistme",
+  "list-patient",
+  "oa-activation",
+  "onboarding-step",
+  "overview-patient",
+  "overview-patient-oa",
+  "overviewTransaksiPaketLayanan",
+  "patient-charge-option",
+  "request-module",
+  "riwayatTransaksiPaketLayanan",
+  "testimoni-hospital"
+ ],
+ "AsuhanKeperawatans": [
+  "insert",
+  "streak/${a}",
+  "updateAsuhanKeperawatans"
+ ],
+ "BPJSKBK": [
+  "getLaporanKbk"
+ ],
+ "Billings": [
+  "createExternalAppointment",
+  "createExternalBilling",
+  "createExternalJonda",
+  "createExternalLayananTambahan",
+  "createExternalReminderWa",
+  "createExternalSms",
+  "createExternalWa",
+  "getInvoice",
+  "previewDiscount"
+ ],
+ "BlastBroadcasts": [
+  "activate-broadcast",
+  "broadcast-list",
+  "broadcast-types",
+  "deactivate-broadcast",
+  "patient-age-ranges",
+  "send-custom",
+  "send-invitation-assistme",
+  "send-pasien",
+  "send-promo",
+  "template"
+ ],
+ "BodyCheckings": [
+  "insert"
+ ],
+ "BpjsPcareRegistrationSources": [
+  "dashboard-detail",
+  "dashboard-detail-export",
+  "dashboard-summary",
+  "re-sync-by-range"
+ ],
+ "BpjsServices": [
+  "Sisrute/GetFaskesRujukan",
+  "Sisrute/GetKriteriaRujukan",
+  "cariDiagnosa",
+  "getAlergi",
+  "getDpho",
+  "getFaskesRujukanKhusus1",
+  "getFaskesRujukanKhusus2",
+  "getFaskesRujukanSubSpesialis",
+  "getPendaftaranProviderList",
+  "getPesertaByJenisKartu",
+  "getPrognosa",
+  "getRujukan",
+  "listDokter",
+  "listReferensiClubProlanis",
+  "listReferensiKesadaran",
+  "listReferensiKhusus",
+  "listReferensiPoli",
+  "listReferensiSarana",
+  "listReferensiSpesialis",
+  "listReferensiStatusPulang",
+  "listReferensiSubspesialis",
+  "listReferensiTindakan"
+ ],
+ "BpjsSkriningPesertas": [
+  "${t}/peserta/${a}/nokartu",
+  "${t}/prolanis/dm/${a}",
+  "${t}/prolanis/ht/${a}"
+ ],
+ "BpjsSkriningRekaps": [
+  "dashboard/${e}${t}"
+ ],
+ "BroadcastHistories": [
+  "broadcast-history"
+ ],
+ "CapaianAntrolFktp": [
+  "capaian-antrol-bpjs",
+  "laporan-capaian-antrol-bpjs"
+ ],
+ "CapaianSatuSehat": [
+  "detail/${e}"
+ ],
+ "Claims": [
+  "updateStatus"
+ ],
+ "CovidImmunization": [
+  "\u00b7"
+ ],
+ "DailyDashboards": [
+  "\u00b7"
+ ],
+ "DashboardReportSubscriptions": [
+  "createSubscription",
+  "getSubscriptions",
+  "updateSubscription/${a}"
+ ],
+ "Dashboards": [
+  "getDashboardData"
+ ],
+ "DeteksiDiniAsamUrat": [
+  "insert"
+ ],
+ "DeteksiDiniDiabetesMelitus": [
+  "insert"
+ ],
+ "DeteksiDiniHipertensi": [
+  "insert"
+ ],
+ "DeteksiDiniJantung": [
+  "insert"
+ ],
+ "DeteksiDiniKanker": [
+  "insert"
+ ],
+ "DeteksiDiniObesitas": [
+  "insert"
+ ],
+ "DeteksiDiniPPOK": [
+  "insert"
+ ],
+ "DeteksiDiniPendengaran": [
+  "insert"
+ ],
+ "DeteksiDiniPenglihatan": [
+  "insert"
+ ],
+ "DeteksiDiniStroke": [
+  "insert"
+ ],
+ "DeteksiDiniTalasemia": [
+  "insert"
+ ],
+ "DigitalCards": [
+  "history",
+  "save"
+ ],
+ "DigitalPayments": [
+  "checkStatusDigipay",
+  "delete/${e}",
+  "getDetail/${e}",
+  "getLinkWa",
+  "saveDataPayment"
+ ],
+ "DischargePlannings": [
+  "streak/${e}"
+ ],
+ "Dkonsuls": [
+  "checkWebinar",
+  "getListDokter",
+  "getMasterClass/${e}",
+  "getMasterSpecialist/${e}"
+ ],
+ "Dokters": [
+  "${e}/updateDokterDetail",
+  "addSignature",
+  "getDokterDetail",
+  "getDokterbyKeywordKamarmedis",
+  "getPraktekRs",
+  "importDocters",
+  "postDoctorDetail",
+  "postDokterDetail",
+  "requestOTP"
+ ],
+ "Domisilis": [
+  "kabupaten",
+  "kecamatan",
+  "kelurahan",
+  "provinsi"
+ ],
+ "ExportHistories": [
+  "bulk",
+  "list",
+  "send-email"
+ ],
+ "Externals": [
+  "${a}/attendances",
+  "addTicket",
+  "addTicketChat",
+  "addTicketGroupChat",
+  "closeTicket",
+  "dKonsulAuth",
+  "getAllTicket",
+  "getAllUnreadChat",
+  "getChatList",
+  "getCurrentTime",
+  "getGroupChatList",
+  "loginV2",
+  "openAI/generateICD9CM",
+  "openAI/prescription",
+  "openAI/soap",
+  "organization",
+  "reopenTicket",
+  "set-approval",
+  "shift-organization/${e}",
+  "summary-attendance",
+  "updateReadChat",
+  "updateReadGroupChat"
+ ],
+ "FasilitasKamars": [
+  "getAll"
+ ],
+ "FasilitasRs": [
+  "getAll"
+ ],
+ "FeedbackAIs": [
+  "\u00b7"
+ ],
+ "FormAksesExportChurn": [
+  "\u00b7"
+ ],
+ "FormEdukasis": [
+  "insert",
+  "streak/${e}",
+  "updateFormEdukasi"
+ ],
+ "FormNeonatus": [
+  "insert",
+  "updateFormNeonatus"
+ ],
+ "FormPersalinan": [
+  "insert",
+  "updateFormPersalinan"
+ ],
+ "FormTumbuhKembang": [
+  "insert"
+ ],
+ "GPOS": [
+  "mapOrderToStock/${e}",
+  "previous-mapping"
+ ],
+ "Gelars": [
+  "getGelar",
+  "getPrefixAll",
+  "getSuffixAll"
+ ],
+ "GposLiteRelations": [
+  "getRelations"
+ ],
+ "Halangans": [
+  "postHalanganDetail",
+  "postHalanganbyRs"
+ ],
+ "HasilOperasis": [
+  "insert",
+  "updateHasilOperasi"
+ ],
+ "HistoryRoomInpatients": [
+  "insert"
+ ],
+ "ICD10s": [
+  "getByKeyword"
+ ],
+ "IdentifikasiDisabilitas": [
+  "insert"
+ ],
+ "IntervensiFisioterapi": [
+  "createNewInstance"
+ ],
+ "Invitation": [
+  "\u00b7"
+ ],
+ "JadwalOperasis": [
+  "getJadwal",
+  "insert"
+ ],
+ "JanjiGroupPatients": [
+  "${e}/delete",
+  "${e}/edit"
+ ],
+ "JanjiGroups": [
+  "${e}/delete",
+  "getListV2"
+ ],
+ "Janjis": [
+  "addNurseNote",
+  "checkUsedAppointmentPermonth",
+  "confirmedStatusV2",
+  "count-appointment",
+  "countAppointmentForClinicaFree",
+  "countAppointmentForTrial",
+  "createSepFromAppoint",
+  "engageStatus",
+  "failedStatus",
+  "getAppointForCreateSEP",
+  "getAvgDoctorWaitingTimePerMonth",
+  "getAvgEngageTimePerMonth",
+  "getAvgPharmacyWaitingTimePerMonth",
+  "getDropdownAppoint",
+  "getJanjiDetail",
+  "getJanjiListByHospital",
+  "getJanjiListByHospitalAndPractices",
+  "getJanjiListByHospitalPracticeAndDates",
+  "getListKondisiAwalPasien",
+  "getListPengantar",
+  "getPracticeAvailable",
+  "getSepRencanaKontrol/${e}",
+  "listAppointmentSatuSehat",
+  "pendingStatus",
+  "performa-staff-registrasi-bpjs",
+  "postAppointment",
+  "postAppointmentFromCounter",
+  "postManualAppointment",
+  "practice-ranap",
+  "privata/engaged",
+  "reschedule",
+  "rescheduleV2",
+  "send-waProdia",
+  "succeedStatus",
+  "syncPrescription",
+  "syncSepToAppoint",
+  "updateAppointment/${e}",
+  "updateIdentitasPengantar",
+  "updateKondisiAwalPasien",
+  "waitingStatus",
+  "\u00b7"
+ ],
+ "KAKHPStocks": [
+  "${e}",
+  "${e}/DepotStocks",
+  "${e}/DepotStocks/${a}",
+  "${e}/deleteDetail",
+  "auditAKHPStock",
+  "deleteByAKHPId",
+  "getAlmostExpiredAKHP",
+  "getExpireDetail1",
+  "getItemsWithExpiredDate",
+  "getList",
+  "getStockTotalAndDepotInfo",
+  "isBarcodeExists",
+  "postDetail",
+  "stockCorrection",
+  "updateDetail",
+  "usedByPatientTypeReport",
+  "\u00b7"
+ ],
+ "KAKHPs": [
+  "${e}",
+  "postAKHPDetail"
+ ],
+ "KApprovals": [
+  "${e}",
+  "addUser",
+  "authenticate",
+  "authenticateV2",
+  "changePassword",
+  "getListUser",
+  "isApproval",
+  "toggleApproval"
+ ],
+ "KBodyMarkers": [
+  "\u00b7"
+ ],
+ "KConfigAccounts": [
+  "${e}",
+  "checkExist",
+  "getNewFeatureFlag",
+  "getReportSkpConfig",
+  "importStaffs",
+  "informUserHakAksesChanged",
+  "inviteMember",
+  "listUserActivation/${e}",
+  "saveReportSkpConfig",
+  "setNewFeatureFlag",
+  "updateDetail",
+  "updateImportStaff",
+  "updatePicConfig",
+  "updatePlgConfig",
+  "\u00b7"
+ ],
+ "KConfigs": [
+  "${a}/KConfigTemplateBillings",
+  "${a}/KConfigTemplateReports",
+  "${e}",
+  "${e}/editTaxFee",
+  "${e}/import-bridging-antrean-fktp-v2",
+  "${e}/importBpjsConfig",
+  "${e}/insertTaxFee",
+  "${e}/removeTaxFee/${a}",
+  "${e}/updateBpjsConfig",
+  "${e}/updateGposConfig",
+  "${e}/updateVclaimConfig",
+  "accept-terms-conditions",
+  "activeAddOn",
+  "activeOtpTeleconsult",
+  "ai-vera-status",
+  "bridging-antrean-fktl",
+  "bridging-antrean-fktp-v2",
+  "getBanner",
+  "getDokterBpjs",
+  "getPoliBpjs",
+  "mapAddOnsV2",
+  "pos-addons/trial",
+  "pos-tax",
+  "recalculateAccountCommissionData",
+  "requestTrialClinicaPro",
+  "setKerjaaPayroll",
+  "setTargetAntrol",
+  "submit-churn-access",
+  "trialQuotaAdjustment",
+  "upsertBiayaAdmin",
+  "upsertBiayaAdminOA",
+  "\u00b7"
+ ],
+ "KDiagnoses": [
+  "askAI",
+  "getDiagnose",
+  "getReport",
+  "\u00b7"
+ ],
+ "KDictionaries": [
+  "${e}",
+  "${e}/getRoleAction",
+  "deleteByKDictionaryId/${e}",
+  "updateByKDictionaryId/${e}",
+  "\u00b7"
+ ],
+ "KDoctorNoteTemplates": [
+  "postTemplate"
+ ],
+ "KEyesMarkers": [
+  "\u00b7"
+ ],
+ "KFaceMarkers": [
+  "add",
+  "streak/${e}"
+ ],
+ "KFiles": [
+  "${e}"
+ ],
+ "KHasilLabs": [
+  "${e}"
+ ],
+ "KImunisasi": [
+  "\u00b7"
+ ],
+ "KKegiatanKelompoks": [
+  "deleteKelompok",
+  "deletePesertaKelompok",
+  "tambahKelompok",
+  "tambahPesertaKelompok",
+  "\u00b7"
+ ],
+ "KMCUPlans": [
+  "${e}",
+  "insert"
+ ],
+ "KMRs": [
+  "${e}/deleteRujukan",
+  "getLockedStatus"
+ ],
+ "KMedicineStocks": [
+  "${e}/DepotStocks",
+  "${e}/DepotStocks/${a}",
+  "${e}/deleteDetail",
+  "checkMigueItem",
+  "count",
+  "deleteByMedicineId",
+  "generateDepot",
+  "generateTxItem",
+  "getAlmostExpiredMedicines",
+  "getItemsWithExpiredDate",
+  "getList",
+  "getMappedObatBpjs/${e}",
+  "getMasterData",
+  "getMedicinesByWarningStockAndUnit",
+  "getObatByHospital/${e}",
+  "getWarningStockByUnits",
+  "mappingObatBpjs",
+  "migueItem",
+  "migueItemDetail",
+  "postDetail",
+  "removeMappingObatBpjs",
+  "requestMasterData",
+  "requestMasterData/${a}",
+  "updateDetail",
+  "updateExpiredDateOrBatchNumber",
+  "updateQueuePharmacyPrescription",
+  "usedByPatientTypeReport",
+  "\u00b7"
+ ],
+ "KMrProcedures": [
+  "${e}",
+  "getList",
+  "newPostProcedureDetail",
+  "postProcedureDetail"
+ ],
+ "KMrs": [
+  "${e}/VitalSigns",
+  "checkSEPBPJS",
+  "editMRDataForBPJSV2",
+  "editMRDataV2",
+  "getSuspiciousStreakedPrescriptionsProceduresMR",
+  "lockEMRForEditing",
+  "prescriptionImageBase64/${e}",
+  "unlockEMR",
+  "updateKmr/${e}",
+  "\u00b7"
+ ],
+ "KOdontograms": [
+  "createNewInstance"
+ ],
+ "KOhises": [
+  "add",
+  "edit/${e}",
+  "streak/${e}"
+ ],
+ "KOnlinePrescriptions": [
+  "confirmPrescription",
+  "insert",
+  "linkToPrescription",
+  "masterListPrescription",
+  "nextOrderId",
+  "overviewTable",
+  "streak/${e}",
+  "validatePrescription"
+ ],
+ "KOrders": [
+  "getListOrderLabV2"
+ ],
+ "KOtherNotes": [
+  "updateOtherNote",
+  "\u00b7"
+ ],
+ "KOwnedPacketProcedures": [
+  "${e}",
+  "getAlmostExpiredPacketV2",
+  "getListPacket"
+ ],
+ "KPacketProcedures": [
+  "${e}",
+  "\u00b7"
+ ],
+ "KPolis": [
+  "${e}",
+  "addPoli",
+  "deletePoliByIds",
+  "generatePoli",
+  "getRemainingQuotaBatch",
+  "schedula",
+  "tambahPoli",
+  "tambahPoliAntrol",
+  "\u00b7"
+ ],
+ "KPrescriptions": [
+  "${e}",
+  "approvedOverBudgetBpjsCapitation",
+  "createPrescription",
+  "dataObatLimaKunjunganTerakhir",
+  "getList",
+  "getOverBugdetBpjsCapitation"
+ ],
+ "KProcedures": [
+  "${e}/updateImport",
+  "bulkSetLayananAssistme",
+  "checkCommissionValidityAgainstMRData",
+  "checkLayananAssistmeBulk",
+  "count",
+  "deleteByProcedureId/${e}",
+  "getByKeyword",
+  "getProcedureByKeywordNotTuslahEmbalase",
+  "setSellingPrice",
+  "updateByProcedureId/${e}",
+  "\u00b7"
+ ],
+ "KPsychosocialSpirituals": [
+  "insert"
+ ],
+ "KQueuePharmacies": [
+  "${e}",
+  "countQueue",
+  "createQueuePharmacy",
+  "getPatientPharmacyHistory",
+  "getQueue",
+  "getSerahTerimaObat/${e}",
+  "panggilAntreanPharmacy",
+  "succeedStatus",
+  "summaryResep",
+  "\u00b7"
+ ],
+ "KRequestRefundPacketProcedures": [
+  "${e}",
+  "approveRefund",
+  "count",
+  "requestRefund",
+  "\u00b7"
+ ],
+ "KRiwayatKelahiran": [
+  "getHistory",
+  "\u00b7"
+ ],
+ "KRujukEksternalAssists": [
+  "${a}",
+  "${e}",
+  "save"
+ ],
+ "KRujukEksternals": [
+  "\u00b7"
+ ],
+ "KRujukInternals": [
+  "streak/${e}",
+  "updateKRujukInternal",
+  "\u00b7"
+ ],
+ "KScourPrescriptions": [
+  "${e}",
+  "getList",
+  "postDetail"
+ ],
+ "KSmses": [
+  "${e}",
+  "${e}/KSmsPatients"
+ ],
+ "KStockDepots": [
+  "generate",
+  "getAllData",
+  "getList",
+  "getName",
+  "mutasi",
+  "updateDetail",
+  "\u00b7"
+ ],
+ "KTreatments": [
+  "add",
+  "editFiles/${e}"
+ ],
+ "KTxAccounts": [
+  "${e}",
+  "count",
+  "generateAccount",
+  "post",
+  "transfer",
+  "updateAccount",
+  "\u00b7"
+ ],
+ "KTxGroups": [
+  "getList",
+  "pay"
+ ],
+ "KTxItemDistributors": [
+  "getGPOSDistributorV2/${e}",
+  "\u00b7"
+ ],
+ "KTxItems": [
+  "POS/items-sold"
+ ],
+ "KTxPharmacies": [
+  "\u00b7"
+ ],
+ "KTxes": [
+  "${e}",
+  "${e}/deletePendingStock",
+  "POS",
+  "POS/activity",
+  "POS/summary",
+  "acceptPurchaseOrder",
+  "addNewInvoice",
+  "auditMedStock",
+  "cancelPayment",
+  "checkAvailable",
+  "checkTransactionStatus",
+  "countDebtCredit",
+  "deleteTransactionOffice",
+  "editInstance",
+  "editTransactionOffice/${a}",
+  "generateCategoryIdPerTransaction",
+  "generateFacilityIncome",
+  "generateFacilityOutcome",
+  "generateItemPaymentandOutcome",
+  "getAccountBalance",
+  "getAccountBalanceByDateRange",
+  "getAllOfficeTransaction",
+  "getApotekTransactionsForLedger",
+  "getDebtCreditNew",
+  "getExpireDetail1",
+  "getOfficeTransactionsForLedger",
+  "getOtcTransactionsForLedger",
+  "getPatientTransactionsForLedger",
+  "getPharmacyTransactionsForLedger",
+  "getPreviewPatientTransactions",
+  "getSuspiciousTransactions",
+  "getTransactionItemsByTxId",
+  "getTransactionsForLedger",
+  "getUntransactedPendingStockPerTransaction",
+  "getUntransactedPendingStockPerTransactionOld",
+  "payment",
+  "repairStockOpname",
+  "stockCorrection",
+  "\u00b7"
+ ],
+ "KVaksin": [
+  "getHistory"
+ ],
+ "KVitalSigns": [
+  "\u00b7"
+ ],
+ "KamarOperasis": [
+  "deleteKamarOperasi",
+  "insert",
+  "updateKamarOperasi",
+  "\u00b7"
+ ],
+ "Kamars": [
+  "${a}/updateKamarDetail",
+  "${e}/deleteKamarDetail",
+  "getListAllowedInpatientRoom",
+  "postKamarDetail",
+  "\u00b7"
+ ],
+ "KategoriDokumens": [
+  "formatSurat",
+  "getDocNumber",
+  "getList",
+  "getListFormatSurat",
+  "updateDocCategory"
+ ],
+ "KesehatanPosyandu": [
+  "insert"
+ ],
+ "KesehatanUKS": [
+  "insert"
+ ],
+ "Ktxes": [
+  "countPatientTransactions",
+  "getPatientTransactions"
+ ],
+ "Ledgers": [
+  "getList"
+ ],
+ "LogActivities": [
+  "\u00b7"
+ ],
+ "LogSurveySatuSehats": [
+  "log"
+ ],
+ "Logs": [
+  "postPlgTelemetry"
+ ],
+ "MTBS": [
+  "insert"
+ ],
+ "MasterCompanys": [
+  "${e}/deleteData",
+  "${e}/updateData",
+  "getData",
+  "insertData"
+ ],
+ "Masyarakats": [
+  "activateAndLogin",
+  "bannerEvent",
+  "bannerPolicies",
+  "changePassword",
+  "changePasswordInsideNew",
+  "changePasswordRequest",
+  "checkExist",
+  "checkPassword",
+  "confirm",
+  "confirmEmailOtpV2",
+  "confirmOtp",
+  "createPartner",
+  "displayBannerCustomReferralLab",
+  "getMasyarakatDetail",
+  "logout",
+  "resetPasswordByManagement",
+  "sendEmailOtp",
+  "sendSmsOtp",
+  "updateAccount",
+  "updateData",
+  "verifySmsAuthToken"
+ ],
+ "MedicineStockPackages": [
+  "deleteMedicineStockPackage",
+  "getMedicineStockPackage",
+  "insert",
+  "updateMedicineStockPackage"
+ ],
+ "Memberships": [
+  "add",
+  "delete/${e}",
+  "edit/${e}"
+ ],
+ "MetodePembayaranDetails": [
+  "getList"
+ ],
+ "MetodePembayarans": [
+  "getAll",
+  "getList",
+  "postMetodePembayaranDetail"
+ ],
+ "Organisasis": [
+  "getKeanggotaan",
+  "getRegistrasi"
+ ],
+ "PKS": [
+  "createPKS",
+  "getStatus",
+  "updatePks"
+ ],
+ "PacketProcedures": [
+  "${e}",
+  "bulkSetLayananAssistme",
+  "checkLayananAssistmeBulk",
+  "list-patient-procedure-assist-me",
+  "packet-usage-list",
+  "procedure-usage-list",
+  "updateDetail/${e}",
+  "\u00b7"
+ ],
+ "Pasiens": [
+  "${e}/deletePasienDetail",
+  "${e}/putPasienDetail",
+  "${e}/setBpjsInfo",
+  "checkExist",
+  "checkPatientByIdNumber",
+  "connectToc",
+  "countAllPatient",
+  "countList",
+  "countNewPatient",
+  "deleteByPatientId",
+  "duplicateDataCheck",
+  "getAllPasienInfo_v2",
+  "getNextMrCode",
+  "getPPKUmumPcare",
+  "getPasienDetails",
+  "getPasienListByKeywordForEntryData_v2",
+  "getPasienListByKeywordsV2",
+  "getPatientConnectOA",
+  "getUnconnectedPasienByKeyword",
+  "getUpcomingBirthdays",
+  "inviteToMedicaboo",
+  "merge",
+  "postDetail",
+  "searchByPatientName",
+  "without-ktp",
+  "\u00b7"
+ ],
+ "PatientRooms": [
+  "listAppointmentAestaByRoom",
+  "switchRoom"
+ ],
+ "PayrollData": [
+  "${e}",
+  "count",
+  "\u00b7"
+ ],
+ "Payrolls": [
+  "${e}",
+  "calculatePacketCommission",
+  "calculatePayroll",
+  "calculateProcedureCommissionV2",
+  "count",
+  "deletePayrollData",
+  "generatePayrollOnClick",
+  "payment",
+  "updatePeriodePayroll",
+  "\u00b7"
+ ],
+ "Pekerjaans": [
+  "getAll",
+  "getSpesialis",
+  "getSubSpesialis"
+ ],
+ "PengkajianNifas": [
+  "insert"
+ ],
+ "PeranAnggotas": [
+  "deletePeranAnggota",
+  "insert",
+  "updatePeranAnggota",
+  "\u00b7"
+ ],
+ "PermintaanJadwalOperasis": [
+  "editPermintaan",
+  "getPermintaan",
+  "reject",
+  "streak",
+  "tambahPermintaan"
+ ],
+ "PointExchanges": [
+  "add",
+  "all",
+  "delete/${e}",
+  "edit/${e}"
+ ],
+ "PointRewards": [
+  "add",
+  "all",
+  "delete/${e}",
+  "edit/${e}"
+ ],
+ "PraAnestesis": [
+  "insert",
+  "streak/${e}"
+ ],
+ "PraBedahs": [
+  "insert",
+  "updatePraBedah"
+ ],
+ "Prakteks": [
+  "${e}/syncJadwalDokterAntrol",
+  "${e}/updatePraktekDetail",
+  "check-jadwal-hfis",
+  "getAllApoteker",
+  "getDokterbyKeyword",
+  "getDokterbyKeywordAndDateTime",
+  "getPraktekDetail",
+  "kelengkapan-input-klinis-bpjs",
+  "postPraktekDetail",
+  "praktek-antri-cepat",
+  "sync-jadwal-hfis",
+  "without-ktp"
+ ],
+ "PreAppointCounters": [
+  "addCounter",
+  "editCounter",
+  "getList"
+ ],
+ "PreAppoints": [
+  "checkAntrean",
+  "getList",
+  "getUnhandleQueue",
+  "handle"
+ ],
+ "Prodia": [
+  "activationRequest",
+  "getListOutlet"
+ ],
+ "ProdiaResult": [
+  "fetchOne"
+ ],
+ "PushProductLogs": [
+  "log"
+ ],
+ "QuickSurvey": [
+  "createNewInstance"
+ ],
+ "RegionNew": [
+  "\u00b7"
+ ],
+ "Regions": [
+  "\u00b7"
+ ],
+ "RegistrasiJantung": [
+  "insert"
+ ],
+ "RegistrasiKanker": [
+  "insert"
+ ],
+ "RegistrasiMata": [
+  "insert"
+ ],
+ "RegistrasiStroke": [
+  "insert"
+ ],
+ "RencanaKontrols": [
+  "insert",
+  "streak/${a}/${t}",
+  "updateKontrol"
+ ],
+ "RencanaTindakLanjuts": [
+  "insert"
+ ],
+ "ResikoJatuhs": [
+  "insert",
+  "streak/${e}",
+  "updateResikoJatuh"
+ ],
+ "RiwayatRisikoPTM": [
+  "insert"
+ ],
+ "RujukExternalProdia": [
+  "createRujukan"
+ ],
+ "RujukanSpesimen": [
+  "insert"
+ ],
+ "Rumahsakits": [
+  "${e}/insertGambar",
+  "${e}/regenerateSlug",
+  "${e}/removeGambar/${a}",
+  "${e}/updateHospitalDetail",
+  "activeOA",
+  "activePracticeDoctor",
+  "answerTicketNpsQuestion",
+  "customize-oa-url",
+  "getCampaigns",
+  "getCertificateTrainings",
+  "getHospitalDetail",
+  "getHospitalGroup",
+  "getListTicketNpsQuestion",
+  "getPaymentMethods",
+  "postRsDetail_v2",
+  "qrisStatic",
+  "resetUsage",
+  "setProfilePicture",
+  "submitQuestionsCampaign",
+  "submitQuestionsTraining",
+  "\u00b7"
+ ],
+ "SatuSehats": [
+  "generateURLKYC",
+  "location/list/${e}",
+  "organization/list/${e}",
+  "postLocationDetail",
+  "postOrganizationDetail",
+  "resendData",
+  "testUrlCenterView",
+  "updateLocationDetail",
+  "updateOrganizationDetail"
+ ],
+ "ScreenAntreanConfigs": [
+  "createScreenAntrean",
+  "deleteScreenAntrean/${t}",
+  "updateScreenAntrean"
+ ],
+ "SiteMarkings": [
+  "insert",
+  "streak/${e}"
+ ],
+ "Skrinnings": [
+  "insert"
+ ],
+ "Surats": [
+  "getGeneralConsentUrl/${e}",
+  "postNewSurat",
+  "submitWithFile",
+  "updateSurat"
+ ],
+ "TelekonsultasiRmes": [
+  "getAllTelekonsultasi"
+ ],
+ "TemplateRacikans": [
+  "${e}",
+  "list",
+  "\u00b7"
+ ],
+ "TreatmentResults": [
+  "streak/${e}",
+  "\u00b7"
+ ],
+ "Tuberkulosis": [
+  "insert"
+ ],
+ "UpayaBerhentiMerokok": [
+  "insert"
+ ],
+ "UploadedFiles": [
+  "save"
+ ],
+ "Uronefrologi": [
+  "insert"
+ ],
+ "Verifikasis": [
+  "getListVerifikasi",
+  "getListVerifikasiV2",
+  "requestOTP",
+  "setSignatureV2",
+  "setVerifikasiV2"
+ ],
+ "WaNotifs": [
+  "daily-dashboard-wa",
+  "sendDailyDashboardToWa",
+  "zesta-scenarios",
+  "zesta-scenarios/logs"
+ ],
+ "WaReports": [
+  "getMonthlyIkhtisar",
+  "getReminderWaReport",
+  "getReport"
+ ],
+ "Zoonosis": [
+  "\u00b7"
+ ]
+}
