@@ -133,6 +133,10 @@ describe("host isolation over HTTP (ARCH-3, SEC-21)", { timeout: 60_000 }, () =>
     });
   });
 
+  it("the component gallery is refused in production", async () => {
+    expect(await get(HOSTS.app, "/dev/galeri"), "/dev/galeri").toEqual({ status: 404, refused: true });
+  });
+
   it("unknown hosts are refused for every path", async () => {
     for (const path of ["/", "/saya", "/klinik-a"]) {
       expect(await get("unknown.test", path), path).toEqual({ status: 404, refused: true });

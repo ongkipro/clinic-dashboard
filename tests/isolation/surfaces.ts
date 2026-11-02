@@ -117,6 +117,7 @@ export const EXEMPT: Exemption[] = [
   { kind: "route", id: "/aktifkan-2fa", reason: AUTH },
   { kind: "route", id: "/terkunci", reason: AUTH },
   { kind: "action", id: "app/(auth)/terkunci/actions", reason: AUTH },
+  { kind: "route", id: "/dev/galeri", reason: "development-only component gallery, refused in production (T-012)" },
 ];
 
 const key = (s: SurfaceRef) => `${s.kind}:${s.id}`;

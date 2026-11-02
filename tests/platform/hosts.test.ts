@@ -107,6 +107,16 @@ describe("host resolver", () => {
     expect([...folders].filter((f) => !RESERVED_SEGMENTS.has(f))).toEqual([]);
   });
 
+  it("development-only /dev pages are refused in production on every host", () => {
+    for (const h of Object.values(cfg)) {
+      for (const p of ["/dev", "/dev/galeri", "/DEV/galeri"]) {
+        expect(resolveRequest(cfg, h, p, true).allow, `${h}${p}`).toBe(false);
+      }
+    }
+    expect(resolveRequest(cfg, cfg.app, "/dev/galeri", false).allow).toBe(true);
+    expect(resolveRequest(cfg, cfg.booking, "/dev/galeri", false).allow).toBe(false);
+  });
+
   it("config: required, distinct, well-formed", () => {
     expect(hostConfigFromEnv({ APP_HOST: "a.test", BOOKING_HOST: "b.test", VENDOR_HOST: "c.test:8443" })).toEqual({
       app: "a.test",

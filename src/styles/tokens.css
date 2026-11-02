@@ -1,0 +1,186 @@
+/* DESIGN.md tokens (D-14 full Apple style, D-15 light only, D-16 tenant accent).
+   Values mirror src/styles/tokens.ts; tests/ui/tokens.spec.ts keeps them equal.
+   Tenant accent: a server-validated hex (checkAccent) may override --tint and
+   --tint-soft on <html>; nothing else is tenant-overridable (UI-8). */
+@import "tailwindcss";
+
+:root {
+  color-scheme: only light;
+
+  --bg: #FFFFFF;
+  --bg-grouped: #F2F2F7;
+  --surface: #FFFFFF;
+  --surface-2: #E9E9EE;
+  --label: #000000;
+  --label-2: #636366;
+  --label-3: #8A8A8E;
+  --separator: #C6C6C8;
+  --control-border: #7C7C80;
+  --tint: #0A6E86;
+  --on-tint: #FFFFFF;
+  --tint-soft: #E2EEF0;
+  /* Hover/pressed fill: the accent darkened 8% (pressedOf in tokens.ts). Overridden
+     together with --tint when a tenant accent is applied. */
+  --tint-pressed: color-mix(in srgb, var(--tint) 92%, #000000);
+  --danger: #C4281C;
+  --danger-soft: #FDECEA;
+  --danger-pressed: #FBE2DF;
+  --secondary-pressed: var(--separator); /* hover/pressed fill of the secondary button */
+  --warning: #A14F00;
+  --warning-soft: #FFF1DF;
+  --success: #1E7A34;
+  --success-soft: #E7F5EA;
+  --locked: #4B3FB5;
+  --locked-soft: #EEEBFB;
+  --neutral: #3A3A3C;
+  --neutral-soft: #E9E9EE;
+  --badge: #D70015;
+  --chart-1: #0072B2;
+  --chart-2: #D55E00;
+  --chart-3: #009E73;
+  --chart-4: #B5568C;
+
+  /* Radius, spacing, motion (DESIGN.md). */
+  --radius-group: 12px;
+  --radius-sheet: 16px;
+  --radius-field: 10px;
+  --radius-capsule: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --target: 44px;
+  --target-clinical: 52px;
+  --button-primary: 50px;
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-sheet: 300ms;
+  --dur-press: 120ms;
+  --dur-fade: 200ms;
+
+  /* shadcn/ui semantic names mapped onto the DESIGN.md tokens (UI-9). */
+  --background: var(--bg);
+  --foreground: var(--label);
+  --card: var(--surface);
+  --card-foreground: var(--label);
+  --popover: var(--surface);
+  --popover-foreground: var(--label);
+  --primary: var(--tint);
+  --primary-foreground: var(--on-tint);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--label);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--label-2);
+  --accent: var(--tint-soft);
+  --accent-foreground: var(--tint);
+  --destructive: var(--danger);
+  --border: var(--separator);
+  --input: var(--control-border);
+  --ring: var(--tint);
+  --radius: var(--radius-field);
+}
+
+/* Increased contrast (DESIGN.md). */
+@media (prefers-contrast: more) {
+  :root {
+    --label-2: #3A3A3C;
+    --separator: var(--control-border);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-tint-pressed: var(--tint-pressed);
+  --color-grouped: var(--bg-grouped);
+  --color-label-2: var(--label-2);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-pressed: var(--danger-pressed);
+  --color-secondary-pressed: var(--secondary-pressed);
+  --color-locked: var(--locked);
+  --color-locked-soft: var(--locked-soft);
+  --color-neutral: var(--neutral);
+  --color-neutral-soft: var(--neutral-soft);
+  --radius-lg: var(--radius-group);
+  --radius-md: var(--radius-field);
+  --radius-sm: 8px;
+  --radius-xl: var(--radius-sheet);
+  --font-sans: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Type: iOS Dynamic Type "Large (default)", Body = 17 px root (DESIGN.md, UI-12). */
+html {
+  font-size: 106.25%;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--label);
+}
+@supports (font: -apple-system-body) {
+  html {
+    font: -apple-system-body;
+    font-family: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+}
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Glass only on the floating functional layer (UI-14). */
+.bar-glass {
+  background: rgb(255 255 255 / 0.92);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(10px) saturate(1.4);
+  border-top: 0.5px solid rgb(0 0 0 / 0.12);
+}
+@media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  .bar-glass { background: #FFFFFF; backdrop-filter: none; }
+}
+html.reduce-transparency .bar-glass { background: #FFFFFF; backdrop-filter: none; }
+
+/* Sheets (vaul) use the DESIGN.md motion: 300 ms, cubic-bezier(0.32, 0.72, 0, 1). vaul
+   opens and closes with keyframe animations (and a transition on drag release), set
+   inline or in its own stylesheet, hence !important on both. Reduced motion: no slide,
+   a 200 ms cross-fade only. */
+[data-vaul-drawer] {
+  animation-duration: var(--dur-sheet) !important;
+  animation-timing-function: var(--ease-sheet) !important;
+  transition-duration: var(--dur-sheet) !important;
+  transition-timing-function: var(--ease-sheet) !important;
+}
+[data-vaul-overlay] {
+  animation-duration: var(--dur-fade) !important;
+  transition-duration: var(--dur-fade) !important;
+}
+@keyframes sheet-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-press: 1ms; }
+  [data-vaul-drawer] {
+    transform: none !important;
+    transition-property: opacity !important;
+    animation-duration: var(--dur-fade) !important;
+    animation-timing-function: linear !important;
+  }
+  [data-vaul-drawer][data-state="open"] { animation-name: sheet-fade-in !important; }
+  [data-vaul-drawer][data-state="closed"] { animation-name: sheet-fade-out !important; }
+}

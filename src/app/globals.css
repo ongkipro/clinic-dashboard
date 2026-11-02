@@ -1,1 +1,2 @@
-@import "tailwindcss";
+/* Global entry: the DESIGN.md tokens, Tailwind and shadcn/ui theme (src/styles). */
+@import "../styles/tokens.css";

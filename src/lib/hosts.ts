@@ -40,7 +40,7 @@ export const RESERVED_SEGMENTS = new Set([
   "pasienku", "pembelian", "pemeriksaan", "pendampingan", "pengaturan", "pengguna-akses",
   "permintaan", "persetujuan", "persetujuan-tindakan", "pesan", "piutang", "privasi",
   "ringkasan", "ruang", "satusehat", "saya", "simulasi", "situs", "staf", "stok",
-  "templat", "vendor", "verifikasi", "terkunci", "aktifkan-2fa",
+  "templat", "vendor", "verifikasi", "terkunci", "aktifkan-2fa", "dev",
 ]);
 
 export function isPublicSitePath(path: string): boolean {
@@ -104,11 +104,22 @@ export function canonicalPath(raw: string): string | undefined {
 }
 
 // `rawPath` is the request pathname as received (Next.js `nextUrl.pathname`).
-export function resolveRequest(cfg: HostConfig, host: string | null, rawPath: string): Decision {
+// Development-only pages (component gallery, T-012) under /dev are refused in production.
+export function isDevOnlyPath(path: string): boolean {
+  return path === "/dev" || path.startsWith("/dev/");
+}
+
+export function resolveRequest(
+  cfg: HostConfig,
+  host: string | null,
+  rawPath: string,
+  production = process.env.NODE_ENV === "production",
+): Decision {
   const kind = hostKind(cfg, host);
   if (!kind) return { allow: false, reason: "unknown host" };
   const path = canonicalPath(rawPath);
   if (path === undefined) return { allow: false, reason: "non-canonical path" };
+  if (production && isDevOnlyPath(path.toLowerCase())) return { allow: false, reason: "development only" };
   // Route folders are lower-case but ids may not be: a path is allowed only if its
   // lower-cased form is allowed too, so /Vendor is treated like /vendor.
   const lower = path.toLowerCase();
