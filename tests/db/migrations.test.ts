@@ -91,7 +91,7 @@ describe("05 §3.1 constraint contract", () => {
 
   it("flags a table without tenant_id that is not a platform table", async () => {
     expect(await violationsWith(`create table patients (id uuid primary key)`)).toEqual([
-      "patients: unclassified table without tenant_id",
+      "public.patients: unclassified table without tenant_id",
     ]);
   });
 
@@ -104,7 +104,7 @@ describe("05 §3.1 constraint contract", () => {
   it("flags a nullable tenant_id and a missing UNIQUE(tenant_id, id)", async () => {
     expect(
       await violationsWith(`create table visits (id uuid primary key, tenant_id uuid)`),
-    ).toEqual(["visits: tenant_id is nullable", "visits: missing UNIQUE(tenant_id, id)"]);
+    ).toEqual(["public.visits: tenant_id is nullable", "public.visits: missing UNIQUE(tenant_id, id)"]);
   });
 
   it("flags a foreign key that is not ON DELETE RESTRICT", async () => {
@@ -114,7 +114,7 @@ describe("05 §3.1 constraint contract", () => {
          constraint rooms_branch_fk foreign key (tenant_id, branch_id)
            references branches (tenant_id, id) on delete cascade)`,
     );
-    expect(v).toEqual(["rooms.rooms_branch_fk: ON DELETE is not RESTRICT"]);
+    expect(v).toEqual(["public.rooms.rooms_branch_fk: ON DELETE is not RESTRICT"]);
   });
 
   it("flags a single-column FK between tenant tables", async () => {
@@ -123,7 +123,7 @@ describe("05 §3.1 constraint contract", () => {
          unique (tenant_id, id),
          constraint rooms_branch_fk foreign key (branch_id) references branches (id) on delete restrict)`,
     );
-    expect(v).toEqual(["rooms.rooms_branch_fk: not composite (tenant_id, id) key (branch_id->id)"]);
+    expect(v).toEqual(["public.rooms.rooms_branch_fk: not composite (tenant_id, id) key (branch_id->id)"]);
   });
 
   it("flags a composite FK that targets a key other than (tenant_id, id)", async () => {
@@ -134,7 +134,7 @@ describe("05 §3.1 constraint contract", () => {
            references branches (tenant_id, code) on delete restrict)`,
     );
     expect(v).toEqual([
-      "rooms.rooms_branch_fk: not composite (tenant_id, id) key (tenant_id->tenant_id, branch_code->code)",
+      "public.rooms.rooms_branch_fk: not composite (tenant_id, id) key (tenant_id->tenant_id, branch_code->code)",
     ]);
   });
 
@@ -146,7 +146,7 @@ describe("05 §3.1 constraint contract", () => {
            references branches (id, tenant_id) on delete restrict)`,
     );
     expect(v).toEqual([
-      "rooms.rooms_branch_fk: not composite (tenant_id, id) key (tenant_id->id, branch_id->tenant_id)",
+      "public.rooms.rooms_branch_fk: not composite (tenant_id, id) key (tenant_id->id, branch_id->tenant_id)",
     ]);
   });
 });

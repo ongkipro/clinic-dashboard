@@ -28,13 +28,14 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | Task | Result | Commit |
 |---|---|---|
 | T-001 repository bootstrap | PASS locally; review APPROVE; CI proof pending push | `862307d` |
-| T-002 database core | PASS; R3 review APPROVE after fixes | this commit |
+| T-002 database core | PASS; R3 review APPROVE after fixes | `60a4498`, `b08bc75` |
+| T-003 RLS harness | PASS; R4 review APPROVE (claude-code and codex, four rounds) | this commit |
 
-Built so far: see `DECISIONS.md` DEC-005 (toolchain) and DEC-006 (database core); `ARCHITECTURE.md` is updated when runtime behaviour exists.
+Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core) and DEC-007 (RLS foundation); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
 ## Active work
 
-None between tasks. Next: T-003 (RLS harness, R4).
+None between tasks. Next: T-004 (isolation CI gates, R3).
 
 Carried forward (outside the owning task's Allowed Paths):
 - `.dockerignore` (build context excludes `.env*`, `node_modules`, `docs/research/`).
@@ -42,6 +43,8 @@ Carried forward (outside the owning task's Allowed Paths):
 - CI has no `pnpm test` step yet (ci.yml belongs to T-004); add it there with `TEST_DATABASE_URL` pointing at the service.
 - Copy `public/` into the runtime image once it exists; upgrade Next.js to 16.4.4 after `minimumReleaseAge`.
 - Migrations from parallel worktrees must be regenerated on rebase (Drizzle skips an older `when`).
+- T-004: add `pnpm test` to CI; the CI PostgreSQL service user must be able to CREATE DATABASE and CREATE ROLE (tests create throwaway databases and roles).
+- Before the first task that writes branch or role predicates: TEMP privilege granted directly to the login is not yet refused by `assertAppRole`.
 
 ## Blockers
 
@@ -49,6 +52,7 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Verification evidence
 
+- 2026-11-02 T-003: 56 tests on PostgreSQL 16.15 (40 RLS: startup refusal per unsafe role shape, scope map incl. views/matviews, no app access to platform tables or definer functions, cross-tenant not-found, fail-closed without context, concurrency, nesting, dead-connection handling); mutation of each control fails its test; typecheck, lint, build, docs:check, drizzle-kit check PASS (`.delivery/`).
 - 2026-11-02 T-002: fresh database migrate, 16 tests on PostgreSQL 16.15 (contract checker with a negative fixture per rule; advisory-lock test fails 3/3 with the lock removed), `drizzle-kit check`, typecheck, lint, build, docs:check — all PASS (`.delivery/`).
 - 2026-11-02 T-001 (Node 26.13.0, clean `node_modules` and `.next`): install --frozen-lockfile, typecheck (`next typegen && tsc`), lint, build, `pnpm audit --prod`, docs:check (24 files, 653 declarations, 131 tasks, 0 findings), docs:promotion, actionlint, Docker image (HTTP 200, uid 1000), compose PostgreSQL 16.15 — all PASS, recorded as executed checks in `.delivery/`. CI run: pending push.
 
@@ -59,4 +63,4 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Next verified action
 
-Start T-003 (RLS harness: non-owner app role, per-transaction tenant context, scope map). R4: independent review before integration.
+Start T-004 (isolation CI gates: negative-test generator per route/job/export, tenant-literal lint rule, build digest record). R3: independent review before integration.
