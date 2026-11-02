@@ -31,13 +31,14 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-002 database core | PASS; R3 review APPROVE after fixes | `60a4498`, `b08bc75` |
 | T-003 RLS harness | PASS; R4 review APPROVE (claude-code and codex, four rounds) | `98067c6` |
 | T-004 isolation CI gates | PASS; R3 review APPROVE after two rounds of fixes | `a4460bb` |
-| T-005 platform basics | PASS; R4 review APPROVE (claude-code and codex, two rounds) | this commit |
+| T-005 platform basics | PASS; R4 review APPROVE (claude-code and codex, two rounds) | `9026b87` |
+| T-006 staff authentication | PASS; R4 review (see ledger) | this commit |
 
-Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate) and DEC-009 (keys, hosts, backups); `ARCHITECTURE.md` is updated when runtime behaviour exists.
+Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups) and DEC-010 (staff authentication); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
 ## Active work
 
-None between tasks. Next: T-006 (staff authentication, R4).
+None between tasks. Next: T-007 (identity chain, R4).
 
 Carried forward (outside the owning task's Allowed Paths):
 - `.dockerignore` (build context excludes `.env*`, `node_modules`, `docs/research/`).
@@ -48,6 +49,11 @@ Carried forward (outside the owning task's Allowed Paths):
 - Isolation lint gaps to close later: env lookups such as `process.env.<TENANT>`, identity props `tenant.id`/`brand`/`host`, map lookups keyed by tenant, and a grep for tenant literals outside `src/` (scripts, seeds, config).
 - When `src/proxy.ts` starts reading tenant data (e.g. slug → tenant), add it to the isolation gate (DEC-009).
 - CI does not run the restore drill or the HTTP host test yet (`ci.yml` is outside T-005); add `RUN_BACKUP_DRILL=1 pnpm vitest run tests/platform/backup.test.ts` and confirm `pnpm test` includes `tests/platform/hosts.spec.ts` with a build step.
+- T-007 must provide the `RoleSource` (src/auth/instance.ts `noRolesYet`) and call `checkSession` from the clinic layout/API so TOTP and idle-lock gates apply to real pages; until then no page is gated.
+- Playwright is not a project dependency yet (T-011): `tests/ui/auth-screens.mjs` runs with `PLAYWRIGHT_CORE` pointing at an installed playwright-core.
+- Root layout still says `lang="en"` and has the create-next-app title (owned by T-012/T-013); auth screens mark `lang="id"` themselves.
+- Better Auth needs the client IP from the trusted proxy (`x-real-ip` from Traefik) in production, or its per-IP limiter falls back to one shared bucket; set at deploy.
+- T-022 invitations: require TOTP enrolment while accepting an invitation for a TOTP role (otherwise anyone with the password can enrol first). Background/polling requests must call `checkSession(..., { activity: false })` (T-007/T-013) or the idle lock never fires. RATE-2 lets anyone lock an FO account by email (spec consequence; RUNBOOK).
 - T-006/T-021: Server Actions are resolved by action id regardless of path; every action must authorize itself, and the booking host should refuse `Next-Action` requests outside an allow-list.
 - pgBackRest: schedule `stanza-create`, full/diff backups and monitoring in the deploy task; without a stanza `archive_command` keeps failing and `pg_wal` grows.
 - KEK custody vs ARCH-7 wording: a root:0400 host file bind-mounted into a non-root container is unreadable and fails the owner check (fail-closed). The deploy task must pick one model (host file owned by the app uid at 0400 and ARCH-7 reworded, or a root helper passing the key) before first start.
@@ -63,6 +69,7 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Verification evidence
 
+- 2026-11-02 T-006: 43 auth tests on PostgreSQL 16.15 as `clinic_auth` (PR-3 scenario; TOTP for each of the 9 IAM-1 roles and not for the other 7; RATE-2 lockout across IPs and its expiry; 120 s idle lock, server-side, password unlock; no plaintext secrets; role separation); concurrency (12 parallel wrong passwords → exactly 5 checked), progressive delay, trust-device refusal, locked/enrolment-gated endpoints; mutations (drop a TOTP role, disable lockout, change idle time, remove the advisory lock, allow trustDevice, drop the session-lock hook, zero the delay) each fail their tests. Browser (standalone build, Chromium 1248) at 390/820/1180/1440 and 200% text: no horizontal overflow, targets ≥ 44 px, all controls named, `lang=id`; flow wrong password → sign-in → enrol TOTP → sign-in asks for code → wrong code → verify → keyboard tab order → unlock wrong/right.
 - 2026-11-02 T-005: restore drill PASSED (25 tenants before the full backup, 10 after, restored 35/105 branches/4 migrations via WAL replay; with replay disabled the drill fails 25 vs 35); envelope round-trip, tenant/purpose binding, tamper, KEK and DEK rotation, blind index and KEK-file custody tests; host resolver unit tests and HTTP negatives against `next start` (`/saya`, `/persetujuan` refused on booking and vendor hosts; public routes refused on the app host; vendor routes refused on every non-vendor host); disabling the proxy check fails 4 HTTP tests.
 - 2026-11-02 T-004: `pnpm test:isolation` failed (exit 1) on a real untested page `src/app/(app)/probe-untested` and passed after removal; probe cases proved the harness fails an empty case (positive control) and a leaking case, and passes a filtered list case; lint rule tests (slug, brand in template/JSX, UUID, three branching forms, no false positives, not applied outside `src/`); full CI step sequence simulated locally with `CI=1`; actionlint clean.
 - 2026-11-02 T-003: 56 tests on PostgreSQL 16.15 (40 RLS: startup refusal per unsafe role shape, scope map incl. views/matviews, no app access to platform tables or definer functions, cross-tenant not-found, fail-closed without context, concurrency, nesting, dead-connection handling); mutation of each control fails its test; typecheck, lint, build, docs:check, drizzle-kit check PASS (`.delivery/`).
@@ -76,4 +83,4 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Next verified action
 
-Start T-006 (staff authentication: Better Auth email+password, TOTP, throttling, idle lock). R4: independent review before integration.
+Start T-007 (identity chain: accounts → memberships → staff, roles, branches; IAM-9). R4: independent review before integration.

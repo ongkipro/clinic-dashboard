@@ -82,6 +82,15 @@ describe("host isolation over HTTP (ARCH-3, SEC-21)", { timeout: 60_000 }, () =>
     expect(await get(HOSTS.app, "/")).toEqual({ status: 200, refused: false });
   });
 
+  it("the auth API and sign-in screens are refused on the booking and vendor hosts", async () => {
+    for (const host of [HOSTS.booking, HOSTS.vendor]) {
+      for (const path of ["/api/auth/sign-in/email", "/api/auth/get-session", "/masuk", "/terkunci"]) {
+        expect(await get(host, path), `${host}${path}`).toEqual({ status: 404, refused: true });
+      }
+    }
+    expect((await get(HOSTS.app, "/masuk")).status).toBe(200);
+  });
+
   it("public routes are refused on the app host", async () => {
     for (const path of ["/klinik-a", "/klinik-a/booking", "/aftercare/x", "/api/v1/public/otp"]) {
       expect(await get(HOSTS.app, path), path).toEqual({ status: 404, refused: true });

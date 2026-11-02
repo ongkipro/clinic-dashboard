@@ -7,7 +7,10 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   turbopack: {
     rules: {
+      // Tailwind for global stylesheets only: "as: *.css" would turn a *.module.css
+      // into a plain stylesheet and drop its class-name exports.
       "*.css": {
+        condition: { all: [{ not: "foreign" }, { not: { path: "*.module.css" } }] },
         loaders: ["@tailwindcss/turbopack"],
         as: "*.css",
       },

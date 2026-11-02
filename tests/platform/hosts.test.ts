@@ -11,7 +11,8 @@ import {
 const cfg = { app: "app.example.test", booking: "booking.example.test", vendor: "vendor.example.test" };
 const allowed = (host: string, path: string) => resolveRequest(cfg, host, path).allow;
 
-const STAFF = ["/", "/saya", "/persetujuan", "/pasien/123", "/kasir", "/api/v1/staff/visits", "/api/v1/webhooks/meta"];
+const STAFF = ["/", "/saya", "/persetujuan", "/pasien/123", "/kasir", "/api/v1/staff/visits", "/api/v1/webhooks/meta",
+  "/masuk", "/verifikasi", "/aktifkan-2fa", "/terkunci", "/api/auth/sign-in/email", "/api/auth/two-factor/verify-totp"];
 const PUBLIC = ["/klinik-a", "/klinik-a/perawatan", "/klinik-a/perawatan/facial-dasar", "/klinik-a/booking", "/aftercare/abc", "/api/v1/public/otp", "/api/v1/webhooks/payment", "/api/v1/webhooks/payment/mock"];
 const VENDOR = ["/vendor", "/vendor/tenant", "/api/v1/vendor/tenants"];
 
@@ -93,10 +94,15 @@ describe("host resolver", () => {
     for (const r of RESERVED_SEGMENTS) expect(isPublicSitePath(`/${r}`), r).toBe(false);
   });
 
-  it("every clinic-app route folder named in TASKS.md is reserved", async () => {
-    const { readFileSync } = await import("node:fs");
+  it("every clinic-app and auth route folder (TASKS.md and src/app) is reserved", async () => {
+    const { readFileSync, readdirSync, existsSync } = await import("node:fs");
     const text = readFileSync(new URL("../../TASKS.md", import.meta.url), "utf8");
-    const folders = new Set([...text.matchAll(/src\/app\/\(app\)\/([a-z-]+)\//g)].map((m) => m[1]));
+    const folders = new Set([...text.matchAll(/src\/app\/\((?:app|auth)\)\/([a-z0-9-]+)\//g)].map((m) => m[1]));
+    for (const group of ["(app)", "(auth)"]) {
+      const dir = new URL(`../../src/app/${group}/`, import.meta.url);
+      if (!existsSync(dir)) continue;
+      for (const e of readdirSync(dir, { withFileTypes: true })) if (e.isDirectory()) folders.add(e.name);
+    }
     folders.delete("layout"); // layout file, not a segment
     expect([...folders].filter((f) => !RESERVED_SEGMENTS.has(f))).toEqual([]);
   });

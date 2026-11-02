@@ -1,9 +1,12 @@
 // Application pool startup (TEN-2): the pool is returned only after the connection role
 // passes assertAppRole; otherwise it is closed and startup fails.
 import pg from "pg";
-import { assertAppRole } from "./context";
+import { APP_GROUP_ROLE, assertAppRole, type GroupRole } from "./context";
 
-export async function openAppPool(config: pg.PoolConfig): Promise<pg.Pool> {
+export async function openAppPool(
+  config: pg.PoolConfig,
+  group: GroupRole = APP_GROUP_ROLE,
+): Promise<pg.Pool> {
   const pool = new pg.Pool(config);
   // pg-pool discards an idle client whose backend died and re-emits the error on the
   // pool; without a listener that crashes the process.
@@ -18,7 +21,7 @@ export async function openAppPool(config: pg.PoolConfig): Promise<pg.Pool> {
     };
     client.on("error", onError);
     try {
-      await assertAppRole(client);
+      await assertAppRole(client, group);
     } finally {
       client.removeListener("error", onError);
       client.release(broken);

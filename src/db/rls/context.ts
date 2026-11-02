@@ -5,6 +5,9 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type pg from "pg";
 
 export const APP_GROUP_ROLE = "clinic_app";
+// Better Auth's login tables only (T-006); same startup rules, other group.
+export const AUTH_GROUP_ROLE = "clinic_auth";
+export type GroupRole = typeof APP_GROUP_ROLE | typeof AUTH_GROUP_ROLE;
 
 export class UnsafeDatabaseRoleError extends Error {}
 
@@ -27,7 +30,10 @@ export const CONTEXT_SETTINGS = [
 // clinic_app). A session default for
 // any app.* setting is refused because policies must fail closed outside a context.
 // Call once per pool at startup.
-export async function assertAppRole(client: pg.ClientBase): Promise<void> {
+export async function assertAppRole(
+  client: pg.ClientBase,
+  group: GroupRole = APP_GROUP_ROLE,
+): Promise<void> {
   const { rows } = await client.query<{ role: string; problems: string[] }>(
     `with reachable as (
        select r.oid, r.rolname, r.rolsuper, r.rolbypassrls, r.rolreplication,
@@ -83,7 +89,7 @@ export async function assertAppRole(client: pg.ClientBase): Promise<void> {
             then 'app.* has a session default' end,
        case when not pg_has_role(session_user, $1, 'USAGE') then 'not a member of ' || $1 end
      ], null) as problems`,
-    [APP_GROUP_ROLE, CONTEXT_SETTINGS],
+    [group, CONTEXT_SETTINGS],
   );
   const [r] = rows;
   if (r.problems.length > 0) {

@@ -106,8 +106,17 @@ export type SurfaceRef = { kind: SurfaceKind; id: string };
 export type Exemption = SurfaceRef & { reason: string };
 
 // Surfaces without tenant data. Each needs a reason; a stale exemption fails the gate.
+// Account-level auth surfaces (T-006) run as clinic_auth, which has no privilege on any
+// tenant table (tests/auth proves it); they are exempt until they read tenant data.
+const AUTH = "account-level auth (clinic_auth role, no tenant tables; tests/auth)";
 export const EXEMPT: Exemption[] = [
   { kind: "route", id: "/", reason: "bootstrap placeholder page; renders no tenant data" },
+  { kind: "route", id: "/api/auth/[...all]#route", reason: AUTH },
+  { kind: "route", id: "/masuk", reason: AUTH },
+  { kind: "route", id: "/verifikasi", reason: AUTH },
+  { kind: "route", id: "/aktifkan-2fa", reason: AUTH },
+  { kind: "route", id: "/terkunci", reason: AUTH },
+  { kind: "action", id: "app/(auth)/terkunci/actions", reason: AUTH },
 ];
 
 const key = (s: SurfaceRef) => `${s.kind}:${s.id}`;

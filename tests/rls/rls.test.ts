@@ -4,6 +4,7 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   APP_GROUP_ROLE,
+  AUTH_GROUP_ROLE,
   assertAppRole,
   type TenantContext,
   UnsafeDatabaseRoleError,
@@ -75,6 +76,22 @@ describe("startup role check (TEN-2)", () => {
     const safe = await h.createLoginRole("", [APP_GROUP_ROLE]);
     const pool = await openAppPool({ connectionString: h.urlAs(safe) });
     await pool.end();
+  });
+
+  it("the auth pool applies the same rules to clinic_auth, and the two groups are not interchangeable", async () => {
+    const authLogin = await h.createLoginRole("", [AUTH_GROUP_ROLE]);
+    await (await openAppPool({ connectionString: h.urlAs(authLogin) }, AUTH_GROUP_ROLE)).end();
+    await expect(openAppPool({ connectionString: h.urlAs(authLogin) })).rejects.toThrow(
+      `not a member of ${APP_GROUP_ROLE}`,
+    );
+    const both = await h.createLoginRole("", [AUTH_GROUP_ROLE, APP_GROUP_ROLE]);
+    await expect(openAppPool({ connectionString: h.urlAs(both) }, AUTH_GROUP_ROLE)).rejects.toThrow(
+      "member of unexpected role clinic_app",
+    );
+    const unsafe = await h.createLoginRole("BYPASSRLS", [AUTH_GROUP_ROLE]);
+    await expect(openAppPool({ connectionString: h.urlAs(unsafe) }, AUTH_GROUP_ROLE)).rejects.toThrow(
+      "bypassrls",
+    );
   });
 
   it("accepts a plain member of clinic_app", async () => {
