@@ -19,7 +19,8 @@
     "test:auth": "vitest run tests/auth",
     "test:org": "vitest run tests/org",
     "test:audit": "vitest run tests/audit",
-    "test:readers": "vitest run tests/rls/readers.test.ts"
+    "test:readers": "vitest run tests/rls/readers.test.ts",
+    "test:idempotency": "vitest run tests/idempotency"
   },
   "dependencies": {
     "better-auth": "1.7.15",

@@ -4,3 +4,4 @@ export * from "../../auth/schema";
 export * from "../../modules/vendor/schema";
 export * from "../../modules/org/schema";
 export * from "../../modules/audit/schema";
+export * from "../../modules/idempotency/schema";
