@@ -1,12 +1,12 @@
 {
   "activeRun": null,
   "lastCheckpoint": {
-    "eventId": "c7e0bd164b274776b461d0f48ce9d1e1",
-    "head": "5537420feb8b06fc07dbcf6eb0772221ccbb0a39",
-    "note": "Initial commit 5537420",
+    "eventId": "eecd97c74a0c43e39ca18ca6c98a00b7",
+    "head": "86d76504f3953e6d92775e5222e63448963a47e6",
+    "note": "Round 7 applied",
     "runId": null,
     "state": "READY",
-    "time": "2026-11-02T09:12:57Z",
+    "time": "2026-11-02T09:44:35Z",
     "type": "checkpoint"
   },
   "lastRun": {
@@ -14,10 +14,10 @@
     "result": "PASS",
     "runId": "RUN-20261102T084839Z-ae0a1e76"
   },
-  "observedHead": "5537420feb8b06fc07dbcf6eb0772221ccbb0a39",
+  "observedHead": "86d76504f3953e6d92775e5222e63448963a47e6",
   "observedState": "READY",
   "project": "clinic-dashboard",
   "schemaVersion": 1,
   "statusAuthority": "STATUS.md",
-  "updatedAt": "2026-11-02T09:12:57Z"
+  "updatedAt": "2026-11-02T09:44:35Z"
 }
