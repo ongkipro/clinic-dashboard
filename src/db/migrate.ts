@@ -17,7 +17,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 
 const MIGRATIONS_FOLDER = fileURLToPath(new URL("../../drizzle", import.meta.url));
-const LOCK_KEY = 7_202_611_020; // arbitrary, stable advisory-lock key for migrations
+export const MIGRATION_LOCK_KEY = 7_202_611_020; // arbitrary, stable advisory-lock key for migrations
 export const LOCAL_DATABASE_URL =
   "postgres://clinic:clinic_local_only@127.0.0.1:5432/clinic_dashboard";
 
@@ -63,7 +63,13 @@ export async function runMigrations(url: string): Promise<void> {
   });
   await client.connect();
   try {
-    await client.query("select pg_advisory_lock($1)", [LOCK_KEY]);
+    // lock_timeout also applies to advisory locks: wait for a concurrent runner (a long
+    // migration on a slow server) without that limit, then restore the DDL limits.
+    await client.query("set lock_timeout = 0");
+    await client.query("set statement_timeout = '15min'");
+    await client.query("select pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+    await client.query("reset lock_timeout");
+    await client.query("reset statement_timeout");
     await assertNoDrift(client);
     await migrate(drizzle(client), { migrationsFolder: MIGRATIONS_FOLDER });
   } finally {

@@ -4,7 +4,8 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { LOCAL_DATABASE_URL, MigrationDriftError, runMigrations } from "../../src/db/migrate";
+import { setTimeout as sleep } from "node:timers/promises";
+import { LOCAL_DATABASE_URL, MIGRATION_LOCK_KEY, MigrationDriftError, runMigrations } from "../../src/db/migrate";
 import { contractViolations } from "./contract";
 
 // Tests create a throwaway database on TEST_DATABASE_URL's server. Only loopback hosts
@@ -65,7 +66,27 @@ describe("fresh database migration", () => {
     } finally {
       await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
     }
-  });
+  }, 60_000); // two full runs of every migration; CI runs the restore drill beside this suite
+
+  it("a runner waits for the migration lock longer than the 5 s DDL lock timeout", async () => {
+    const name = `${dbName}_w`;
+    await admin.query(`CREATE DATABASE ${name}`);
+    const u = new URL(testUrl);
+    u.pathname = `/${name}`;
+    const holder = new pg.Client({ connectionString: u.toString() });
+    await holder.connect();
+    try {
+      await holder.query("select pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+      const run = runMigrations(u.toString());
+      const settled = await Promise.race([run.then(() => "done", () => "failed"), sleep(6_500).then(() => "waiting")]);
+      expect(settled).toBe("waiting");
+      await holder.query("select pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]);
+      await expect(run).resolves.toBeUndefined();
+    } finally {
+      await holder.end();
+      await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+    }
+  }, 60_000);
 
   it("refuses to run when an applied migration was edited (drift)", async () => {
     const [row] = (await db.query(`select id, hash from drizzle.__drizzle_migrations order by id limit 1`)).rows;

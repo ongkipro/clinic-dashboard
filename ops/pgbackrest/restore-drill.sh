@@ -38,6 +38,22 @@ wait_ready() {
   docker logs "$1" | tail -20 >&2
   return 1
 }
+# A restored instance accepts connections (hot standby) while it is still replaying WAL;
+# compare only after recovery has ended and the server was promoted.
+wait_recovered() {
+  for _ in $(seq 1 240); do
+    if [ "$(psql_in "$1" -c 'select pg_is_in_recovery()' 2>/dev/null)" = "f" ]; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  echo "restored instance is still in recovery" >&2
+  docker logs "$1" | tail -20 >&2
+  return 1
+}
+# pgBackRest check/backup wait 60 s for WAL by default; a busy CI runner can exceed that
+# (stanza-create does not take this option).
+pgbr=(pgbackrest --stanza=clinic --archive-timeout=300)
 
 docker build -q -t "$image" "$here" >/dev/null
 docker network create "$net" >/dev/null
@@ -67,13 +83,13 @@ seed 25
 
 echo "== backup: stanza, check, full backup"
 docker exec -u postgres "$src" pgbackrest --stanza=clinic stanza-create >/dev/null
-docker exec -u postgres "$src" pgbackrest --stanza=clinic check >/dev/null
-docker exec -u postgres "$src" pgbackrest --stanza=clinic --type=full backup >/dev/null
+docker exec -u postgres "$src" "${pgbr[@]}" check >/dev/null
+docker exec -u postgres "$src" "${pgbr[@]}" --type=full backup >/dev/null
 
 echo "== after backup: more rows, archived through WAL only"
 seed 10
 psql_in "$src" -c "select pg_switch_wal()" >/dev/null
-docker exec -u postgres "$src" pgbackrest --stanza=clinic check >/dev/null # waits for the WAL push
+docker exec -u postgres "$src" "${pgbr[@]}" check >/dev/null # waits for the WAL push
 
 # Row count plus an order-independent content checksum per table.
 counts_sql="select t, n, md5(h) from (
@@ -97,6 +113,7 @@ docker exec "$dst" bash -c '
 ' >/dev/null
 docker exec -d -e PGBACKREST_ARCHIVE=off "$dst" /usr/local/bin/entrypoint-pgbackrest.sh postgres
 wait_ready "$dst"
+wait_recovered "$dst"
 actual="$(psql_in "$dst" -c "$counts_sql")"
 
 echo "expected:"; echo "$expected"
