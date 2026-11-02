@@ -2,7 +2,7 @@
 
 - **What:** one multi-tenant platform for Indonesian beauty and aesthetic clinics — staff operations, electronic medical record (RME) and SATUSEHAT, cashier, packages and patient balance, stock and pharmacy, commission, WhatsApp CRM, accounting, vendor console and a patient public site. A clinic system, not an online shop (P-13).
 - **First client:** Numa Klinik (P-20, P-23). **Commercial model:** tenders plus a monthly server fee per clinic from go-live, billed through the vendor's AutoLaris account (P-14).
-- **Status:** kit **v0.7**, Approved for development 2026-11-02 (P-27, gate G1); promoted to `~/Projects/clinic-dashboard`, where the repository copies are canonical and this folder is a non-authoritative snapshot. Deployment still needs its own approval. Five review rounds with Opus 5.5, GPT-6.1 Sol, GPT-6 Astra and Fable 5.1 have been applied (`docs/research/reviews/`).
+- **Status:** kit **v0.7**, Approved for development 2026-11-02 (P-27, gate G1); promoted to `~/Projects/clinic-dashboard`, where this `docs/spec/` folder is canonical; retired external staging copies are non-authoritative. Deployment still needs its own approval. Five review rounds with Opus 5.5, GPT-6.1 Sol, GPT-6 Astra and Fable 5.1 have been applied (`docs/research/reviews/`).
 - **Canonical** in this repository since 2026-11-02 (P-27, DEL-1); the planning folder is retired (archive `/data/backups/clinic-dashboard-kit/`). Research and reviews: `docs/research/`.
 - **Validate:** `pnpm docs:check` from the repository root.
 

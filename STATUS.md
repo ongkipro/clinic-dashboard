@@ -43,7 +43,8 @@ None for M0. These open questions gate later milestones (see `docs/spec/02-PRD.m
 
 - 2026-11-02 `project-check --full`: lint, build and delivery contract passed (bootstrap).
 - 2026-11-02 `pnpm docs:check`: PASS, 24 spec files, 653 declarations, 131 tasks, 0 findings.
-- 2026-11-02 round 7 review (GPT-6 Astra) applied; `pnpm docs:check` PASS, `project-check --full` VERIFIED.
+- 2026-11-02 round 7 review (GPT-6 Astra route) applied; `pnpm docs:check` PASS, `project-check --full` VERIFIED.
+- 2026-11-02 closure review and follow-up confirmation: all F1–F9 CLOSED as specification defects; final APPROVE (`docs/research/reviews/round7-closure-final-astra.md`). Generator reproduced byte-for-byte; 131 tasks, no forward dependencies, UI contracts and migration/schema-permission invariants checked. T-001 remains unstarted.
 
 ## Next verified action
 

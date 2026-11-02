@@ -56,7 +56,7 @@ Nothing is forked or copied from Kliniknuma. It is consulted only for lessons:
 | Versioned catalog and sale-time snapshots | PR-41, DATA-6 |
 | Facility-strict RLS and global unique keys | **Not repeated** (06 policy kinds, TEN-10) |
 
-## 3. Money Scenario Suite (must pass in M4/M5)
+## 3. Money Scenario Suite (domain behaviour M4, commission M5, journals and scenario 20 M8)
 
 From `docs/research/SESSION-HANDOFF-2026-10-30.md` §7 and `docs/research/OPERATIONAL-SCENARIO-AUDIT.md`:
 1. New patient buys products only.

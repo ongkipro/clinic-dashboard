@@ -110,7 +110,7 @@ Schema convention: each module owns `src/modules/<module>/schema.ts`; `src/db/sc
 
 Foundation schemas (T-002): `tenants`, `branches` in `src/modules/org/schema.ts`; `tenants_registry` in `src/modules/vendor/schema.ts`.
 
-Dependency direction: the single rule is in `03` §2 (platform core never imports clinic-domain modules except through their published interfaces or events); a module writes only its own tables; cross-module reads go through exported queries or events.
+Dependency direction: the single rule is in `03` §4 (platform core never imports clinic-domain modules except through their published interfaces or events); a module writes only its own tables; cross-module reads go through exported queries or events.
 
 ### Repository documents at promotion
 

@@ -101,7 +101,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-007: Identity chain: accounts → memberships → staff (1:1), staff_roles, staff_branches with composite FKs, acting role and branch scope per IAM-9 (DATA-55)
 - **Primary requirement:** PR-3
 - **Risk Level:** R4
-- **Allowed Paths:** `src/modules/org/**`, `drizzle/**`, `tests/org/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/org/**`, `drizzle/**`, `tests/org/**`, `src/db/schema/index.ts`, `src/modules/org/schema.ts`
 - **Protected Paths:** `drizzle/**`
 - **Depends On:** T-006
 - **Visual Contract:** Not applicable
@@ -112,7 +112,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-008: Audit attribution and log: `audit_events` with DATA-60 fields set server-side, hash chain per tenant, daily write-once copy, Log Audit read API
 - **Primary requirement:** PR-51
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/audit/**`, `drizzle/**`, `tests/audit/**`, `src/app/(app)/audit/**`, `tests/ui/audit.spec.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/audit/**`, `drizzle/**`, `tests/audit/**`, `src/app/(app)/audit/**`, `tests/ui/audit.spec.ts`, `src/db/schema/index.ts`, `src/modules/audit/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-007
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-31; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -123,7 +123,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-009: Idempotency records with request fingerprint and replay contract (DATA-45) as a shared command wrapper
 - **Primary requirement:** PR-1
 - **Risk Level:** R3
-- **Allowed Paths:** `src/lib/command.ts`, `src/modules/idempotency/**`, `drizzle/**`, `tests/idempotency/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/lib/command.ts`, `src/modules/idempotency/**`, `drizzle/**`, `tests/idempotency/**`, `src/db/schema/index.ts`, `src/modules/idempotency/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-008
 - **Visual Contract:** Not applicable
@@ -134,7 +134,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-010: Domain events outbox, worker claim with SKIP LOCKED and per-row tenant binding, consumer receipts (DATA-59, TEN-5)
 - **Primary requirement:** PR-1
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/events/**`, `src/workers/outbox.ts`, `drizzle/**`, `tests/events/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/events/**`, `src/workers/outbox.ts`, `drizzle/**`, `tests/events/**`, `src/db/schema/index.ts`, `src/modules/events/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-009
 - **Visual Contract:** Not applicable
@@ -145,7 +145,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-011: Approvals engine: requester ≠ approver, owner self-write-off whitelist, approval types registry
 - **Primary requirement:** PR-37
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/approvals/**`, `drizzle/**`, `tests/approvals/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/approvals/**`, `drizzle/**`, `tests/approvals/**`, `src/db/schema/index.ts`, `src/modules/approvals/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-010
 - **Visual Contract:** Not applicable
@@ -200,7 +200,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-016: In-app notifications with acknowledgement (generic engine; alert types added by later tasks)
 - **Primary requirement:** PR-54
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/notifications/**`, `drizzle/**`, `tests/notifications/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/notifications/**`, `drizzle/**`, `tests/notifications/**`, `src/db/schema/index.ts`, `src/modules/notifications/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-010
 - **Visual Contract:** Not applicable
@@ -211,18 +211,18 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-017: Settings registry SET-1–SET-49: typed values, bounds, scope, versions, drafts and approvals, Kembalikan ke default, snapshot helper
 - **Primary requirement:** PR-38
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/settings/**`, `drizzle/**`, `tests/settings/**`, `src/app/(app)/pengaturan/**`, `tests/ui/pengaturan.spec.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/settings/**`, `drizzle/**`, `tests/settings/**`, `src/app/(app)/pengaturan/**`, `tests/ui/pengaturan.spec.ts`, `src/db/schema/index.ts`, `src/modules/settings/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-011
 - **Visual Contract:** Visual contract per `docs/spec/19` §2.17 and §5; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenarios PR-38 (out of bounds, restore default) pass; every SET row in `19` §5 exists with its default, bound and changer; fixed rules are absent from the registry; browser check of the Pengaturan editor including Kembalikan ke default
+- **Done when:** Scenarios PR-38 (out of bounds, restore default) pass; every SET row in `19` §5 exists with its default, bound and changer; fixed rules are absent from the registry; browser check of the Pengaturan editor including Kembalikan ke default; SET-44 accepts month_end or day(1..28), defaults to month_end and never changes the monthly cadence
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-018: Vendor profile with placeholder marking and residency fields (DATA-47)
 - **Primary requirement:** PR-55
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/vendor/profile/**`, `drizzle/**`, `tests/vendor/profile.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/vendor/profile/**`, `drizzle/**`, `tests/vendor/profile.test.ts`, `src/db/schema/index.ts`, `src/modules/vendor/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-008
 - **Visual Contract:** Not applicable
@@ -233,7 +233,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-019: Compliance register: evidence items, file versions with checksum, approvals bound to file/config version, feature-gate evaluator (DATA-71)
 - **Primary requirement:** PR-97
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/compliance/**`, `drizzle/**`, `tests/compliance/**`, `src/app/(app)/kepatuhan/**`, `src/app/vendor/kepatuhan/**`, `tests/ui/kepatuhan.spec.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/compliance/**`, `drizzle/**`, `tests/compliance/**`, `src/app/(app)/kepatuhan/**`, `src/app/vendor/kepatuhan/**`, `tests/ui/kepatuhan.spec.ts`, `src/db/schema/index.ts`, `src/modules/compliance/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-018, T-011
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-58; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -244,7 +244,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-020: Vendor staff and roles with TOTP, IP allowlist, maker-checker for fee change, suspension, exit, waiver, clinical grant
 - **Primary requirement:** PR-57
 - **Risk Level:** R4
-- **Allowed Paths:** `src/modules/vendor/staff/**`, `drizzle/**`, `tests/vendor/staff.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/vendor/staff/**`, `drizzle/**`, `tests/vendor/staff.test.ts`, `src/db/schema/index.ts`, `src/modules/vendor/schema.ts`
 - **Protected Paths:** `src/modules/vendor/**`
 - **Depends On:** T-006, T-011
 - **Visual Contract:** Not applicable
@@ -266,7 +266,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-022: Tenant lifecycle states and suspension effects (TEN-12)
 - **Primary requirement:** PR-56
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/vendor/lifecycle/**`, `drizzle/**`, `tests/vendor/lifecycle.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/vendor/lifecycle/**`, `drizzle/**`, `tests/vendor/lifecycle.test.ts`, `src/db/schema/index.ts`, `src/modules/vendor/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-020
 - **Visual Contract:** Not applicable
@@ -288,7 +288,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-024: Onboarding grant: configuration-only scope, draft invitations, owner-confirmed, never Level 2 roles, imports owner-started (TEN-13)
 - **Primary requirement:** PR-58
 - **Risk Level:** R4
-- **Allowed Paths:** `src/modules/vendor/onboarding/**`, `drizzle/**`, `tests/vendor/onboarding.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/vendor/onboarding/**`, `drizzle/**`, `tests/vendor/onboarding.test.ts`, `src/db/schema/index.ts`, `src/modules/vendor/schema.ts`
 - **Protected Paths:** `src/modules/vendor/**`
 - **Depends On:** T-023
 - **Visual Contract:** Not applicable
@@ -299,7 +299,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-025: Support sessions: scope by object kind, TTL ≤ 2 h, operator RLS predicates (TEN-14, TEN-17)
 - **Primary requirement:** PR-53
 - **Risk Level:** R4
-- **Allowed Paths:** `src/modules/vendor/support/**`, `src/db/rls/operator.sql`, `drizzle/**`, `tests/vendor/support.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/vendor/support/**`, `src/db/rls/operator.sql`, `drizzle/**`, `tests/vendor/support.test.ts`, `src/db/schema/index.ts`, `src/modules/vendor/schema.ts`
 - **Protected Paths:** `src/db/rls/**`
 - **Depends On:** T-024, T-003
 - **Visual Contract:** Not applicable
@@ -321,7 +321,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-027: Onboarding checklist per tenant/branch and go-live confirmation
 - **Primary requirement:** PR-59
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/vendor/checklist/**`, `src/app/vendor/onboarding/**`, `tests/vendor/checklist.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/vendor/checklist/schema.ts`
+- **Allowed Paths:** `src/modules/vendor/checklist/**`, `src/app/vendor/onboarding/**`, `tests/vendor/checklist.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/vendor/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-025
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-41 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -362,14 +362,14 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
-#### T-031: Pengguna & Akses: read-only permission matrix, sessions with revoke (≤ 60 s), duty assignments, change log (DATA-65, IAM-16)
+#### T-031: Staf & Undangan UX-3: staff, invitations and credential-status segments; Pengguna & Akses permission matrix, membership sessions, duties and change log
 - **Primary requirement:** PR-91
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/org/access/**`, `src/app/(app)/pengguna-akses/**`, `tests/org/access.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/org/access/**`, `src/app/(app)/pengguna-akses/**`, `tests/org/access.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/org/schema.ts`, `src/app/(app)/staf/**`, `src/modules/org/staff/**`, `tests/ui/staf.spec.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-030
-- **Visual Contract:** Visual contract per `docs/spec/17` UX-3 ▸ Akses and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-91 passes; revoking ends only that membership's sessions; an already open session loses access within 60 s
+- **Depends On:** T-030, T-007
+- **Visual Contract:** Visual contract per `docs/spec/17` UX-3 and `docs/spec/19` Staf & Undangan (all segments); tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
+- **Done when:** Scenario PR-91 passes; revoking ends only that membership's sessions; an already open session loses access within 60 s; browser checks of staff list/detail, invite creation/acceptance and credential-status segment using fixtures (credential verification actions completed in the credentials task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -389,7 +389,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-033: Catalog versions with clinical-review publishing gate
 - **Primary requirement:** PR-41
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/catalog/**`, `drizzle/**`, `tests/catalog/**`, `src/app/(app)/katalog/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/catalog/**`, `drizzle/**`, `tests/catalog/**`, `src/app/(app)/katalog/**`, `src/db/schema/index.ts`, `src/modules/catalog/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-032
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-25; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -400,7 +400,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-034: Master Layanan: durations, resources, staff eligibility, BHP recipe, consent and aftercare links, online-bookable (DATA-62) + UX-25 screen
 - **Primary requirement:** PR-88
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/catalog/service/**`, `src/app/(app)/layanan/**`, `drizzle/**`, `tests/catalog/service.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/catalog/service/**`, `src/app/(app)/layanan/**`, `drizzle/**`, `tests/catalog/service.test.ts`, `src/db/schema/index.ts`, `src/modules/catalog/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-033, T-014
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-25 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -411,7 +411,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-035: Branch price overrides (owner only), effective-dated
 - **Primary requirement:** PR-42
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/catalog/prices/**`, `drizzle/**`, `tests/catalog/prices.test.ts`, `src/app/(app)/katalog/harga-cabang/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/catalog/prices/**`, `drizzle/**`, `tests/catalog/prices.test.ts`, `src/app/(app)/katalog/harga-cabang/**`, `src/db/schema/index.ts`, `src/modules/catalog/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-033
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-25 branch price tab; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -422,7 +422,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-036: Branch master UX-2: hours, closures, rooms, devices, services, WhatsApp, map, publish window, licence fields (SET-46)
 - **Primary requirement:** PR-2
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/org/branches/**`, `src/app/(app)/pengaturan/cabang/**`, `tests/org/branches.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/org/branches/**`, `src/app/(app)/pengaturan/cabang/**`, `tests/org/branches.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/org/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-032, T-014
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-2 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -433,7 +433,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-037: Patient registration with identity types, guardian, duplicate decision, encrypted NIK + blind index (UX-4)
 - **Primary requirement:** PR-5
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/patients/**`, `src/app/(app)/pasien/baru/**`, `drizzle/**`, `tests/patients/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/patients/**`, `src/app/(app)/pasien/baru/**`, `drizzle/**`, `tests/patients/**`, `src/db/schema/index.ts`, `src/modules/patients/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-032, T-014
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-4 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -444,7 +444,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-038: Consent ledger with immutable consent-text versions and withdrawal
 - **Primary requirement:** PR-4
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/patients/consents/**`, `drizzle/**`, `tests/patients/consents.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/patients/consents/**`, `drizzle/**`, `tests/patients/consents.test.ts`, `src/db/schema/index.ts`, `src/modules/patients/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-037
 - **Visual Contract:** Not applicable
@@ -455,7 +455,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-039: Privacy workspace: consent texts, consent ledger view, processors, breach register with 72 h deadline and notices (UX-30 ▸ Privasi)
 - **Primary requirement:** PR-92
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/privacy/**`, `src/app/(app)/privasi/**`, `drizzle/**`, `tests/privacy/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/privacy/**`, `src/app/(app)/privasi/**`, `drizzle/**`, `tests/privacy/**`, `src/db/schema/index.ts`, `src/modules/privacy/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-038
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-30 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -474,21 +474,21 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
-#### T-041: Global patient search under RLS: masked phone, rate limit, no query logging, abuse alert
+#### T-041: Patient list UX-4 (filters and saved segments) and global patient search under RLS: masked phone, rate limit, no query logging, abuse alert
 - **Primary requirement:** PR-76
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/patients/search/**`, `tests/patients/search.test.ts`
+- **Allowed Paths:** `src/modules/patients/search/**`, `tests/patients/search.test.ts`, `src/app/(app)/pasien/page.tsx`, `src/app/(app)/pasien/_components/**`, `tests/ui/pasien-list.spec.ts`, `src/modules/patients/schema.ts`, `drizzle/**`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-040
-- **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-76 passes; query string absent from logs; rate limit enforced
+- **Visual Contract:** Visual contract per `docs/spec/17` UX-4 and `docs/spec/19` §2 Daftar Pasien; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
+- **Done when:** Scenario PR-76 passes; query string absent from logs; rate limit enforced; browser check of Daftar Pasien filters and persisted saved segments; cross-tenant negatives on list and saved segments
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-042: Duplicate patient merge (records officer), audited and reversible
 - **Primary requirement:** PR-85
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/patients/merge/**`, `tests/patients/merge.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/patients/merge/**`, `tests/patients/merge.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/patients/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-040
 - **Visual Contract:** Not applicable
@@ -499,22 +499,22 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-043: Staff schedules (shifts, leave) per branch (UX-33)
 - **Primary requirement:** PR-48
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/scheduling/rosters/**`, `src/app/(app)/jadwal-staf/**`, `tests/scheduling/rosters.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/scheduling/rosters/**`, `src/app/(app)/jadwal-staf/**`, `tests/scheduling/rosters.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/scheduling/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-036
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-33 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-48 passes
+- **Done when:** Roster shifts and leave persist per branch; module-level availability excludes a doctor on leave (full scenario PR-48 roster in the booking task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-044: Booking engine: valid slots from service master, resources reserved together, channel and source, slot hold
 - **Primary requirement:** PR-6
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/scheduling/booking/**`, `drizzle/**`, `tests/scheduling/booking.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/scheduling/booking/**`, `drizzle/**`, `tests/scheduling/booking.test.ts`, `src/db/schema/index.ts`, `src/modules/scheduling/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-034, T-043
 - **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-6 passes; overlapping reservations refused by exclusion constraint; scenario PR-88 (no device → no slot) passes; bookings store the catalog version used; slot half of scenario PR-2 (branch hours and closures limit slots) passes
+- **Done when:** Scenario PR-6 passes; overlapping reservations refused by exclusion constraint; scenario PR-88 (no device → no slot) passes; bookings store the catalog version used; slot half of scenario PR-2 (branch hours and closures limit slots) passes; full scenario PR-48 roster passes: requesting a slot for a doctor on leave yields no slot
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -543,7 +543,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-047: Check-in, visit with independent states, Hari Ini board with VisitTrack and Belum dibayar section (UX-6)
 - **Primary requirement:** PR-7
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/visits/**`, `src/app/(app)/hari-ini/**`, `drizzle/**`, `tests/visits/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/visits/**`, `src/app/(app)/hari-ini/**`, `drizzle/**`, `tests/visits/**`, `src/db/schema/index.ts`, `src/modules/visits/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-045, T-040
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-6 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -554,7 +554,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-048: Walk-in registration and daily queue numbers; paired TV display without names
 - **Primary requirement:** PR-71
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/visits/queue/**`, `src/app/(app)/antrean/**`, `tests/visits/queue.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/visits/queue/**`, `src/app/(app)/antrean/**`, `tests/visits/queue.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/visits/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-047
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-6 ▸ Antrean and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -578,18 +578,18 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-050: Credential model (STR lifetime, SIP per branch) and expiry alerts 60/30/7
 - **Primary requirement:** PR-73
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/org/credentials/**`, `tests/org/credentials.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/org/credentials/**`, `tests/org/credentials.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/app/(app)/staf/**`, `tests/ui/staf-kredensial.spec.ts`, `src/modules/org/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-049
-- **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-73 passes; no alert for lifetime STR
+- **Visual Contract:** Visual contract per `docs/spec/17` UX-3 credential verification segment; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
+- **Done when:** Scenario PR-73 passes; no alert for lifetime STR; browser check of STR/SIP credential verification in Staf & Undangan; expired/invalid credentials remain blocked
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-051: BC Pendampingan flow (UX-7): intake, photos, Observasi Kulit, Kirim ke Dokter; no scores
 - **Primary requirement:** PR-9
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/clinical/intake/**`, `src/app/(app)/pendampingan/**`, `drizzle/**`, `tests/clinical/intake.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/clinical/intake/**`, `src/app/(app)/pendampingan/**`, `drizzle/**`, `tests/clinical/intake.test.ts`, `src/db/schema/index.ts`, `src/modules/clinical/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-049
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-7 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -600,7 +600,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-052: Lembar Pemeriksaan (UX-8): verify intake, SOAP templates, face map with dose per point, staged plan, BC/FO projection
 - **Primary requirement:** PR-10
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/clinical/exam/**`, `src/app/(app)/pemeriksaan/**`, `drizzle/**`, `tests/clinical/exam.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/clinical/exam/**`, `src/app/(app)/pemeriksaan/**`, `drizzle/**`, `tests/clinical/exam.test.ts`, `src/db/schema/index.ts`, `src/modules/clinical/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-051
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-8 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -611,7 +611,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-053: Signing, immutability, 2×24 h correction, late corrections via approval, patient copy, retention
 - **Primary requirement:** PR-13
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/clinical/records/**`, `drizzle/**`, `tests/clinical/records.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/clinical/records/**`, `drizzle/**`, `tests/clinical/records.test.ts`, `src/db/schema/index.ts`, `src/modules/clinical/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-052
 - **Visual Contract:** Not applicable
@@ -622,7 +622,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-054: Procedure consent (UX-39) and start gates: credentials, competence, contraindication, consent matches items and doses
 - **Primary requirement:** PR-11
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/clinical/consent/**`, `src/app/(app)/persetujuan-tindakan/**`, `tests/clinical/consent.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/clinical/consent/**`, `src/app/(app)/persetujuan-tindakan/**`, `tests/clinical/consent.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/clinical/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-053, T-050
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-39 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -633,7 +633,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-055: Private clinical media with short-lived tokens; photo compare
 - **Primary requirement:** PR-32
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/clinical/media/**`, `tests/clinical/media.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/clinical/media/**`, `tests/clinical/media.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/clinical/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-052
 - **Visual Contract:** Not applicable
@@ -644,7 +644,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-056: Permintaan Klinis (UX-27): additions, plan changes, substitutions decided by clinician
 - **Primary requirement:** PR-45
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/clinical/requests/**`, `src/app/(app)/permintaan/**`, `tests/clinical/requests.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/clinical/requests/**`, `src/app/(app)/permintaan/**`, `tests/clinical/requests.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/clinical/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-054
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-27 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -655,7 +655,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-057: Keluhan Klinis and Layanan tasks from visit notes and staff flags, SET-31 targets (UX-28)
 - **Primary requirement:** PR-43
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/clinical/complaints/**`, `src/app/(app)/keluhan/**`, `tests/clinical/complaints.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/clinical/complaints/**`, `src/app/(app)/keluhan/**`, `tests/clinical/complaints.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/clinical/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-053
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-28 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -666,7 +666,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-058: Document templates (UX-54) and signed medical letters
 - **Primary requirement:** PR-74
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/documents/**`, `src/app/(app)/templat/**`, `tests/documents/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/documents/**`, `src/app/(app)/templat/**`, `tests/documents/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/documents/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-053
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-54 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -690,7 +690,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-060: Items, batches, opened vials, FEFO, min/target, counts (UX-11)
 - **Primary requirement:** PR-17
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/inventory/**`, `src/app/(app)/stok/**`, `drizzle/**`, `tests/inventory/items.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/inventory/**`, `src/app/(app)/stok/**`, `drizzle/**`, `tests/inventory/items.test.ts`, `src/db/schema/index.ts`, `src/modules/inventory/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-059
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-11 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -701,7 +701,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-061: Depots, batch holdings, atomic linked transfers (DATA-63)
 - **Primary requirement:** PR-89
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/inventory/depots/**`, `drizzle/**`, `tests/inventory/depots.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/inventory/depots/**`, `drizzle/**`, `tests/inventory/depots.test.ts`, `src/db/schema/index.ts`, `src/modules/inventory/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-060
 - **Visual Contract:** Not applicable
@@ -712,7 +712,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-062: Material lifecycle request → issue → consume/return/waste; no double deduction
 - **Primary requirement:** PR-16
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/inventory/materials/**`, `tests/inventory/materials.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/inventory/materials/**`, `tests/inventory/materials.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/inventory/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-061
 - **Visual Contract:** Not applicable
@@ -723,7 +723,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-063: Moving average cost per item per branch
 - **Primary requirement:** PR-46
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/inventory/costing/**`, `tests/inventory/costing.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/inventory/costing/**`, `tests/inventory/costing.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/inventory/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-062
 - **Visual Contract:** Not applicable
@@ -734,7 +734,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-064: Ruang Tindakan checklist, staged timer, four outcomes, session effects contract (UX-9)
 - **Primary requirement:** PR-14
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/treatment/**`, `src/app/(app)/ruang/**`, `drizzle/**`, `tests/treatment/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/treatment/**`, `src/app/(app)/ruang/**`, `drizzle/**`, `tests/treatment/**`, `src/db/schema/index.ts`, `src/modules/treatment/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-062
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-9 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -745,7 +745,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-065: Siapkan & Serahkan: prep list, seven checks, quarantine/recall blocks, labels (UX-10)
 - **Primary requirement:** PR-18
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/pharmacy/**`, `src/app/(app)/apotek/**`, `tests/pharmacy/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/pharmacy/**`, `src/app/(app)/apotek/**`, `tests/pharmacy/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/pharmacy/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-064
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-10 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -756,7 +756,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-066: Suppliers and supplier returns
 - **Primary requirement:** PR-75
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/purchasing/suppliers/**`, `tests/purchasing/returns.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/purchasing/suppliers/**`, `tests/purchasing/returns.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/purchasing/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-063
 - **Visual Contract:** Not applicable
@@ -767,7 +767,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-067: Purchase orders, goods receipts (GRNI), supplier invoices, payments, allocations, credit applications (UX-52)
 - **Primary requirement:** PR-90
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/purchasing/**`, `src/app/(app)/pembelian/**`, `drizzle/**`, `tests/purchasing/payables.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/purchasing/**`, `src/app/(app)/pembelian/**`, `drizzle/**`, `tests/purchasing/payables.test.ts`, `src/db/schema/index.ts`, `src/modules/purchasing/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-066
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-52 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -778,7 +778,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-068: Logbooks (sterilization, calibration, B3 waste) and patient-safety incident register
 - **Primary requirement:** PR-82
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/safety/**`, `src/app/(app)/logbook/**`, `tests/safety/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/safety/**`, `src/app/(app)/logbook/**`, `tests/safety/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/safety/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-064
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-9 ▸ Logbook, UX-28 ▸ Insiden and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -813,7 +813,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-071: Invoice and tax foundation: frozen price, tax category snapshot, PKP gate via compliance register, PKP turnover monitor
 - **Primary requirement:** PR-24
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/cashier/invoice/**`, `src/modules/tax/**`, `drizzle/**`, `tests/tax/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/cashier/invoice/**`, `src/modules/tax/**`, `drizzle/**`, `tests/tax/**`, `src/db/schema/index.ts`, `src/modules/cashier/schema.ts`, `src/modules/tax/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-070, T-019
 - **Visual Contract:** Not applicable
@@ -824,7 +824,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-072: Kasir (UX-12): invoices, split tender, proportional allocation, receipts, counter sale, void via approval
 - **Primary requirement:** PR-19
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/cashier/**`, `src/app/(app)/kasir/**`, `tests/cashier/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/cashier/**`, `src/app/(app)/kasir/**`, `tests/cashier/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/cashier/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-071
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-12 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -835,7 +835,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-073: Payment port and mock adapter (UX-56) with contract suite; mock hidden in production
 - **Primary requirement:** PR-68
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/payments/**`, `src/app/(app)/simulasi/**`, `tests/payments/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/payments/**`, `src/app/(app)/simulasi/**`, `tests/payments/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/payments/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-56; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -846,18 +846,18 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-074: Additional treatment payment flow, release before payment, receivable fallback, close guard
 - **Primary requirement:** PR-15
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/cashier/additions/**`, `tests/cashier/additions.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/cashier/additions/**`, `tests/cashier/additions.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/cashier/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072, T-056
 - **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-15 additional payment, CLIN-020, CLIN-025 and the domain part of money scenario 3 pass; scenario PR-7 unpaid-addition blocker passes (receivable conversion in the refunds task, WhatsApp reminder in the reminders task)
+- **Done when:** Scenarios PR-15 alerts and PR-15 cannot close unpaid, CLIN-020, CLIN-025 and the domain part of money scenario 3 pass; PR-7 unpaid-addition blocker passes (receivable conversion in refunds; full PR-15 receivable after the WhatsApp-bill fallback in outbound)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-075: Patient balance ledger (never expires)
 - **Primary requirement:** PR-21
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/balance/**`, `tests/balance/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/balance/**`, `tests/balance/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/balance/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072
 - **Visual Contract:** Not applicable
@@ -868,7 +868,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-076: Packages: unlock by paid value, reserve/redeem, expiry and cancellation to balance
 - **Primary requirement:** PR-20
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/packages/**`, `drizzle/**`, `tests/packages/**`, `src/db/schema/index.ts`, `src/app/(app)/kasir/paket-saldo/**`, `tests/ui/paket-saldo.spec.ts`
+- **Allowed Paths:** `src/modules/packages/**`, `drizzle/**`, `tests/packages/**`, `src/db/schema/index.ts`, `src/app/(app)/kasir/paket-saldo/**`, `tests/ui/paket-saldo.spec.ts`, `src/modules/packages/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072, T-075, T-074
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-13; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -879,7 +879,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-077: Booking DP lifecycle incl. no-show and reschedule effects (PR-83 integration)
 - **Primary requirement:** PR-22
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/cashier/deposits/**`, `tests/cashier/deposits.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/cashier/deposits/**`, `tests/cashier/deposits.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/cashier/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-075, T-045
 - **Visual Contract:** Not applicable
@@ -890,18 +890,18 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-078: Refunds (balance default, cash exception), receivables and write-offs (UX-14)
 - **Primary requirement:** PR-21
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/cashier/receivables/**`, `src/app/(app)/piutang/**`, `tests/cashier/receivables.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/cashier/receivables/**`, `src/app/(app)/piutang/**`, `tests/cashier/receivables.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/cashier/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-077
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-14 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenarios PR-21 refund goes to balance by default, PR-15 receivable fallback, PR-37 owner write-off and PR-63 Admin Pusat boundary pass; money scenarios 9 and 15 pass and the receivable half of 3; the commission half of money scenario 14 passes in the commission task
+- **Done when:** PR-21 refund goes to balance by default and PR-63 Admin Pusat boundary pass; PR-37 owner write-off passes at module level (owner self-approval, mandatory reason, audit; commission exclusion completed in commission); PR-15 receivable conversion passes at module level (full WhatsApp-bill fallback in outbound); money scenarios 9 and 15 and the receivable half of 3 pass
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-079: Consultation fee and free controls
 - **Primary requirement:** PR-12
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/cashier/consultation/**`, `tests/cashier/consultation.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/cashier/consultation/**`, `tests/cashier/consultation.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/cashier/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072, T-078
 - **Visual Contract:** Not applicable
@@ -912,7 +912,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-080: Manual discount limits per role and approval
 - **Primary requirement:** PR-72
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/cashier/discounts/**`, `tests/cashier/discounts.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/cashier/discounts/**`, `tests/cashier/discounts.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/cashier/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072
 - **Visual Contract:** Not applicable
@@ -923,7 +923,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-081: Promo codes with atomic quota (BILL-36)
 - **Primary requirement:** PR-77
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/promo/**`, `drizzle/**`, `tests/promo/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/promo/**`, `drizzle/**`, `tests/promo/**`, `src/db/schema/index.ts`, `src/modules/promo/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-080
 - **Visual Contract:** Not applicable
@@ -934,7 +934,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-082: Family package sharing switch, beneficiaries, locked reservations
 - **Primary requirement:** PR-93
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/packages/sharing/**`, `tests/packages/sharing.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/packages/sharing/**`, `tests/packages/sharing.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/packages/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-076
 - **Visual Contract:** Not applicable
@@ -945,7 +945,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-083: Reminder-only instalment schedules for packages and receivables
 - **Primary requirement:** PR-96
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/packages/schedules/**`, `tests/packages/schedules.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/packages/schedules/**`, `tests/packages/schedules.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/packages/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-078, T-076
 - **Visual Contract:** Not applicable
@@ -956,7 +956,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-084: Expenses and petty cash (posting integrates in M8)
 - **Primary requirement:** PR-79
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/expenses/**`, `src/app/(app)/keuangan/biaya/**`, `tests/expenses/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/expenses/**`, `src/app/(app)/keuangan/biaya/**`, `tests/expenses/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/expenses/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072, T-067
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-22 ▸ Biaya; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -967,7 +967,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-085: Tutup Kasir (UX-15): any variance → manager approval, above SET-13 → owner
 - **Primary requirement:** PR-19
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/cashier/shifts/**`, `src/app/(app)/kasir/tutup/**`, `tests/cashier/shifts.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/cashier/shifts/**`, `src/app/(app)/kasir/tutup/**`, `tests/cashier/shifts.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/cashier/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-15 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -975,7 +975,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
-#### T-086: M4 exit: money scenarios 1–9, 11–20 against the fixture document
+#### T-086: M4 exit: domain money scenarios 1–9, 11–13, 15–19 (commission M5; journals and scenario 20 M8)
 - **Primary requirement:** PR-19
 - **Risk Level:** R3
 - **Allowed Paths:** `docs/evidence/m4/**`, `STATUS.md`
@@ -991,18 +991,18 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-087: Commission engine: rules, snapshots, contributions, adjustments, carry-forward, batches, per-recipient export (UX-16)
 - **Primary requirement:** PR-23
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/commission/**`, `src/app/(app)/komisi/**`, `drizzle/**`, `tests/commission/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/commission/**`, `src/app/(app)/komisi/**`, `drizzle/**`, `tests/commission/**`, `src/db/schema/index.ts`, `src/modules/commission/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-086
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-16 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-23, PR-14 commission effect and money scenarios 10 and 14 pass; commission parts of money scenarios 11 and 12 pass
+- **Done when:** Scenario PR-23, PR-14 commission effect and money scenarios 10 and 14 pass; commission parts of money scenarios 11 and 12 pass; full scenario PR-37 owner write-off passes, including exclusion from commission payment
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-088: BC targets and staff scorecard
 - **Primary requirement:** PR-47
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/commission/targets/**`, `tests/commission/targets.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/commission/targets/**`, `tests/commission/targets.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/commission/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-087
 - **Visual Contract:** Not applicable
@@ -1015,7 +1015,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-089: WABA onboarding state machine (Embedded Signup, BSP fallback), numbers, encrypted PIN, token vault
 - **Primary requirement:** PR-27
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/messaging/waba/**`, `drizzle/**`, `tests/messaging/waba.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/messaging/waba/**`, `drizzle/**`, `tests/messaging/waba.test.ts`, `src/db/schema/index.ts`, `src/modules/messaging/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-032
 - **Visual Contract:** Not applicable
@@ -1026,7 +1026,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-090: Pesan inbox (UX-17): routing, assignment, 24 h window, templates, raw webhook receipts
 - **Primary requirement:** PR-28
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/messaging/inbox/**`, `src/app/(app)/pesan/**`, `tests/messaging/inbox.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/messaging/inbox/**`, `src/app/(app)/pesan/**`, `tests/messaging/inbox.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/messaging/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-089
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-17 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1048,7 +1048,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-092: Leads pipeline and source (UX-18)
 - **Primary requirement:** PR-29
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/crm/leads/**`, `src/app/(app)/lead/**`, `tests/crm/leads.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/crm/leads/**`, `src/app/(app)/lead/**`, `tests/crm/leads.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/crm/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-090, T-072
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-18 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1059,7 +1059,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-093: Follow-up tasks from rules
 - **Primary requirement:** PR-30
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/crm/followups/**`, `tests/crm/followups.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/crm/followups/**`, `tests/crm/followups.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/crm/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-092, T-076, T-077
 - **Visual Contract:** Not applicable
@@ -1070,18 +1070,18 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-094: Outbound consent, daily budget, no health content in templates
 - **Primary requirement:** PR-31
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/messaging/outbound/**`, `tests/messaging/outbound.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/messaging/outbound/**`, `tests/messaging/outbound.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `tests/messaging/receivable-fallback.test.ts`, `src/modules/messaging/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-090, T-038
+- **Depends On:** T-090, T-038, T-078
 - **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-31 passes; scenario PR-4 consent withdrawal passes in full (queued promo not sent, care reminders continue)
+- **Done when:** Scenario PR-31 passes; scenario PR-4 consent withdrawal passes in full (queued promo not sent, care reminders continue); full scenario PR-15 receivable passes: send the WhatsApp bill through the mock adapter, keep an unpaid visit blocked, then convert to receivable so the bill is settled and the visit can close; the receivable appears at the next visit
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-095: Neutral appointment reminders with Konfirmasi/Ubah Jadwal replies
 - **Primary requirement:** PR-69
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/crm/reminders/**`, `tests/crm/reminders.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/crm/reminders/**`, `tests/crm/reminders.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/crm/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-094, T-045
 - **Visual Contract:** Not applicable
@@ -1092,7 +1092,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-096: Aftercare via neutral notice and OTP-protected link
 - **Primary requirement:** PR-70
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/crm/aftercare/**`, `src/app/(public)/aftercare/**`, `tests/crm/aftercare.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/crm/aftercare/**`, `src/app/(public)/aftercare/**`, `tests/crm/aftercare.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/crm/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-094, T-047, T-053
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-51 patient pages (aftercare link); tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1103,7 +1103,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-097: Automation scenarios with occurrences per offset and per-patient cap (UX-55)
 - **Primary requirement:** PR-94
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/crm/automation/**`, `src/app/(app)/otomasi/**`, `drizzle/**`, `tests/crm/automation.test.ts`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/crm/automation/**`, `src/app/(app)/otomasi/**`, `drizzle/**`, `tests/crm/automation.test.ts`, `src/db/schema/index.ts`, `src/modules/crm/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-095, T-096
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-55 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1114,7 +1114,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-098: Satisfaction surveys and review-request rule
 - **Primary requirement:** PR-78
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/crm/surveys/**`, `tests/crm/surveys.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/crm/surveys/**`, `tests/crm/surveys.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/crm/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-097
 - **Visual Contract:** Not applicable
@@ -1125,7 +1125,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-099: Waitlist and offer on cancellation
 - **Primary requirement:** PR-81
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/scheduling/waitlist/**`, `tests/scheduling/waitlist.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/scheduling/waitlist/**`, `tests/scheduling/waitlist.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/scheduling/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-045
 - **Visual Contract:** Not applicable
@@ -1136,7 +1136,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-100: Campaigns and segments with sending switched off until Q-15 evidence (UX-19)
 - **Primary requirement:** PR-94
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/crm/campaigns/**`, `src/app/(app)/kampanye/**`, `tests/crm/campaigns.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/crm/campaigns/**`, `src/app/(app)/kampanye/**`, `tests/crm/campaigns.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/crm/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-097, T-019
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-19 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1160,7 +1160,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-102: SATUSEHAT: per-branch credentials, facility-context invariant, identity states, sync ledger, outcome_unknown reconciliation, amendments (UX-23)
 - **Primary requirement:** PR-35
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/integrations/satusehat/**`, `src/app/(app)/satusehat/**`, `drizzle/**`, `tests/integrations/satusehat/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/integrations/satusehat/**`, `src/app/(app)/satusehat/**`, `drizzle/**`, `tests/integrations/satusehat/**`, `src/db/schema/index.ts`, `src/modules/integrations/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-059, T-065
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-23 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1171,7 +1171,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-103: Server-fee billing: fee versions, invoices, proration, AutoLaris attempts and Advice (mock HTTP), waivers, reminders (UX-43, UX-49)
 - **Primary requirement:** PR-61
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/vendor/billing/**`, `src/app/vendor/tagihan/**`, `src/app/(app)/saya/tagihan-server/**`, `tests/vendor/billing/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/vendor/billing/**`, `src/app/vendor/tagihan/**`, `src/app/(app)/saya/tagihan-server/**`, `tests/vendor/billing/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/vendor/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-027
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-43, UX-49; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1184,7 +1184,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-104: Sub-ledgers and roll-forwards (step 1), exports
 - **Primary requirement:** PR-25
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/accounting/subledgers/**`, `tests/accounting/subledgers.test.ts`, `src/app/(app)/keuangan/kewajiban/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/accounting/subledgers/**`, `tests/accounting/subledgers.test.ts`, `src/app/(app)/keuangan/kewajiban/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/accounting/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-086, T-087
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-22 ▸ Kewajiban; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1195,7 +1195,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-105: Chart of accounts, posting engine from events, periods, statements; journal export gated by posting-map evidence
 - **Primary requirement:** PR-26
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/accounting/ledger/**`, `drizzle/**`, `tests/accounting/ledger.test.ts`, `src/app/(app)/keuangan/buku-besar/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/accounting/ledger/**`, `drizzle/**`, `tests/accounting/ledger.test.ts`, `src/app/(app)/keuangan/buku-besar/**`, `src/db/schema/index.ts`, `src/modules/accounting/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-104, T-084, T-067
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-22 ▸ Buku Besar; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1206,7 +1206,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-106: Coretax XML export for PKP tenants, gated
 - **Primary requirement:** PR-98
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/tax/coretax/**`, `tests/tax/coretax.test.ts`, `src/app/(app)/keuangan/pajak/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/accounting/coretax/**`, `tests/accounting/coretax.test.ts`, `src/app/(app)/keuangan/pajak/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/accounting/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-105
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-22 ▸ Pajak; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1217,7 +1217,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-107: Dashboard read models, drill-down and per-role homes (UX-60: Klinis, Marketing, Apotek, Pembelian, Audit, Ruang Saya), K1–K19 computed from fixtures
 - **Primary requirement:** PR-33
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/reporting/dashboards/**`, `tests/reporting/dashboards.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/app/(app)/ringkasan/peran/**`, `tests/ui/ringkasan-peran.spec.ts`
+- **Allowed Paths:** `src/modules/reporting/dashboards/**`, `tests/reporting/dashboards.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/app/(app)/ringkasan/peran/**`, `tests/ui/ringkasan-peran.spec.ts`, `src/modules/reporting/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-104, T-101
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-60 and `docs/spec/19` §2.1; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1228,7 +1228,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-108: Reconciliation report KPI vs ledger
 - **Primary requirement:** PR-34
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/accounting/recon/**`, `tests/accounting/recon.test.ts`, `src/app/(app)/keuangan/rekon/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/accounting/recon/**`, `tests/accounting/recon.test.ts`, `src/app/(app)/keuangan/rekon/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/accounting/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-105, T-107
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-22 ▸ Rekon; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1316,7 +1316,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-116: Reports and KPI dictionary K1–K27 (UX-38, UX-59)
 - **Primary requirement:** PR-95
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/reporting/reports/**`, `src/app/(app)/laporan/**`, `tests/reporting/reports.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/reporting/reports/**`, `src/app/(app)/laporan/**`, `tests/reporting/reports.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/reporting/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-107
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-38, UX-59 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1327,7 +1327,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-117: Owner daily digest
 - **Primary requirement:** PR-80
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/reporting/digest/**`, `tests/reporting/digest.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/reporting/digest/**`, `tests/reporting/digest.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/reporting/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-116
 - **Visual Contract:** Not applicable
@@ -1362,7 +1362,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-120: Residency configuration and real-patient gate (ARCH-10) bound to compliance evidence
 - **Primary requirement:** PR-36
 - **Risk Level:** R4
-- **Allowed Paths:** `src/modules/platform/residency/**`, `tests/platform/residency.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/platform/residency/**`, `tests/platform/residency.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/platform/schema.ts`
 - **Protected Paths:** `src/modules/platform/**`
 - **Depends On:** T-119
 - **Visual Contract:** Not applicable
@@ -1373,7 +1373,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-121: Data-subject requests (UX-30) linked to the privacy workspace
 - **Primary requirement:** PR-50
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/privacy/requests/**`, `tests/privacy/requests.test.ts`, `src/app/(app)/privasi/permintaan/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/privacy/requests/**`, `tests/privacy/requests.test.ts`, `src/app/(app)/privasi/permintaan/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/privacy/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-119
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-30; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1384,7 +1384,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-122: Tenant export job with manifest and 24 h expiry (UX-32)
 - **Primary requirement:** PR-52
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/export/**`, `tests/export/**`, `src/app/(app)/ekspor/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/export/**`, `tests/export/**`, `src/app/(app)/ekspor/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/export/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-119
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-32; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1395,7 +1395,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-123: Public site generator and Situs Klinik admin (UX-50, UX-51)
 - **Primary requirement:** PR-64
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/public-site/**`, `src/app/(public)/[slug]/**`, `src/app/(app)/situs/**`, `tests/public/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/public-site/**`, `src/app/(public)/[slug]/**`, `src/app/(app)/situs/**`, `tests/public/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/public-site/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-119
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-50, UX-51 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -1417,7 +1417,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-125: Doctor listing with consent and immediate purge on withdrawal
 - **Primary requirement:** PR-66
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/public-site/doctors/**`, `tests/public/doctors.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/public-site/doctors/**`, `tests/public/doctors.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/public-site/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-123
 - **Visual Contract:** Not applicable
@@ -1450,11 +1450,11 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-128: Opening-data import: batches, dry-run, source-ID map, opening sub-ledgers, owner approval (DATA-58)
 - **Primary requirement:** PR-85
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/import/**`, `tests/import/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/import/**`, `tests/import/**`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/import/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-120
 - **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-85 import dry-run passes; synthetic Numa-shaped file reconciles; re-import creates no duplicates
+- **Done when:** Scenario PR-85 import dry-run passes; synthetic Numa-shaped file reconciles; re-import creates no duplicates; each imported opening liability and receivable reconciles to its balanced OpeningImportApplied journal in `11`, with no new revenue, VAT or commission
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 

@@ -149,6 +149,8 @@ This document is a pack extension (integration contracts). Requirement IDs reuse
 - Acceptance: Given any event, When inspected, Then it contains no names, phone numbers, clinical text or amounts beyond IDs.
 - Constraints: ARCH-5
 
+Posting eligibility, companion suppression and reversal ownership are defined exclusively by the canonical posting-trigger matrix in `11-BILLING-PAYMENTS.md`; a consumer labelled Posting below is conditional on that matrix, not permission for every event in the row to post.
+
 | Event | Producer | Consumers |
 |---|---|---|
 | PatientRegistered | TD-2 | CRM |
@@ -171,20 +173,22 @@ This document is a pack extension (integration contracts). Requirement IDs reuse
 | ComplaintFlagged / ComplaintResolved | TD-4 | Notifications |
 | RecordSigned / RecordAmended | TD-4 | SATUSEHAT |
 | BalanceToppedUp / BalanceUsed | TD-7 | Posting |
-| BookingDepositReceived / Applied / Forfeited / MovedToBalance | TD-7 | Posting |
+| BookingDepositReceived / BookingDepositApplied / BookingDepositForfeited / BookingDepositMovedToBalance | TD-7 | Posting per `11` matrix (MovedToBalance is notification-only) |
 | CommissionPaid | TD-8 | Posting |
 | SupplierReturned | TD-6 | Posting, supplier credit expectation |
 | ExpenseRecorded | TD-7 | Posting |
 | InvoiceVoided / DiscountApproved | TD-7 | Posting, suspicious-activity report |
-| OpeningImportApplied | TD-13 | Posting (opening journal; `11` trigger `OpeningBalanceImported`), reconciliation |
+| OpeningImportApplied | TD-13 | Posting (opening journal, same event name in `11`), reconciliation |
 | TenantLifecycleChanged / ServerFeeInvoiced / ServerFeePaid | TD-13 | Vendor console, notifications (platform events, no tenant data) |
-| ConsultationFeeCharged / Recharged | TD-7 | Posting, commission |
+| ConsultationFeeCharged / ConsultationFeeRecharged | TD-7 | Posting per `11` matrix (Recharged is notification-only), commission |
 | ProductHandedOver / ProductReturned | TD-6 | Posting (COGS), revenue |
 | SubstitutionApproved | TD-4 | Posting, commission adjustment |
 | GoodsReceived | TD-6 | Posting (GRNI), moving average |
 | SupplierInvoiceRecorded / SupplierPaymentAllocated / SupplierCreditApplied | TD-6 | Posting (AP), supplier roll-forward |
 | ReceivableCollected | TD-7 | Posting (no revenue or VAT) |
-| SupplierInvoiceReversed / SupplierPaymentReversed / SupplierCreditReversed / ExpenseReversed / JournalReversed | TD-6, TD-7, TD-10 | Posting (mirror of the original journal) |
+| SupplierInvoiceReversed / SupplierPaymentReversed / SupplierCreditReversed | TD-6 | Posting (mirror of original journal per `11`) |
+| ExpenseReversed | TD-7 | Posting (mirror of expense recognition per `11`) |
+| JournalReversed | TD-10 | Notification only, emitted after reversal journal; never a posting trigger |
 | BookingDepositRefunded | TD-7 | Posting |
 | GatewaySettlementReceived | TD-7 | Posting (clearing, fees) |
 | ShiftClosed | TD-7 | Approvals (variance) |

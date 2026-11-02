@@ -623,6 +623,52 @@ K("packages")['visual']=V("`docs/spec/17` UX-13")
 deps("m8_exit","dash_PR-33a","dash_PR-33b","dash_PR-33c","dash_PR-33d","dash_PR-33e","dash_PR-33f")
 K("nav_sweep")['done']="`pnpm test:ui -- nav-sweep` passes for every role in the `07` matrix at 390 and 1440 (verification only: a missing page is a defect in its builder task, not built here)"
 
+# ---------------- closure review follow-up (F1–F9) ----------------
+# F2: import reconciliation proves both balanced opening alternatives.
+add_done("import","each imported opening liability and receivable reconciles to its balanced OpeningImportApplied journal in `11`, with no new revenue, VAT or commission")
+# F3 is fixed in SET-44; the settings task validates its typed default.
+add_done("settings","SET-44 accepts month_end or day(1..28), defaults to month_end and never changes the monthly cadence")
+# F4: canonical module-root schemas, not just migration permission.
+for k, schema in (("access_admin","org"),("branches","org"),("merge","patients"),("shift","cashier"),("golive","vendor")):
+    paths(k,"src/modules/"+schema+"/schema.ts")
+K("golive")['paths']=[p for p in K("golive")['paths'] if p != "src/modules/vendor/checklist/schema.ts"]
+# F5: roster storage precedes the slot engine.
+done("schedules","Roster shifts and leave persist per branch; module-level availability excludes a doctor on leave (full scenario PR-48 roster in the booking task)")
+add_done("booking","full scenario PR-48 roster passes: requesting a slot for a doctor on leave yields no slot")
+# F6: real scenario names and explicit downstream integration ownership.
+done("additions","Scenarios PR-15 alerts and PR-15 cannot close unpaid, CLIN-020, CLIN-025 and the domain part of money scenario 3 pass; PR-7 unpaid-addition blocker passes (receivable conversion in refunds; full PR-15 receivable after the WhatsApp-bill fallback in outbound)")
+done("refunds","PR-21 refund goes to balance by default and PR-63 Admin Pusat boundary pass; PR-37 owner write-off passes at module level (owner self-approval, mandatory reason, audit; commission exclusion completed in commission); PR-15 receivable conversion passes at module level (full WhatsApp-bill fallback in outbound); money scenarios 9 and 15 and the receivable half of 3 pass")
+add_done("commission","full scenario PR-37 owner write-off passes, including exclusion from commission payment")
+deps("outbound","refunds")
+add_done("outbound","full scenario PR-15 receivable passes: send the WhatsApp bill through the mock adapter, keep an unpaid visit blocked, then convert to receivable so the bill is settled and the visit can close; the receivable appears at the next visit")
+paths("outbound","tests/messaging/receivable-fallback.test.ts")
+# F7: explicit builders for list and staff-screen segments.
+paths("search","src/app/(app)/pasien/page.tsx","src/app/(app)/pasien/_components/**","tests/ui/pasien-list.spec.ts","src/modules/patients/schema.ts","drizzle/**")
+K("search")['title']="Patient list UX-4 (filters and saved segments) and global patient search under RLS: masked phone, rate limit, no query logging, abuse alert"
+K("search")['visual']=V("`docs/spec/17` UX-4 and `docs/spec/19` §2 Daftar Pasien")
+add_done("search","browser check of Daftar Pasien filters and persisted saved segments; cross-tenant negatives on list and saved segments")
+paths("access_admin","src/app/(app)/staf/**","src/modules/org/staff/**","tests/ui/staf.spec.ts")
+K("access_admin")['title']="Staf & Undangan UX-3: staff, invitations and credential-status segments; Pengguna & Akses permission matrix, membership sessions, duties and change log"
+K("access_admin")['visual']=V("`docs/spec/17` UX-3 and `docs/spec/19` Staf & Undangan (all segments)")
+add_done("access_admin","browser checks of staff list/detail, invite creation/acceptance and credential-status segment using fixtures (credential verification actions completed in the credentials task)")
+deps("access_admin","membership")
+paths("cred_alerts","src/app/(app)/staf/**","tests/ui/staf-kredensial.spec.ts")
+K("cred_alerts")['visual']=V("`docs/spec/17` UX-3 credential verification segment")
+add_done("cred_alerts","browser check of STR/SIP credential verification in Staf & Undangan; expired/invalid credentials remain blocked")
+# F8: accounting owns Coretax, including its task paths.
+K("coretax")['paths']=[p.replace("src/modules/tax/coretax/","src/modules/accounting/coretax/").replace("tests/tax/coretax.test.ts","tests/accounting/coretax.test.ts") for p in K("coretax")['paths']]
+# F9: exit heading must agree with its executable acceptance scope.
+K("m4_exit")['title']="M4 exit: domain money scenarios 1–9, 11–13, 15–19 (commission M5; journals and scenario 20 M8)"
+
+# F4 final closure: every migration builder may edit the canonical root schema
+# of each module already in its declared source surface (15 §3).
+for task in T:
+    if "drizzle/**" in task['paths']:
+        for path in list(task['paths']):
+            match = re.match(r"src/modules/([^/]+)/", path)
+            if match:
+                paths(task['key'], "src/modules/" + match[1] + "/schema.ts")
+
 # ---------------- missing-PR sweep: add tasks for PRs not yet primary ----------------
 assigned={x['primary'] for x in T}
 missing=[p for p in pr if p not in assigned and p!='PR-40' and not p.startswith('PR-33')]
