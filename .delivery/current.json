@@ -1,12 +1,17 @@
 {
-  "activeRun": null,
+  "activeRun": "RUN-20261102T130612Z-c5339ef8",
+  "activeTask": "T-001",
+  "capability": "unattributed",
+  "job": "implementation",
   "lastCheckpoint": {
-    "eventId": "6ce1dd6312324b0fbbc00414571ea0ca",
-    "head": "40741c9bf021d90442abbed36e1d5f5b27b0f988",
-    "note": "Pre-development closure approved; T-001 unstarted",
-    "runId": null,
-    "state": "READY",
-    "time": "2026-11-02T11:02:29Z",
+    "eventHash": "b1d911bd283432423e342529e9a2bee82899f70a56070b258c14729adf444be4",
+    "eventId": "6fe5398fb6d3443f933e911792a8ebf9",
+    "head": "308f31057c9feb96da926395cb5b35c4cc0aa4d9",
+    "note": "T-001 verified locally and independently reviewed (R3); awaiting owner commit/push for CI proof",
+    "prevEventHash": "cec8912ea6b808c15113ed9fc2424d1e0232976218db0b0acc89a0c2938e4f21",
+    "runId": "RUN-20261102T130612Z-c5339ef8",
+    "state": "INTEGRATING",
+    "time": "2026-11-02T13:19:51Z",
     "type": "checkpoint"
   },
   "lastRun": {
@@ -14,10 +19,16 @@
     "result": "PASS",
     "runId": "RUN-20261102T084839Z-ae0a1e76"
   },
-  "observedHead": "40741c9bf021d90442abbed36e1d5f5b27b0f988",
-  "observedState": "READY",
+  "model": "cc/claude-opus-5-5",
+  "observedHead": "308f31057c9feb96da926395cb5b35c4cc0aa4d9",
+  "observedState": "INTEGRATING",
   "project": "clinic-dashboard",
+  "provider": "9router-fantastico",
+  "reasoningEffort": "medium",
+  "requirement": "PR-1",
+  "risk": "R2",
   "schemaVersion": 1,
   "statusAuthority": "STATUS.md",
-  "updatedAt": "2026-11-02T11:02:29Z"
+  "updatedAt": "2026-11-02T13:19:51Z",
+  "worker": "pi"
 }

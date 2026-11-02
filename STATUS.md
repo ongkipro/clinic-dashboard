@@ -2,11 +2,11 @@
 
 Updated: 2026-11-02
 Status: Active
-State: READY
-Review-Risk: R0
-Independent-Review: PENDING
-Primary-Worker: UNSET
-Independent-Reviewer: UNSET
+State: INTEGRATING
+Review-Risk: R3
+Independent-Review: PASS
+Primary-Worker: pi (9router-fantastico/cc/claude-opus-5-5)
+Independent-Reviewer: claude-code 2.1.316 (claude-opus-5-5, separate context; codex lane failed: sandbox bwrap error)
 Independent-Review-Head: UNSET
 
 ## Delivery state machine
@@ -23,13 +23,18 @@ Use `BLOCKED` only as an interruption state. Record the blocker and exact state 
 
 ## Current state
 
-M0 not started. Development authorized 2026-11-02 (P-27, gate G1). The specification pack, kit v0.7, is promoted into `docs/spec/`, and `TASKS.md` (131 tasks) has been re-validated.
+M0 in progress. T-001 (repository bootstrap, PR-1) is implemented and verified locally; it waits for the owner to approve commit and push so the first GitHub Actions run can prove the "exit 0 in CI" part of Done-when.
 
-Bootstrap evidence comes from the create-next-app generator: Next.js 16.4.3, React 19.3.0, an empty App Router page. PostgreSQL 16 + Drizzle, Better Auth and Coolify are decisions only. Each one becomes real only when its M0 task passes executable checks.
+Built so far: Node 26.13.0 pinned (`devEngines`, Docker image), Next.js 16.4.3 with `output: "standalone"`, `compose.yaml` (PostgreSQL 16.15, loopback only), multi-stage non-root `Dockerfile`, `.github/workflows/ci.yml` (SHA-pinned actions, PostgreSQL service ready for later tests), `pnpm docs:promotion`. Versions and their reasons: `DECISIONS.md` DEC-005.
 
 ## Active work
 
-No active implementation task is recorded.
+T-001, run `RUN-20261102T130612Z-c5339ef8`. Ledger risk escalated R2 → R3 (CI and Dockerfile); independent review APPROVE after fixes, boundary approved.
+
+Carried forward (not in T-001 Allowed Paths):
+- Add `.dockerignore` (keeps `.env*`, `node_modules`, `docs/research/` out of the build context sent to Coolify) — needs a task or a Rules exception.
+- Copy `public/` into the runtime image once the folder exists.
+- Upgrade Next.js to 16.4.4 once it passes pnpm `minimumReleaseAge`.
 
 ## Blockers
 
@@ -41,6 +46,8 @@ None for M0. These open questions gate later milestones (see `docs/spec/02-PRD.m
 
 ## Verification evidence
 
+- 2026-11-02 T-001 (Node 26.13.0, clean `node_modules` and `.next`): install --frozen-lockfile, typecheck (`next typegen && tsc`), lint, build, `pnpm audit --prod`, docs:check (24 files, 653 declarations, 131 tasks, 0 findings), docs:promotion, actionlint, Docker image (HTTP 200, uid 1000), compose PostgreSQL 16.15 — all PASS, recorded as executed checks in `.delivery/`. CI run: pending push.
+
 - 2026-11-02 `project-check --full`: lint, build and delivery contract passed (bootstrap).
 - 2026-11-02 `pnpm docs:check`: PASS, 24 spec files, 653 declarations, 131 tasks, 0 findings.
 - 2026-11-02 round 7 review (GPT-6 Astra route) applied; `pnpm docs:check` PASS, `project-check --full` VERIFIED.
@@ -48,4 +55,4 @@ None for M0. These open questions gate later milestones (see `docs/spec/02-PRD.m
 
 ## Next verified action
 
-Start T-001 (repository bootstrap: pin versions, Compose PostgreSQL, CI skeleton, `pnpm docs:check` in CI). T-001 is R2 and needs no independent review.
+Owner: approve commit and push of T-001. Then record the CI run URL and conclusion in the ledger, finish the run, and start T-002 (database core, R3).

@@ -27,18 +27,23 @@ Multi-tenant SaaS for Indonesian beauty and aesthetic clinics. One platform runs
 
 ## Quickstart
 
-Requires Node.js (LTS, pinned in T-001), pnpm and Python 3. Docker is needed from T-002 onward.
+Requires Node.js 26.13.0 (pinned in `package.json` `devEngines`; pnpm refuses other versions), pnpm 12.15.0, Python 3 and Docker. Node 26 ships without corepack: install pnpm with `npm install -g pnpm@12.15.0` under that Node (with mise: `mise exec node@26.13.0 -- <command>`).
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
+docker compose up -d --wait postgres   # PostgreSQL 16 on 127.0.0.1:5432 (local only)
 pnpm dev            # http://localhost:3000
 pnpm lint
 pnpm typecheck
 pnpm build
 pnpm docs:check     # specification traceability (scripts/check-traceability.py)
+pnpm docs:promotion # every repository document from docs/spec/15 §3 exists and is non-empty
+docker build -t clinic-dashboard .     # standalone, non-root image (DEL-4)
 ```
 
-These are added by their tasks: `docker compose up -d postgres` and `pnpm db:migrate` (T-002), `pnpm test` / `pnpm test:rls` / `pnpm test:isolation` (T-003, T-004) and `pnpm test:ui` (T-011).
+CI (`.github/workflows/ci.yml`) runs the same commands plus `pnpm audit --prod` on every push to `main` and every pull request.
+
+These are added by their tasks: `pnpm db:migrate` (T-002), `pnpm test` / `pnpm test:rls` / `pnpm test:isolation` (T-003, T-004) and `pnpm test:ui` (T-011).
 
 ## Rules that never bend
 

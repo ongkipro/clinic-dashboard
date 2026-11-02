@@ -116,7 +116,7 @@ Dependency direction: the single rule is in `03` §4 (platform core never import
 
 | File | Created by | Initial content | Updated by / when |
 |---|---|---|---|
-| `README.md` | project-init, then edited in the first task | What the product is, quickstart (`pnpm install`, `docker compose up -d db`, `pnpm db:migrate`, `pnpm dev`), links to docs | Engineering owner when setup changes |
+| `README.md` | project-init, then edited in the first task | What the product is, quickstart (`pnpm install`, `docker compose up -d postgres`, `pnpm db:migrate`, `pnpm dev`), links to docs | Engineering owner when setup changes |
 | `AGENTS.md` | project-init template + merge of the kit's `AGENTS-DRAFT.md` (done at promotion) | Sources of truth, non-negotiable rules, test commands | When a rule or command changes |
 | `PRD.md` | project-init | Index pointing to `docs/spec/02-PRD.md` | Never duplicated; edit `02-PRD.md` |
 | `TASKS.md` | promoted from this kit | 131 tasks | prd-taskbreaker when requirements change |

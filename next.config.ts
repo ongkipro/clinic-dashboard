@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Docker image runs the traced standalone server (DEL-4).
+  output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
