@@ -364,6 +364,7 @@ describe("functions (TEN-16)", () => {
     "account_memberships(uuid)",
     "audit_append(text,text,uuid,text,text,text,uuid)",
     "audit_verify(uuid)",
+    "events_claim(text,text,integer,integer)",
     "role_assign(uuid,text)",
     "role_request_decide(uuid,boolean)",
     "vendor_go_live_allowed()",
