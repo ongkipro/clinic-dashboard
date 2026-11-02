@@ -359,8 +359,8 @@ describe("scope map (TEN-3, TEN-19)", () => {
 
 describe("functions (TEN-16)", () => {
   // Security-definer functions run as their owner and skip RLS; the app may execute
-  // only those on this allow-list (empty until T-025/T-029 add them).
-  const ALLOWED_DEFINER_FUNCTIONS: string[] = [];
+  // only those on this allow-list; each entry has its own tests (tests/org).
+  const ALLOWED_DEFINER_FUNCTIONS: string[] = ["account_memberships(uuid)"];
 
   it("the app executes no SECURITY DEFINER function outside the allow-list", async () => {
     const { rows } = await h.admin.query<{ f: string }>(

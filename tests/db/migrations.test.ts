@@ -168,6 +168,17 @@ describe("05 §3.1 constraint contract", () => {
     ]);
   });
 
+  it("accepts a wider same-row key that includes (tenant_id, id)", async () => {
+    const v = await violationsWith(
+      `alter table branches add constraint branches_wide_key unique (tenant_id, id, code);
+       create table rooms (id uuid primary key, tenant_id uuid not null, branch_id uuid not null,
+         branch_code text not null, unique (tenant_id, id),
+         constraint rooms_branch_fk foreign key (tenant_id, branch_id, branch_code)
+           references branches (tenant_id, id, code) on delete restrict)`,
+    );
+    expect(v).toEqual([]);
+  });
+
   it("flags a composite FK whose columns are mis-paired", async () => {
     const v = await violationsWith(
       `create table rooms (id uuid primary key, tenant_id uuid not null, branch_id uuid not null,

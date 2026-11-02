@@ -10,6 +10,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { authUser } from "../../auth/schema";
 import { tenantsRegistry } from "../vendor/schema";
 
 // Tenant = one brand = one legal entity (PR-1, DATA-10). Its id is the registry id.
@@ -54,5 +55,158 @@ export const branches = pgTable(
       "branches_timezone_check",
       sql`${t.timezone} in ('Asia/Jakarta','Asia/Makassar','Asia/Jayapura')`,
     ),
+  ],
+);
+
+// Identity chain (DATA-55, IAM-3, IAM-9, TEN-11). A login account (auth_user) holds at
+// most one membership per tenant; each membership has exactly one staff row, created in
+// the same transaction (src/modules/org/identity.ts). Ending a membership sets
+// effective_to; history is never deleted.
+export const memberships = pgTable(
+  "memberships",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    accountId: uuid("account_id").notNull(),
+    effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull().defaultNow(),
+    effectiveTo: timestamp("effective_to", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.accountId], foreignColumns: [authUser.id] }).onDelete("restrict"),
+    unique("memberships_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("memberships_tenant_id_account_id_key").on(t.tenantId, t.accountId),
+    check(
+      "memberships_effective_check",
+      sql`${t.effectiveTo} is null or ${t.effectiveTo} > ${t.effectiveFrom}`,
+    ),
+  ],
+);
+
+export const staff = pgTable(
+  "staff",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    membershipId: uuid("membership_id").notNull(),
+    displayName: text("display_name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // staff.tenant_id = membership tenant (DATA-55).
+    foreignKey({
+      columns: [t.tenantId, t.membershipId],
+      foreignColumns: [memberships.tenantId, memberships.id],
+    }).onDelete("restrict"),
+    unique("staff_membership_id_key").on(t.membershipId),
+    unique("staff_tenant_id_id_key").on(t.tenantId, t.id),
+  ],
+);
+
+// The 16 roles of the 07 matrix. Level 2 roles hold every current and future branch of
+// the tenant (wildcard, never a stored list); Level 3 roles hold the branches listed
+// in staff_branches for that role (IAM-9). Facility head and records officer are branch
+// scoped (IAM-8).
+export const LEVEL2_ROLES = [
+  "owner",
+  "admin_pusat",
+  "finance",
+  "central_cs",
+  "marketing",
+  "purchasing",
+  "auditor",
+] as const;
+export const LEVEL3_ROLES = [
+  "manager",
+  "facility_head",
+  "records_officer",
+  "fo_cashier",
+  "bc",
+  "doctor",
+  "nurse",
+  "therapist",
+  "pharmacist",
+] as const;
+const inList = (xs: readonly string[]) => sql.raw(xs.map((x) => `'${x}'`).join(","));
+
+export const staffRoles = pgTable(
+  "staff_roles",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
+    role: text("role").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.staffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete(
+      "restrict",
+    ),
+    unique("staff_roles_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("staff_roles_staff_role_key").on(t.tenantId, t.staffId, t.role),
+    // Target for staff_branches: the branch row repeats staff and role so its CHECK can
+    // see the role, and the FK keeps them equal to the role row's.
+    unique("staff_roles_tenant_id_id_staff_role_key").on(t.tenantId, t.id, t.staffId, t.role),
+    check(
+      "staff_roles_role_check",
+      sql`${t.role} in (${inList([...LEVEL2_ROLES, ...LEVEL3_ROLES])})`,
+    ),
+  ],
+);
+
+// Branch scope of one Level 3 role of one staff member. The composite FK to branches
+// makes it impossible to assign a branch of another tenant.
+export const staffBranches = pgTable(
+  "staff_branches",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    staffRoleId: uuid("staff_role_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
+    role: text("role").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.tenantId, t.staffRoleId, t.staffId, t.role],
+      foreignColumns: [staffRoles.tenantId, staffRoles.id, staffRoles.staffId, staffRoles.role],
+    }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete(
+      "restrict",
+    ),
+    unique("staff_branches_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("staff_branches_role_branch_key").on(t.tenantId, t.staffRoleId, t.branchId),
+    // Level 2 roles never store branches (IAM-9 wildcard).
+    check("staff_branches_level3_check", sql`${t.role} in (${inList(LEVEL3_ROLES)})`),
+  ],
+);
+
+// IAM-3 / B-19: every action records the staff and acting role, taken from the bound
+// transaction context (app_staff_id(), app_acting_role()), never from the client. This
+// org log records identity actions (context selection); T-008's audit_events applies
+// the same rule to every command.
+export const orgActions = pgTable(
+  "org_actions",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull().default(sql`app_tenant_id()`),
+    staffId: uuid("staff_id").notNull().default(sql`app_staff_id()`),
+    actingRole: text("acting_role").notNull().default(sql`app_acting_role()`),
+    activeBranchId: uuid("active_branch_id"),
+    action: text("action").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.staffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete(
+      "restrict",
+    ),
+    foreignKey({
+      columns: [t.tenantId, t.activeBranchId],
+      foreignColumns: [branches.tenantId, branches.id],
+    }).onDelete("restrict"),
+    unique("org_actions_tenant_id_id_key").on(t.tenantId, t.id),
+    check("org_actions_action_check", sql`${t.action} in ('context_selected')`),
   ],
 );

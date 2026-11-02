@@ -86,11 +86,13 @@ export async function contractViolations(db: pg.ClientBase): Promise<string[]> {
   );
   for (const fk of fks.rows) {
     if (fk.deltype !== "r") out.push(`${fk.src}.${fk.name}: ON DELETE is not RESTRICT`);
-    const target = fk.pairs.map((p) => p.split("->")[1]).sort().join(",");
+    // 05 §3.1: tenant_id -> tenant_id, and the target includes the referenced row's id
+    // (wider same-row keys such as (tenant_id, id, patient_id) are allowed).
+    const target = fk.pairs.map((p) => p.split("->")[1]);
     if (
       tenantTables.has(fk.src) &&
       tenantTables.has(fk.dst) &&
-      (!fk.pairs.includes("tenant_id->tenant_id") || target !== "id,tenant_id")
+      (!fk.pairs.includes("tenant_id->tenant_id") || !target.includes("id"))
     ) {
       out.push(`${fk.src}.${fk.name}: not composite (tenant_id, id) key (${fk.pairs.join(", ")})`);
     }

@@ -18,6 +18,7 @@ export type Harness = {
   connectAs(role: string): Promise<pg.Client>;
   urlAs(role: string): string;
   poolAs(role: string): pg.Pool;
+  ownerUrl(): string; // superuser (migration owner) on the throwaway database
   createLoginRole(attrs: string, memberOf?: string[]): Promise<string>;
   createGroupRole(attrs: string): Promise<string>;
   close(): Promise<void>;
@@ -113,6 +114,9 @@ export async function createHarness(): Promise<Harness> {
     },
     urlAs(role) {
       return urlFor(role, password);
+    },
+    ownerUrl() {
+      return urlFor();
     },
     poolAs(role) {
       const pool = new pg.Pool({ connectionString: urlFor(role, password), max: 4 });
