@@ -364,6 +364,8 @@ describe("functions (TEN-16)", () => {
     "account_memberships(uuid)",
     "audit_append(text,text,uuid,text,text,text,uuid)",
     "audit_verify(uuid)",
+    "role_assign(uuid,text)",
+    "role_request_decide(uuid,boolean)",
   ];
 
   it("the app executes no SECURITY DEFINER function outside the allow-list", async () => {

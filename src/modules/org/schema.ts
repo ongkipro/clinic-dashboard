@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { authUser } from "../../auth/schema";
@@ -208,5 +209,48 @@ export const orgActions = pgTable(
     }).onDelete("restrict"),
     unique("org_actions_tenant_id_id_key").on(t.tenantId, t.id),
     check("org_actions_action_check", sql`${t.action} in ('context_selected')`),
+  ],
+);
+
+// IAM-11 / PR-63: when Admin Pusat asks for any role other than the Level 3 roles it may
+// assign (so every Level 2 role, plus Facility head and Records officer), the change is a
+// request until an owner other than the requester approves it; only then does the
+// staff_roles row exist.
+export const roleRequests = pgTable(
+  "role_requests",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull().default(sql`app_tenant_id()`),
+    staffId: uuid("staff_id").notNull(), // whose role set changes
+    role: text("role").notNull(),
+    change: text("change").notNull(), // grant | revoke
+    requestedBy: uuid("requested_by").notNull().default(sql`app_staff_id()`),
+    requestedAs: text("requested_as").notNull().default(sql`app_acting_role()`),
+    state: text("state").notNull().default("pending"), // pending | approved | rejected
+    decidedBy: uuid("decided_by"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.staffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.requestedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.decidedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("role_requests_tenant_id_id_key").on(t.tenantId, t.id),
+    check("role_requests_change_check", sql`${t.change} in ('grant','revoke')`),
+    check("role_requests_state_check", sql`${t.state} in ('pending','approved','rejected')`),
+    // Any role except the Level 3 roles Admin Pusat assigns directly.
+    check(
+      "role_requests_role_check",
+      sql`${t.role} in ('owner','admin_pusat','finance','facility_head','records_officer','auditor','central_cs','marketing','purchasing')`,
+    ),
+    check(
+      "role_requests_decision_check",
+      sql`(${t.state} = 'pending') = (${t.decidedBy} is null and ${t.decidedAt} is null)`,
+    ),
+    check("role_requests_not_self_check", sql`${t.decidedBy} is null or ${t.decidedBy} <> ${t.requestedBy}`),
+    // One open request per staff, role and change (concurrent requests cannot both land).
+    uniqueIndex("role_requests_one_pending")
+      .on(t.tenantId, t.staffId, t.role, t.change)
+      .where(sql`${t.state} = 'pending'`),
   ],
 );
