@@ -1,8 +1,11 @@
-// T-005 HTTP negatives: the production Next.js server running src/proxy.ts. The suite
-// runs `next build` first (into .next; `next dev` would rewrite tsconfig.json), so it
-// never runs against a stale build. Requests carry each host's Host header; refused
+// T-005 HTTP negatives: the production (standalone) Next.js server running
+// src/proxy.ts. The suite runs `next build` (`next dev` would rewrite tsconfig.json),
+// then copies the standalone output to a temporary directory and serves it from there,
+// so a concurrent build that rewrites .next cannot break the running server. Requests carry each host's Host header; refused
 // requests must get the proxy's 404 (x-host-policy: refused) before any route renders.
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -31,6 +34,7 @@ async function get(
 }
 
 const NEXT = join(ROOT, "node_modules/next/dist/bin/next");
+const SERVE = mkdtempSync(join(tmpdir(), "hosts-spec-"));
 
 beforeAll(async () => {
   execFileSync(process.execPath, [NEXT, "build"], {
@@ -38,12 +42,17 @@ beforeAll(async () => {
     env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
     stdio: ["ignore", "ignore", "inherit"],
   });
-  server = spawn(process.execPath, [NEXT, "start", "-p", String(PORT)], {
-    cwd: ROOT,
+  // verbatimSymlinks keeps pnpm's relative links pointing inside the copy.
+  cpSync(join(ROOT, ".next/standalone"), SERVE, { recursive: true, verbatimSymlinks: true });
+  cpSync(join(ROOT, ".next/static"), join(SERVE, ".next/static"), { recursive: true, verbatimSymlinks: true });
+  server = spawn(process.execPath, [join(SERVE, "server.js")], {
+    cwd: SERVE,
     env: {
       ...process.env,
       NEXT_TELEMETRY_DISABLED: "1",
       NODE_ENV: "production",
+      PORT: String(PORT),
+      HOSTNAME: "127.0.0.1",
       APP_HOST: HOSTS.app,
       BOOKING_HOST: HOSTS.booking,
       VENDOR_HOST: HOSTS.vendor,
@@ -61,8 +70,13 @@ beforeAll(async () => {
   throw new Error("next start did not come up");
 }, 180_000);
 
-afterAll(() => {
-  server?.kill("SIGTERM");
+afterAll(async () => {
+  if (server && server.exitCode === null) {
+    const exited = new Promise((r) => server.once("exit", r));
+    server.kill("SIGTERM");
+    await exited;
+  }
+  rmSync(SERVE, { recursive: true, force: true });
 });
 
 describe("host isolation over HTTP (ARCH-3, SEC-21)", { timeout: 60_000 }, () => {

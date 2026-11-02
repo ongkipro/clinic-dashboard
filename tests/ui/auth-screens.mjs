@@ -53,7 +53,7 @@ try {
           return {
             overflowX: document.documentElement.scrollWidth - innerWidth,
             h1: document.querySelector("h1")?.textContent,
-            lang: document.querySelector("main")?.closest("[lang]")?.getAttribute("lang"),
+            lang: document.documentElement.getAttribute("lang"),
             minTarget: Math.min(...controls.map((c) => c.h)),
             unnamed: controls.filter((c) => !c.named).length,
           };

@@ -32,7 +32,8 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-003 RLS harness | PASS; R4 review APPROVE (claude-code and codex, four rounds) | `98067c6` |
 | T-004 isolation CI gates | PASS; R3 review APPROVE after two rounds of fixes | `a4460bb` |
 | T-005 platform basics | PASS; R4 review APPROVE (claude-code and codex, two rounds) | `9026b87` |
-| T-006 staff authentication | PASS; R4 review (see ledger) | this commit |
+| T-006 staff authentication | PASS; R4 review APPROVE (claude-code and codex) | `42edaf2` |
+| HYG-001 hygiene (owner option A) | PASS; R4 review APPROVE (claude-code and codex, two rounds) | this commit |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups) and DEC-010 (staff authentication); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
@@ -41,17 +42,12 @@ Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), D
 None between tasks. Next: T-007 (identity chain, R4).
 
 Carried forward (outside the owning task's Allowed Paths):
-- `.dockerignore` (build context excludes `.env*`, `node_modules`, `docs/research/`).
-- Runtime image does not yet ship `src/db/migrate.ts` and `drizzle/`, so migrations cannot run from the image; owner: the deploy/Dockerfile task.
 - Copy `public/` into the runtime image once it exists; upgrade Next.js to 16.4.4 after `minimumReleaseAge`.
-- Migrations from parallel worktrees must be regenerated on rebase (Drizzle skips an older `when`).
 - TEN-4 (tenant keys in caches; lint against tenant-less `"use cache"`, `cacheTag`/`cacheLife`, `unstable_cache`, cached `fetch`; dynamic `(app)`/vendor/API routes) has no owning task in `TASKS.md`; owner to assign before the first cached page.
 - Isolation lint gaps to close later: env lookups such as `process.env.<TENANT>`, identity props `tenant.id`/`brand`/`host`, map lookups keyed by tenant, and a grep for tenant literals outside `src/` (scripts, seeds, config).
 - When `src/proxy.ts` starts reading tenant data (e.g. slug → tenant), add it to the isolation gate (DEC-009).
-- CI does not run the restore drill or the HTTP host test yet (`ci.yml` is outside T-005); add `RUN_BACKUP_DRILL=1 pnpm vitest run tests/platform/backup.test.ts` and confirm `pnpm test` includes `tests/platform/hosts.spec.ts` with a build step.
 - T-007 must provide the `RoleSource` (src/auth/instance.ts `noRolesYet`) and call `checkSession` from the clinic layout/API so TOTP and idle-lock gates apply to real pages; until then no page is gated.
 - Playwright is not a project dependency yet (T-011): `tests/ui/auth-screens.mjs` runs with `PLAYWRIGHT_CORE` pointing at an installed playwright-core.
-- Root layout still says `lang="en"` and has the create-next-app title (owned by T-012/T-013); auth screens mark `lang="id"` themselves.
 - Better Auth needs the client IP from the trusted proxy (`x-real-ip` from Traefik) in production, or its per-IP limiter falls back to one shared bucket; set at deploy.
 - T-022 invitations: require TOTP enrolment while accepting an invitation for a TOTP role (otherwise anyone with the password can enrol first). Background/polling requests must call `checkSession(..., { activity: false })` (T-007/T-013) or the idle lock never fires. RATE-2 lets anyone lock an FO account by email (spec consequence; RUNBOOK).
 - T-006/T-021: Server Actions are resolved by action id regardless of path; every action must authorize itself, and the booking host should refuse `Next-Action` requests outside an allow-list.
@@ -61,7 +57,6 @@ Carried forward (outside the owning task's Allowed Paths):
 - Public site task: upper-case slugs 404 on the booking host (slugs are lower-case); decide whether to redirect.
 - Production: create the KEK file (0400, owned by the app user) and its offline escrow (ARCH-7); configure the pgBackRest S3 repository in a second location (H-07); schedule full/diff backups and quarterly drills (DR-2).
 - Release task: push the image to a registry and record the manifest digest (`packages: write` for GHCR); the CI record is a build attestation until then.
-- Before the first task that writes branch or role predicates: TEMP privilege granted directly to the login is not yet refused by `assertAppRole`.
 
 ## Blockers
 
@@ -69,6 +64,7 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Verification evidence
 
+- 2026-11-02 HYG-001 (owner option A): `.dockerignore` allow-list with recursive re-excludes (nested `.env`/`.pem`/`node_modules` probe: none in the context); release image runs migrations (`tests/platform/image-migrate.sh`: 6 migrations on an empty database, non-root, migration files read-only, no `.env*` anywhere); `assertAppRole` refuses any effective TEMPORARY, incl. via PUBLIC (tests + mutation); the migration runner refuses drift (an applied migration edited later, or an unapplied one older than the newest applied), the root cause of the local database still granting PUBLIC CONNECT/TEMPORARY after 0003 was edited during T-003 review (local synthetic database recreated); HTTP host test serves a copied standalone build so a concurrent build cannot break it; root layout `lang="id"`, real title, light only (noindex stays on the auth layout); CI runs the restore drill and the image check. Full CI step sequence simulated locally (incl. drill) PASS; browser re-check of the auth screens (32 layouts, full flow) PASS.
 - 2026-11-02 T-006: 43 auth tests on PostgreSQL 16.15 as `clinic_auth` (PR-3 scenario; TOTP for each of the 9 IAM-1 roles and not for the other 7; RATE-2 lockout across IPs and its expiry; 120 s idle lock, server-side, password unlock; no plaintext secrets; role separation); concurrency (12 parallel wrong passwords → exactly 5 checked), progressive delay, trust-device refusal, locked/enrolment-gated endpoints; mutations (drop a TOTP role, disable lockout, change idle time, remove the advisory lock, allow trustDevice, drop the session-lock hook, zero the delay) each fail their tests. Browser (standalone build, Chromium 1248) at 390/820/1180/1440 and 200% text: no horizontal overflow, targets ≥ 44 px, all controls named, `lang=id`; flow wrong password → sign-in → enrol TOTP → sign-in asks for code → wrong code → verify → keyboard tab order → unlock wrong/right.
 - 2026-11-02 T-005: restore drill PASSED (25 tenants before the full backup, 10 after, restored 35/105 branches/4 migrations via WAL replay; with replay disabled the drill fails 25 vs 35); envelope round-trip, tenant/purpose binding, tamper, KEK and DEK rotation, blind index and KEK-file custody tests; host resolver unit tests and HTTP negatives against `next start` (`/saya`, `/persetujuan` refused on booking and vendor hosts; public routes refused on the app host; vendor routes refused on every non-vendor host); disabling the proxy check fails 4 HTTP tests.
 - 2026-11-02 T-004: `pnpm test:isolation` failed (exit 1) on a real untested page `src/app/(app)/probe-untested` and passed after removal; probe cases proved the harness fails an empty case (positive control) and a leaking case, and passes a filtered list case; lint rule tests (slug, brand in template/JSX, UUID, three branching forms, no false positives, not applied outside `src/`); full CI step sequence simulated locally with `CI=1`; actionlint clean.

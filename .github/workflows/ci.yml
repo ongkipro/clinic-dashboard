@@ -51,12 +51,19 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm db:migrate
-      # `pnpm test` runs every suite, including tests/rls and tests/isolation.
+      # `pnpm test` runs every suite (db, rls, isolation, auth, platform incl. the HTTP
+      # host test against a standalone build) and the pgBackRest restore drill.
       - run: pnpm test
+        env:
+          RUN_BACKUP_DRILL: "1"
       - run: pnpm build
       - run: pnpm audit --prod
       - run: pnpm docs:check
       - run: pnpm docs:promotion
+      - name: Image migration check (migrations run from the release image)
+        run: tests/platform/image-migrate.sh
+        env:
+          ADMIN_URL: postgres://clinic:clinic_ci_only@127.0.0.1:5432/postgres
       - name: Build image and record digest
         run: |
           docker build -t "clinic-dashboard:${GITHUB_SHA}" .

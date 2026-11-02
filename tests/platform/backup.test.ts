@@ -1,6 +1,5 @@
 // T-005 restore drill (DR-1): runs ops/pgbackrest/restore-drill.sh, which needs Docker.
-// Opt-in with RUN_BACKUP_DRILL=1 because it takes about 90 s. Not yet in CI (ci.yml is
-// outside T-005; tracked in STATUS.md).
+// Opt-in with RUN_BACKUP_DRILL=1 because it takes about 90 s; CI sets it.
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";

@@ -1,0 +1,15 @@
+# The Dockerfile copies explicit paths; this keeps everything else (secrets, local
+# state, research captures) out of the build context sent to the builder (Coolify).
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!next.config.ts
+!tsconfig.json
+!src/**
+!drizzle/**
+# Re-exclude anything sensitive or bulky that may sit inside the allowed trees.
+**/.env*
+**/node_modules
+**/.next
+**/*.pem

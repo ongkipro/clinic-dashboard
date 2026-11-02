@@ -208,6 +208,25 @@ describe("startup role check (TEN-2)", () => {
     }
   });
 
+  it("refuses a login granted TEMPORARY on the database (temp tables shadow names)", async () => {
+    const temp = await h.createLoginRole("", [APP_GROUP_ROLE]);
+    await h.admin.query(`grant temporary on database ${h.dbName} to ${temp}`);
+    const c = await h.connectAs(temp);
+    expect(String(await assertAppRole(c).catch((e) => e))).toContain("can create objects");
+  });
+
+  it("refuses TEMPORARY granted to PUBLIC (the migration revokes it; drift must not pass)", async () => {
+    const plain = await h.createLoginRole("", [APP_GROUP_ROLE]);
+    const c = await h.connectAs(plain);
+    expect(await assertAppRole(c)).toBeUndefined();
+    await h.admin.query(`grant temporary on database ${h.dbName} to public`);
+    try {
+      expect(String(await assertAppRole(c).catch((e) => e))).toContain("can create objects");
+    } finally {
+      await h.admin.query(`revoke temporary on database ${h.dbName} from public`);
+    }
+  });
+
   it("refuses a NOINHERIT member (it would not receive clinic_app grants)", async () => {
     expect(String(await check("NOINHERIT", [APP_GROUP_ROLE]))).toContain(
       `not a member of ${APP_GROUP_ROLE}`,

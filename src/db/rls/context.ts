@@ -25,7 +25,8 @@ export const CONTEXT_SETTINGS = [
 // as pg_read_all_data or pg_execute_server_program are refused. Because SET ROLE /
 // RESET ROLE can return to any reachable role, every reachable role is checked for
 // SUPERUSER, BYPASSRLS, REPLICATION, CREATEROLE/CREATEDB, owning the database, a schema
-// or a relation (owners skip RLS), CREATE on the database or a schema, and direct
+// or a relation (owners skip RLS), CREATE or TEMPORARY on the database (effective,
+// including grants to PUBLIC) or CREATE on a schema, and direct
 // privileges on relations, columns, functions or schemas (all access goes through
 // clinic_app). A session default for
 // any app.* setting is refused because policies must fail closed outside a context.
@@ -62,6 +63,8 @@ export async function assertAppRole(
             then 'owns relations' end,
        case when exists (select 1 from reachable r
                          where has_database_privilege(r.oid, current_database(), 'CREATE'))
+              or exists (select 1 from reachable r
+                         where has_database_privilege(r.oid, current_database(), 'TEMPORARY'))
               or exists (select 1 from reachable r cross join user_schemas s
                          where has_schema_privilege(r.oid, s.oid, 'CREATE'))
             then 'can create objects' end,

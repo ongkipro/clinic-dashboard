@@ -4,7 +4,7 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { LOCAL_DATABASE_URL, runMigrations } from "../../src/db/migrate";
+import { LOCAL_DATABASE_URL, MigrationDriftError, runMigrations } from "../../src/db/migrate";
 import { contractViolations } from "./contract";
 
 // Tests create a throwaway database on TEST_DATABASE_URL's server. Only loopback hosts
@@ -64,6 +64,36 @@ describe("fresh database migration", () => {
       ).resolves.toEqual([undefined, undefined]);
     } finally {
       await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+    }
+  });
+
+  it("refuses to run when an applied migration was edited (drift)", async () => {
+    const [row] = (await db.query(`select id, hash from drizzle.__drizzle_migrations order by id limit 1`)).rows;
+    await db.query(`update drizzle.__drizzle_migrations set hash = 'edited' where id = $1`, [row.id]);
+    try {
+      await expect(runMigrations(testUrl)).rejects.toBeInstanceOf(MigrationDriftError);
+    } finally {
+      await db.query(`update drizzle.__drizzle_migrations set hash = $2 where id = $1`, [row.id, row.hash]);
+    }
+    await expect(runMigrations(testUrl)).resolves.toBeUndefined();
+  });
+
+  it("refuses an unapplied migration older than the newest applied one", async () => {
+    const [first] = (await db.query(`select id, hash, created_at from drizzle.__drizzle_migrations order by created_at limit 1`)).rows;
+    await db.query(`delete from drizzle.__drizzle_migrations where id = $1`, [first.id]);
+    try {
+      await expect(runMigrations(testUrl)).rejects.toThrow("would be skipped");
+    } finally {
+      await db.query(`insert into drizzle.__drizzle_migrations (id, hash, created_at) values ($1, $2, $3)`, [first.id, first.hash, first.created_at]);
+    }
+  });
+
+  it("refuses an applied migration that has no file", async () => {
+    await db.query(`insert into drizzle.__drizzle_migrations (hash, created_at) values ('x', 1)`);
+    try {
+      await expect(runMigrations(testUrl)).rejects.toThrow("has no file");
+    } finally {
+      await db.query(`delete from drizzle.__drizzle_migrations where created_at = 1`);
     }
   });
 
