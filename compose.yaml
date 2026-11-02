@@ -17,5 +17,26 @@ services:
       timeout: 3s
       retries: 30
 
+  # PostgreSQL with pgBackRest WAL archiving, the production database image (H-07,
+  # DR-1). Opt-in locally: `docker compose --profile backup up -d postgres-backup`.
+  # The drill (`ops/pgbackrest/restore-drill.sh`) uses its own throwaway containers.
+  postgres-backup:
+    profiles: ["backup"]
+    build: ops/pgbackrest
+    environment:
+      POSTGRES_USER: clinic
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clinic_local_only}
+      POSTGRES_DB: clinic_dashboard
+      PGBACKREST_STANZA: clinic
+      # Required by the entrypoint; set a local passphrase before starting this profile.
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:-}
+    ports:
+      - "127.0.0.1:${POSTGRES_BACKUP_PORT:-5433}:5432"
+    volumes:
+      - pgdata-backup:/var/lib/postgresql/data
+      - pgbackrest-repo:/var/lib/pgbackrest
+
 volumes:
   pgdata:
+  pgdata-backup:
+  pgbackrest-repo:

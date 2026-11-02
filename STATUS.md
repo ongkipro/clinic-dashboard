@@ -30,13 +30,14 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-001 repository bootstrap | PASS locally; review APPROVE; CI proof pending push | `862307d` |
 | T-002 database core | PASS; R3 review APPROVE after fixes | `60a4498`, `b08bc75` |
 | T-003 RLS harness | PASS; R4 review APPROVE (claude-code and codex, four rounds) | `98067c6` |
-| T-004 isolation CI gates | PASS; R3 review APPROVE after two rounds of fixes | this commit |
+| T-004 isolation CI gates | PASS; R3 review APPROVE after two rounds of fixes | `a4460bb` |
+| T-005 platform basics | PASS; R4 review APPROVE (claude-code and codex, two rounds) | this commit |
 
-Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation) and DEC-008 (isolation gate); `ARCHITECTURE.md` is updated when runtime behaviour exists.
+Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate) and DEC-009 (keys, hosts, backups); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
 ## Active work
 
-None between tasks. Next: T-005 (platform basics, R4).
+None between tasks. Next: T-006 (staff authentication, R4).
 
 Carried forward (outside the owning task's Allowed Paths):
 - `.dockerignore` (build context excludes `.env*`, `node_modules`, `docs/research/`).
@@ -45,7 +46,14 @@ Carried forward (outside the owning task's Allowed Paths):
 - Migrations from parallel worktrees must be regenerated on rebase (Drizzle skips an older `when`).
 - TEN-4 (tenant keys in caches; lint against tenant-less `"use cache"`, `cacheTag`/`cacheLife`, `unstable_cache`, cached `fetch`; dynamic `(app)`/vendor/API routes) has no owning task in `TASKS.md`; owner to assign before the first cached page.
 - Isolation lint gaps to close later: env lookups such as `process.env.<TENANT>`, identity props `tenant.id`/`brand`/`host`, map lookups keyed by tenant, and a grep for tenant literals outside `src/` (scripts, seeds, config).
-- T-005 creates `src/proxy.ts`, which can answer requests itself: add it to the isolation gate (surface or guard) in that task.
+- When `src/proxy.ts` starts reading tenant data (e.g. slug → tenant), add it to the isolation gate (DEC-009).
+- CI does not run the restore drill or the HTTP host test yet (`ci.yml` is outside T-005); add `RUN_BACKUP_DRILL=1 pnpm vitest run tests/platform/backup.test.ts` and confirm `pnpm test` includes `tests/platform/hosts.spec.ts` with a build step.
+- T-006/T-021: Server Actions are resolved by action id regardless of path; every action must authorize itself, and the booking host should refuse `Next-Action` requests outside an allow-list.
+- pgBackRest: schedule `stanza-create`, full/diff backups and monitoring in the deploy task; without a stanza `archive_command` keeps failing and `pg_wal` grows.
+- KEK custody vs ARCH-7 wording: a root:0400 host file bind-mounted into a non-root container is unreadable and fails the owner check (fail-closed). The deploy task must pick one model (host file owned by the app uid at 0400 and ARCH-7 reworded, or a root helper passing the key) before first start.
+- Field ciphertexts bind tenant, purpose and DEK version, not the row: add an optional row id to the AAD when the patient table first stores NIK (T-037) so values cannot be swapped between rows.
+- Public site task: upper-case slugs 404 on the booking host (slugs are lower-case); decide whether to redirect.
+- Production: create the KEK file (0400, owned by the app user) and its offline escrow (ARCH-7); configure the pgBackRest S3 repository in a second location (H-07); schedule full/diff backups and quarterly drills (DR-2).
 - Release task: push the image to a registry and record the manifest digest (`packages: write` for GHCR); the CI record is a build attestation until then.
 - Before the first task that writes branch or role predicates: TEMP privilege granted directly to the login is not yet refused by `assertAppRole`.
 
@@ -55,6 +63,7 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Verification evidence
 
+- 2026-11-02 T-005: restore drill PASSED (25 tenants before the full backup, 10 after, restored 35/105 branches/4 migrations via WAL replay; with replay disabled the drill fails 25 vs 35); envelope round-trip, tenant/purpose binding, tamper, KEK and DEK rotation, blind index and KEK-file custody tests; host resolver unit tests and HTTP negatives against `next start` (`/saya`, `/persetujuan` refused on booking and vendor hosts; public routes refused on the app host; vendor routes refused on every non-vendor host); disabling the proxy check fails 4 HTTP tests.
 - 2026-11-02 T-004: `pnpm test:isolation` failed (exit 1) on a real untested page `src/app/(app)/probe-untested` and passed after removal; probe cases proved the harness fails an empty case (positive control) and a leaking case, and passes a filtered list case; lint rule tests (slug, brand in template/JSX, UUID, three branching forms, no false positives, not applied outside `src/`); full CI step sequence simulated locally with `CI=1`; actionlint clean.
 - 2026-11-02 T-003: 56 tests on PostgreSQL 16.15 (40 RLS: startup refusal per unsafe role shape, scope map incl. views/matviews, no app access to platform tables or definer functions, cross-tenant not-found, fail-closed without context, concurrency, nesting, dead-connection handling); mutation of each control fails its test; typecheck, lint, build, docs:check, drizzle-kit check PASS (`.delivery/`).
 - 2026-11-02 T-002: fresh database migrate, 16 tests on PostgreSQL 16.15 (contract checker with a negative fixture per rule; advisory-lock test fails 3/3 with the lock removed), `drizzle-kit check`, typecheck, lint, build, docs:check — all PASS (`.delivery/`).
@@ -67,4 +76,4 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Next verified action
 
-Start T-005 (platform basics: pgBackRest backups, envelope key custody, host resolver). R4: independent review before integration.
+Start T-006 (staff authentication: Better Auth email+password, TOTP, throttling, idle lock). R4: independent review before integration.
