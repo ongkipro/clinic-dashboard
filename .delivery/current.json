@@ -1,12 +1,12 @@
 {
   "activeRun": null,
   "lastCheckpoint": {
-    "eventId": "eecd97c74a0c43e39ca18ca6c98a00b7",
-    "head": "86d76504f3953e6d92775e5222e63448963a47e6",
-    "note": "Round 7 applied",
+    "eventId": "6ce1dd6312324b0fbbc00414571ea0ca",
+    "head": "40741c9bf021d90442abbed36e1d5f5b27b0f988",
+    "note": "Pre-development closure approved; T-001 unstarted",
     "runId": null,
     "state": "READY",
-    "time": "2026-11-02T09:44:35Z",
+    "time": "2026-11-02T11:02:29Z",
     "type": "checkpoint"
   },
   "lastRun": {
@@ -14,10 +14,10 @@
     "result": "PASS",
     "runId": "RUN-20261102T084839Z-ae0a1e76"
   },
-  "observedHead": "86d76504f3953e6d92775e5222e63448963a47e6",
+  "observedHead": "40741c9bf021d90442abbed36e1d5f5b27b0f988",
   "observedState": "READY",
   "project": "clinic-dashboard",
   "schemaVersion": 1,
   "statusAuthority": "STATUS.md",
-  "updatedAt": "2026-11-02T09:44:35Z"
+  "updatedAt": "2026-11-02T11:02:29Z"
 }
