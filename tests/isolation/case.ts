@@ -12,6 +12,7 @@ export type TenantFixture = { tenantId: string; branchId: string; legalName: str
 
 export type IsolationEnv = {
   app: pg.Pool; // clinic_app login, checked by openAppPool
+  owner: pg.Pool; // database owner, for seeding fixtures only (never the surface under test)
   actor: TenantFixture; // the caller
   victim: TenantFixture; // tenant B, whose data the case targets
   // Rows the case seeds for B (patients, invoices, ...) must be registered here.

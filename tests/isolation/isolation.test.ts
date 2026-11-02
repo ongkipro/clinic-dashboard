@@ -7,7 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { APP_GROUP_ROLE } from "../../src/db/rls/context";
 import { openAppPool } from "../../src/db/rls/pool";
 import { createHarness, type Harness } from "../rls/harness";
-import type pg from "pg";
+import pg from "pg";
+
+const { Pool: PgPool } = pg;
 import type { IsolationCase, IsolationEnv, TenantFixture } from "./case";
 import {
   coverageViolations,
@@ -138,6 +140,7 @@ describe("coverage gate self-test", () => {
 describe("cross-tenant negative cases", () => {
   let h: Harness;
   let app: pg.Pool;
+  let owner: pg.Pool;
   let a: TenantFixture;
   let b: TenantFixture;
 
@@ -160,7 +163,7 @@ describe("cross-tenant negative cases", () => {
   }
 
   function envFor(actor: TenantFixture, secrets: Set<string>): IsolationEnv {
-    return { app, actor, victim: b, victimSecret: (v) => void secrets.add(v) };
+    return { app, owner, actor, victim: b, victimSecret: (v) => void secrets.add(v) };
   }
 
   beforeAll(async () => {
@@ -170,11 +173,13 @@ describe("cross-tenant negative cases", () => {
       connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])),
       max: 4,
     });
+    owner = new PgPool({ connectionString: h.ownerUrl(), max: 2 });
     a = await fixture("PT Sintetis A");
     b = await fixture("PT Sintetis B");
   });
 
   afterAll(async () => {
+    await owner?.end();
     await app?.end();
     await h?.close();
   });

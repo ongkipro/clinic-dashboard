@@ -17,7 +17,8 @@
     "test:rls": "vitest run tests/rls",
     "test:isolation": "vitest run tests/isolation",
     "test:auth": "vitest run tests/auth",
-    "test:org": "vitest run tests/org"
+    "test:org": "vitest run tests/org",
+    "test:audit": "vitest run tests/audit"
   },
   "dependencies": {
     "better-auth": "1.7.15",

@@ -34,13 +34,14 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-005 platform basics | PASS; R4 review APPROVE (claude-code and codex, two rounds) | `9026b87` |
 | T-006 staff authentication | PASS; R4 review APPROVE (claude-code and codex) | `42edaf2` |
 | HYG-001 hygiene (owner option A) | PASS; R4 review APPROVE (claude-code and codex, two rounds) | `6600db0` |
-| T-007 identity chain | PASS; R4 review APPROVE (claude-code and codex, two rounds) | this commit |
+| T-007 identity chain | PASS; R4 review APPROVE (claude-code and codex, two rounds) | `724aafc` |
+| T-008 audit log | PASS; R3 review APPROVE (claude-code, two rounds) | this commit |
 
-Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations) and DEC-012 (identity chain); `ARCHITECTURE.md` is updated when runtime behaviour exists.
+Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain) and DEC-013 (audit); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
 ## Active work
 
-None between tasks. Next: T-008 (audit attribution and log, R3).
+Wave plan (owner 2026-11-02): waves 1–9 of M0 run back to back, each task reviewed and fixed before the next, local commits only, no push. Wave 1: T-008 ✓, T-012, T-029.
 
 Carried forward (outside the owning task's Allowed Paths):
 - Copy `public/` into the runtime image once it exists; upgrade Next.js to 16.4.4 after `minimumReleaseAge`.
@@ -62,12 +63,16 @@ Carried forward (outside the owning task's Allowed Paths):
 - Owner decision (from T-007 review): 05 §2.1 level table says facility head and records officer are Level 2, IAM-8 says branch set; implemented as Level 3 (DEC-012). Confirm with Q-12 and correct the table.
 - T-007 follow-ups: `account_memberships` ignores tenant lifecycle (suspended/closed tenants still resolve; lifecycle task T-023); role lists exist in SQL (0007, 0009) and TS (`LEVEL2_ROLES`) — add a catalog test when roles change; the contract checker should require NOT NULL (or MATCH FULL) source columns on FKs wider than (tenant_id, id) before a nullable wide FK appears; role revocation needs an effective-dated design (T-031); the RoleSource pool can share the app pool once T-030 exists.
 
+- T-008 follow-ups: Log Audit page still lacks the UX-31 actor, object and vendor-session filters (the API has them) and Ekspor (T-031/UX-32); role lists duplicated in SQL; `audit_verify` is O(n) per page load (cache the last verified seq when logs grow); the per-tenant advisory lock serialises audited actions of one tenant until commit. Deploy task must schedule the audit copy (`dailyCopy` as the migration owner) to a create-only Object Lock bucket and prove compliance-mode retention (Vultr's S3 matrix does not list Object Lock); alerting on `AuditChainBrokenError` (OBS); pgaudit for break-glass statements (SEC-5) belongs to the database deploy; the `/audit` page reads tenant and role from the query string until T-030's context switcher; vendor session attribution arrives with T-025.
+- Local leftover: `/data/tmp/cd-ui` (45 MB copy of a standalone build, no secrets) from the T-008 browser check could not be removed by the agent (safety net blocks `rm -r` outside the repository); safe to delete by hand.
+
 ## Blockers
 
 None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, PR-18, PR-71, PR-83), G2 (H-02d, Q-08, Q-10, Q-11, Q-15, Q-17, R-01), G3 (Q-05, Q-06). See `docs/spec/02-PRD.md` §13 and `PLAN.md`.
 
 ## Verification evidence
 
+- 2026-11-02 T-008: 23 audit tests (PR-51 break-glass with reason and time in the owner's log; ≥ 15-char reason only for break-glass; attribution from context incl. account and membership; no actor arguments; forged role/branch refused; no direct writes and append-only even for the owner; an audited action fails with its transaction; per-tenant chain under concurrency; tampering and deletion detected at the row; verify only for the bound tenant and log readers; reader scope per role; auditor masked; filters; cross-tenant empty; no free-text columns but the reason; copy by seq with late commits, rows recomputable from the copy, a DBA who deletes and re-chains caught by the anchor check, a broken tenant or a failed store write does not stop the others; Level 3 must bind a branch so the facility head sees it; canonical form covers every column); mutations (hash check, update trigger, role check, branch scope) fail tests; isolation case for `/audit` with positive control; browser (standalone build) at 390/820/1180/1440 and 200%: sign-in → owner TOTP enrolment gate → log with break-glass reason and time → filter → filtered-empty → permission message for a non-reader role, an unheld role and a foreign tenant.
 - 2026-11-02 T-007: 19 identity tests on PostgreSQL 16.15 (membership_id NOT NULL UNIQUE; one membership per account per tenant; staff tenant = membership tenant; atomic creation; another tenant's branch refused by FK, also when written directly; branch scope cannot claim another staff/role; Level 2 stores no branches and sees a branch created later; Level 3 scope per acting role; client selectors validated with one message; ended memberships give nothing; acting role and staff recorded from the server-side context, forged role/staff/tenant/branch refused; cross-tenant reads empty; clinic_app cannot write identity tables; account_memberships returns only the requested account; TOTP gate driven by a real doctor membership); mutations of the insert policy and the Level 2 wildcard fail their tests.
 - 2026-11-02 HYG-001 (owner option A): `.dockerignore` allow-list with recursive re-excludes (nested `.env`/`.pem`/`node_modules` probe: none in the context); release image runs migrations (`tests/platform/image-migrate.sh`: 6 migrations on an empty database, non-root, migration files read-only, no `.env*` anywhere); `assertAppRole` refuses any effective TEMPORARY, incl. via PUBLIC (tests + mutation); the migration runner refuses drift (an applied migration edited later, or an unapplied one older than the newest applied), the root cause of the local database still granting PUBLIC CONNECT/TEMPORARY after 0003 was edited during T-003 review (local synthetic database recreated); HTTP host test serves a copied standalone build so a concurrent build cannot break it; root layout `lang="id"`, real title, light only (noindex stays on the auth layout); CI runs the restore drill and the image check. Full CI step sequence simulated locally (incl. drill) PASS; browser re-check of the auth screens (32 layouts, full flow) PASS.
 - 2026-11-02 T-006: 43 auth tests on PostgreSQL 16.15 as `clinic_auth` (PR-3 scenario; TOTP for each of the 9 IAM-1 roles and not for the other 7; RATE-2 lockout across IPs and its expiry; 120 s idle lock, server-side, password unlock; no plaintext secrets; role separation); concurrency (12 parallel wrong passwords → exactly 5 checked), progressive delay, trust-device refusal, locked/enrolment-gated endpoints; mutations (drop a TOTP role, disable lockout, change idle time, remove the advisory lock, allow trustDevice, drop the session-lock hook, zero the delay) each fail their tests. Browser (standalone build, Chromium 1248) at 390/820/1180/1440 and 200% text: no horizontal overflow, targets ≥ 44 px, all controls named, `lang=id`; flow wrong password → sign-in → enrol TOTP → sign-in asks for code → wrong code → verify → keyboard tab order → unlock wrong/right.
@@ -84,4 +89,4 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Next verified action
 
-Start T-008 (audit attribution and log: DATA-60 fields server-side, hash chain per tenant, write-once copy, Log Audit read API). R3: independent review before integration.
+Continue wave 1 with T-012 (design tokens and base components, R1).

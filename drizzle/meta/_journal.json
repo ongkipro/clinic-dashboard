@@ -71,6 +71,20 @@
       "when": 1793641589554,
       "tag": "0009_org_actions_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793642949144,
+      "tag": "0010_audit_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793643001635,
+      "tag": "0011_audit_chain",
+      "breakpoints": true
     }
   ]
 }
