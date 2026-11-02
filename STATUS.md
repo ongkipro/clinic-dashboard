@@ -41,7 +41,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | HYG-002 restore drill and concurrent migrations stable under load | PASS; review APPROVE (claude-code, three rounds) | `d45cdb3` |
 | T-009 idempotency records and command wrapper | PASS; R3 review APPROVE (claude-code, two rounds) | `f554570` |
 | T-013 clinic shell and role-filtered navigation | PASS; R2 review APPROVE (claude-code, three rounds; round-1 finding 1 lost in transport) | `fbceb4c` |
-| T-018 vendor profile with placeholders and residency gate | PASS; R3 review APPROVE (claude-code, two rounds) | this commit |
+| T-018 vendor profile with placeholders and residency gate | PASS; R3 review APPROVE (claude-code, two rounds) | `9ee0bd1` |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
