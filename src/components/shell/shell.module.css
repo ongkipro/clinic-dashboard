@@ -1,0 +1,131 @@
+/* Clinic shell (DESIGN.md Layout, UI-11, UI-14). Compact < 700 px: tab bar; regular:
+   sidebar. Tokens only; light only. */
+.shell { min-height: 100dvh; background: var(--bg-grouped); color: var(--label); }
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: var(--space-4); top: var(--space-2); z-index: 60; background: var(--surface); padding: var(--space-2) var(--space-3); border-radius: var(--radius-field); }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+.main { min-width: 0; display: flex; flex-direction: column; min-height: 100dvh; }
+.content { flex: 1; padding: var(--space-4); padding-bottom: calc(76px + env(safe-area-inset-bottom)); outline: none; }
+
+/* Top bar: context on the leading side, global actions trailing. */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: max(env(safe-area-inset-top), var(--space-2)) var(--space-4) var(--space-2);
+  background: rgb(255 255 255 / 0.92);
+  border-bottom: 0.5px solid rgb(0 0 0 / 0.12);
+}
+.context { display: grid; min-width: 0; flex: 1 1 12rem; }
+.branch, .branchStatic { display: inline-flex; align-items: center; gap: var(--space-1); min-height: var(--target); color: var(--label); text-decoration: none; font-weight: 600; min-width: 0; }
+.branch { color: var(--tint); }
+.branch svg, .branchStatic svg { width: 1.1rem; height: 1.1rem; flex: none; }
+.branchName { overflow-wrap: anywhere; }
+.roleLine { font-size: 0.82rem; line-height: 1.3; color: var(--label-2); overflow-wrap: anywhere; }
+.actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.iconButton {
+  display: inline-grid; place-items: center; min-width: var(--target); min-height: var(--target);
+  border: 0; border-radius: var(--radius-capsule); background: transparent; color: var(--tint); cursor: pointer; flex: none;
+}
+.iconButton:hover { background: var(--tint-soft); }
+.iconButton svg { width: 1.35rem; height: 1.35rem; }
+.searchSlot {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--target);
+  padding: 0 var(--space-3); border: 0; border-radius: var(--radius-field);
+  background: var(--surface-2); color: var(--label-2); font: inherit; cursor: pointer;
+}
+.searchSlot svg { width: 1.1rem; height: 1.1rem; }
+.kbd { display: none; font: inherit; font-size: 0.76rem; color: var(--label-2); }
+.shell :focus-visible, .sheet :focus-visible, .palette :focus-visible { outline: 3px solid var(--tint); outline-offset: 2px; }
+
+/* Bottom tab bar (compact). */
+.tabbar {
+  position: fixed; inset: auto 0 0 0; z-index: 40;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 2px 4px env(safe-area-inset-bottom);
+}
+.tab {
+  display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 50px; min-width: 0;
+  padding: 4px 2px; border: 0; background: transparent; color: var(--label-2); text-decoration: none; font: inherit; cursor: pointer;
+}
+/* Tab bars keep a fixed size at large text (HIG: tab bar items do not scale with
+   Dynamic Type); labels never break inside a word. */
+.tab svg { width: 25px; height: 25px; }
+.tab[aria-current="page"], .tab[data-active="true"] { color: var(--tint); }
+.tabLabel { font-size: 11px; line-height: 13px; font-weight: 600; text-align: center; overflow-wrap: normal; word-break: keep-all; hyphens: none; max-width: 100%; } /* Caption 2 */
+
+/* Sidebar (regular). */
+.sidebar { display: none; }
+.brand { font-weight: 700; font-size: 1.06rem; padding: var(--space-4) var(--space-4) var(--space-2); overflow-wrap: anywhere; }
+.tree { display: grid; gap: var(--space-1); padding: 0 var(--space-2) var(--space-6); }
+.group { display: grid; }
+.groupHead {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--target);
+  padding: 0 var(--space-3); border: 0; border-radius: var(--radius-field); background: transparent;
+  color: var(--label); font: inherit; font-weight: 600; text-align: left; cursor: pointer;
+}
+.groupHead span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.groupIcon { width: 1.2rem; height: 1.2rem; flex: none; color: var(--tint); }
+.chevron { width: 1rem; height: 1rem; flex: none; color: var(--label-3); transition: transform var(--dur-press); }
+.chevron[data-open="false"] { transform: rotate(-90deg); }
+.pages { list-style: none; margin: 0; padding: 0 0 var(--space-1); display: grid; }
+.pageLink {
+  display: flex; align-items: center; gap: var(--space-2); min-height: var(--target); flex: 1; min-width: 0;
+  padding: 0 var(--space-3) 0 calc(var(--space-3) + 1.2rem + var(--space-2));
+  border-radius: var(--radius-field); color: var(--label); text-decoration: none; overflow-wrap: anywhere;
+}
+.pageLink:hover { background: var(--surface-2); }
+.pageLink[aria-current="page"] { background: var(--tint-soft); color: var(--tint); font-weight: 600; }
+.signOut { width: 100%; border: 0; background: transparent; font: inherit; color: var(--danger); text-align: left; cursor: pointer; }
+.signOutError { margin: 0 var(--space-3) var(--space-2); color: var(--danger); font-size: 0.88rem; }
+.listTitle { margin: var(--space-3) var(--space-3) var(--space-1); font-size: 0.765rem; font-weight: 400; color: var(--label-2); }
+.pinRow { display: flex; align-items: center; gap: var(--space-1); }
+.pinRow .pageLink { padding-left: var(--space-3); }
+.empty { margin: var(--space-4); color: var(--label-2); }
+
+/* Sheets: Menu (compact, full height) and the command palette. */
+.overlay { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 0.1); }
+.sheet {
+  position: fixed; inset: max(env(safe-area-inset-top), 12px) 0 0 0; z-index: 51;
+  display: flex; flex-direction: column; background: var(--bg-grouped);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; padding-bottom: env(safe-area-inset-bottom);
+  animation: sheet-in var(--dur-sheet) var(--ease-sheet);
+}
+.sheetHead { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4) 0; }
+.sheetTitle { margin: 0; font-size: 1.29rem; font-weight: 700; } /* Title 2 */
+.sheetBody { overflow-y: auto; flex: 1; padding-bottom: var(--space-6); }
+.searchField {
+  display: flex; align-items: center; gap: var(--space-2); margin: var(--space-3) var(--space-4);
+  padding: 0 var(--space-3); min-height: var(--target); border-radius: var(--radius-field); background: var(--surface-2); color: var(--label-2);
+}
+.searchField svg { width: 1.1rem; height: 1.1rem; flex: none; }
+.searchField input { flex: 1; min-width: 0; min-height: var(--target); border: 0; background: transparent; font: inherit; color: var(--label); outline: none; }
+.searchField:focus-within { outline: 3px solid var(--tint); outline-offset: 2px; }
+.searchField input:focus-visible { outline: none; } /* the field draws the ring */
+.palette {
+  position: fixed; z-index: 51; left: 50%; top: 10vh; transform: translateX(-50%);
+  width: min(640px, calc(100vw - 2 * var(--space-4))); max-height: 76vh;
+  display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-group);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.18);
+  animation: fade-in var(--dur-fade);
+}
+.paletteBody { overflow-y: auto; padding-bottom: var(--space-3); }
+@keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .sheet { animation: fade-in var(--dur-fade); }
+  .chevron { transition: none; }
+}
+
+@media (min-width: 700px) {
+  .shell { display: grid; grid-template-columns: 280px minmax(0, 1fr); }
+  .sidebar {
+    display: block; position: sticky; top: 0; height: 100dvh; overflow-y: auto;
+    background: var(--surface); border-right: 0.5px solid var(--separator);
+  }
+  .tabbar { display: none; }
+  .topbar { padding-inline: var(--space-5); }
+  .content { padding: var(--space-5); }
+  .kbd { display: inline; }
+}
+@media (min-width: 700px) and (max-width: 1179px) { .shell { grid-template-columns: 248px minmax(0, 1fr); } }
