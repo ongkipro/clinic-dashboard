@@ -48,7 +48,7 @@ Status values: **DECIDED** (owner's explicit decision) · **ADOPTED-REC** (recom
 |---|---|---|
 | B-01 | Initial treatment paid before it starts; additional treatment needs patient + authorized clinician agreement; FO may let addition start before payment; visit cannot close unpaid | DECIDED |
 | B-02 | Consultation fee, waiver, refund re-charge, free controls (default 1, valid to control date + 7 days) | DECIDED |
-| B-03 | Packages, installments, minimum DP, session unlock by paid value, 12-month default validity, expiry → paid-unused to balance | DECIDED |
+| B-03 | Packages, installments, minimum DP, session unlock by paid value, default validity 365 days (SET-8; wording aligned 2026-11-02, round 7), expiry → paid-unused to balance | DECIDED |
 | B-04 | Patient balance never expires; cash refund only as approved exception | DECIDED |
 | B-05 | Booking DP optional per treatment; 24 h rule | DECIDED |
 | B-06 | Interrupted treatment: medical/clinic stop not counted; patient stop counted | DECIDED |
@@ -192,5 +192,6 @@ Owner (2026-11-02): accountant, tax adviser and clinical reviews are deferred an
 | 2026-11-02 | Kit v0.5: P-21 full research-based Release 1 (Q-18 closed), P-22 research defaults + Pengaturan, P-23 Numa first client confirmed, B-24 settings registry |
 | 2026-11-02 | Kit v0.6: P-24 every Should becomes Must (campaign sending waits for Q-15, journal export for the posting map), D-13 and B-03 amended |
 | 2026-11-02 | Kit v0.6: P-25 proposal defaults accepted; P-26 expert input as evidence register (PR-97); JUR-ID-9–11 verified |
+| 2026-11-02 | Round 7 (Astra) applied: posting triggers and tax-point guard, B-03 validity wording, SET-44 monthly only |
 | 2026-11-02 | P-27 development authorized; kit v0.7 promoted to `~/Projects/clinic-dashboard` |
 | 2026-11-02 | Kit v0.7: round 5 and round 6 reviews applied; register rows aligned with P-24 (P-15, P-18, A-15, D-09, D-13), B-16 superseded by B-24, H-10 wording |

@@ -60,21 +60,21 @@ Two money domains exist and stay separate: (1) the **clinic's** money with its p
 
 ## Posting Map Draft (accounting step 2; accountant must sign before journals are exported — A-02, A-14, PRD Q-06)
 
-Two event families (A-11). **Settlement** moves money into a liability; **performance** moves liability into revenue. VAT (A-12) is credited at the earlier of payment or delivery of a taxable item. Liabilities are carried net of VAT; patient balance is carried gross (what the patient may spend). Every posting row has a domain event in `18` TD-50.
+Two event families (A-11). **Settlement** moves money into a liability; **performance** moves liability into revenue. VAT (A-12) is credited at the earlier of payment or delivery of a taxable item. Liabilities are carried net of VAT; patient balance is carried gross (what the patient may spend). **Tender rule (all settlement rows):** "Cash/Bank" means the tender's account: cash → Cash (shift), transfer → Bank, gateway/QRIS/EDC/link → Gateway clearing; this applies equally to invoice lines, packages, top-ups, booking DP and receivable collection. **Tax-point guard (all tenders, incl. balance and receivable collection):** VAT payable is credited only for the part of a taxable line or session whose VAT was not already recognised; each line/session stores `vat_recognised_amount`, `vat_recognised_at` and the tax-document reference (DATA-27, DATA-29). Every posting row has a domain event in `18` TD-50.
 
 | Family | Event | Debit | Credit |
 |---|---|---|---|
 | Settlement | Payment allocated to an invoice line (treatment, product, consultation) | Cash/Bank by method (gateway/QRIS/EDC: Gateway clearing) | Contract liability — paid not delivered (+ VAT payable for the part of a taxable line whose VAT was not already recognised at an earlier delivery, PKP; the tax point is stored per line) |
-| Settlement | Payment collects a patient receivable | Cash/Bank or Gateway clearing | Patient receivable (no new revenue or VAT; commission uses the originating line allocation) |
-| Settlement | Payment allocated to a package | Cash/Bank | Contract liability — packages (+ VAT payable on taxable session share, PKP) |
-| Settlement | Balance top-up | Cash/Bank | Contract liability — patient balance (no VAT until used) |
-| Settlement | Balance used for an invoice line | Contract liability — patient balance | Contract liability — paid not delivered (+ VAT payable for taxable line, with matching reduction of the balance liability) |
+| Settlement | Payment collects a patient receivable (any tender, incl. balance) | Cash/Bank (tender rule) or Contract liability — patient balance | Patient receivable (no new revenue or VAT; commission uses the originating line allocation) |
+| Settlement | Payment allocated to a package | Cash/Bank (tender rule) | Contract liability — packages (+ VAT payable on taxable session share not yet recognised, PKP) |
+| Settlement | Balance top-up | Cash/Bank (tender rule) | Contract liability — patient balance (no VAT until used) |
+| Settlement | Balance used for an invoice line | Contract liability — patient balance | Contract liability — paid not delivered (+ VAT payable only for the not-yet-recognised part of a taxable line, tax-point guard; nothing when the balance entry is `vat_settled`) |
 | Settlement | Balance used for a package installment | Contract liability — patient balance | Contract liability — packages (+ VAT as above) |
-| Settlement | Booking DP received | Cash/Bank | Contract liability — booking DP (+ VAT payable if the booked item is taxable, PKP; pending Q-05) |
+| Settlement | Booking DP received | Cash/Bank (tender rule) | Contract liability — booking DP (+ VAT payable if the booked item is taxable, PKP; pending Q-05) |
 | Settlement | Gateway settlement received | Bank + Merchant fee expense | Gateway clearing |
 | Settlement | Booking DP applied on arrival | Contract liability — booking DP | Contract liability — paid not delivered |
 | Settlement | Booking DP forfeited | Contract liability — booking DP | Other income (A-10, pending accountant; VAT on forfeit pending Q-05) |
-| Settlement | Booking DP moved to balance | Contract liability — booking DP (+ VAT payable reversed with its document, or kept as `vat_settled` per tax advice) | Contract liability — patient balance (gross DP value) |
+| Settlement | Booking DP moved to balance | Contract liability — booking DP (net) + VAT payable reversed with its credit document (taxable DP, PKP) | Contract liability — patient balance (gross DP value) |
 | Cash out | Booking DP refunded after clinic cancellation (no B-04 exception approval) | Contract liability — booking DP (+ VAT payable reversed) | Cash/Bank |
 | Settlement | Unpaid remainder converted to receivable | Patient receivable | Contract liability — paid not delivered (VAT already credited at delivery if delivered first) |
 | Performance | Treatment counted / product handed over / consultation charged | Contract liability — paid not delivered | Revenue (executing branch) (+ VAT payable if delivered before payment, PKP) |
@@ -84,11 +84,11 @@ Two event families (A-11). **Settlement** moves money into a liability; **perfor
 | Reclass | Cheaper substitution difference | Contract liability — packages (net) + VAT payable (taxable share, PKP; VAT credit document) | Contract liability — patient balance (gross) |
 | Reclass | Refund of undelivered item to balance (default) | Contract liability — paid not delivered (net) + VAT payable (taxable share, PKP; VAT credit document) | Contract liability — patient balance (gross) |
 | Reversal | Refund of delivered item to balance | Revenue (+ VAT payable reversal, PKP) | Contract liability — patient balance |
-| Reversal | Consultation fee re-charged on full refund | Contract liability — patient balance (or refund liability) | Revenue — consultation |
+| Reversal | Consultation fee re-charged on full refund | (a) re-charge creates a consultation invoice line with its tax snapshot, settled like any line: Contract liability — patient balance (or refund liability) → Contract liability — paid not delivered (+ VAT per tax-point guard); (b) performance posts once: Contract liability — paid not delivered → Revenue — consultation | — (one posting per step; `ConsultationFeeRecharged` is the only trigger, no second `ConsultationFeeCharged` posting) |
 | Cash out | Cash refund exception | Contract liability — patient balance | Cash/Bank |
 | Credit | Write-off | Bad-debt expense | Patient receivable |
 | Stock | Material consumed / waste | Cost of materials / Waste expense (branch, moving average) | Inventory (branch) |
-| Stock | Goods receipt | Inventory (+ non-creditable input VAT) + VAT input (creditable share, PKP; pending Q-05) | Goods received not invoiced (GRNI); cash purchases without a supplier invoice: Cash |
+| Stock | Goods receipt | Inventory (+ non-creditable input VAT) + VAT input (creditable share, PKP; pending Q-05) | Goods received not invoiced (GRNI) — always; a cash purchase is recorded as receipt + supplier invoice + supplier payment in one transaction (GRNI and AP end at zero, one cash credit) |
 | Stock | Product handed over (and reverse on return) | Cost of goods sold (moving average) | Inventory (branch) |
 | Stock | Transfer A → B | Inventory B | Inventory A |
 | Inter-branch | Package sold at A, session counted at B | Contract liability — packages (A) → Inter-branch clearing (A) | Inter-branch clearing (B) → Revenue (B) |
@@ -98,7 +98,9 @@ Two event families (A-11). **Settlement** moves money into a liability; **perfor
 
 Additional rows pending accountant (A-02): **Goods receipt** — Dr Inventory / Cr GRNI (a cash purchase records a supplier invoice and payment at once, so GRNI is cleared in the same transaction and no AP remains); **Supplier invoice** — Dr GRNI (± Purchase price variance) / Cr Accounts payable; **Supplier payment** — Dr Accounts payable / Cr Cash/Bank; **Depot transfer** — Dr Inventory (depot B) / Cr Inventory (depot A), same value. **Supplier return** — Dr Supplier receivable (credit note) / Cr Inventory at moving average cost ± Purchase price variance; Cr VAT input when PKP. **Operational expense** (PR-79) — Dr Branch expense / Cr Petty cash, Cash, Bank, or Accounts payable (unpaid; settled later Dr AP / Cr Cash/Bank); reversal mirrors the original row.
 
-Notes: delivery before payment posts revenue once at delivery; the line's paid-not-delivered balance turns negative (unbilled receivable) until settled or converted to a receivable. If the tax adviser rules out a VAT reversal on moves to balance, the balance entry carries `vat_settled = true` and spending it creates no second VAT. Gateway fees are expenses, never a revenue reduction.
+**Posting triggers (one economic fact = one posting).** Each row above has exactly one canonical trigger event; other events about the same fact are non-posting companions. Canonical: `PaymentAllocated` (settlement rows; `InvoiceIssued` and `PaymentReceived` do not post), `TreatmentOutcomeCounted` / `ProductHandedOver` / `ConsultationFeeCharged` (performance; `TreatmentFinished` and `SessionRedeemed` do not post on their own — a package session posts through `SessionRedeemed` only, a single treatment through `TreatmentOutcomeCounted` only), `BalanceMoved` (all reclass rows; `PackageExpired` / `PackageCancelled` are companions), `GoodsReceived`, `SupplierInvoiceRecorded`, `SupplierPaymentAllocated`, `SupplierCreditApplied` (Dr Accounts payable / Cr Supplier receivable), `ExpenseRecorded`, `ReceivableCollected`, `ReceivableWrittenOff` (Dr Bad-debt expense / Cr Patient receivable), `BookingDepositRefunded`, `OpeningImportApplied` (Dr Opening balance equity / Cr the imported liability or Dr receivable, no revenue, VAT or commission). A product sale with COGS and an inter-branch package session each post as one coordinated multi-leg journal. **Reversals:** invoice void, expense reversal, supplier invoice/payment/credit reversal and any correction post the exact mirror of the original journal with `reverses_journal_id`; originals are never edited.
+
+Notes: delivery before payment posts revenue once at delivery; the line's paid-not-delivered balance turns negative (unbilled receivable) until settled or converted to a receivable. Only the VAT-reversal path is supported. If the tax adviser rules out VAT reversal on moves to balance (Q-05), a balanced alternative (e.g. Dr liability net + Dr VAT-settled clearing / Cr balance gross) must be specified and signed before it can be enabled; until then the `vat_settled` alternative is switched off. The same rule applies to package-to-balance moves. Gateway fees are expenses, never a revenue reduction.
 
 Consequences: revenue never at payment; balance never becomes breakage income; cancelled unpaid package remainders are never receivables; each rupiah is recognised once even when it passes through balance.
 
@@ -108,7 +110,7 @@ Consequences: revenue never at payment; balance never becomes breakage income; c
 - Package liability: opening + paid allocations (incl. balance used) − counted sessions − moved to balance (expiry, cancellation, cheaper substitution) − refunds = closing.
 - Patient balance: opening + top-ups + from expiry/cancel + from interrupted treatment + from substitution + refunds to balance + DP moved − used − cash refunded = closing.
 - VAT payable (PKP): opening + VAT at tax point (payment or earlier delivery) − VAT reversals (refunds, moves to balance) − input VAT credited − VAT paid = closing.
-- Gateway clearing: opening + gateway payments − settlements − fees = closing (should trend to zero).
+- Gateway clearing: opening + gateway payments (all targets: lines, packages, top-ups, DP, receivables) − gross settlements (net bank proceeds + merchant fees) = closing (should trend to zero).
 - Inter-branch clearing: nets to zero across branches each month.
 - Booking DP: opening + received − applied − forfeited − moved − refunded = closing.
 - Commission payable: opening + accrued − adjustments − paid = closing.

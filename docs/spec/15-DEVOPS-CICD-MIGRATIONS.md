@@ -92,24 +92,25 @@ Schema convention: each module owns `src/modules/<module>/schema.ts`; `src/db/sc
 
 | Folder | Module | Owning design ID |
 |---|---|---|
-| `src/modules/vendor/**` | tenants, lifecycle, vendor console, onboarding, support sessions, server-fee billing | TD-13 (03) |
-| `src/modules/org/**` | organization, memberships, roles, context switching, access | TD-13 (03) |
-| `src/modules/{audit,idempotency,events,approvals,notifications,settings,compliance,payments,platform,import,export}/**` | audit, idempotency, events/outbox, approvals, notifications, settings, compliance register, payments port, platform residency, import, export | TD-13 (03) |
+| `src/modules/vendor/**` | tenants registry, lifecycle, vendor console, onboarding, support sessions, server-fee billing | TD-13 (03) |
+| `src/modules/{memberships,audit,idempotency,events,notifications,compliance,payments,platform,import,export}/**` | memberships and IAM, audit, idempotency, events/outbox, notifications, compliance register, payment port, platform residency, import, export | TD-13 (03) |
 | `src/modules/public-site/**` | public-site generator and rules | TD-14 (03) |
-| `src/modules/catalog/**` | catalog, master layanan, prices | TD-1 (03) |
+| `src/modules/{org,settings,approvals,catalog}/**` | tenant profile, branches, rooms, staff, roles, context, access; settings registry; approvals; catalog, Master Layanan, prices | TD-1 (03) |
 | `src/modules/{patients,privacy}/**` | patients, consents, privacy | TD-2 (03) |
 | `src/modules/{scheduling,visits}/**` | scheduling, visits, queue | TD-3 (03) |
 | `src/modules/{clinical,documents,safety}/**` | clinical (intake, exam, records, consent, media, requests, complaints), documents, safety | TD-4 (03) |
 | `src/modules/treatment/**` | treatment room | TD-5 (03) |
 | `src/modules/{inventory,pharmacy,purchasing}/**` | inventory, depots, pharmacy, purchasing | TD-6 (03) |
-| `src/modules/{cashier,packages,balance,promo,tax,expenses}/**` | cashier, packages, balance, promo, tax, expenses | TD-7 (03) |
+| `src/modules/{cashier,packages,balance,promo,tax,expenses}/**` | cashier, packages, balance, promo, tax profile/VAT, expenses | TD-7 (03) |
 | `src/modules/commission/**` | commission and targets | TD-8 (03) |
 | `src/modules/{messaging,crm}/**` | messaging, CRM, automation | TD-9 (03) |
-| `src/modules/accounting/**` | accounting | TD-10 (03) |
-| `src/modules/integrations/**` | integrations (SATUSEHAT) | TD-11 (03) |
+| `src/modules/accounting/**` | accounting, journals, Coretax export (`accounting/coretax`) | TD-10 (03) |
+| `src/modules/integrations/**` | SATUSEHAT, real payment adapters | TD-11 (03) |
 | `src/modules/reporting/**` | reporting | TD-12 (03) |
 
-Dependency direction: clinic-domain modules may call platform-core modules; platform-core modules never import clinic-domain modules (they consume events); a module writes only its own tables; cross-module reads go through exported queries or events.
+Foundation schemas (T-002): `tenants`, `branches` in `src/modules/org/schema.ts`; `tenants_registry` in `src/modules/vendor/schema.ts`.
+
+Dependency direction: the single rule is in `03` §2 (platform core never imports clinic-domain modules except through their published interfaces or events); a module writes only its own tables; cross-module reads go through exported queries or events.
 
 ### Repository documents at promotion
 

@@ -123,8 +123,8 @@ Legend: **KEEP** (adopted as is) · **MODIFY** (adopted with stated change) · *
 | CLIN-001–CLIN-028 | KEEP / REWORD / DEFER per row | 02-PRD §8.1 | Each CLIN mapped to an owning PR |
 | RG-01 partial execution (consume 1) | SUPERSEDED | PR-14 | Decided: medical/clinic stop not counted, patient stop counted |
 | RG-02 no-show grace 15 min | SUPERSEDED | PR-8, PR-22 | Lateness rule default off; booking DP 24 h rule |
-| RG-03 package validity 12 months, breakage | MODIFY | PR-20 | 12 months kept; expiry → balance, no breakage |
-| RG-05 installments 2–3 terms | SUPERSEDED | PR-20 | No schedule, pay any amount |
+| RG-03 package validity 12 months, breakage | MODIFY | PR-20 | Default 365 days (SET-8, bounds 30–1095 days); expiry → balance, no breakage |
+| RG-05 installments 2–3 terms | SUPERSEDED | PR-20 | No binding schedule, pay any amount; optional reminder-only schedules (PR-96) |
 | RG-06 repeated refunds, write-off ≤ Rp500k | SUPERSEDED | PR-21, PR-37, PR-44 | Refund to balance by default; owner write-off (B-11, B-14) |
 | RG-07/RG-08 loyalty | LATER | Phase 4 | Loyalty deferred |
 | RG-10/RG-11/RG-12 tax | KEEP | PR-24 | Matches research |

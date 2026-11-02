@@ -136,7 +136,7 @@ This document is a pack extension (integration contracts). Requirement IDs reuse
 ### TD-43 — Mock payment adapter
 - Status: Proposal
 - Owner: Engineering owner
-- Statement: Implements the payment port: creates simulated QRIS/VA/link charges, exposes UX-56 to mark paid, expired or failed, sends HMAC-signed webhooks to `/api/v1/webhooks/payment/mock`, and can replay duplicate and late webhooks; every artifact is flagged simulated (BILL-29). Every future real adapter must pass the same contract suite: duplicate webhook → one payment; paid after expiry → recorded and flagged; amount mismatch → rejected and audited; bad signature → 401 and audited; lost webhook → status query settles once; out-of-order events (paid after failed/cancelled) → flagged for review; refund idempotent including partial refund; webhook outside the timestamp window → rejected; `payment_routes` tenant mismatch → dropped and audited; gateway paid after the line was settled in cash → value to patient balance and flagged. PLAN scenario 20 (gateway clearing and fee) runs only with the real adapter in M7.
+- Statement: Implements the payment port: creates simulated QRIS/VA/link charges, exposes UX-56 to mark paid, expired or failed, sends HMAC-signed webhooks to `/api/v1/webhooks/payment/mock`, and can replay duplicate and late webhooks; every artifact is flagged simulated (BILL-29). Every future real adapter must pass the same contract suite: duplicate webhook → one payment; paid after expiry → recorded and flagged; amount mismatch → rejected and audited; bad signature → 401 and audited; lost webhook → status query settles once; out-of-order events (paid after failed/cancelled) → flagged for review; refund idempotent including partial refund; webhook outside the timestamp window → rejected; `payment_routes` tenant mismatch → dropped and audited; gateway paid after the line was settled in cash → value to patient balance and flagged. PLAN scenario 20 (gateway clearing and fee) is verified in M8 with a synthetic settlement fixture posted directly to the ledger (not through simulated payments, which never enter real ledgers); a real-provider run waits for the Q-14 partner and its adapter task.
 - Acceptance: Given the mock adapter and a paid webhook replayed twice, When processed, Then one payment exists marked simulated and K1 is unchanged.
 - Constraints: H-10, PR-68, TD-41
 
@@ -174,9 +174,9 @@ This document is a pack extension (integration contracts). Requirement IDs reuse
 | BookingDepositReceived / Applied / Forfeited / MovedToBalance | TD-7 | Posting |
 | CommissionPaid | TD-8 | Posting |
 | SupplierReturned | TD-6 | Posting, supplier credit expectation |
-| ExpenseRecorded | TD-10 | Posting |
+| ExpenseRecorded | TD-7 | Posting |
 | InvoiceVoided / DiscountApproved | TD-7 | Posting, suspicious-activity report |
-| OpeningImportApplied | TD-13 | Posting (opening journal), reconciliation |
+| OpeningImportApplied | TD-13 | Posting (opening journal; `11` trigger `OpeningBalanceImported`), reconciliation |
 | TenantLifecycleChanged / ServerFeeInvoiced / ServerFeePaid | TD-13 | Vendor console, notifications (platform events, no tenant data) |
 | ConsultationFeeCharged / Recharged | TD-7 | Posting, commission |
 | ProductHandedOver / ProductReturned | TD-6 | Posting (COGS), revenue |
@@ -184,10 +184,11 @@ This document is a pack extension (integration contracts). Requirement IDs reuse
 | GoodsReceived | TD-6 | Posting (GRNI), moving average |
 | SupplierInvoiceRecorded / SupplierPaymentAllocated / SupplierCreditApplied | TD-6 | Posting (AP), supplier roll-forward |
 | ReceivableCollected | TD-7 | Posting (no revenue or VAT) |
+| SupplierInvoiceReversed / SupplierPaymentReversed / SupplierCreditReversed / ExpenseReversed / JournalReversed | TD-6, TD-7, TD-10 | Posting (mirror of the original journal) |
 | BookingDepositRefunded | TD-7 | Posting |
 | GatewaySettlementReceived | TD-7 | Posting (clearing, fees) |
 | ShiftClosed | TD-7 | Approvals (variance) |
-| TaxProfileChanged | TD-1 | Posting (PKP boundary) |
+| TaxProfileChanged | TD-7 | Posting (PKP boundary) |
 
 ## 5. Error Catalog
 

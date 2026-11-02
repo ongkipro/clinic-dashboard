@@ -28,22 +28,22 @@ A single transactional application (modular monolith) with background workers, o
 
 | ID | Component | Responsibility | Owns data | Owner |
 |---|---|---|---|---|
-| TD-1 | Org & access module | Tenants, branches, staff, roles, scopes, settings, approvals | tenants, branches, staff, policy_settings, approvals | Engineering owner |
+| TD-1 | Org, access & catalog module | Tenant profile, branches, rooms, staff, roles, scopes, context switching, access administration, settings registry, approvals, catalog and Master Layanan, branch prices | tenants, branches, rooms, staff, staff_roles, duty_assignments, settings_*, approvals, catalog_*, branch_prices | Engineering owner |
 | TD-2 | Patient & consent module | Patients, contact points, guardians, consents, merges | patients, contact_points, consents | Engineering owner |
 | TD-3 | Scheduling & front office module | Schedules, resources, appointments, visits, queue | appointments, resource_reservations, visits | Engineering owner |
 | TD-4 | Clinical module | Intake, examination, face map, care plans, conditions, consent records, photos, amendments, letters | medical_records + versions, care_plans, condition_assessments, procedure_consents, clinical_media | Engineering owner |
 | TD-5 | Treatment execution module | Checklist, start/finish/interrupt, performer, materials actuals | treatment_executions | Engineering owner |
 | TD-6 | Inventory & pharmacy module | Items, batches, vials, requests, issues, consumption, returns, waste, counts, transfers, POs, prescriptions, dispensing | stock_* tables, prescriptions | Engineering owner |
-| TD-7 | Cashier & entitlement module | Invoices, payments, allocations, packages, balance, DP, receivables, refunds, shift close | invoices, payments, package_*, balance_accounts, balance_entries | Engineering owner |
+| TD-7 | Cashier & entitlement module | Invoices, payments, allocations, packages, balance, DP, receivables, refunds, shift close, promo codes, tax profile and VAT computation, expenses and petty cash | invoices, payments, package_*, balance_accounts, balance_entries, booking_deposits, receivables, cash_shifts, promo_*, tax_profiles, expenses | Engineering owner |
 | TD-8 | Commission module | Rules, snapshots, contributions, entitlements, adjustments, payout batches, targets | commission_* | Engineering owner |
 | TD-9 | Messaging & CRM module | WABA accounts, numbers, templates, conversations, messages, leads, follow-ups, campaigns | waba_*, conversations, leads, followups | Engineering owner |
-| TD-10 | Accounting module | Chart of accounts, posting rules, journals, periods, statements, exports | accounts, journal_entries, journal_lines, periods | Engineering owner |
-| TD-11 | Integration module | SATUSEHAT mapping and outbox, payment gateway adapters, Coretax export | integration_outbox, resource_links | Engineering owner |
+| TD-10 | Accounting module | Chart of accounts, posting rules, journals, periods, statements, exports incl. Coretax XML | accounts, journal_entries, journal_lines, periods | Engineering owner |
+| TD-11 | Integration module | SATUSEHAT mapping and outbox, payment gateway adapters (behind the TD-13 payment port) | integration_outbox, resource_links | Engineering owner |
 | TD-12 | Reporting module | Read models for dashboards and KPI dictionary | read models only | Engineering owner |
 | TD-13 | Platform core module group | Tenants and lifecycle, memberships and IAM, vendor console, server-fee billing (vendor AutoLaris adapter), audit, notifications, outbox, files, public-site engine, payment port | tenants_registry, vendor_*, onboarding_*, support_sessions, payment_port_configs | Engineering owner |
 | TD-14 | Public site module | Generates tenant pages from branch master, catalog web fields, consenting doctor profiles and promos; publish versions; edge purge | public_site_settings, public_profiles, promos | Engineering owner |
 
-Rule: each record has one owning module; other modules read through module interfaces or events. TD-1–TD-12 are the **clinic domain**; TD-13–TD-14 are the **platform core** and never import clinic-domain modules except through published interfaces.
+Rule: each record has one owning module; other modules read through module interfaces or events. TD-1–TD-12 are the **clinic domain**; TD-13–TD-14 are the **platform core** and never import clinic-domain modules except through their published interfaces (exported queries) or events; this is the single dependency rule, repeated in `15` §3.
 
 ## 5. Key Flows
 

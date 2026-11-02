@@ -373,6 +373,11 @@ Scenario: PR-21 balance never expires
   When the patient buys a product
   Then the balance can be used in full
 
+Scenario: PR-21 refund goes to balance by default
+  Given a paid product line of Rp200,000 that was not handed over
+  When the cashier refunds it without a cash-refund exception
+  Then Rp200,000 is added to the patient balance and no cash leaves the drawer
+
 Scenario: PR-22 booking DP under 24 hours
   Given a booking with DP Rp200,000
   When the patient reschedules 10 hours before the appointment
@@ -490,6 +495,11 @@ Scenario: PR-37 maker-checker
   Given a refund exception requested by a manager
   When the same manager tries to approve it
   Then approval is refused
+
+Scenario: PR-37 owner write-off
+  Given a receivable of Rp150,000 older than the collection policy
+  When the owner writes it off alone with a reason
+  Then the write-off is recorded with the owner as requester and approver, the reason is mandatory, and no commission is paid on it
 
 Scenario: PR-38 bounded settings
   Given the settings screen

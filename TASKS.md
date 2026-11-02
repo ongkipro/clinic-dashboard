@@ -46,29 +46,29 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-002: Database core: Drizzle setup, migration runner, `tenants`, `tenants_registry`, `branches` with composite keys `(tenant_id,id)`
 - **Primary requirement:** PR-1
 - **Risk Level:** R3
-- **Allowed Paths:** `src/db/**`, `drizzle/**`, `drizzle.config.ts`, `tests/db/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/db/**`, `drizzle/**`, `drizzle.config.ts`, `tests/db/**`, `src/db/schema/index.ts`, `package.json`, `pnpm-lock.yaml`, `src/modules/org/schema.ts`, `src/modules/vendor/schema.ts`
 - **Protected Paths:** `drizzle/**`
 - **Depends On:** T-001
 - **Visual Contract:** Not applicable
-- **Done when:** Fresh database migrates with `pnpm db:migrate`; a migration test asserts `UNIQUE(tenant_id,id)` on every tenant table and `ON DELETE RESTRICT` on business FKs (05 §3.1)
+- **Done when:** Fresh database migrates with `pnpm db:migrate`; a migration test asserts `UNIQUE(tenant_id,id)` on every tenant table and `ON DELETE RESTRICT` on business FKs (05 §3.1); `pnpm db:migrate` script and Drizzle dependencies added by this task
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-003: RLS harness: non-owner app role without BYPASSRLS, per-transaction tenant context (TEN-2), scope map table and TEN-3/TEN-19 test
 - **Primary requirement:** PR-1
 - **Risk Level:** R4
-- **Allowed Paths:** `src/db/rls/**`, `src/db/scope-map.ts`, `tests/rls/**`, `drizzle/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/db/rls/**`, `src/db/scope-map.ts`, `tests/rls/**`, `drizzle/**`, `src/db/schema/index.ts`, `package.json`, `pnpm-lock.yaml`, `vitest.config.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-002
 - **Visual Contract:** Not applicable
-- **Done when:** `pnpm test:rls` passes: startup refuses a BYPASSRLS role; a table missing from `scope_map` or classified twice fails the test; scenario PR-1 (tenant A reading tenant B → not found + audit) passes
+- **Done when:** `pnpm test:rls` passes: startup refuses a BYPASSRLS role; a table missing from `scope_map` or classified twice fails the test; cross-tenant read of a fixture row returns not-found (full scenario PR-1 with patients and audit in the patient-registration task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-004: Isolation CI gates: cross-tenant negative test generator per route/job/export, tenant-literal lint rule, build digest record (DEL-2)
 - **Primary requirement:** PR-1
 - **Risk Level:** R3
-- **Allowed Paths:** `tests/isolation/**`, `eslint.config.mjs`, `.github/workflows/ci.yml`, `scripts/record-digest.mjs`
+- **Allowed Paths:** `tests/isolation/**`, `eslint.config.mjs`, `.github/workflows/ci.yml`, `scripts/record-digest.mjs`, `package.json`, `pnpm-lock.yaml`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-003
 - **Visual Contract:** Not applicable
@@ -79,11 +79,11 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-005: Platform basics: pgBackRest backups, key custody (envelope keys for NIK, tokens and PINs), app/booking/vendor host resolver (ARCH-3)
 - **Primary requirement:** PR-1
 - **Risk Level:** R4
-- **Allowed Paths:** `ops/pgbackrest/**`, `compose.yaml`, `src/lib/keys/**`, `src/lib/hosts.ts`, `tests/platform/**`
+- **Allowed Paths:** `ops/pgbackrest/**`, `compose.yaml`, `src/lib/keys/**`, `src/lib/hosts.ts`, `tests/platform/**`, `src/proxy.ts`, `tests/platform/hosts.spec.ts`
 - **Protected Paths:** `src/lib/keys/**`
 - **Depends On:** T-003
 - **Visual Contract:** Not applicable
-- **Done when:** A seeded database restores to a scratch instance with matching row counts; envelope encryption round-trip and key-rotation tests pass; the host resolver serves clinic routes only on the app host, booking routes only on the booking host and vendor routes only on the vendor host
+- **Done when:** A seeded database restores to a scratch instance with matching row counts; envelope encryption round-trip and key-rotation tests pass; the host resolver is wired into `src/proxy.ts` (Next.js 16 proxy convention) and HTTP negatives prove `/saya` and `/persetujuan` are refused on the booking and vendor hosts, public routes are refused on the app host, and vendor routes are refused on every non-vendor host
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -156,7 +156,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-012: Design tokens and base components from DESIGN.md (shadcn restyled, Drawer sheets), state copy patterns
 - **Primary requirement:** PR-86
 - **Risk Level:** R1
-- **Allowed Paths:** `src/styles/**`, `src/components/ui/**`, `tests/ui/tokens.spec.ts`
+- **Allowed Paths:** `src/styles/**`, `src/components/ui/**`, `tests/ui/tokens.spec.ts`, `package.json`, `pnpm-lock.yaml`, `playwright.config.ts`, `components.json`
 - **Protected Paths:** None
 - **Depends On:** T-001
 - **Visual Contract:** Visual contract per `docs/spec/10` and `DESIGN.md`; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -255,7 +255,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-021: Vendor console on its own hostname with separate __Host- cookies, strict CSP, no clinic session accepted (SEC-21)
 - **Primary requirement:** PR-57
 - **Risk Level:** R3
-- **Allowed Paths:** `src/app/vendor/**`, `middleware.ts`, `tests/vendor/host.test.ts`
+- **Allowed Paths:** `src/app/vendor/**`, `src/proxy.ts`, `tests/vendor/host.test.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-020
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-40–UX-49 shell (desktop-first); tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -270,7 +270,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-020
 - **Visual Contract:** Not applicable
-- **Done when:** Scenarios PR-56 pass at module level: suspension keeps records, blocks new bookings and marketing, keeps care-message eligibility (delivery verified in the reminders task)
+- **Done when:** Scenario PR-56 manual suspension keeps records passes; suspended tenants keep care-message eligibility (the aftercare half of PR-56 completes in the aftercare task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -321,7 +321,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-027: Onboarding checklist per tenant/branch and go-live confirmation
 - **Primary requirement:** PR-59
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/vendor/checklist/**`, `src/app/vendor/onboarding/**`, `tests/vendor/checklist.test.ts`
+- **Allowed Paths:** `src/modules/vendor/checklist/**`, `src/app/vendor/onboarding/**`, `tests/vendor/checklist.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/modules/vendor/checklist/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-025
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-41 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -358,14 +358,14 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-029, T-013
 - **Visual Contract:** Visual contract per `docs/spec/17` 17 Navigation and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Context switching records the active branch, brand and acting role on actions; scenario PR-3 acting role for multi-role staff passes (full PR-84 with Antrean in the walk-in task)
+- **Done when:** Context switching records the active branch, brand and acting role on actions (full PR-84 with Antrean in the walk-in task; PR-3 acting role with signing in the signing task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-031: Pengguna & Akses: read-only permission matrix, sessions with revoke (≤ 60 s), duty assignments, change log (DATA-65, IAM-16)
 - **Primary requirement:** PR-91
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/org/access/**`, `src/app/(app)/pengguna-akses/**`, `tests/org/access.test.ts`
+- **Allowed Paths:** `src/modules/org/access/**`, `src/app/(app)/pengguna-akses/**`, `tests/org/access.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-030
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-3 ▸ Akses and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -393,7 +393,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-032
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-25; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-41 passes; CLIN-011 (catalog change keeps old receipts) passes
+- **Done when:** Scenario PR-41 passes; catalog versions are immutable once referenced (CLIN-011 old receipts and entitlements complete in the packages task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -404,7 +404,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-033, T-014
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-25 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-88 passes
+- **Done when:** Master Layanan saved and versioned with resources and staff eligibility (scenario PR-88 slot effect in the booking task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -415,15 +415,15 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-033
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-25 branch price tab; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-42 passes; Admin Pusat cannot override
+- **Done when:** Branch price override stored owner-only and effective-dated; Admin Pusat cannot override (invoice half of scenario PR-42 in the cashier task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-036: Branch master UX-2: hours, closures, rooms, devices, services, WhatsApp, map, publish window, licence fields (SET-46)
 - **Primary requirement:** PR-2
-- **Risk Level:** R2
-- **Allowed Paths:** `src/modules/org/branches/**`, `src/app/(app)/pengaturan/cabang/**`, `tests/org/branches.test.ts`
-- **Protected Paths:** None
+- **Risk Level:** R3
+- **Allowed Paths:** `src/modules/org/branches/**`, `src/app/(app)/pengaturan/cabang/**`, `tests/org/branches.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
+- **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-032, T-014
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-2 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
 - **Done when:** Branch master saved and audited; browser check UX-2 (slot half of PR-2 in the booking task, public listing half in the public-site task)
@@ -437,7 +437,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-032, T-014
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-4 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-5 passes; NIK never stored in clear; one phone for two patients does not expose either
+- **Done when:** Scenario PR-5 passes; NIK never stored in clear; one phone for two patients does not expose either; scenario PR-1 tenant isolation passes in full (patients of two tenants, audit event recorded)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -448,7 +448,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-037
 - **Visual Contract:** Not applicable
-- **Done when:** Consent-ledger half of scenario PR-4 passes (withdrawal recorded, text versions immutable); the queued-message half passes in the outbound task
+- **Done when:** Consent-ledger half of scenario PR-4 passes (withdrawal recorded, text versions immutable); the full scenario completes in the outbound task
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -488,7 +488,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-042: Duplicate patient merge (records officer), audited and reversible
 - **Primary requirement:** PR-85
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/patients/merge/**`, `tests/patients/merge.test.ts`
+- **Allowed Paths:** `src/modules/patients/merge/**`, `tests/patients/merge.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-040
 - **Visual Contract:** Not applicable
@@ -525,7 +525,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** None
 - **Depends On:** T-044
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-5 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-83 no-show without DP passes; browser check UX-5 phone agenda and desktop week
+- **Done when:** Appointment states and actions of scenario PR-83 no-show without DP pass (state no-show, no money moves); the CS follow-up half passes in the follow-ups task; browser check UX-5 phone agenda and desktop week
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -615,7 +615,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-052
 - **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-13 and CLIN-014, CLIN-023 pass; patient record copy of scenario PR-49 passes
+- **Done when:** Scenario PR-13 and CLIN-014, CLIN-023 pass; patient record copy of scenario PR-49 passes; scenario PR-3 acting role for multi-role staff passes
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -745,7 +745,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-065: Siapkan & Serahkan: prep list, seven checks, quarantine/recall blocks, labels (UX-10)
 - **Primary requirement:** PR-18
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/pharmacy/**`, `src/app/(app)/apotek/**`, `tests/pharmacy/**`
+- **Allowed Paths:** `src/modules/pharmacy/**`, `src/app/(app)/apotek/**`, `tests/pharmacy/**`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-064
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-10 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -817,18 +817,18 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-070, T-019
 - **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-24 passes; VAT switch refused without approved tax-advice evidence (PR-97); money scenarios 16, 19 pass
+- **Done when:** Scenario PR-24 passes; VAT switch refused without approved tax-advice evidence (PR-97); tax-policy unit checks for the PKP boundary and VAT tax point pass (full money scenarios 16, 19 in the packages task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-072: Kasir (UX-12): invoices, split tender, proportional allocation, receipts, counter sale, void via approval
 - **Primary requirement:** PR-19
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/cashier/**`, `src/app/(app)/kasir/**`, `tests/cashier/**`
+- **Allowed Paths:** `src/modules/cashier/**`, `src/app/(app)/kasir/**`, `tests/cashier/**`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-071
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-12 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-19 and money scenario 1 pass
+- **Done when:** Scenario PR-19 and money scenario 1 pass; scenario PR-42 branch price on an invoice passes
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -839,7 +839,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-56; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenarios PR-68 and money scenarios 18, 20 pass; TD-43 contract suite passes against the mock
+- **Done when:** Scenario PR-68 and money scenario 18 pass; TD-43 contract suite passes against the mock (scenario 20 is verified in the ledger task with a synthetic settlement)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -850,7 +850,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072, T-056
 - **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-15, CLIN-020, CLIN-025 and money scenario 3 pass; scenario PR-7 unpaid-addition blocker passes; money scenario 12 (substitution difference) passes
+- **Done when:** Scenario PR-15 additional payment, CLIN-020, CLIN-025 and the domain part of money scenario 3 pass; scenario PR-7 unpaid-addition blocker passes (receivable conversion in the refunds task, WhatsApp reminder in the reminders task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -861,18 +861,18 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072
 - **Visual Contract:** Not applicable
-- **Done when:** Balance half of scenario PR-21 and money scenario 15 pass
+- **Done when:** Balance ledger tests pass: scenario PR-21 balance never expires; entries never negative (product refund parts of money scenario 15 in the refunds task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
 #### T-076: Packages: unlock by paid value, reserve/redeem, expiry and cancellation to balance
 - **Primary requirement:** PR-20
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/packages/**`, `drizzle/**`, `tests/packages/**`, `src/db/schema/index.ts`
+- **Allowed Paths:** `src/modules/packages/**`, `drizzle/**`, `tests/packages/**`, `src/db/schema/index.ts`, `src/app/(app)/kasir/paket-saldo/**`, `tests/ui/paket-saldo.spec.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-072, T-075
-- **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-20, PR-14 session effects, CLIN-006, 007, 009, 010, 028 and money scenarios 2, 5, 7, 8, 11, 13 pass
+- **Depends On:** T-072, T-075, T-074
+- **Visual Contract:** Visual contract per `docs/spec/17` UX-13; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
+- **Done when:** Scenario PR-20, PR-14 session effects, CLIN-006, 007, 009, 010, 011, 028 and the domain parts of money scenarios 2, 5, 7, 8, 11, 12 (substitution), 13, 16, 19 pass (commission parts in the commission task)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -883,7 +883,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-075, T-045
 - **Visual Contract:** Not applicable
-- **Done when:** Scenarios PR-22, PR-83 no-show with DP and money scenarios 6, 17 pass
+- **Done when:** Scenario PR-22 and the money part of PR-83 no-show with DP (DP forfeited) pass; money scenarios 6, 17 pass with gross-DP fixtures: DP moved to balance (VAT reversed, balance gross), spent later, and clinic-caused cash refund, all balanced with no duplicate VAT
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -894,7 +894,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-077
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-14 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenarios PR-21 refund, PR-15 receivable, PR-37 owner write-off, PR-63 Admin Pusat boundary and money scenario 9 pass; the commission half of money scenario 14 passes in the commission task
+- **Done when:** Scenarios PR-21 refund goes to balance by default, PR-15 receivable fallback, PR-37 owner write-off and PR-63 Admin Pusat boundary pass; money scenarios 9 and 15 pass and the receivable half of 3; the commission half of money scenario 14 passes in the commission task
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -947,7 +947,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R3
 - **Allowed Paths:** `src/modules/packages/schedules/**`, `tests/packages/schedules.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-078
+- **Depends On:** T-078, T-076
 - **Visual Contract:** Not applicable
 - **Done when:** Scenario PR-96 passes; schedule never unlocks or creates debt
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
@@ -967,7 +967,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 #### T-085: Tutup Kasir (UX-15): any variance → manager approval, above SET-13 → owner
 - **Primary requirement:** PR-19
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/cashier/shifts/**`, `src/app/(app)/kasir/tutup/**`, `tests/cashier/shifts.test.ts`
+- **Allowed Paths:** `src/modules/cashier/shifts/**`, `src/app/(app)/kasir/tutup/**`, `tests/cashier/shifts.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-072
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-15 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
@@ -982,7 +982,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-073, T-079, T-074, T-078, T-081, T-082, T-083, T-084, T-085
 - **Visual Contract:** Not applicable
-- **Done when:** `pnpm test -- money` passes; independent R3 review recorded
+- **Done when:** `pnpm test -- money` passes for the domain behaviour of money scenarios 1–9, 11–13, 15–19 (commission parts and scenario 14 in M5, journal lines and scenario 20 in M8); independent R3 review recorded
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -995,7 +995,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-086
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-16 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-23 and money scenario 10 pass; scenario PR-14 commission effect and money scenario 14 pass
+- **Done when:** Scenario PR-23, PR-14 commission effect and money scenarios 10 and 14 pass; commission parts of money scenarios 11 and 12 pass
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -1061,9 +1061,9 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R3
 - **Allowed Paths:** `src/modules/crm/followups/**`, `tests/crm/followups.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-092, T-076
+- **Depends On:** T-092, T-076, T-077
 - **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-30 passes
+- **Done when:** Scenario PR-30 passes; follow-up tasks for no-shows (PR-83 without and with DP) are created for CS
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -1072,9 +1072,9 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R3
 - **Allowed Paths:** `src/modules/messaging/outbound/**`, `tests/messaging/outbound.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-090
+- **Depends On:** T-090, T-038
 - **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-31 passes; withdrawn marketing consent stops queued promotional messages (PR-4)
+- **Done when:** Scenario PR-31 passes; scenario PR-4 consent withdrawal passes in full (queued promo not sent, care reminders continue)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -1085,7 +1085,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-094, T-045
 - **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-69 passes; care messages still send for a suspended tenant (PR-56)
+- **Done when:** Scenario PR-69 passes
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -1094,9 +1094,9 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R3
 - **Allowed Paths:** `src/modules/crm/aftercare/**`, `src/app/(public)/aftercare/**`, `tests/crm/aftercare.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-094
+- **Depends On:** T-094, T-047, T-053
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-51 patient pages (aftercare link); tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-70 passes; WhatsApp text contains no treatment name
+- **Done when:** Scenario PR-70 passes; WhatsApp text contains no treatment name; scenario PR-56 suspended tenant keeps care messages passes
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -1199,7 +1199,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-104, T-084, T-067
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-22 ▸ Buku Besar; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** Scenario PR-26 passes; every fixture posting matches the money fixture document; export refused without evidence
+- **Done when:** Scenario PR-26 passes; every fixture posting matches the money fixture document; export refused without evidence; every money scenario 1–20 posts the journal lines of the fixture document; scenario 20 runs with a synthetic gateway settlement posted directly (clearing ends at zero, fee is expense); posting triggers post each economic fact once
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -1214,25 +1214,25 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
-#### T-107: Reconciliation report KPI vs ledger
+#### T-107: Dashboard read models, drill-down and per-role homes (UX-60: Klinis, Marketing, Apotek, Pembelian, Audit, Ruang Saya), K1–K19 computed from fixtures
+- **Primary requirement:** PR-33
+- **Risk Level:** R3
+- **Allowed Paths:** `src/modules/reporting/dashboards/**`, `tests/reporting/dashboards.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/app/(app)/ringkasan/peran/**`, `tests/ui/ringkasan-peran.spec.ts`
+- **Protected Paths:** `drizzle/**`, `src/db/rls/**`
+- **Depends On:** T-104, T-101
+- **Visual Contract:** Visual contract per `docs/spec/17` UX-60 and `docs/spec/19` §2.1; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
+- **Done when:** Scenario PR-33 passes; K1–K19 equal fixture expectations; no clinical content in any dashboard payload; browser check of each UX-60 home
+- **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
+- **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
+
+#### T-108: Reconciliation report KPI vs ledger
 - **Primary requirement:** PR-34
 - **Risk Level:** R3
 - **Allowed Paths:** `src/modules/accounting/recon/**`, `tests/accounting/recon.test.ts`, `src/app/(app)/keuangan/rekon/**`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-105
+- **Depends On:** T-105, T-107
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-22 ▸ Rekon; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
 - **Done when:** Scenario PR-34 passes
-- **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
-- **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
-
-#### T-108: Dashboard read models, drill-down and per-role homes (UX-60), K1–K19 computed from fixtures
-- **Primary requirement:** PR-33
-- **Risk Level:** R3
-- **Allowed Paths:** `src/modules/reporting/dashboards/**`, `tests/reporting/dashboards.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
-- **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-104, T-101
-- **Visual Contract:** Not applicable
-- **Done when:** Scenario PR-33 passes; K1–K19 equal fixture expectations; no clinical content in any dashboard payload
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 
@@ -1241,7 +1241,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R2
 - **Allowed Paths:** `src/app/(app)/ringkasan/owner/**`, `tests/reporting/pr-33a.test.ts`
 - **Protected Paths:** None
-- **Depends On:** T-108
+- **Depends On:** T-107
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-20, UX-37 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
 - **Done when:** Scenario PR-33a passes; browser check UX-20, UX-37
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
@@ -1252,7 +1252,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R2
 - **Allowed Paths:** `src/app/(app)/ringkasan/cabang/**`, `tests/reporting/pr-33b.test.ts`
 - **Protected Paths:** None
-- **Depends On:** T-108
+- **Depends On:** T-107
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-21 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
 - **Done when:** Scenario PR-33b passes; browser check UX-21
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
@@ -1263,7 +1263,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R2
 - **Allowed Paths:** `src/app/(app)/hari-ini/ringkasan/**`, `tests/reporting/pr-33c.test.ts`
 - **Protected Paths:** None
-- **Depends On:** T-108
+- **Depends On:** T-107
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-6 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
 - **Done when:** Scenario PR-33c passes; browser check UX-6
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
@@ -1274,7 +1274,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R2
 - **Allowed Paths:** `src/app/(app)/pasienku/**`, `tests/reporting/pr-33d.test.ts`
 - **Protected Paths:** None
-- **Depends On:** T-108
+- **Depends On:** T-107
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-35 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
 - **Done when:** Scenario PR-33d passes; browser check UX-35
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
@@ -1285,7 +1285,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R2
 - **Allowed Paths:** `src/app/(app)/ringkasan/cs/**`, `tests/reporting/pr-33e.test.ts`
 - **Protected Paths:** None
-- **Depends On:** T-108
+- **Depends On:** T-107
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-36 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
 - **Done when:** Scenario PR-33e passes; browser check UX-36
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
@@ -1296,7 +1296,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R2
 - **Allowed Paths:** `src/app/(app)/keuangan/ringkasan/**`, `tests/reporting/pr-33f.test.ts`
 - **Protected Paths:** None
-- **Depends On:** T-108
+- **Depends On:** T-107
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-22 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
 - **Done when:** Scenario PR-33f passes; browser check UX-22
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
@@ -1318,7 +1318,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R3
 - **Allowed Paths:** `src/modules/reporting/reports/**`, `src/app/(app)/laporan/**`, `tests/reporting/reports.test.ts`, `drizzle/**`, `src/db/schema/index.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-108
+- **Depends On:** T-107
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-38, UX-59 and `19` row; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (10 State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
 - **Done when:** Scenario PR-95 passes; each K20–K27 value equals its fixture
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
@@ -1351,7 +1351,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Risk Level:** R3
 - **Allowed Paths:** `docs/evidence/m8/**`, `STATUS.md`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
-- **Depends On:** T-106, T-107, T-115, T-117, T-118, T-102
+- **Depends On:** T-106, T-108, T-115, T-117, T-118, T-102, T-109, T-110, T-111, T-112, T-113, T-114
 - **Visual Contract:** Not applicable
 - **Done when:** `pnpm test -- m8` passes; owner walkthrough recorded
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
@@ -1476,7 +1476,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 - **Protected Paths:** None
 - **Depends On:** T-129, T-126, T-122, T-121
 - **Visual Contract:** Visual contract per `docs/spec/19` §2; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.
-- **Done when:** `pnpm test:ui -- nav-sweep` passes for every role in the `07` matrix at 390 and 1440
+- **Done when:** `pnpm test:ui -- nav-sweep` passes for every role in the `07` matrix at 390 and 1440 (verification only: a missing page is a defect in its builder task, not built here)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 

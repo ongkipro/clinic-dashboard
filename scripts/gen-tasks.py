@@ -82,7 +82,7 @@ t("vendor_roles",M,"PR-57","Vendor staff and roles with TOTP, IP allowlist, make
   ["src/modules/vendor/staff/**","drizzle/**","tests/vendor/staff.test.ts"],["auth","approvals"],
   "Scenario PR-57 passes; dual vendor/clinic identity refused without both approvals; go-live refused with fewer than two vendor staff",protected=["src/modules/vendor/**"])
 t("vendor_console_host",M,"PR-57","Vendor console on its own hostname with separate __Host- cookies, strict CSP, no clinic session accepted (SEC-21)",R3,
-  ["src/app/vendor/**","middleware.ts","tests/vendor/host.test.ts"],["vendor_roles"],
+  ["src/app/vendor/**","src/proxy.ts","tests/vendor/host.test.ts"],["vendor_roles"],
   "Tests: clinic session cookie rejected on vendor host and vice versa; CSP header present; tenant strings escaped in vendor tables")
 t("lifecycle",M,"PR-56","Tenant lifecycle states and suspension effects (TEN-12)",R3,
   ["src/modules/vendor/lifecycle/**","drizzle/**","tests/vendor/lifecycle.test.ts"],["vendor_roles"],
@@ -559,6 +559,69 @@ K("tenant_create")['visual']=V("`docs/spec/17` UX-40")
 K("expenses")['visual']=V("`docs/spec/17` UX-22 ▸ Biaya")
 K("aftercare")['visual']=V("`docs/spec/17` UX-51 patient pages (aftercare link)")
 K("pixels")['visual']=V("`docs/spec/17` UX-51 (consent banner only)")
+
+
+# ---------------- round 7 (Astra) fixes ----------------
+# R7-15: dependencies and scripts introduced by their tasks; foundation module schemas
+paths("dbcore","package.json","pnpm-lock.yaml","src/modules/org/schema.ts","src/modules/vendor/schema.ts")
+add_done("dbcore","`pnpm db:migrate` script and Drizzle dependencies added by this task")
+paths("rls","package.json","pnpm-lock.yaml","vitest.config.ts")
+paths("isolation_ci","package.json","pnpm-lock.yaml")
+paths("tokens","package.json","pnpm-lock.yaml","playwright.config.ts","components.json")
+# R7-16: host enforcement wired into the request entry point
+paths("platform","src/proxy.ts","tests/platform/hosts.spec.ts")
+done("platform","A seeded database restores to a scratch instance with matching row counts; envelope encryption round-trip and key-rotation tests pass; the host resolver is wired into `src/proxy.ts` (Next.js 16 proxy convention) and HTTP negatives prove `/saya` and `/persetujuan` are refused on the booking and vendor hosts, public routes are refused on the app host, and vendor routes are refused on every non-vendor host")
+# R7-10: early tasks claim only module-level parts; completions named
+done("rls","`pnpm test:rls` passes: startup refuses a BYPASSRLS role; a table missing from `scope_map` or classified twice fails the test; cross-tenant read of a fixture row returns not-found (full scenario PR-1 with patients and audit in the patient-registration task)")
+add_done("patients","scenario PR-1 tenant isolation passes in full (patients of two tenants, audit event recorded)")
+done("switch","Context switching records the active branch, brand and acting role on actions (full PR-84 with Antrean in the walk-in task; PR-3 acting role with signing in the signing task)")
+add_done("signing","scenario PR-3 acting role for multi-role staff passes")
+done("catalog","Scenario PR-41 passes; catalog versions are immutable once referenced (CLIN-011 old receipts and entitlements complete in the packages task)")
+add_done("packages","CLIN-011 passes (catalog change keeps old receipts and entitlements)")
+done("master_layanan","Master Layanan saved and versioned with resources and staff eligibility (scenario PR-88 slot effect in the booking task)")
+done("branch_price","Branch price override stored owner-only and effective-dated; Admin Pusat cannot override (invoice half of scenario PR-42 in the cashier task)")
+add_done("cashier","scenario PR-42 branch price on an invoice passes")
+done("calendar","Appointment states and actions of scenario PR-83 no-show without DP pass (state no-show, no money moves); the CS follow-up half passes in the follow-ups task; browser check UX-5 phone agenda and desktop week")
+done("followups","Scenario PR-30 passes; follow-up tasks for no-shows (PR-83 without and with DP) are created for CS")
+deps("followups","dp")
+done("dp","Scenario PR-22 and the money part of PR-83 no-show with DP (DP forfeited) pass; money scenarios 6, 17 pass with gross-DP fixtures: DP moved to balance (VAT reversed, balance gross), spent later, and clinic-caused cash refund, all balanced with no duplicate VAT")
+# R7-12: completions owned by the task that builds them
+done("lifecycle","Scenario PR-56 manual suspension keeps records passes; suspended tenants keep care-message eligibility (the aftercare half of PR-56 completes in the aftercare task)")
+done("reminders","Scenario PR-69 passes")
+done("aftercare","Scenario PR-70 passes; WhatsApp text contains no treatment name; scenario PR-56 suspended tenant keeps care messages passes")
+done("consents","Consent-ledger half of scenario PR-4 passes (withdrawal recorded, text versions immutable); the full scenario completes in the outbound task")
+done("outbound","Scenario PR-31 passes; scenario PR-4 consent withdrawal passes in full (queued promo not sent, care reminders continue)")
+deps("outbound","consents"); deps("aftercare","checkin","signing")
+# R7-08, R7-09: money scenarios where executable
+done("tax","Scenario PR-24 passes; VAT switch refused without approved tax-advice evidence (PR-97); tax-policy unit checks for the PKP boundary and VAT tax point pass (full money scenarios 16, 19 in the packages task)")
+done("port","Scenario PR-68 and money scenario 18 pass; TD-43 contract suite passes against the mock (scenario 20 is verified in the ledger task with a synthetic settlement)")
+done("additions","Scenario PR-15 additional payment, CLIN-020, CLIN-025 and the domain part of money scenario 3 pass; scenario PR-7 unpaid-addition blocker passes (receivable conversion in the refunds task, WhatsApp reminder in the reminders task)")
+done("balance","Balance ledger tests pass: scenario PR-21 balance never expires; entries never negative (product refund parts of money scenario 15 in the refunds task)")
+done("packages","Scenario PR-20, PR-14 session effects, CLIN-006, 007, 009, 010, 011, 028 and the domain parts of money scenarios 2, 5, 7, 8, 11, 12 (substitution), 13, 16, 19 pass (commission parts in the commission task)")
+deps("packages","additions")
+done("refunds","Scenarios PR-21 refund goes to balance by default, PR-15 receivable fallback, PR-37 owner write-off and PR-63 Admin Pusat boundary pass; money scenarios 9 and 15 pass and the receivable half of 3; the commission half of money scenario 14 passes in the commission task")
+done("commission","Scenario PR-23, PR-14 commission effect and money scenarios 10 and 14 pass; commission parts of money scenarios 11 and 12 pass")
+done("m4_exit","`pnpm test -- money` passes for the domain behaviour of money scenarios 1–9, 11–13, 15–19 (commission parts and scenario 14 in M5, journal lines and scenario 20 in M8); independent R3 review recorded")
+add_done("ledger","every money scenario 1–20 posts the journal lines of the fixture document; scenario 20 runs with a synthetic gateway settlement posted directly (clearing ends at zero, fee is expense); posting triggers post each economic fact once")
+# R7-11: missing dependency edges
+deps("schedules_inst","packages")
+deps("recon","dashboards")
+move_before("dashboards","recon")
+# R7-13: persistence owners
+for k in ("access_admin","branches","merge","pharmacy","cashier","shift","golive"):
+    paths(k,"drizzle/**","src/db/schema/index.ts")
+    if K(k)['risk'] in (R1,R2): K(k)['risk']=R3
+    if K(k)['protected'] is None: K(k)['protected']=["drizzle/**","src/db/rls/**"]
+paths("golive","src/modules/vendor/checklist/schema.ts")
+# R7-14: screen builders
+paths("dashboards","src/app/(app)/ringkasan/peran/**","tests/ui/ringkasan-peran.spec.ts")
+K("dashboards")['title']="Dashboard read models, drill-down and per-role homes (UX-60: Klinis, Marketing, Apotek, Pembelian, Audit, Ruang Saya), K1–K19 computed from fixtures"
+K("dashboards")['visual']=V("`docs/spec/17` UX-60 and `docs/spec/19` §2.1")
+add_done("dashboards","browser check of each UX-60 home")
+paths("packages","src/app/(app)/kasir/paket-saldo/**","tests/ui/paket-saldo.spec.ts")
+K("packages")['visual']=V("`docs/spec/17` UX-13")
+deps("m8_exit","dash_PR-33a","dash_PR-33b","dash_PR-33c","dash_PR-33d","dash_PR-33e","dash_PR-33f")
+K("nav_sweep")['done']="`pnpm test:ui -- nav-sweep` passes for every role in the `07` matrix at 390 and 1440 (verification only: a missing page is a defect in its builder task, not built here)"
 
 # ---------------- missing-PR sweep: add tasks for PRs not yet primary ----------------
 assigned={x['primary'] for x in T}
