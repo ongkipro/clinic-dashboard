@@ -1,11 +1,10 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { callAuth } from "../client";
 import s from "../auth.module.css";
 
-export function SignInForm() {
-  const router = useRouter();
+// Destinations and API base are props so the vendor console (SEC-21) reuses the form.
+export function SignInForm({ base, home = "/", verify = "/verifikasi" }: { base?: string; home?: string; verify?: string }) {
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
 
@@ -18,10 +17,12 @@ export function SignInForm() {
     const r = await callAuth("/sign-in/email", {
       email: String(form.get("email") ?? ""),
       password: String(form.get("password") ?? ""),
-    });
+    }, base);
     setBusy(false);
     if (!r.ok) return setError(r.message);
-    router.replace(r.data.twoFactorRedirect ? "/verifikasi" : "/");
+    // The session just changed: a full load, so no page cached by the client router under
+    // the previous session (e.g. a redirect to enrolment) is reused.
+    window.location.replace(r.data.twoFactorRedirect ? verify : home);
   }
 
   return (

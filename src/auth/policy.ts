@@ -98,8 +98,10 @@ export function sessionGate(input: {
   lastActiveAt: Date;
   lockedAt: Date | null;
   now: Date;
+  // The vendor console requires TOTP for every account, whatever its clinic roles (IAM-10).
+  totpAlways?: boolean;
 }): SessionGate {
-  if (requiresTotp(input.roles) && !input.twoFactorEnabled) return "enrol_totp";
+  if ((input.totpAlways || requiresTotp(input.roles)) && !input.twoFactorEnabled) return "enrol_totp";
   if (input.lockedAt) return "locked";
   if (hasIdleLock(input.roles) && input.now.getTime() - input.lastActiveAt.getTime() >= IDLE_LOCK_MS) {
     return "locked";

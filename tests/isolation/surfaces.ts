@@ -109,6 +109,9 @@ export type Exemption = SurfaceRef & { reason: string };
 // Account-level auth surfaces (T-006) run as clinic_auth, which has no privilege on any
 // tenant table (tests/auth proves it); they are exempt until they read tenant data.
 const AUTH = "account-level auth (clinic_auth role, no tenant tables; tests/auth)";
+// Vendor console sign-in surfaces (T-021): same account store and clinic_auth role on the
+// vendor host, sessions marked surface = vendor (tests/vendor/host.test.ts).
+const VENDOR_AUTH = "vendor-console account-level auth (clinic_auth role, no tenant tables; tests/vendor/host.test.ts)";
 export const EXEMPT: Exemption[] = [
   { kind: "route", id: "/", reason: "bootstrap placeholder page; renders no tenant data" },
   { kind: "route", id: "/api/auth/[...all]#route", reason: AUTH },
@@ -119,6 +122,13 @@ export const EXEMPT: Exemption[] = [
   { kind: "action", id: "app/(auth)/terkunci/actions", reason: AUTH },
   { kind: "route", id: "/undangan/[token]", reason: "invitation link: before any membership; shows only the invited name, clinic and roles for a valid token (tests/org/access.test.ts)" },
   { kind: "action", id: "app/(auth)/undangan/[token]/actions", reason: "invitation acceptance: creates the invited account and membership from the token only (tests/org/access.test.ts)" },
+  { kind: "route", id: "/vendor", reason: "vendor console redirect to /vendor/tenant; no data (T-021)" },
+  { kind: "route", id: "/vendor/[...rest]", reason: "vendor console not-found for unknown paths; renders no data (T-021)" },
+  { kind: "route", id: "/vendor/masuk", reason: VENDOR_AUTH },
+  { kind: "route", id: "/vendor/verifikasi", reason: VENDOR_AUTH },
+  { kind: "route", id: "/vendor/aktifkan-2fa", reason: VENDOR_AUTH },
+  { kind: "route", id: "/vendor/api/auth/[...all]#route", reason: VENDOR_AUTH },
+  { kind: "route", id: "/vendor/tenant", reason: "vendor console platform page (no tenant context): clinic_vendor has no tenant-table privilege; reads only state, legal name and branch count through vendor_console_tenants behind vendor_guard (tests/vendor/host.test.ts)" },
   { kind: "route", id: "/dev/galeri", reason: "development-only component gallery, refused in production (T-012)" },
   { kind: "route", id: "/dev/templat", reason: "development-only page-template gallery with static sample data, refused in production (T-014)" },
 ];

@@ -27,13 +27,26 @@ import {
   sessionGate,
 } from "./policy";
 
+// SEC-21: the clinic app and the vendor console are two surfaces of one account store.
+// Each surface signs its own sessions in (auth_session.surface) and accepts only those,
+// whatever cookie name a token arrives under. The vendor console's cookies are
+// host-only `__Host-vendor.*` (Secure, SameSite=Strict), its auth API lives under
+// /vendor/api/auth on the vendor host, and every vendor account needs TOTP.
+export type AuthSurface = "app" | "vendor";
+export const VENDOR_AUTH_BASE_PATH = "/vendor/api/auth";
+export const VENDOR_COOKIE_PREFIX = "__Host-vendor";
+
 export type AuthConfig = {
   pool: pg.Pool; // clinic_auth login, opened with openAppPool(..., AUTH_GROUP_ROLE)
-  baseURL: string; // https://<APP_HOST>
+  baseURL: string; // https://<APP_HOST> (vendor surface: https://<VENDOR_HOST>)
+  surface?: AuthSurface; // defaults to "app"
   secret: string; // BETTER_AUTH_SECRET (≥ 32 chars, from configuration)
   roles: RoleSource;
   now?: () => Date; // injectable clock for tests (DATA §6)
   rateLimit?: boolean; // defaults to on; tests that sign in repeatedly turn it off
+  // Vendor surface: refuses sign-in and TOTP from an address outside the console allowlist
+  // before any password or code is checked (owner decision 2026-11-03).
+  allowAddress?: (ip: string) => Promise<boolean>;
   sleep?: (ms: number) => Promise<void>; // progressive delay; tests inject a recorder
   // Client IP header set by the trusted origin proxy (Traefik). Never read from a
   // header the client controls directly.
@@ -58,6 +71,8 @@ const PASSWORD_PATHS = new Set([
 const LOCK_EXEMPT_PATHS = new Set(["/get-session", "/sign-out", "/ok", "/error"]);
 // Endpoints a session needing TOTP enrolment may still call.
 const ENROL_PATHS = new Set(["/two-factor/enable", "/two-factor/verify-totp", "/two-factor/get-totp-uri"]);
+// A successful call proves the second factor for the session it creates or continues.
+const SECOND_FACTOR_PATHS = new Set(["/two-factor/verify-totp", "/two-factor/verify-backup-code"]);
 
 // RATE-2 progressive delay before checking a password: 0, 250, 500, 1000, 2000 ms for
 // the 1st..5th attempt in the window (attempts already failed or still in flight).
@@ -68,6 +83,9 @@ export function progressiveDelayMs(priorAttempts: number): number {
 export function createAuth(config: AuthConfig) {
   if (config.secret.length < 32) throw new Error("BETTER_AUTH_SECRET must be at least 32 characters");
   const now = config.now ?? (() => new Date());
+  const surface: AuthSurface = config.surface ?? "app";
+  const vendor = surface === "vendor";
+  if (vendor && !config.allowAddress) throw new Error("the vendor surface needs allowAddress (console IP allowlist)");
   const sleep = config.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const db = drizzle(config.pool, { schema });
 
@@ -113,8 +131,10 @@ export function createAuth(config: AuthConfig) {
     const s = await auth.api.getSession({ headers, query: { disableCookieCache: true } });
     if (!s) return undefined;
     const row = await db.query.authSession.findFirst({ where: eq(schema.authSession.id, s.session.id) });
-    return row ? { s, row } : undefined;
+    return row && row.surface === surface ? { s, row } : undefined;
   };
+  const foreignSession = () =>
+    APIError.from("UNAUTHORIZED", { code: "SESSION_WRONG_SURFACE", message: "Sesi tidak berlaku di sini. Masuk kembali." });
 
   const auth = betterAuth({
     appName: "Clinic Dashboard",
@@ -132,10 +152,19 @@ export function createAuth(config: AuthConfig) {
         rateLimit: schema.authRateLimit,
       },
     }),
+    ...(vendor ? { basePath: VENDOR_AUTH_BASE_PATH } : {}),
     advanced: {
       database: { generateId: false }, // UUIDv7 from the database (DATA-7)
-      useSecureCookies: config.baseURL.startsWith("https://"),
       ipAddress: { ipAddressHeaders: config.ipAddressHeaders ?? ["x-real-ip"] },
+      ...(vendor
+        ? {
+            // Names are `__Host-vendor.<cookie>` (no __Secure- prefix in front of it);
+            // the browser then enforces Secure, Path=/ and no Domain.
+            useSecureCookies: false,
+            cookiePrefix: VENDOR_COOKIE_PREFIX,
+            defaultCookieAttributes: { secure: true, sameSite: "strict" as const, path: "/", httpOnly: true },
+          }
+        : { useSecureCookies: config.baseURL.startsWith("https://") }),
     },
     emailAndPassword: {
       enabled: true,
@@ -146,15 +175,26 @@ export function createAuth(config: AuthConfig) {
     },
     databaseHooks: {
       // Activity starts at sign-in, on the same clock the idle lock reads.
-      session: { create: { before: async (session) => ({ data: { ...session, lastActiveAt: now(), lockedAt: null } }) } },
+      session: {
+        create: {
+          before: async (session) => ({ data: { ...session, lastActiveAt: now(), lockedAt: null, surface, secondFactorAt: null } }),
+        },
+      },
     },
     session: {
-      expiresIn: 12 * 60 * 60, // absolute: one working day, staff sign in each day
+      // No cookie cache and no bearer plugin: the surface check (before hook) reads the
+      // signed session-token cookie and the database row; a cached session_data cookie or
+      // a bearer token would bypass it. tests/vendor/host.test.ts asserts both stay off.
+      // Absolute, no refresh: one working day for staff; 8 hours for the vendor console
+      // (the TOTP window in vendor_guard is 12 h, so a vendor session always ends first).
+      expiresIn: (vendor ? 8 : 12) * 60 * 60,
       disableSessionRefresh: true,
       freshAge: 10 * 60, // sensitive actions (2FA changes) need a recent sign-in
       additionalFields: {
         lastActiveAt: { type: "date", required: false, input: false },
         lockedAt: { type: "date", required: false, input: false },
+        surface: { type: "string", required: false, input: false },
+        secondFactorAt: { type: "date", required: false, input: false },
       },
     },
     rateLimit: {
@@ -172,6 +212,23 @@ export function createAuth(config: AuthConfig) {
     ],
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        // SEC-21: a session token signed in on the other surface is refused on every
+        // endpoint (read straight from the cookie, so get-session is covered too).
+        const token = ctx.headers ? await ctx.getSignedCookie(ctx.context.authCookies.sessionToken.name, ctx.context.secret) : null;
+        if (token) {
+          const row = await db.query.authSession.findFirst({ where: eq(schema.authSession.token, token) });
+          if (row && row.surface !== surface) throw foreignSession();
+        }
+
+        // Vendor console: every auth endpoint except reading or ending the session only
+        // from the allowlist (default deny; DEC-030).
+        if (vendor && config.allowAddress && !LOCK_EXEMPT_PATHS.has(ctx.path)) {
+          const ip = ctx.headers?.get((config.ipAddressHeaders ?? ["x-real-ip"])[0]) ?? "";
+          if (!(await config.allowAddress(ip))) {
+            throw APIError.from("FORBIDDEN", { code: "ADDRESS_NOT_ALLOWED", message: "Alamat jaringan ini tidak diizinkan." });
+          }
+        }
+
         // IAM-1: a trusted-device cookie would skip TOTP on later sign-ins; never issue one.
         if (ctx.path.startsWith("/two-factor/verify-")) {
           if (ctx.body && typeof ctx.body === "object") delete (ctx.body as { trustDevice?: unknown }).trustDevice;
@@ -187,6 +244,7 @@ export function createAuth(config: AuthConfig) {
               lastActiveAt: current.row.lastActiveAt,
               lockedAt: current.row.lockedAt,
               now: now(),
+              totpAlways: vendor,
             });
             if (gate === "locked" || (gate === "enrol_totp" && !ENROL_PATHS.has(ctx.path))) {
               throw APIError.from("FORBIDDEN", {
@@ -210,9 +268,15 @@ export function createAuth(config: AuthConfig) {
         }
       }),
       after: createAuthMiddleware(async (ctx) => {
-        if (!PASSWORD_PATHS.has(ctx.path)) return;
         const returned = ctx.context.returned as { statusCode?: number; body?: { code?: string } } | undefined;
         const failed = Boolean(returned && typeof returned.statusCode === "number" && returned.statusCode >= 400);
+        // The second factor was proven for the session this call created (sign-in,
+        // enrolment) or continued (step-up).
+        if (SECOND_FACTOR_PATHS.has(ctx.path) && !failed && !(returned instanceof Error)) {
+          const id = ctx.context.newSession?.session.id ?? (await sessionRow(ctx.headers))?.row.id;
+          if (id) await db.update(schema.authSession).set({ secondFactorAt: now() }).where(eq(schema.authSession.id, id));
+        }
+        if (!PASSWORD_PATHS.has(ctx.path)) return;
         const email =
           ctx.path === "/sign-in/email"
             ? String(ctx.body?.email ?? "").trim().toLowerCase()
@@ -262,13 +326,17 @@ export function createAuth(config: AuthConfig) {
   // lock server-side, so a locked front-desk session cannot be used from another tab.
   async function checkSession(headers: Headers, opts: { activity?: boolean } = {}): Promise<
     | { gate: "anonymous" }
-    | { gate: SessionGate; userId: string; sessionId: string }
+    | { gate: SessionGate; userId: string; sessionId: string; token: string }
   > {
-    const s = await auth.api.getSession({ headers, query: { disableCookieCache: true } });
+    // A session of the other surface is refused by the before hook (SEC-21): anonymous here.
+    const s = await auth.api.getSession({ headers, query: { disableCookieCache: true } }).catch((e: unknown) => {
+      if (e instanceof APIError && (e.body as { code?: string } | undefined)?.code === "SESSION_WRONG_SURFACE") return null;
+      throw e;
+    });
     if (!s) return { gate: "anonymous" };
-    const roles = await config.roles(s.user.id);
     const row = await db.query.authSession.findFirst({ where: eq(schema.authSession.id, s.session.id) });
     if (!row) return { gate: "anonymous" };
+    const roles = await config.roles(s.user.id);
     const t = now();
     const gate = sessionGate({
       roles,
@@ -276,6 +344,7 @@ export function createAuth(config: AuthConfig) {
       lastActiveAt: row.lastActiveAt,
       lockedAt: row.lockedAt,
       now: t,
+      totpAlways: vendor,
     });
     if (gate === "locked" && !row.lockedAt) {
       await db.update(schema.authSession).set({ lockedAt: t }).where(eq(schema.authSession.id, row.id));
@@ -283,7 +352,7 @@ export function createAuth(config: AuthConfig) {
     if (gate === "ok" && opts.activity !== false) {
       await db.update(schema.authSession).set({ lastActiveAt: t }).where(eq(schema.authSession.id, row.id));
     }
-    return { gate, userId: s.user.id, sessionId: s.session.id };
+    return { gate, userId: s.user.id, sessionId: s.session.id, token: row.token };
   }
 
   // IAM-7: unlock by password re-check. Counts toward RATE-2 like a sign-in, with the

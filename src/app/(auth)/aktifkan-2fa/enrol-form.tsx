@@ -1,5 +1,4 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { callAuth } from "../client";
 import s from "../auth.module.css";
@@ -10,8 +9,7 @@ type Setup = { uri: string; secret: string; backupCodes: string[] };
 // the otpauth URI and backup codes; step 2 confirms one code, which marks the factor
 // verified. Lazy: no QR image (no extra dependency); the otpauth link opens the
 // authenticator on phones and the secret can be typed on other devices.
-export function EnrolForm() {
-  const router = useRouter();
+export function EnrolForm({ base, home = "/" }: { base?: string; home?: string }) {
   const [setup, setSetup] = useState<Setup>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -23,7 +21,7 @@ export function EnrolForm() {
     setError(undefined);
     const r = await callAuth("/two-factor/enable", {
       password: String(new FormData(event.currentTarget).get("password") ?? ""),
-    });
+    }, base);
     setBusy(false);
     if (!r.ok) return setError(r.message);
     const uri = String(r.data.totpURI ?? "");
@@ -40,10 +38,12 @@ export function EnrolForm() {
     setBusy(true);
     setError(undefined);
     const code = String(new FormData(event.currentTarget).get("code") ?? "").replace(/\s/g, "");
-    const r = await callAuth("/two-factor/verify-totp", { code });
+    const r = await callAuth("/two-factor/verify-totp", { code }, base);
     setBusy(false);
     if (!r.ok) return setError(r.message);
-    router.replace("/");
+    // The session just changed: a full load, so no page cached by the client router under
+    // the previous session (e.g. a redirect to enrolment) is reused.
+    window.location.replace(home);
   }
 
   const alert = error && (

@@ -44,10 +44,20 @@ export const authSession = pgTable(
     // IAM-7 idle lock: server-side, so a locked session cannot be used by another tab.
     lastActiveAt: ts("last_active_at").notNull().defaultNow(),
     lockedAt: ts("locked_at"),
+    // SEC-21: which surface signed this session in (clinic app or vendor console); each
+    // surface accepts only its own sessions, whatever cookie name a token arrives under.
+    surface: text("surface").notNull().default("app"),
+    // When this session last passed a TOTP (or backup-code) check: at sign-in, at
+    // enrolment or at a step-up. The vendor console passes it to vendor_guard (T-020).
+    secondFactorAt: ts("second_factor_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
-  (t) => [unique("auth_session_token_key").on(t.token), index("auth_session_user_idx").on(t.userId)],
+  (t) => [
+    unique("auth_session_token_key").on(t.token),
+    index("auth_session_user_idx").on(t.userId),
+    check("auth_session_surface_check", sql`${t.surface} in ('app','vendor')`),
+  ],
 );
 
 export const authAccount = pgTable(

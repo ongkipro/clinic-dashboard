@@ -11,7 +11,9 @@ export const viewport: Viewport = { colorScheme: "only light", themeColor: "#FFF
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="id">
-      <body style={{ margin: 0 }}>{children}</body>
+      {/* No inline style: the vendor console CSP (SEC-21) refuses style attributes;
+          Tailwind preflight already sets margin 0. */}
+      <body>{children}</body>
     </html>
   );
 }

@@ -9,12 +9,15 @@ const MESSAGES: Record<string, string> = {
   INVALID_PASSWORD: "Kata sandi salah.",
   TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: "Terlalu banyak percobaan. Masuk ulang untuk mencoba lagi.",
   ACCOUNT_LOCKED: "Akun dikunci sementara. Coba lagi dalam 15 menit.",
+  ADDRESS_NOT_ALLOWED: "Masuk hanya dari jaringan kantor yang diizinkan.",
 };
 
-export async function callAuth(path: string, body: unknown): Promise<ApiResult> {
+// `base`: the auth API of this surface (clinic app /api/auth; vendor console
+// /vendor/api/auth, SEC-21).
+export async function callAuth(path: string, body: unknown, base = "/api/auth"): Promise<ApiResult> {
   let res: Response;
   try {
-    res = await fetch(`/api/auth${path}`, {
+    res = await fetch(`${base}${path}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       credentials: "same-origin",

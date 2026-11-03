@@ -7,7 +7,9 @@ import type pg from "pg";
 export const APP_GROUP_ROLE = "clinic_app";
 // Better Auth's login tables only (T-006); same startup rules, other group.
 export const AUTH_GROUP_ROLE = "clinic_auth";
-export type GroupRole = typeof APP_GROUP_ROLE | typeof AUTH_GROUP_ROLE;
+// The vendor console (T-021): EXECUTE on the vendor_* functions only, no table privilege.
+export const VENDOR_GROUP_ROLE = "clinic_vendor";
+export type GroupRole = typeof APP_GROUP_ROLE | typeof AUTH_GROUP_ROLE | typeof VENDOR_GROUP_ROLE;
 
 export class UnsafeDatabaseRoleError extends Error {}
 

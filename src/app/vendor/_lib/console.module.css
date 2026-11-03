@@ -1,0 +1,61 @@
+/* Vendor console shell (UI-17: desktop-first, sidebar, data tables; same tokens, light
+   only). Compact (< 700 px) puts the menu above the content instead of beside it. */
+.shell { min-height: 100dvh; background: var(--bg-grouped); color: var(--label); display: grid; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 700px) { .shell { grid-template-columns: 15rem minmax(0, 1fr); } }
+@media (min-width: 1180px) { .shell { grid-template-columns: 16.5rem minmax(0, 1fr); } }
+
+.skip { position: absolute; left: -9999px; display: inline-flex; align-items: center; min-height: var(--target); }
+.skip:focus { left: var(--space-4); top: var(--space-2); z-index: 60; background: var(--surface); padding: var(--space-2) var(--space-3); border-radius: var(--radius-field); }
+.shell :focus-visible { outline: 3px solid var(--tint); outline-offset: 2px; }
+
+.sidebar { display: grid; align-content: start; gap: var(--space-3); min-width: 0; padding: var(--space-4); background: var(--surface); border-bottom: 0.5px solid var(--separator); }
+@media (min-width: 700px) { .sidebar { border-bottom: 0; border-right: 0.5px solid var(--separator); min-height: 100dvh; position: sticky; top: 0; align-self: start; } }
+.product { margin: 0; font-size: 1.06rem; font-weight: 700; overflow-wrap: anywhere; }
+.nav { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+@media (min-width: 700px) { .nav { display: grid; } }
+.navLink { display: flex; align-items: center; gap: var(--space-2); min-height: var(--target); padding: 0 var(--space-3); border-radius: var(--radius-field); color: var(--label); text-decoration: none; font-weight: 500; }
+.navLink:hover { background: var(--bg-grouped); }
+.navLink[aria-current="page"] { background: var(--tint-soft); color: var(--tint); font-weight: 600; }
+.navLink svg { width: 1.15rem; height: 1.15rem; flex: none; }
+.who { display: grid; gap: var(--space-1); min-width: 0; padding-top: var(--space-3); border-top: 0.5px solid var(--separator); }
+.whoName { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.whoRoles { margin: 0; font-size: 0.82rem; color: var(--label-2); overflow-wrap: anywhere; }
+.signOut { justify-self: start; min-height: var(--target); padding: 0; border: 0; background: none; color: var(--danger); font: inherit; font-weight: 600; cursor: pointer; }
+
+.content { min-width: 0; padding: var(--space-4); outline: none; }
+@media (min-width: 700px) { .content { padding: var(--space-6); } }
+.page { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); width: 100%; max-width: 1280px; min-width: 0; margin: 0 auto; }
+.title { margin: 0; font-size: 2rem; line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; }
+.lead { margin: 0; color: var(--label-2); font-size: 0.94rem; }
+
+/* Dense table at regular width; cards at compact (NAV-7). */
+.tableWrap { display: none; min-width: 0; overflow-x: auto; border-radius: var(--radius-group); background: var(--surface); }
+@media (min-width: 700px) { .tableWrap { display: block; } }
+.table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.94rem; }
+.table th, .table td { padding: var(--space-2) var(--space-4); border-bottom: 0.5px solid var(--separator); vertical-align: top; overflow-wrap: anywhere; }
+.table thead th { font-size: 0.82rem; font-weight: 600; color: var(--label-2); }
+.table tbody tr:last-child > * { border-bottom: 0; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.cards { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+@media (min-width: 700px) { .cards { display: none; } }
+.card { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-4); border-radius: var(--radius-group); background: var(--surface); }
+.cardTitle { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.cardMeta { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-3); margin: 0; font-size: 0.94rem; }
+.cardMeta dt { color: var(--label-2); }
+.cardMeta dd { margin: 0; }
+
+.badge { display: inline-flex; align-items: center; min-height: 1.5rem; padding: 0 var(--space-2); border-radius: var(--radius-capsule); font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
+.toneNeutral { background: var(--neutral-soft); color: var(--neutral); }
+.toneSuccess { background: var(--success-soft); color: var(--success); }
+.toneWarning { background: var(--warning-soft); color: var(--warning); }
+.toneDanger { background: var(--danger-soft); color: var(--danger); }
+
+/* Sign-in screens on the vendor host. */
+.screen { min-height: 100dvh; display: grid; justify-items: center; align-items: start; padding: 48px var(--space-4) var(--space-8); background: var(--bg-grouped); color: var(--label); }
+@media (min-width: 700px) { .screen { align-items: center; } }
+.panel { width: 100%; max-width: 420px; min-width: 0; display: grid; gap: var(--space-2); }
+.eyebrow { margin: 0; font-size: 0.82rem; font-weight: 600; color: var(--label-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.box { display: grid; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-group); background: var(--surface); }
+.boxText { margin: 0; }
+.boxMuted { margin: 0; color: var(--label-2); font-size: 0.94rem; }
+.retry { justify-self: start; min-height: var(--target); padding: 0; border: 0; background: none; color: var(--tint); font: inherit; font-weight: 600; cursor: pointer; }

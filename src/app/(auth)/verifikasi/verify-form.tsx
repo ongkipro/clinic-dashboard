@@ -1,11 +1,9 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { callAuth } from "../client";
 import s from "../auth.module.css";
 
-export function VerifyForm() {
-  const router = useRouter();
+export function VerifyForm({ base, home = "/" }: { base?: string; home?: string }) {
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [backup, setBackup] = useState(false);
@@ -16,10 +14,12 @@ export function VerifyForm() {
     const code = String(new FormData(event.currentTarget).get("code") ?? "").replace(/\s/g, "");
     setBusy(true);
     setError(undefined);
-    const r = await callAuth(backup ? "/two-factor/verify-backup-code" : "/two-factor/verify-totp", { code });
+    const r = await callAuth(backup ? "/two-factor/verify-backup-code" : "/two-factor/verify-totp", { code }, base);
     setBusy(false);
     if (!r.ok) return setError(r.message);
-    router.replace("/");
+    // The session just changed: a full load, so no page cached by the client router under
+    // the previous session (e.g. a redirect to enrolment) is reused.
+    window.location.replace(home);
   }
 
   return (

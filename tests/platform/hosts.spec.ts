@@ -14,6 +14,28 @@ const PORT = 3000 + Math.floor(Math.random() * 2000) + 1000;
 const HOSTS = { app: "app.test", booking: "booking.test", vendor: "vendor.test" };
 let server: ChildProcess;
 
+// Full response (headers and body) for the vendor-host header checks.
+async function fetchRaw(
+  host: string,
+  path: string,
+  init: { method?: string; headers?: Record<string, string>; body?: string } = {},
+): Promise<{ status: number; headers: import("node:http").IncomingHttpHeaders; body: string }> {
+  const { request } = await import("node:http");
+  return new Promise((resolve, reject) => {
+    const req = request(
+      { host: "127.0.0.1", port: PORT, path, method: init.method ?? "GET", headers: { host, ...init.headers } },
+      (res) => {
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => (body += c));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body }));
+      },
+    );
+    req.on("error", reject);
+    req.end(init.body);
+  });
+}
+
 async function get(
   host: string,
   path: string,
@@ -135,6 +157,54 @@ describe("host isolation over HTTP (ARCH-3, SEC-21)", { timeout: 60_000 }, () =>
 
   it("the component gallery is refused in production", async () => {
     expect(await get(HOSTS.app, "/dev/galeri"), "/dev/galeri").toEqual({ status: 404, refused: true });
+  });
+
+  it("vendor pages carry a strict CSP with a per-response nonce, and every script carries it (SEC-21)", async () => {
+    const seen = new Set<string>();
+    for (const path of ["/vendor/masuk", "/vendor/verifikasi", "/vendor/aktifkan-2fa", "/vendor/tidak-ada/sama-sekali"]) {
+      const r = await fetchRaw(HOSTS.vendor, path);
+      // An unknown vendor path renders the vendor not-found inside the request-rendered
+      // layout (streaming has started, so Next keeps 200 and adds noindex; docs not-found).
+      expect(r.status, path).toBe(200);
+      if (path.includes("tidak-ada")) expect(r.body).toContain("Halaman tidak ditemukan");
+      const csp = String(r.headers["content-security-policy"] ?? "");
+      const nonce = /script-src 'self' 'nonce-([A-Za-z0-9+/=]+)'/.exec(csp)?.[1];
+      expect(nonce, `${path}: ${csp}`).toBeTruthy();
+      expect(csp).toContain("frame-ancestors 'none'");
+      expect(csp).toContain("object-src 'none'");
+      expect(csp).not.toMatch(/unsafe-inline|unsafe-eval/);
+      expect(seen.has(nonce!), "nonce reused").toBe(false);
+      seen.add(nonce!);
+      // Every <script> (inline or not) carries this response's nonce: none is blocked.
+      const scripts = [...r.body.matchAll(/<script\b([^>]*)>/g)].map((m) => m[1]);
+      expect(scripts.length, path).toBeGreaterThan(0);
+      for (const attrs of scripts) expect(attrs, `${path}: <script${attrs}>`).toContain(`nonce="${nonce}"`);
+      // No inline style attribute (the CSP refuses them); styles come from stylesheets.
+      expect(r.body, path).not.toMatch(/<[a-z][^>]*\sstyle="/);
+      expect(r.headers["cache-control"]).toContain("no-store");
+    }
+  });
+
+  it("no Server Action runs on the vendor host: a progressive-enhancement form POST with an action id is refused", async () => {
+    const boundary = "----vendorspec";
+    const body = `--${boundary}\r\nContent-Disposition: form-data; name="$ACTION_ID_${"0".repeat(42)}"\r\n\r\n\r\n--${boundary}--\r\n`;
+    for (const path of ["/vendor/tenant", "/vendor/masuk"]) {
+      const r = await fetchRaw(HOSTS.vendor, path, { method: "POST", headers: { "content-type": `multipart/form-data; boundary=${boundary}` }, body });
+      expect([r.status, r.headers["x-host-policy"]], path).toEqual([404, "refused"]);
+    }
+    const u = await fetchRaw(HOSTS.vendor, "/vendor/tenant", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "a=1" });
+    expect([u.status, u.headers["x-host-policy"]]).toEqual([404, "refused"]);
+  });
+
+  it("the clinic auth API is not served on the vendor host, nor the vendor auth API on the app host", async () => {
+    expect(await get(HOSTS.vendor, "/api/auth/get-session")).toEqual({ status: 404, refused: true });
+    expect(await get(HOSTS.app, "/vendor/api/auth/get-session")).toEqual({ status: 404, refused: true });
+  });
+
+  it("app-host pages carry no vendor CSP", async () => {
+    const r = await fetchRaw(HOSTS.app, "/masuk");
+    expect(r.status).toBe(200);
+    expect(r.headers["content-security-policy"]).toBeUndefined();
   });
 
   it("unknown hosts are refused for every path", async () => {

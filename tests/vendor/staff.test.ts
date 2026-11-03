@@ -435,7 +435,7 @@ describe("round 2: one person per half, execution once, logs", () => {
     await exec.end();
   });
 
-  it("the console role executes the vendor commands and touches no vendor table directly", async () => {
+  it("the console role touches no vendor table and cannot call the actor-taking commands (T-021 session binding)", async () => {
     const consoleRole = await h.createLoginRole("", ["clinic_vendor"]);
     const c = new pg.Client({ connectionString: h.urlAs(consoleRole) });
     await c.connect();
@@ -447,8 +447,7 @@ describe("round 2: one person per half, execution once, logs", () => {
       await expect(c.query(`select vendor_request_consume(gen_random_uuid(), 'exit', gen_random_uuid(), 'x.y')`)).rejects.toMatchObject({ code: "42501" });
       await expect(c.query(`select vendor_bootstrap(gen_random_uuid(), 'x', '10.0.0.0/16', 'x')`)).rejects.toMatchObject({ code: "42501" });
       const t15 = await tenant();
-      const r = (await c.query(`select vendor_request($1, $2, now(), 'exit', $3, '{}', 'Lewat peran konsol') as r`, [FIN, IP, t15])).rows[0].r;
-      expect(r).toMatchObject({ ok: true });
+      await expect(c.query(`select vendor_request($1, $2, now(), 'exit', $3, '{}', 'Lewat peran konsol') as r`, [FIN, IP, t15])).rejects.toMatchObject({ code: "42501" });
     } finally {
       await c.end();
     }
