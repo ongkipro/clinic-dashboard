@@ -407,6 +407,7 @@ describe("functions (TEN-16)", () => {
     "staff_session_revoke(uuid,uuid)",
     "staff_session_revoked(uuid,uuid)",
     "staff_sessions(uuid)",
+    "support_session_end_by_owner(uuid)",
     "tenant_capability(text)",
     "tenant_lifecycle_status()",
     "tenant_owner_invite_accept(text,uuid)",

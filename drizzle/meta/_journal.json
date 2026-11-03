@@ -316,6 +316,20 @@
       "when": 1793721066546,
       "tag": "0044_onboarding_grant_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1793733607329,
+      "tag": "0045_support_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1793733608319,
+      "tag": "0046_support_session_rules",
+      "breakpoints": true
     }
   ]
 }

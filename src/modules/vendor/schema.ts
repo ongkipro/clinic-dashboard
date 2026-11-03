@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, date, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, date, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { authUser } from "../../auth/schema";
 
 // Platform registry of every tenant (DATA-10, TEN-9, TEN-12). Policy kind: platform.
@@ -423,4 +423,118 @@ export const onboardingInvitationDrafts = pgTable(
     check("onboarding_invitation_drafts_roles_check", sql`cardinality(${t.roles}) >= 1 and ${t.roles} <@ array['manager','fo_cashier','bc','doctor','nurse','therapist','pharmacist','central_cs','marketing','purchasing']::text[]`),
     check("onboarding_invitation_drafts_decided_check", sql`(${t.state} = 'draft') = (${t.decidedAt} is null) and (${t.state} = 'draft') = (${t.decidedByStaff} is null) and (${t.state} = 'confirmed') = (${t.invitationId} is not null)`),
   ],
+);
+
+// Support sessions (T-025, PR-53, TEN-6, TEN-14, TEN-17): a reasoned, time-limited look into
+// one tenant by the vendor operator who opened it, limited to the declared tables. Platform
+// table; written only by the support functions (migration 0046).
+export const supportSessions = pgTable(
+  "support_sessions",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenantsRegistry.id, { onDelete: "restrict" }),
+    openedBy: uuid("opened_by")
+      .notNull()
+      .references(() => vendorStaff.id, { onDelete: "restrict" }),
+    purpose: text("purpose").notNull(),
+    scope: text("scope").array().notNull(),
+    minutes: integer("minutes").notNull(),
+    state: text("state", { enum: ["pending_approval", "active", "ended"] }).notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    activatedAt: timestamp("activated_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    extendedAt: timestamp("extended_at", { withTimezone: true }),
+    extensionReason: text("extension_reason"),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    endReason: text("end_reason", { enum: ["expired", "operator", "owner", "tenant_closed"] }),
+  },
+  (t) => [
+    check("support_sessions_state_check", sql`${t.state} in ('pending_approval','active','ended')`),
+    check("support_sessions_purpose_check", sql`length(btrim(${t.purpose})) between 10 and 500`),
+    check("support_sessions_scope_check", sql`cardinality(${t.scope}) between 1 and 40`),
+    check("support_sessions_minutes_check", sql`${t.minutes} between 5 and 120`),
+    check("support_sessions_extension_check", sql`(${t.extendedAt} is null) = (${t.extensionReason} is null) and (${t.extensionReason} is null or length(btrim(${t.extensionReason})) between 10 and 500)`),
+    // Pending never activated; active always activated; an ended session may never have been
+    // activated (a pending request withdrawn or ended by the Owner).
+    check("support_sessions_active_check", sql`(${t.state} <> 'pending_approval' or ${t.activatedAt} is null) and (${t.state} <> 'active' or ${t.activatedAt} is not null) and (${t.activatedAt} is null) = (${t.endsAt} is null) and (${t.endsAt} is null or ${t.endsAt} <= ${t.activatedAt} + interval '4 hours')`),
+    check("support_sessions_end_check", sql`(${t.state} = 'ended') = (${t.endedAt} is not null) and (${t.endedAt} is null) = (${t.endReason} is null)`),
+  ],
+);
+
+// The operator class of each tenant table (TEN-14/TEN-19): config (notify-only), personal and
+// clinical (owner approval first, T-026), money_total (bounded views, later), never.
+export const supportObjectKinds = pgTable(
+  "support_object_kinds",
+  {
+    tableName: text("table_name").primaryKey(),
+    supportClass: text("support_class", { enum: ["config", "personal", "clinical", "money_total", "never"] }).notNull(),
+  },
+  (t) => [check("support_object_kinds_class_check", sql`${t.supportClass} in ('config','personal','clinical','money_total','never')`)],
+);
+
+// Which backend and transaction a session is bound to right now (TEN-17): the operator
+// predicate trusts the app.* settings only together with this row, so a forged setting reads
+// nothing. Rows are transaction-scoped in meaning (txid); old rows are swept.
+export const supportSessionBindings = pgTable(
+  "support_session_bindings",
+  {
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => supportSessions.id, { onDelete: "restrict" }),
+    backendPid: integer("backend_pid").notNull(),
+    txid: bigint("txid", { mode: "bigint" }).notNull(),
+    // The vendor login session and staff member the bind was made with: the operator predicate
+    // re-checks both on every statement (sign-out or deactivation stops reads at once).
+    authSessionId: uuid("auth_session_id").notNull(),
+    // No foreign key: a key-share lock on vendor_staff for the life of the read transaction
+    // would block deactivating the operator (the predicate joins vendor_staff instead).
+    staffId: uuid("staff_id").notNull(),
+    boundAt: timestamp("bound_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("support_session_bindings_key").on(t.backendPid, t.txid)],
+);
+
+// A ticket to bind a session for reading in exactly one transaction (review rounds 2–3): the read
+// transaction is opened first and names its backend pid and txid; the console then issues the
+// ticket for that transaction in its own short, committed transaction, which writes "bind
+// issued" to the vendor log and the tenant chain. txids are never reused, so a reader's
+// rollback cannot replay the ticket: every read transaction leaves its own durable trace.
+// Expires 2 minutes after issue. No foreign key to vendor_staff (same reason as bindings).
+export const supportBindTickets = pgTable(
+  "support_bind_tickets",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => supportSessions.id, { onDelete: "restrict" }),
+    staffId: uuid("staff_id").notNull(),
+    authSessionId: uuid("auth_session_id").notNull(),
+    backendPid: integer("backend_pid").notNull(),
+    txid: bigint("txid", { mode: "bigint" }).notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (t) => [unique("support_bind_tickets_txid_key").on(t.txid), check("support_bind_tickets_expiry_check", sql`${t.expiresAt} > ${t.issuedAt} and ${t.expiresAt} <= ${t.issuedAt} + interval '2 minutes'`)],
+);
+
+// The records an operator's queries touched in a session (TEN-14): written by the operator RLS
+// policy for each row it admits. A superset of the rows returned (a non-leakproof filter, a
+// sort with LIMIT, a join or an aggregate discards rows after the policy admitted them), and
+// written in the reader's transaction, so a reader's rollback removes them (DEC-038); the
+// durable trace of every read transaction is its bind ticket. The Owner sees the list grouped
+// by session (T-026 / T-028).
+export const supportSessionReads = pgTable(
+  "support_session_reads",
+  {
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => supportSessions.id, { onDelete: "restrict" }),
+    tableName: text("table_name").notNull(),
+    rowId: uuid("row_id").notNull(),
+    firstReadAt: timestamp("first_read_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("support_session_reads_key").on(t.sessionId, t.tableName, t.rowId)],
 );

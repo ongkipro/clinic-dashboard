@@ -1,12 +1,12 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-03
+Updated: 2026-11-04
 Status: Active
 State: INTEGRATING
-Review-Risk: R3
+Review-Risk: R4
 Independent-Review: PASS
 Primary-Worker: pi (9router-fantastico/cc/claude-opus-5-5)
-Independent-Reviewer: claude-code 2.1.316 (claude-opus-5-5, separate context)
+Independent-Reviewer: codex 0.166.0 (gpt-6.1-sol) and claude-opus-5-5 via 9Router (pi, separate context)
 Independent-Review-Head: UNSET
 
 ## Delivery state machine
@@ -58,6 +58,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-023 Tenant provisioning, first Owner, Profil & Keamanan (DEC-033) | PASS; R3 review APPROVE (codex, three rounds) | `8c3a89e` |
 | HYG-003 Vendor bootstrap command and minimal Tim Vendor (DEC-036) | PASS; R3 review APPROVE (codex, three rounds) | `5d9bcf2` |
 | T-024 Onboarding grant (PR-58, TEN-13) | PASS; R4 review APPROVE (codex seven rounds, claude two) | `4ea416a` |
+| T-025 Support sessions (PR-53, TEN-6, TEN-14, TEN-17, TEN-19) | PASS; R4 review APPROVE (codex and claude, five rounds) | pending |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
@@ -122,6 +123,12 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Verification evidence
 
+- 2026-11-04 T-025:
+  - **Sessions:** a vendor operator (support, onboarding, platform owner) opens a reasoned session (purpose 10–500, 5–120 min, one extension with a new reason) for declared tables; config-only scopes activate at once, personal/clinical scopes stay `pending_approval` (T-026). Opener, Owner, TTL and the expiry sweep (also for closed tenants) end it, audited in the tenant chain (PR-53 scenario).
+  - **Reads:** role `clinic_operator`, one `<table>_operator_read` policy per readable table (tenant compare, then `operator_row_read`). A read transaction runs in READ COMMITTED, names its backend and txid, the console commits a ticket for exactly that transaction (vendor log + tenant chain), and the bind consumes it. The predicate re-checks session, opener, login session, staff state, tenant and wall-clock expiry on every row, so an Owner end, a sign-out or a deactivation stops reads at the next statement.
+  - **Residual risk (DEC-038):** touched-row records are a superset of rows returned and vanish on the reader's rollback; the ticket is the durable per-transaction trace.
+  - **Evidence:** 28 tests in `tests/vendor/support.test.ts`; 48 mutants killed (`/data/tmp/t025-mut.py`); full suite 746 passing; codex and claude APPROVE (rounds 4–5).
+
 - 2026-11-04 T-024:
   - **Grant lifecycle:** the onboarding grant is created on provisioning → onboarding (30 days) and ended at go-live or on leaving onboarding. A tenant still not live on day 31 is denied (PR-60 expired grant). The Owner can renew once, only while the grant is active.
   - **One authority:** `onboarding_grant_check`. Configuration kinds only. A patient record or any clinical, personal or unknown kind is denied, and the denial is in the vendor log and the tenant audit chain, by kind name up to 28 characters (PR-58 boundary).
@@ -179,6 +186,31 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 - 2026-11-02 closure review and follow-up confirmation: all F1–F9 CLOSED as specification defects; final APPROVE (`docs/research/reviews/round7-closure-final-astra.md`). Generator reproduced byte-for-byte; 131 tasks, no forward dependencies, UI contracts and migration/schema-permission invariants checked. T-001 remains unstarted.
 
 ## Next verified action
+
+### Resume here
+
+**T-025 support sessions (R4): done locally, review APPROVE (codex + claude, round 5), ledger finished; local commit only (push needs the owner's go-ahead).**
+
+**Next, in order (M0 focus, owner instruction 2026-11-04):**
+1. ~~T-025~~ done (push and CI watch pending owner approval).
+2. **T-026:** the Owner approves personal or clinical scopes and clinical extensions, and the read listing for the Owner (R4, may add a migration per DEC-038). Carry from T-025: label `ticket_issued` as "access window opened"; join bind refusals by session id (`vendor_actions.tenant_id` is null for them); list only read records that match an existing row; test the extension rule for personal scopes.
+3. **T-027:** onboarding checklist and go-live confirmation (R3, UI with browser evidence). It can run in parallel with T-026 under DEC-035, because T-026 has no migration unless needed.
+4. **T-028:** Saya › Akses Vendor page (UI).
+5. **T-032:** M0 exit review (R4), then the wave gate and push.
+
+### Working rules (owner instructions, standing)
+
+- **Order:** one task at a time, finished before the next; focus on M0 until it is done.
+- **Plan first:** write `docs/tasks/<TASK>.md` before starting, and keep it updated with what was built and every review round.
+- **Review:** every task and every HYG gets an independent review, is fixed, and is re-reviewed until APPROVE.
+  - R3 needs one reviewer (codex).
+  - R4 needs claude AND codex. Claude runs through 9Router (`pi -p --model 9router-fantastico/cc/claude-opus-5-5:medium`, with the files inlined in the prompt, which must stay ≤ 60 KB); codex runs through `ai-ask codex --attach` (≤ 60 KB).
+- **Testing:** mutation-test every key control. After each mutation run, compare the mutated files with a known-good copy, because a killed run can leave a mutant behind. UI tasks need browser evidence at 390/820/1180/1440 and at 200% text.
+- **Delivery ledger:** start → record checks → check-boundary → review-boundary → finish → commit → STATUS hash commit. If HEAD moves during a run, finish the run as FAIL and restart it with `--accept-dirty`.
+- **Docs every task:** update `ARCHITECTURE.md` (system map, as built) and `BUILD-LOG.md` (durable gotchas). Add a `DECISIONS.md` row for any constraining decision.
+- **Parallel work (DEC-035):** only for tasks with disjoint Allowed Paths, and at most one migrating task per wave. Each task gets its own worktree and database, and they are integrated one at a time.
+- **Repository and CI:** the repository is public (DEC-037). Push after each task or wave, and watch CI until green. Local gate scripts live in `/data/tmp/gate*.sh`.
+- **Git:** noreply identity, no AI trailers, never stage `.pi/`. Language: UI copy in Bahasa Indonesia; code, docs and commits in English.
 
 Wave 5: T-015 ✓ (`5d30801`), T-017 ✓ (`47dffe4`), T-019 ✓ (`c53afdd`), T-020 ✓ (`25eb18a`); Wave 5 gate PASS (622 tests, image migrate, restore drill); pushed `0672220..591a27b`, GitHub run 41597523073 green. Next: Wave 6 — T-021 (vendor console host), then T-022.
 Wave 6: T-021 ✓ (`29c183c`), HYG-002 ✓ (`2d720ff`, owner decisions DEC-031), T-022 ✓ (`5a1031e`); Wave 6 gate PASS (667 tests, image migrate, restore drill); pushed `94f656d..f1a0e58`, GitHub run 41640186904 green. T-023 ✓ (`8c3a89e`, DEC-033: first Owner from the vendor console with maker-checker; Profil & Keamanan). Next: T-024 (onboarding grant, TEN-13). Recorded DEC-034 (acceptance testing on staging through the product's own flows, no seeded per-role accounts); DEC-035 (parallel waves without collisions: disjoint Allowed Paths, one migrating task per wave, worktree + own database per task, sequential integration, every task and HYG reviewed) and DEC-036 (first platform owner by a one-time terminal command; further vendor staff invited from Tim Vendor). Wave 7a: T-023 ✓, HYG-003 ✓ (`5d9bcf2`), DEC-033–036; gate PASS (698 tests, image migrate, restore drill); pushed `07b38fc..1334a80`. CI run 41667968386 failed on a flaky T-030 test (default branch by UUIDv7 order of two branches made in the same millisecond), fixed in `a755508`; run 41668902765 green. T-024 ✓ (`4ea416a`, R4; codex APPROVE after seven rounds, claude APPROVE after two through 9Router; 718 tests, 29 mutations). Repository made public (DEC-037). Next: T-025 (plan `docs/tasks/T-025.md`).

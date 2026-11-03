@@ -9,7 +9,10 @@ export const APP_GROUP_ROLE = "clinic_app";
 export const AUTH_GROUP_ROLE = "clinic_auth";
 // The vendor console (T-021): EXECUTE on the vendor_* functions only, no table privilege.
 export const VENDOR_GROUP_ROLE = "clinic_vendor";
-export type GroupRole = typeof APP_GROUP_ROLE | typeof AUTH_GROUP_ROLE | typeof VENDOR_GROUP_ROLE;
+// Support-session reads (T-025, TEN-17): SELECT through operator policies only, after binding a
+// session with support_session_bind on the same connection and transaction.
+export const OPERATOR_GROUP_ROLE = "clinic_operator";
+export type GroupRole = typeof APP_GROUP_ROLE | typeof AUTH_GROUP_ROLE | typeof VENDOR_GROUP_ROLE | typeof OPERATOR_GROUP_ROLE;
 
 export class UnsafeDatabaseRoleError extends Error {}
 
