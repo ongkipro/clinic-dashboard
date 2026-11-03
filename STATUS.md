@@ -54,7 +54,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-020 Vendor staff, roles and maker-checker | PASS; R4 reviewed (claude APPROVE round 4, codex APPROVE round 7) | `25eb18a` |
 | T-021 Vendor console host, cookies, CSP | PASS; R3 review APPROVE (claude-code, two rounds) | `29c183c` |
 | HYG-002 Owner decisions applied (DEC-031) | PASS; R3 review APPROVE (claude rounds 1–2, codex round 3 — claude weekly limit reached) | `2d720ff` |
-| T-022 Tenant lifecycle and suspension effects | PASS; R3 review APPROVE (codex, two rounds) | (pending) |
+| T-022 Tenant lifecycle and suspension effects | PASS; R3 review APPROVE (codex, two rounds) | `5a1031e` |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
