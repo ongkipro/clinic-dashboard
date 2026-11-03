@@ -32,3 +32,27 @@ Record only durable implementation changes, validation evidence, and gotchas tha
 - Reports and actual route/provenance limitations: `docs/research/reviews/round7-closure-SUMMARY.md` and its linked reports.
 - Executed: docs traceability PASS (131 tasks, 0 findings); isolated generator reproduction identical; static checks PASS for dependency order, UI contracts, migration risks and canonical schema permissions; project-check full VERIFIED (types/lint/build); dotuiux validation PASSED with direction-selection/composition warnings deferred to UI work; delivery-ledger VERIFIED READY.
 - No feature development, provider call, provisioning or deployment. T-001 remains next and unstarted.
+
+## 2026-11-02 → 2026-11-04 — M0 foundation built (T-001–T-024 except T-025–T-028, T-032; HYG-001–003)
+
+Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/tasks/`, decisions in `DECISIONS.md` (DEC-005–DEC-037), ledger runs in `.delivery/`. Pushed waves are green in GitHub Actions (latest wave 7a: run 41668902765).
+
+- Built: repository/CI/Docker, database core with RLS and scope map, isolation gates, platform basics (keys, hosts, backup drill), staff auth with TOTP and lockout, identity chain, audit chain, idempotency, events outbox, approvals and inbox, notifications, settings registry, compliance register, design tokens and templates, clinic shell and context switching, staff and access, vendor staff with maker-checker, vendor console host, tenant lifecycle, tenant provisioning with first-owner invitation, Profil & Keamanan, vendor bootstrap command and Tim Vendor, onboarding grant.
+- Review practice: every R3/R4 task independently reviewed until APPROVE (codex; claude for R4, through 9Router when the claude CLI hit its weekly limit); key controls mutation-tested; UI tasks with browser evidence at 390/820/1180/1440 and 200% text.
+
+### Gotchas worth keeping
+
+- PL/pgSQL: an `IF … CASE … END THEN` needs the CASE in parentheses.
+- `now()` is the transaction start: validity checks that may run after a lock wait use `clock_timestamp()`, and judge after the lock (`FOR SHARE` predicates are not re-evaluated for elapsed time) — T-024.
+- A `RAISE` rolls back an `UPDATE` done just before it in the same statement: close records in the transaction that causes the closure (trigger), not in the refusal path — T-023.
+- Per-tenant lock order (T-024): session check → `staff_access` advisory lock → tenant row → grant row → audit lock. Every path that logs a refusal for a tenant takes `staff_access` first.
+- Two branches created in the same millisecond have UUIDv7 ids in random order; never rely on "first branch by id" in a test — T-030 flaky test fixed in `a755508`.
+- `vendor_log` with a tenant writes the tenant audit chain: its `reason_code` must fit `^[a-z][a-z_]{1,40}$`, or the whole call rolls back and the refusal leaves no trace — T-024.
+- Next 16 keeps the previous route mounted (hidden) for back/forward: Playwright locators need `main:visible`.
+- Better Auth rate limits `/change-password` and sign-in to 3 per 10 s per address; UI specs use a distinct `x-real-ip` per person.
+- A killed mutation run can leave a mutant in place: compare the mutated file with a known-good copy after every run.
+- ESLint must ignore `.pi/**` (local agent scratch, git-excluded).
+
+### Repository state changes
+
+- 2026-11-04: repository made **public** for free CI (DEC-037); gitleaks over all commits found no project secret.
