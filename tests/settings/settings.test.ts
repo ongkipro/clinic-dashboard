@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Role } from "../../src/auth/policy";
 import { APP_GROUP_ROLE, withTenantContext } from "../../src/db/rls/context";
 import { openAppPool } from "../../src/db/rls/pool";
+import { inboxDetail, listInbox } from "../../src/modules/approvals/inbox";
 import { CommandError } from "../../src/lib/command";
 import { cancelApproval, decideApproval, requestApproval } from "../../src/modules/approvals/approvals";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
@@ -446,6 +447,61 @@ describe("who changes what (07, 19 §5 'Changed by')", () => {
     expect(await code(as(own, (db) => decideDraft(db, d.approvalId!, true)))).toBe("ERR_FORBIDDEN");
     expect(await as(fh, (db) => decideDraft(db, d.approvalId!, true))).toBe("approved");
     expect(await as(fh, (db) => settingValue(db, "SET-48"))).toMatchObject({ jeda: 80 });
+  });
+
+  it("a tenant-scope clinical draft is decided by a facility head of any branch; the owner only when the tenant has none (DEC-031 D2)", async () => {
+    const C = await tenant();
+    const ph = await person(C, ["pharmacist"], C.b1);
+    const fhB2 = await person(C, ["facility_head"], C.b2);
+    const own = await person(C, ["owner"]);
+    const value = { masa: 30, masa_akut: 7, jeda: 85, sebagian: 4 };
+    const d = await as(ph, (db) => changeSetting(db, { key: "SET-48", branchId: null, value, reason: "Jeda isi ulang 85%" }));
+    // The facility head of the other branch sees it in Persetujuan and decides it.
+    expect((await as(fhB2, (db) => listInbox(db, "facility_head"))).rows.map((r) => r.id)).toContain(d.approvalId);
+    // The owner is not the decider while a facility head exists.
+    expect(await code(as(own, (db) => decideDraft(db, d.approvalId!, true)))).toBe("ERR_FORBIDDEN");
+    expect(await as(fhB2, (db) => decideDraft(db, d.approvalId!, true))).toBe("approved");
+    expect(await as(own, (db) => settingValue(db, "SET-48"))).toMatchObject({ jeda: 85 });
+    // A branch-scope draft of another branch stays with that branch's facility head (unchanged).
+    // No facility head left in the tenant: the owner decides.
+    await h.admin.query(`update memberships set effective_to = now() where id = (select membership_id from staff where id = $1)`, [fhB2.staffId]);
+    const e = await as(ph, (db) => changeSetting(db, { key: "SET-48", branchId: null, value: { ...value, jeda: 90 }, reason: "Jeda isi ulang 90%" }));
+    expect(await as(own, (db) => decideDraft(db, e.approvalId!, true))).toBe("approved");
+    expect(await as(own, (db) => settingValue(db, "SET-48"))).toMatchObject({ jeda: 90 });
+    // While a facility head exists, the owner's inbox does not list the draft (no dead button).
+    const fh2 = await person(C, ["facility_head"], C.b1);
+    const f = await as(ph, (db) => changeSetting(db, { key: "SET-48", branchId: null, value: { ...value, jeda: 70 }, reason: "Jeda isi ulang 70%" }));
+    expect((await as(own, (db) => listInbox(db, "owner"))).rows.map((r) => r.id)).not.toContain(f.approvalId);
+    expect((await as(own, (db) => inboxDetail(db, { staffId: own.staffId, role: "owner" }, f.approvalId!)))?.blocked).toBe("not-approver");
+    // Another tenant's facility head neither sees nor probes the draft.
+    const other = await person(B, ["facility_head"], B.b1);
+    expect((await as(other, (db) => listInbox(db, "facility_head"))).rows.map((r) => r.id)).not.toContain(f.approvalId);
+    expect(await as(other, (db) => db.query(`select approval_is_tenant_setting_draft($1, $2) as x`, [C.tenantId, f.approvalId]))).toMatchObject({ rows: [{ x: false }] });
+    expect(await as(other, (db) => db.query(`select approval_owner_decides_fh($1) as x`, [f.approvalId]))).toMatchObject({ rows: [{ x: null }] });
+    expect(await code(as(other, (db) => decideDraft(db, f.approvalId!, true)))).toBe("ERR_NOT_FOUND");
+    await as(fh2, (db) => decideDraft(db, f.approvalId!, true));
+  });
+
+  it("a branch clinical draft whose branch has no facility head goes to the owner (no stranded draft)", async () => {
+    const E = await tenant();
+    const ph = await person(E, ["pharmacist"], E.b1);
+    await person(E, ["facility_head"], E.b2); // the only facility head, in another branch
+    const own = await person(E, ["owner"]);
+    const ver = crypto.randomUUID();
+    const ap = await as(ph, (db) => db.query(`select approval_request('setting_change_fh', 'setting_version', $1, 'Uji draf cabang', $2, null) as id`, [ver, E.b1]));
+    const id = ap.rows[0].id as string;
+    expect((await as(own, (db) => listInbox(db, "owner"))).rows.map((r) => r.id)).toContain(id);
+    expect(await as(own, (db) => db.query(`select approval_decide($1, true, null) as s`, [id]))).toMatchObject({ rows: [{ s: "approved" }] });
+  });
+
+  it("a facility head's own clinical draft goes to the owner when no other facility head exists (no deadlock)", async () => {
+    const D = await tenant();
+    const fh = await person(D, ["facility_head", "pharmacist"], D.b1);
+    const own = await person(D, ["owner"]);
+    const d = await as({ ...fh, role: "pharmacist" }, (db) => changeSetting(db, { key: "SET-48", branchId: null, value: { masa: 30, masa_akut: 7, jeda: 60, sebagian: 4 }, reason: "Jeda isi ulang 60%" }));
+    expect(await code(as(fh, (db) => decideDraft(db, d.approvalId!, true)))).toBe("ERR_APPROVER_IS_REQUESTER");
+    expect((await as(own, (db) => listInbox(db, "owner"))).rows.map((r) => r.id)).toContain(d.approvalId);
+    expect(await as(own, (db) => decideDraft(db, d.approvalId!, true))).toBe("approved");
   });
 
   it("the draft follows its approval whichever path decides it (plain approval path, cancel)", async () => {

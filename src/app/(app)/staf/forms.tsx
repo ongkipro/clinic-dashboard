@@ -75,6 +75,9 @@ export function InviteSheet({ roles, branches }: { roles: { value: string; label
           <Message state={state} />
           {state.link && (
             <div className="grid gap-2">
+              <p className="m-0 text-[0.94rem] text-[var(--label-2)]">
+                Kirim tautan ini langsung ke orangnya (misalnya lewat WhatsApp). Tautan hanya bisa dipakai sekali untuk email yang diundang dan berlaku 7 hari.
+              </p>
               <input className={`${input} font-mono text-[0.82rem]`} readOnly value={state.link} aria-label="Tautan undangan" />
               <Button
                 type="button"

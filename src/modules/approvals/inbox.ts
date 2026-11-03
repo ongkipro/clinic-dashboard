@@ -17,7 +17,8 @@ export const APPROVAL_TYPES: Record<string, { label: string; approverRoles: read
   stock_adjustment: { label: "Penyesuaian stok", approverRoles: ["owner", "manager"] },
   disposal: { label: "Pemusnahan", approverRoles: ["owner", "manager"] },
   setting_change_owner: { label: "Perubahan pengaturan", approverRoles: ["owner"] },
-  setting_change_fh: { label: "Perubahan pengaturan klinis", approverRoles: ["facility_head"] },
+  // The owner decides clinical drafts only while the tenant has no facility head (DEC-031 D2).
+  setting_change_fh: { label: "Perubahan pengaturan klinis", approverRoles: ["facility_head", "owner"] },
 };
 
 // Approval types whose decision also applies a waiting draft (settings, T-017): the
@@ -97,8 +98,9 @@ export async function listInbox(db: pg.ClientBase, role: Role, filter: { type?: 
   const types = decidableTypes(role).filter((t) => !filter.type || t === filter.type);
   const { rows } = await db.query(
     `${SELECT} where a.state = 'pending' and a.type = any($1::text[])
+        and ($3::text <> 'owner' or a.type <> 'setting_change_fh' or approval_owner_decides_fh(a.id))
       order by a.requested_at, a.id limit $2`,
-    [types, limit + 1],
+    [types, limit + 1, role],
   );
   return { rows: rows.slice(0, limit).map(row), more: rows.length > limit };
 }
@@ -114,6 +116,8 @@ export async function inboxDetail(db: pg.ClientBase, actor: { staffId: string; r
     r.state !== "pending" ? "decided"
     : r.requested_by === actor.staffId ? "own-request"
     : !(APPROVAL_TYPES[r.type]?.approverRoles ?? []).includes(actor.role) ? "not-approver"
+    // The owner is only the fallback for clinical drafts (DEC-031 D2).
+    : actor.role === "owner" && r.type === "setting_change_fh" && !(await db.query(`select approval_owner_decides_fh($1) as ok`, [id])).rows[0].ok ? "not-approver"
     : null;
   return {
     ...row(r),

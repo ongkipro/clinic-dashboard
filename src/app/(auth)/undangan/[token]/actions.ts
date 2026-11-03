@@ -4,20 +4,18 @@
 // password policy, then the membership with the invited roles and branches
 // (acceptWithNewAccount). An email that already has an account signs in first and accepts
 // from the same page (future: T-024). TOTP roles enrol at the first sign-in (T-006 gate).
-// Until the owner decides how the link reaches the invited person (DEC-024), accepting is
-// closed in production (invitationsOpen).
+// The inviter sends the link personally (DEC-031 D1); it works once until it expires.
 import { redirect } from "next/navigation";
 import { getAuth } from "../../../../auth/instance";
 import { AccountExistsError, PasswordPolicyError } from "../../../../auth/server";
 import { appPool } from "../../../../modules/org/context/store";
-import { acceptWithNewAccount, invitationsOpen } from "../../../../modules/org/staff/staff";
+import { acceptWithNewAccount } from "../../../../modules/org/staff/staff";
 
 export type AcceptState = { error?: string };
 
 const GONE = "Undangan sudah tidak berlaku. Minta undangan baru ke klinik Anda.";
 
 export async function acceptAction(_prev: AcceptState, form: FormData): Promise<AcceptState> {
-  if (!invitationsOpen()) return { error: GONE };
   const token = form.get("token");
   const password = form.get("password");
   const confirm = form.get("confirm");

@@ -246,6 +246,20 @@
       "when": 1793701118292,
       "tag": "0034_vendor_console",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793708527506,
+      "tag": "0035_role_owner_confirm",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793708528385,
+      "tag": "0036_owner_decisions",
+      "breakpoints": true
     }
   ]
 }

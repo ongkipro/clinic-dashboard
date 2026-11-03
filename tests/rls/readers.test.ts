@@ -4,12 +4,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ROLES, type Role } from "../../src/auth/policy";
+import { ROLES, type Role, sessionGate } from "../../src/auth/policy";
 import { APP_GROUP_ROLE, withTenantContext } from "../../src/db/rls/context";
 import { openAppPool } from "../../src/db/rls/pool";
-import { assignBranch, assignRole as seedRole, createMembership, resolveContext } from "../../src/modules/org/identity";
+import { assignBranch, assignRole as seedRole, createMembership, resolveContext, roleSource } from "../../src/modules/org/identity";
 import { ADMIN_PUSAT_DIRECT_ROLES, CAPABILITY_TABLES, EVERY_MEMBER_TABLES, parseMatrix, readersByTable } from "../../src/modules/org/roles/matrix";
-import { assignRole, decideRoleRequest } from "../../src/modules/org/roles/roles";
+import { answerOwnerGrant, assignRole, decideRoleRequest, myOwnerGrants, withdrawOwnerGrant } from "../../src/modules/org/roles/roles";
+import { invite } from "../../src/modules/org/staff/staff";
 import { LEVEL3_ROLES } from "../../src/modules/org/schema";
 import { createHarness, type Harness } from "./harness";
 
@@ -150,13 +151,87 @@ describe("scenario PR-63 Admin Pusat cannot grant Owner", () => {
     const { rows } = await h.admin.query(`select role from staff_roles where staff_id = $1`, [target.staffId]);
     expect(rows.map((x) => x.role)).toEqual(["nurse"]);
 
-    // The owner approves; the role becomes active.
+    // The owner approves; the new Owner must still confirm (DEC-031 D7) before acting.
     const ownerP = people.get("owner")!;
-    const decided = await withTenantContext(app, await ctxOf(ownerP, "owner"), (db) =>
-      decideRoleRequest(db, (r as { requestId: string }).requestId, true),
-    );
-    expect(decided).toBe("approved");
+    const requestId = (r as { requestId: string }).requestId;
+    const decided = await withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => decideRoleRequest(db, requestId, true));
+    expect(decided).toBe("awaiting_confirmation");
+    await expect(ctxOf(target, "owner")).rejects.toThrow();
+    expect(await withTenantContext(app, await ctxOf(target, "nurse"), (db) => myOwnerGrants(db))).toMatchObject([{ requestId }]);
+    expect(await withTenantContext(app, await ctxOf(target, "nurse"), (db) => answerOwnerGrant(db, requestId, true))).toBe("approved");
     await expect(ctxOf(target, "owner")).resolves.toMatchObject({ actingRole: "owner" });
+  });
+
+  it("an Owner's assignment of Owner waits for the person's confirmation; only that person answers (DEC-031 D7)", async () => {
+    const ownerP = people.get("owner")!;
+    const target = await person(["nurse"]);
+    const r = await withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => assignRole(db, target.staffId, "owner"));
+    expect(r.state).toBe("awaiting_confirmation");
+    const requestId = (r as { requestId: string }).requestId;
+    await expect(ctxOf(target, "owner")).rejects.toThrow();
+    // A second Owner assignment while one waits is refused; nobody else answers it.
+    await expect(withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => assignRole(db, target.staffId, "owner"))).rejects.toMatchObject({ code: "23505" });
+    await expect(withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => answerOwnerGrant(db, requestId, true))).rejects.toMatchObject({ code: "P0002" });
+    await expect(withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => decideRoleRequest(db, requestId, true))).rejects.toMatchObject({ code: "55000" });
+    // Declining leaves no role and closes the request; a new assignment is possible afterwards.
+    expect(await withTenantContext(app, await ctxOf(target, "nurse"), (db) => answerOwnerGrant(db, requestId, false))).toBe("rejected");
+    await expect(ctxOf(target, "owner")).rejects.toThrow();
+    await expect(withTenantContext(app, await ctxOf(target, "nurse"), (db) => answerOwnerGrant(db, requestId, true))).rejects.toMatchObject({ code: "P0002" });
+    const again = await withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => assignRole(db, target.staffId, "owner"));
+    // A grant older than 14 days lapses: accepting it closes it (audited), and it no longer
+    // blocks a new assignment, which closes any lapsed grant first.
+    const againId = (again as { requestId: string }).requestId;
+    await h.admin.query(`update role_requests set decided_at = now() - interval '15 days' where id = $1`, [againId]);
+    expect(await withTenantContext(app, await ctxOf(target, "nurse"), (db) => myOwnerGrants(db))).toEqual([]);
+    expect(await withTenantContext(app, await ctxOf(target, "nurse"), (db) => answerOwnerGrant(db, againId, true))).toBe("lapsed");
+    await expect(ctxOf(target, "owner")).rejects.toThrow();
+    const lapsedViaAssign = await withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => assignRole(db, target.staffId, "owner"));
+    await h.admin.query(`update role_requests set decided_at = now() - interval '15 days' where id = $1`, [(lapsedViaAssign as { requestId: string }).requestId]);
+    const fresh = await withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => assignRole(db, target.staffId, "owner"));
+    expect(fresh.state).toBe("awaiting_confirmation");
+    expect((await h.admin.query(`select state from role_requests where id = $1`, [(lapsedViaAssign as { requestId: string }).requestId])).rows[0].state).toBe("rejected");
+    // Any Owner may withdraw a waiting grant; then it cannot be accepted.
+    await withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => withdrawOwnerGrant(db, (fresh as { requestId: string }).requestId));
+    await expect(withTenantContext(app, await ctxOf(target, "nurse"), (db) => answerOwnerGrant(db, (fresh as { requestId: string }).requestId, true))).rejects.toMatchObject({ code: "P0002" });
+    await expect(withTenantContext(app, await ctxOf(target, "nurse"), (db) => withdrawOwnerGrant(db, (fresh as { requestId: string }).requestId))).rejects.toMatchObject({ code: "42501" });
+    // A grant whose granter stopped being an Owner lapses.
+    const second = await person(["owner"]);
+    const byLeaver = await withTenantContext(app, await ctxOf(second, "owner"), (db) => assignRole(db, target.staffId, "owner"));
+    await h.admin.query(`update memberships set effective_to = now() where id = (select membership_id from staff where id = $1)`, [second.staffId]);
+    expect(await withTenantContext(app, await ctxOf(target, "nurse"), (db) => answerOwnerGrant(db, (byLeaver as { requestId: string }).requestId, true))).toBe("lapsed");
+    await expect(ctxOf(target, "owner")).rejects.toThrow();
+    // Confirming creates the role, audited.
+    const third = await withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => assignRole(db, target.staffId, "owner"));
+    expect(await withTenantContext(app, await ctxOf(target, "nurse"), (db) => answerOwnerGrant(db, (third as { requestId: string }).requestId, true))).toBe("approved");
+    await expect(ctxOf(target, "owner")).resolves.toMatchObject({ actingRole: "owner" });
+    const audit = (await h.admin.query(`select reason_code from audit_events where object_id = $1 order by seq`, [(third as { requestId: string }).requestId])).rows.map((x) => x.reason_code);
+    expect(audit).toEqual(["owner_grant_awaits_confirmation", "owner_grant_confirmed"]);
+    const roleRow = (await h.admin.query(`select id from staff_roles where staff_id = $1 and role = 'owner'`, [target.staffId])).rows[0].id;
+    expect((await h.admin.query(`select reason_code from audit_events where object_id = $1`, [roleRow])).rows.map((x) => x.reason_code)).toEqual(["role_assigned"]);
+  });
+
+  it("a confirmed Owner without TOTP is sent to enrolment by the session gate (no step-up bypass)", async () => {
+    const ownerP = people.get("owner")!;
+    const target = await person(["nurse"]);
+    const roles = roleSource(app);
+    const gate = async () => sessionGate({ roles: await roles(target.acc), twoFactorEnabled: false, lastActiveAt: new Date(), lockedAt: null, now: new Date() });
+    expect(await gate()).toBe("ok"); // a nurse needs no TOTP
+    const g = await withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => assignRole(db, target.staffId, "owner"));
+    expect(await gate()).toBe("ok"); // not yet an Owner
+    await withTenantContext(app, await ctxOf(target, "nurse"), (db) => answerOwnerGrant(db, (g as { requestId: string }).requestId, true));
+    expect(await gate()).toBe("enrol_totp"); // every page and API now requires TOTP enrolment first
+  });
+
+  it("an Owner is never created through an invitation link (finding 1)", async () => {
+    const ownerP = people.get("owner")!;
+    await expect(withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => invite(db, { email: `o.inv${Date.now()}@klinik-sintetis.test`, name: "Calon Owner", roles: ["owner"], branchIds: [] })))
+      .rejects.toMatchObject({ code: "ERR_FORBIDDEN" });
+    // Also a direct write (the trigger fires for every role, ENABLE ALWAYS).
+    await expect(h.admin.query(
+      `insert into staff_invitations (tenant_id, email, display_name, roles, branch_ids, token_hash, invited_by, expires_at)
+       values ($1, 'langsung@klinik-sintetis.test', 'Langsung', '{owner}', '{}', repeat('a', 64), $2, now() + interval '1 day')`,
+      [tenantId, ownerP.staffId],
+    )).rejects.toMatchObject({ code: "42501" });
   });
 
   it.each(ROLES.filter((r) => !ADMIN_PUSAT_DIRECT_ROLES.includes(r)))(

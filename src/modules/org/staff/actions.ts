@@ -8,7 +8,7 @@ import { withTenantContext } from "../../../db/rls/context";
 import { CommandError } from "../../../lib/command";
 import { endMembership, removeRole, revokeSession, setDuty } from "../access/access";
 import { appPool, requestContext } from "../context/store";
-import { cancelInvite, invitationsOpen, invite } from "./staff";
+import { cancelInvite, invite } from "./staff";
 
 export type ActionState = { error?: string; ok?: string; link?: string };
 
@@ -39,8 +39,6 @@ export async function inviteAction(_p: ActionState, f: FormData): Promise<Action
   const name = str(f, "name").trim();
   const roles = f.getAll("roles").filter((r): r is Role => typeof r === "string" && (ROLES as readonly string[]).includes(r));
   const branchIds = f.getAll("branches").filter((b): b is string => typeof b === "string" && UUID.test(b));
-  // DEC-024: closed in production until the owner decides how the link is delivered.
-  if (!invitationsOpen()) return { error: "Undangan staf belum dibuka di lingkungan ini." };
   if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(email) || name.length < 2 || roles.length === 0) {
     return { error: "Isi email, nama dan minimal satu peran." };
   }

@@ -10,7 +10,7 @@ import { accessLog, call, CAPABILITY_LABEL, duties, endMembership, permissionMat
 import { activeContext } from "../../src/modules/org/context/context";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { AccountExistsError, createAuth } from "../../src/auth/server";
-import { acceptInvite, acceptWithNewAccount, cancelInvite, invitationsOpen, invite, listInvitations, listStaff, lookupInvite } from "../../src/modules/org/staff/staff";
+import { acceptInvite, acceptWithNewAccount, cancelInvite, invite, listInvitations, listStaff, lookupInvite } from "../../src/modules/org/staff/staff";
 import { BASE_URL, Client, PASSWORD } from "../auth/helpers";
 import { createHarness, type Harness } from "../rls/harness";
 
@@ -442,21 +442,33 @@ describe("invite link flow (account + membership)", () => {
     expect((await new Client(auth).signIn("q.late@klinik-sintetis.test")).status).toBe(200); // credential still there
   });
 
-  it("invitations are closed in production until the delivery channel is decided (DEC-024)", async () => {
+  it("invitations work in production; the copied link works once, then never again (DEC-031 D1)", async () => {
     const own = await person(A, ["owner"]);
-    const r = await as(own, (db) => invite(db, { email: "p.gate@klinik-sintetis.test", name: "P Gate", roles: ["bc"], branchIds: [A.b1] }));
     process.env.DEPLOY_ENV = "production";
     try {
-      expect(await code(as(own, (db) => invite(db, { email: "p.gate2@klinik-sintetis.test", name: "P Gate", roles: ["bc"], branchIds: [A.b1] })))).toBe("ERR_FORBIDDEN");
+      const r = await as(own, (db) => invite(db, { email: "p.gate@klinik-sintetis.test", name: "P Gate", roles: ["bc"], branchIds: [A.b1] }));
+      expect(await acceptWithNewAccount(app, auth, r.token, PASSWORD)).toMatchObject({ tenantId: A.tenantId });
       expect(await acceptWithNewAccount(app, auth, r.token, PASSWORD)).toBeNull();
+      expect(await lookupInvite(app, r.token)).toBeNull();
     } finally {
       process.env.DEPLOY_ENV = "local";
     }
-    expect(invitationsOpen({})).toBe(false);
-    expect(invitationsOpen({ DEPLOY_ENV: "production" })).toBe(false);
-    expect(invitationsOpen({ DEPLOY_ENV: "prod" })).toBe(false);
-    expect(invitationsOpen({ DEPLOY_ENV: "staging" })).toBe(true);
-    expect(invitationsOpen({ DEPLOY_ENV: "local" })).toBe(true);
+  });
+
+  it("an invitation accepted from Admin Pusat notifies the owners; one from an Owner does not (DEC-031 D1 residual risk)", async () => {
+    const own = await person(A, ["owner"]);
+    const ap = await person(A, ["admin_pusat"]);
+    const byAp = await as(ap, (db) => invite(db, { email: `ap.inv${Date.now()}@klinik-sintetis.test`, name: "Dokter Baru", roles: ["doctor"], branchIds: [A.b1] }));
+    const byOwner = await as(own, (db) => invite(db, { email: `own.inv${Date.now()}@klinik-sintetis.test`, name: "Perawat Baru", roles: ["nurse"], branchIds: [A.b1] }));
+    await acceptWithNewAccount(app, auth, byAp.token, PASSWORD);
+    await acceptWithNewAccount(app, auth, byOwner.token, PASSWORD);
+    const rows = (await h.admin.query(
+      `select subject_id, recipient_role from notifications where tenant_id = $1 and type = 'staff_joined_by_admin_invite'`, [A.tenantId])).rows;
+    expect(rows).toEqual([{ subject_id: byAp.invitationId, recipient_role: "owner" }]);
+    // Visible in the owner's notifications (the bell), not to Admin Pusat.
+    const { list } = await import("../../src/modules/notifications/notifications");
+    expect((await as(own, (db) => list(db))).map((n) => n.subjectId)).toContain(byAp.invitationId);
+    expect((await as(ap, (db) => list(db))).map((n) => n.subjectId)).not.toContain(byAp.invitationId);
   });
 });
 

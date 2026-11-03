@@ -286,6 +286,35 @@ describe("who handles what (07)", () => {
   });
 });
 
+describe("one decider in the tenant (DEC-031 D3)", () => {
+  it("a sole owner approves their own upload, audited as self-approval; with another eligible decider they cannot", async () => {
+    const C = await tenant();
+    const own = await person(C, "owner");
+    await up(own, "dpia");
+    const item = await itemOf(own, "dpia");
+    expect(item.mayDecide).toBe(true);
+    expect(await code(decide(own, item.itemId!, "approved"))).toBe("ok");
+    expect((await h.admin.query(`select reason_code from audit_events where object_id = $1 order by seq desc limit 1`, [item.itemId])).rows[0].reason_code).toBe("self_evidence_approved");
+    // A clinical item: the facility head could decide it, so the owner uploader cannot.
+    const fh = await person(C, "facility_head");
+    await up(own, "sop_waste");
+    const clin = await itemOf(own, "sop_waste");
+    expect(clin.mayDecide).toBe(false);
+    expect(await code(decide(own, clin.itemId!, "approved"))).toBe("ERR_APPROVER_IS_REQUESTER");
+    expect(await code(decide(fh, clin.itemId!, "approved"))).toBe("ok");
+    // A second owner joins: the first owner can no longer approve their own legal upload.
+    await person(C, "owner");
+    await up(own, "dpia");
+    expect((await itemOf(own, "dpia")).mayDecide).toBe(false);
+    expect(await code(decide(own, item.itemId!, "approved"))).toBe("ERR_APPROVER_IS_REQUESTER");
+    // Finance alone in tax: approves its own tax upload when the tenant has no other finance… but the owner can decide tax too.
+    const fin = await person(C, "finance");
+    await up(fin, "tax_advice");
+    const tax = await itemOf(fin, "tax_advice");
+    expect(await code(decide(fin, tax.itemId!, "approved"))).toBe("ERR_APPROVER_IS_REQUESTER");
+  });
+});
+
 describe("files", () => {
   it("only PDF, PNG or JPEG up to 5 MB by content; the checksum is the database's", async () => {
     const own = await person(A, "owner");

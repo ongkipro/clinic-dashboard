@@ -226,9 +226,12 @@ export const roleRequests = pgTable(
     change: text("change").notNull(), // grant | revoke
     requestedBy: uuid("requested_by").notNull().default(sql`app_staff_id()`),
     requestedAs: text("requested_as").notNull().default(sql`app_acting_role()`),
-    state: text("state").notNull().default("pending"), // pending | approved | rejected
+    // pending | awaiting_confirmation (an approved Owner grant the person has not confirmed,
+    // DEC-031 D7) | approved | rejected
+    state: text("state").notNull().default("pending"),
     decidedBy: uuid("decided_by"),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -237,7 +240,7 @@ export const roleRequests = pgTable(
     foreignKey({ columns: [t.tenantId, t.decidedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
     unique("role_requests_tenant_id_id_key").on(t.tenantId, t.id),
     check("role_requests_change_check", sql`${t.change} in ('grant','revoke')`),
-    check("role_requests_state_check", sql`${t.state} in ('pending','approved','rejected')`),
+    check("role_requests_state_check", sql`${t.state} in ('pending','awaiting_confirmation','approved','rejected')`),
     // Any role except the Level 3 roles Admin Pusat assigns directly.
     check(
       "role_requests_role_check",
@@ -247,11 +250,20 @@ export const roleRequests = pgTable(
       "role_requests_decision_check",
       sql`(${t.state} = 'pending') = (${t.decidedBy} is null and ${t.decidedAt} is null)`,
     ),
-    check("role_requests_not_self_check", sql`${t.decidedBy} is null or ${t.decidedBy} <> ${t.requestedBy}`),
+    // Requester ≠ decider, except an Owner's own Owner assignment (the person confirms it).
+    check(
+      "role_requests_not_self_check",
+      sql`${t.decidedBy} is null or ${t.decidedBy} <> ${t.requestedBy} or (${t.role} = 'owner' and ${t.requestedAs} = 'owner' and ${t.change} = 'grant' and ${t.state} <> 'pending')`,
+    ),
+    // Only an Owner grant waits for confirmation; confirmed_at only on a confirmed Owner grant.
+    check(
+      "role_requests_confirm_check",
+      sql`(${t.state} <> 'awaiting_confirmation' or ${t.role} = 'owner') and (${t.confirmedAt} is null or (${t.state} = 'approved' and ${t.role} = 'owner'))`,
+    ),
     // One open request per staff, role and change (concurrent requests cannot both land).
     uniqueIndex("role_requests_one_pending")
       .on(t.tenantId, t.staffId, t.role, t.change)
-      .where(sql`${t.state} = 'pending'`),
+      .where(sql`${t.state} in ('pending','awaiting_confirmation')`),
   ],
 );
 

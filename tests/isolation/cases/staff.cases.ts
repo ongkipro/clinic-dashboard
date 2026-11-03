@@ -7,13 +7,30 @@ import { withTenantContext } from "../../../src/db/rls/context";
 import { CommandError } from "../../../src/lib/command";
 import { accessLog, endMembership, removeRole, revokeSession, setBranch, setDuty, staffSessions } from "../../../src/modules/org/access/access";
 import { assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
+import { answerOwnerGrant, assignRole as grantRole, myOwnerGrants } from "../../../src/modules/org/roles/roles";
 import { cancelInvite, invite, listInvitations, listStaff } from "../../../src/modules/org/staff/staff";
 import { defineCases, type IsolationEnv } from "../case";
 
-// Invitations are open only outside production (DEC-024 gate); the gate runs as local.
-process.env.DEPLOY_ENV = "local";
-
 const owners = new Map<string, string>();
+// A separate B staff member (finance) for the Owner-grant case: the staff action case ends
+// the other victim's membership in its positive control.
+const grantees = new Map<string, { acc: string; staffId: string }>();
+async function grantee(env: IsolationEnv): Promise<{ acc: string; staffId: string }> {
+  const t = env.victim.tenantId;
+  const known = grantees.get(t);
+  if (known) return known;
+  const acc = (await env.owner.query(`insert into auth_user (name, email) values ('G', $1) returning id`, [`grantee.${t}@klinik-sintetis.test`])).rows[0].id as string;
+  const { staffId } = await createMembership(env.owner, { tenantId: t, accountId: acc, displayName: `Calon Owner ${t.slice(0, 8)}` });
+  const c = await env.owner.connect();
+  try {
+    await assignRole(c, { tenantId: t, staffId, role: "finance" });
+  } finally {
+    c.release();
+  }
+  const g = { acc, staffId };
+  grantees.set(t, g);
+  return g;
+}
 const victims = new Map<string, { staffId: string; name: string; email: string; invitationId: string; branchId: string }>();
 
 async function ownerOf(env: IsolationEnv, tenantId: string): Promise<string> {
@@ -48,6 +65,20 @@ async function victimStaff(env: IsolationEnv) {
   env.victimSecret(email);
   env.victimSecret(staffId);
   return v;
+}
+
+// B's owner grants Owner to the victim staff (waiting for confirmation); id registered secret.
+const grants = new Map<string, string>();
+async function victimGrant(env: IsolationEnv, staffId: string): Promise<string> {
+  const t = env.victim.tenantId;
+  const known = grants.get(t);
+  if (known) return known;
+  const ctx = await resolveContext(env.app, await ownerOf(env, t), { tenantId: t, actingRole: "owner" });
+  const r = await withTenantContext(env.app, ctx, (db) => grantRole(db, staffId, "owner"));
+  const id = (r as { requestId: string }).requestId;
+  grants.set(t, id);
+  env.victimSecret(id);
+  return id;
 }
 
 async function asOwner<T>(env: IsolationEnv, fn: Parameters<typeof withTenantContext>[2] & ((db: never) => Promise<T>)) {
@@ -118,6 +149,24 @@ export default defineCases(
         staff: await asOwner(env, async (db) => (await listStaff(db)).map((s) => s.name)),
       };
       return body as never;
+    },
+  },
+  {
+    // Saya › Ganti Peran Owner-grant answer (DEC-031 D7): B's Owner grant to B's staff can be
+    // neither answered nor listed by A; the positive control lists it as the victim itself.
+    kind: "action",
+    id: "modules/org/roles/actions",
+    marker: (env) => grants.get(env.victim.tenantId) ?? "",
+    async run(env) {
+      const g = await grantee(env);
+      const id = await victimGrant(env, g.staffId);
+      const answer = await asOwner(env, (db) => answerOwnerGrant(db, id, true)).then(() => "done", (e) => (e as { code?: string }).code ?? "error");
+      const mine = await asOwner(env, async (db) => (await myOwnerGrants(db)).map((g) => g.requestId));
+      // Positive control: in its own tenant the victim staff sees the grant.
+      const own = env.actor.tenantId === env.victim.tenantId
+        ? await withTenantContext(env.app, await resolveContext(env.app, g.acc, { tenantId: env.victim.tenantId, actingRole: "finance" }), async (db) => (await myOwnerGrants(db)).map((x) => x.requestId))
+        : [];
+      return { answer, mine, own } as never;
     },
   },
 );

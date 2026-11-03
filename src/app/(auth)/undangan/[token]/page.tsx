@@ -5,7 +5,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { ROLE_LABEL } from "../../../../components/shell/nav";
 import { appPool } from "../../../../modules/org/context/store";
-import { invitationsOpen, lookupInvite } from "../../../../modules/org/staff/staff";
+import { lookupInvite } from "../../../../modules/org/staff/staff";
 import { AcceptForm } from "./accept-form";
 import s from "../../auth.module.css";
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Undangan Staf — Clinic Dashboard",
 async function Invitation({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
-  const info = invitationsOpen() && /^[A-Za-z0-9_-]{20,64}$/.test(token) ? await lookupInvite(await appPool(), token) : null;
+  const info = /^[A-Za-z0-9_-]{20,64}$/.test(token) ? await lookupInvite(await appPool(), token) : null;
   if (!info) {
     return (
       <p className={s.lead} role="status">

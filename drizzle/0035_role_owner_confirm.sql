@@ -1,0 +1,8 @@
+ALTER TABLE "role_requests" DROP CONSTRAINT "role_requests_state_check";--> statement-breakpoint
+ALTER TABLE "role_requests" DROP CONSTRAINT "role_requests_not_self_check";--> statement-breakpoint
+DROP INDEX "role_requests_one_pending";--> statement-breakpoint
+ALTER TABLE "role_requests" ADD COLUMN "confirmed_at" timestamp with time zone;--> statement-breakpoint
+CREATE UNIQUE INDEX "role_requests_one_pending" ON "role_requests" USING btree ("tenant_id","staff_id","role","change") WHERE "role_requests"."state" in ('pending','awaiting_confirmation');--> statement-breakpoint
+ALTER TABLE "role_requests" ADD CONSTRAINT "role_requests_confirm_check" CHECK (("role_requests"."state" <> 'awaiting_confirmation' or "role_requests"."role" = 'owner') and ("role_requests"."confirmed_at" is null or ("role_requests"."state" = 'approved' and "role_requests"."role" = 'owner')));--> statement-breakpoint
+ALTER TABLE "role_requests" ADD CONSTRAINT "role_requests_state_check" CHECK ("role_requests"."state" in ('pending','awaiting_confirmation','approved','rejected'));--> statement-breakpoint
+ALTER TABLE "role_requests" ADD CONSTRAINT "role_requests_not_self_check" CHECK ("role_requests"."decided_by" is null or "role_requests"."decided_by" <> "role_requests"."requested_by" or ("role_requests"."role" = 'owner' and "role_requests"."requested_as" = 'owner' and "role_requests"."change" = 'grant' and "role_requests"."state" <> 'pending'));

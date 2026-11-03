@@ -1,7 +1,10 @@
 // Shared server body of the three switch pages: gates, active context, and the choices.
 import { redirect } from "next/navigation";
 import { ROLE_LABEL } from "../../../components/shell/nav";
-import { requestContext } from "../../../modules/org/context/store";
+import { withTenantContext } from "../../../db/rls/context";
+import { appPool, requestContext } from "../../../modules/org/context/store";
+import { myOwnerGrants } from "../../../modules/org/roles/roles";
+import { OwnerGrant } from "./owner-grant";
 import { BlockedState } from "../../../components/ui/states";
 import { type SwitchOption, SwitchForm } from "./switch-form";
 
@@ -26,11 +29,17 @@ export async function SwitchBody({ kind }: { kind: "clinic" | "role" | "branch" 
     options = a.clinics.map((c) => ({ value: c.tenantId, label: c.name, current: a.context.tenantId === c.tenantId }));
   }
   const nothingToSwitch = options.length < 2;
+  // Owner grants waiting for this person show on Ganti Peran (DEC-031 D7).
+  const grants = kind === "role" ? await withTenantContext(await appPool(), a.context, (db) => myOwnerGrants(db)) : [];
+  const when = new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Jakarta" });
   return (
     <div className="grid gap-4">
       <p className="m-0 text-[var(--label-2)]" data-slot="active-context">
         Aktif: {a.clinic.name} · {a.context.activeBranchId ? a.branches.find((b) => b.id === a.context.activeBranchId)?.name : "Semua Cabang"} · Sebagai {ROLE_LABEL[a.context.actingRole]}
       </p>
+      {grants.map((g) => (
+        <OwnerGrant key={g.requestId} id={g.requestId} grantedBy={g.grantedBy} at={when.format(g.at)} />
+      ))}
       {nothingToSwitch ? (
         <p role="status" className="m-0 rounded-[var(--radius-group)] bg-[var(--surface)] p-4 text-[var(--label-2)]">
           {kind === "branch" ? "Anda hanya punya satu cabang." : kind === "role" ? "Anda hanya punya satu peran." : "Anda hanya terdaftar di satu klinik."}

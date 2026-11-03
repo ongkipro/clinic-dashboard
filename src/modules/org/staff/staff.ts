@@ -4,24 +4,17 @@ import { createHash, randomBytes } from "node:crypto";
 import type pg from "pg";
 import type { Role } from "../../../auth/policy";
 import { CommandError } from "../../../lib/command";
-import { deployEnv } from "../../vendor/profile/profile";
 import { call } from "../access/access";
 
 export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
-// DEC-024 gate: the invite link is shown to the inviter (no delivery channel yet), who
-// could accept it themselves. Until the owner decides the channel, invitations are created
-// and accepted only in staging, demo and local deployments (synthetic data, MIG-2); an
-// unset or unknown DEPLOY_ENV counts as production and stays closed.
-export function invitationsOpen(env: Partial<Record<string, string>> = process.env): boolean {
-  return deployEnv(env) !== "production";
-}
-
+// Delivery channel (DEC-031 D1): the inviter copies the one-time link and sends it to the
+// person personally (e.g. their own WhatsApp). Only the token's hash is stored; the link
+// works once, for the invited email, until it expires (7 days by default) or is cancelled.
 export type InviteInput = { email: string; name: string; roles: Role[]; branchIds: string[]; days?: number };
 
 // Returns the token once (shown to the inviter as a link); only its hash is stored.
 export async function invite(db: pg.ClientBase, i: InviteInput): Promise<{ invitationId: string; token: string }> {
-  if (!invitationsOpen()) throw new CommandError("ERR_FORBIDDEN");
   const token = randomBytes(32).toString("base64url");
   const id = await call(async () =>
     (await db.query<{ id: string }>(`select staff_invite($1, $2, $3, $4, $5, $6) as id`, [
@@ -64,7 +57,6 @@ export type AccountMaker = {
 export async function acceptWithNewAccount(
   app: pg.Pool, auth: AccountMaker, token: string, password: string,
 ): Promise<{ tenantId: string; staffId: string; accountId: string } | null> {
-  if (!invitationsOpen()) return null;
   const info = await lookupInvite(app, token);
   if (!info) return null;
   const { id } = await auth.createStaffAccount({ email: info.email, name: info.displayName, password });
