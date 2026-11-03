@@ -5,7 +5,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { ROLE_LABEL } from "../../../../components/shell/nav";
 import { appPool } from "../../../../modules/org/context/store";
-import { lookupInvite } from "../../../../modules/org/staff/staff";
+import { lookupInvite, lookupOwnerInvite } from "../../../../modules/org/staff/staff";
 import { AcceptForm } from "./accept-form";
 import s from "../../auth.module.css";
 
@@ -14,7 +14,20 @@ export const metadata: Metadata = { title: "Undangan Staf — Clinic Dashboard",
 async function Invitation({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
-  const info = /^[A-Za-z0-9_-]{20,64}$/.test(token) ? await lookupInvite(await appPool(), token) : null;
+  const valid = /^[A-Za-z0-9_-]{20,64}$/.test(token);
+  const info = valid ? await lookupInvite(await appPool(), token) : null;
+  // The first Owner of a new clinic (DEC-033): issued from the vendor console.
+  const owner = !info && valid ? await lookupOwnerInvite(await appPool(), token) : null;
+  if (owner) {
+    return (
+      <>
+        <p className={s.lead}>
+          <strong>{owner.displayName}</strong>, Anda didaftarkan sebagai Owner {owner.clinic}. Buat kata sandi untuk akun Anda. Setelah masuk, Anda akan memasang aplikasi autentikator.
+        </p>
+        <AcceptForm token={token} email={owner.email} />
+      </>
+    );
+  }
   if (!info) {
     return (
       <p className={s.lead} role="status">

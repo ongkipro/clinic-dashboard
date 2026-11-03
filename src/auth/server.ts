@@ -22,6 +22,7 @@ import {
   PASSWORD_MAX,
   PASSWORD_MIN,
   passwordProblem,
+  requiresTotp,
   type RoleSource,
   type SessionGate,
   sessionGate,
@@ -55,6 +56,9 @@ export type AuthConfig = {
 
 export const LOGIN_LOCKED_CODE = "LOGIN_TEMPORARILY_LOCKED";
 export const SESSION_LOCKED_CODE = "SESSION_LOCKED";
+export const PASSWORD_POLICY_CODE = "PASSWORD_POLICY";
+export type OwnSecurity = { email: string; totpEnabled: boolean; totpRequired: boolean; sessions: OwnSession[] };
+export type OwnSession = { id: string; createdAt: Date; ipAddress: string | null; userAgent: string | null; current: boolean };
 
 // Endpoints that check a password for an account; each counts toward RATE-2.
 const PASSWORD_PATHS = new Set([
@@ -255,6 +259,16 @@ export function createAuth(config: AuthConfig) {
           }
         }
 
+        // Profil & Keamanan (DEC-033): a new password follows the IAM-1 policy (checked
+        // before the current password, so a weak choice does not count toward RATE-2), and
+        // changing it always ends every other session.
+        if (ctx.path === "/change-password") {
+          const body = (ctx.body ?? {}) as { newPassword?: unknown; revokeOtherSessions?: unknown };
+          const problem = passwordProblem(String(body.newPassword ?? ""), (await sessionRow(ctx.headers))?.s.user.email);
+          if (problem) throw APIError.from("BAD_REQUEST", { code: PASSWORD_POLICY_CODE, message: problem });
+          body.revokeOtherSessions = true;
+        }
+
         // RATE-2: claim an attempt before any password is checked.
         if (PASSWORD_PATHS.has(ctx.path)) {
           const email =
@@ -265,6 +279,16 @@ export function createAuth(config: AuthConfig) {
           const attempt = await claimAttempt(email);
           if (!attempt) throw lockedOut();
           await sleep(progressiveDelayMs(attempt.prior));
+        }
+
+        // Turning the authenticator off (to replace it, or for a role that does not require
+        // it) needs the password and a current code: possession of the device, not only of
+        // the session. A wrong code keeps the RATE-2 claim above. Roles that require TOTP
+        // are sent straight back to enrolment by the session gate (PR-3).
+        if (ctx.path === "/two-factor/disable") {
+          const code = String((ctx.body as { code?: unknown } | undefined)?.code ?? "").replace(/\s/g, "");
+          if (!/^[0-9]{6}$/.test(code)) throw APIError.from("UNAUTHORIZED", { code: "INVALID_CODE", message: "Invalid code" });
+          await auth.api.verifyTOTP({ headers: ctx.headers ?? new Headers(), body: { code } });
         }
       }),
       after: createAuthMiddleware(async (ctx) => {
@@ -389,6 +413,38 @@ export function createAuth(config: AuthConfig) {
     if (row) await (await auth.$context).internalAdapter.deleteSession(row.token);
   }
 
+  // Profil & Keamanan › Sesi aktif: this account's sessions on this surface (never their
+  // tokens), newest first; and ending one of them other than the current one.
+  async function ownSecurity(headers: Headers): Promise<OwnSecurity | null> {
+    const current = await sessionRow(headers);
+    if (!current) return null;
+    return {
+      email: current.s.user.email,
+      totpEnabled: Boolean((current.s.user as { twoFactorEnabled?: boolean }).twoFactorEnabled),
+      totpRequired: vendor || requiresTotp(await config.roles(current.s.user.id)),
+      sessions: await ownSessions(headers),
+    };
+  }
+  async function ownSessions(headers: Headers): Promise<OwnSession[]> {
+    const current = await sessionRow(headers);
+    if (!current) return [];
+    const rows = await db.query.authSession.findMany({
+      where: and(eq(schema.authSession.userId, current.s.user.id), eq(schema.authSession.surface, surface), gte(schema.authSession.expiresAt, now())),
+      orderBy: (t, { desc }) => [desc(t.createdAt)],
+    });
+    return rows.map((r) => ({ id: r.id, createdAt: r.createdAt, ipAddress: r.ipAddress, userAgent: r.userAgent, current: r.id === current.row.id }));
+  }
+  async function endOwnSession(headers: Headers, sessionId: string): Promise<boolean> {
+    const current = await sessionRow(headers);
+    if (!current || current.row.id === sessionId) return false;
+    const row = await db.query.authSession.findFirst({
+      where: and(eq(schema.authSession.id, sessionId), eq(schema.authSession.userId, current.s.user.id), eq(schema.authSession.surface, surface)),
+    });
+    if (!row) return false;
+    await (await auth.$context).internalAdapter.deleteSession(row.token);
+    return true;
+  }
+
   // Undo createStaffAccount when the invitation could not be accepted in the same request
   // (cancelled or expired meanwhile), so the email is not left with an orphan account.
   // One transaction: if the accept did commit after all (a lost response), the membership
@@ -409,7 +465,7 @@ export function createAuth(config: AuthConfig) {
     }
   }
 
-  return { auth, createStaffAccount, discardNewAccount, checkSession, unlock, endSession };
+  return { auth, createStaffAccount, discardNewAccount, checkSession, unlock, endSession, ownSecurity, ownSessions, endOwnSession };
 }
 
 export class AccountExistsError extends Error {

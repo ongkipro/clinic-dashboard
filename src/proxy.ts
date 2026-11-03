@@ -8,8 +8,10 @@
 // forms only. Server Actions resolve by action id regardless of path — as a Next-Action
 // fetch or as a progressive-enhancement multipart/urlencoded form POST — so the vendor
 // host accepts no state-changing request except to its own auth API, and never a
-// Next-Action or form-encoded body there either. The first vendor action adds an
-// allow-list here.
+// Next-Action or form-encoded body there either. Console writes (T-023) go to the JSON
+// routes under /vendor/api/console/: POST with application/json only (a cross-site form
+// cannot send it without a CORS preflight, which is never answered), and the route
+// checks Origin again.
 import { NextResponse, type NextRequest } from "next/server";
 import { type HostConfig, hostConfigFromEnv, resolveRequest } from "./lib/hosts";
 
@@ -62,9 +64,11 @@ export function proxy(request: NextRequest) {
   const method = request.method.toUpperCase();
   const contentType = (request.headers.get("content-type") ?? "").toLowerCase();
   const authApi = request.nextUrl.pathname.startsWith("/vendor/api/auth/");
+  const consoleApi = request.nextUrl.pathname.startsWith("/vendor/api/console/");
   if (request.headers.has("next-action")) return refused();
-  if (method !== "GET" && method !== "HEAD" && !authApi) return refused();
+  if (method !== "GET" && method !== "HEAD" && !authApi && !(consoleApi && method === "POST")) return refused();
   if (authApi && (contentType.startsWith("multipart/form-data") || contentType.startsWith("application/x-www-form-urlencoded"))) return refused();
+  if (consoleApi && !contentType.startsWith("application/json")) return refused();
   const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(18))));
   const csp = vendorCsp(nonce);
   const forwarded = new Headers(request.headers);

@@ -1,13 +1,14 @@
 // Tenant list body (UX-40; the error state is error.tsx). Pure: rows in, markup out (tests render it with a hostile
 // tenant name to prove names are escaped, SEC-21). Tenant names are tenant-controlled
 // strings and are only ever React text children.
+import Link from "next/link";
 import s from "../_lib/console.module.css";
 
 export type TenantRow = { id: string; state: State; name: string | null; branches: number };
-type State = "provisioning" | "onboarding" | "live" | "suspended" | "exit" | "closed";
+export type State = "provisioning" | "onboarding" | "live" | "suspended" | "exit" | "closed";
 
 // TEN-12 states in Bahasa Indonesia.
-const STATE: Record<State, { label: string; tone: string }> = {
+export const STATE: Record<State, { label: string; tone: string }> = {
   provisioning: { label: "Penyiapan", tone: s.toneNeutral },
   onboarding: { label: "Onboarding", tone: s.toneWarning },
   live: { label: "Aktif", tone: s.toneSuccess },
@@ -44,7 +45,11 @@ export function TenantList({ rows }: { rows: TenantRow[] }) {
               <tbody>
                 {rows.map((t) => (
                   <tr key={t.id}>
-                    <th scope="row">{t.name ?? NO_NAME}</th>
+                    <th scope="row">
+                      <Link prefetch={false} className={s.rowLink} href={`/vendor/tenant/${t.id}`}>
+                        {t.name ?? NO_NAME}
+                      </Link>
+                    </th>
                     <td>
                       <span className={`${s.badge} ${STATE[t.state].tone}`}>{STATE[t.state].label}</span>
                     </td>
@@ -57,7 +62,11 @@ export function TenantList({ rows }: { rows: TenantRow[] }) {
           <ul className={s.cards} aria-label="Daftar tenant">
             {rows.map((t) => (
               <li key={t.id} className={s.card}>
-                <p className={s.cardTitle}>{t.name ?? NO_NAME}</p>
+                <p className={s.cardTitle}>
+                  <Link prefetch={false} className={s.rowLink} href={`/vendor/tenant/${t.id}`}>
+                    {t.name ?? NO_NAME}
+                  </Link>
+                </p>
                 <dl className={s.cardMeta}>
                   <dt>Status</dt>
                   <dd>

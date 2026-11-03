@@ -221,6 +221,29 @@ describe("separate sessions per surface (SEC-21)", () => {
     expect(await vendor.checkSession(v.headers())).toEqual({ gate: "anonymous" });
     expect((await app.checkSession(c.headers())).gate).toBe("ok");
   });
+
+  it("Keamanan (DEC-033): each surface lists and ends only its own sessions; TOTP off needs a current code on the vendor surface too", async () => {
+    const a = await account();
+    const b = vendorBrowser();
+    await b.post("/sign-in/email", { email: a.email, password: PASSWORD });
+    const sec = await enrol(b);
+    const v = await vendorSignIn(a.email, sec);
+    const c = appBrowser();
+    await c.post("/sign-in/email", { email: a.email, password: PASSWORD });
+    await c.post("/two-factor/verify-totp", { code: totp(sec, Date.now() + 30_000) });
+    const vendorSessions = await vendor.ownSecurity(v.headers());
+    const appSessions = await app.ownSessions(c.headers());
+    expect(vendorSessions).toMatchObject({ totpEnabled: true, totpRequired: true });
+    const vIds = vendorSessions!.sessions.map((x) => x.id);
+    const aIds = appSessions.map((x) => x.id);
+    expect(vIds.some((id) => aIds.includes(id))).toBe(false);
+    expect(aIds.length).toBeGreaterThan(0);
+    // The vendor surface cannot end a clinic session, nor the reverse.
+    expect(await vendor.endOwnSession(v.headers(), aIds[0])).toBe(false);
+    expect(await app.endOwnSession(c.headers(), vIds[0])).toBe(false);
+    expect((await app.checkSession(c.headers())).gate).toBe("ok");
+    expect((await v.post("/two-factor/disable", { password: PASSWORD })).status).toBe(401);
+  });
 });
 
 describe("console functions under clinic_vendor: the caller is its session token", () => {
@@ -470,5 +493,21 @@ describe("proxy on the vendor host (SEC-21)", () => {
     expect(post("/vendor/api/auth/sign-in/email", "application/json").headers.get("x-host-policy")).toBeNull();
     const put = proxy(new NextRequest(new URL("http://vendor.test/vendor/tenant"), { method: "PUT", headers: { host: "vendor.test" } }));
     expect(put.headers.get("x-host-policy")).toBe("refused");
+  });
+
+  it("console writes (T-023): JSON POST only under /vendor/api/console/, never a form or a Server Action", () => {
+    const send = (method: string, contentType: string, extra: Record<string, string> = {}) =>
+      proxy(new NextRequest(new URL("http://vendor.test/vendor/api/console/tenant-create"), { method, headers: { host: "vendor.test", "content-type": contentType, ...extra }, body: method === "GET" ? undefined : "{}" }));
+    expect(send("POST", "application/json").headers.get("x-host-policy")).toBeNull();
+    expect(send("POST", "application/json").headers.get("content-security-policy")).toContain("default-src 'self'");
+    for (const ct of ["multipart/form-data; boundary=x", "application/x-www-form-urlencoded", "text/plain", ""]) {
+      expect(send("POST", ct).headers.get("x-host-policy"), ct).toBe("refused");
+    }
+    expect(send("PUT", "application/json").headers.get("x-host-policy")).toBe("refused");
+    expect(send("DELETE", "application/json").headers.get("x-host-policy")).toBe("refused");
+    expect(send("POST", "application/json", { "next-action": "abc" }).headers.get("x-host-policy")).toBe("refused");
+    // Not on the app host.
+    const app = proxy(new NextRequest(new URL("http://app.test/vendor/api/console/tenant-create"), { method: "POST", headers: { host: "app.test", "content-type": "application/json" }, body: "{}" }));
+    expect(app.headers.get("x-host-policy")).toBe("refused");
   });
 });

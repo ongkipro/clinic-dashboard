@@ -3,6 +3,7 @@
 // T-118). Lifecycle state, legal name and branch count only: platform pages never show
 // patient, staff or clinical data (PR-60). Tenant names are tenant-controlled: rendered
 // as React text (escaped, SEC-21).
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { call, consoleGate } from "../_lib/server";
 import { ConsoleShell, RefusedScreen } from "../_lib/shell";
@@ -22,7 +23,14 @@ export default async function TenantPage() {
   return (
     <ConsoleShell user={gate.user} current="/vendor/tenant">
       <div className={s.page}>
-        <h1 className={s.title}>Tenant</h1>
+        <div className={s.header}>
+          <h1 className={s.title}>Tenant</h1>
+          {gate.user.roles.some((r) => r === "onboarding" || r === "platform_owner") && (
+            <Link prefetch={false} className={s.primary} href="/vendor/tenant/baru">
+              Buat Tenant
+            </Link>
+          )}
+        </div>
         <TenantList rows={rows} />
       </div>
     </ConsoleShell>

@@ -113,3 +113,11 @@ export function sessionGate(input: {
 // (a login holds roles per tenant; the strictest rule across its memberships applies,
 // so a person who is a doctor anywhere needs TOTP everywhere).
 export type RoleSource = (userId: string) => Promise<readonly Role[]>;
+
+// "Chrome di Windows" from a user-agent string; enough to recognise one's own devices.
+export function deviceLabel(ua: string | null): string {
+  if (!ua) return "Perangkat tidak dikenal";
+  const browser = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Peramban";
+  const os = /iPhone|iPad/.test(ua) ? "iPhone/iPad" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /Mac OS X/.test(ua) ? "Mac" : /Linux/.test(ua) ? "Linux" : "";
+  return os ? `${browser} di ${os}` : browser;
+}

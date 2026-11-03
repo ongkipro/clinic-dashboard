@@ -290,3 +290,48 @@ export const tenantLifecycleEvents = pgTable(
     check("tenant_lifecycle_events_actor_check", sql`${t.actorKind} in ('service','vendor_staff') and ${t.actor} ~ '^[a-z0-9][a-z0-9_.-]{1,80}$'`),
   ],
 );
+
+// T-023 (PR-1, DEC-033): the first-owner invitation of a new tenant, issued from the vendor
+// console. Platform table. A maker (onboarding or platform owner) names the person; a
+// different platform owner approves; only then is a one-time token issued (its hash is
+// stored; the link is shown once). Accepting creates the Owner membership directly.
+export const tenantOwnerInvitations = pgTable(
+  "tenant_owner_invitations",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenantsRegistry.id, { onDelete: "restrict" }),
+    email: text("email").notNull(),
+    displayName: text("display_name").notNull(),
+    requestedBy: uuid("requested_by")
+      .notNull()
+      .references(() => vendorStaff.id, { onDelete: "restrict" }),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    // pending (waiting for the checker) → issued (token exists) → accepted | cancelled | expired
+    state: text("state", { enum: ["pending", "issued", "accepted", "cancelled", "expired"] }).notNull().default("pending"),
+    approvedBy: uuid("approved_by").references(() => vendorStaff.id, { onDelete: "restrict" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    tokenHash: text("token_hash"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    acceptedAccount: uuid("accepted_account").references(() => authUser.id, { onDelete: "restrict" }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [
+    unique("tenant_owner_invitations_token_key").on(t.tokenHash),
+    check("tenant_owner_invitations_state_check", sql`${t.state} in ('pending','issued','accepted','cancelled','expired')`),
+    check("tenant_owner_invitations_email_check", sql`${t.email} = lower(${t.email}) and ${t.email} ~ '^[^@[:space:]]+@[^@[:space:]]+\\.[a-z]{2,}$' and length(${t.email}) <= 254`),
+    check("tenant_owner_invitations_name_check", sql`length(btrim(${t.displayName})) between 2 and 120`),
+    check("tenant_owner_invitations_token_check", sql`${t.tokenHash} is null or ${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check("tenant_owner_invitations_checker_check", sql`${t.approvedBy} is null or ${t.approvedBy} <> ${t.requestedBy}`),
+    // issued/accepted carry an approval and a token; accepted names the account; open
+    // states (pending, issued) have no closing time.
+    check(
+      "tenant_owner_invitations_flow_check",
+      sql`(${t.state} <> 'pending' or (${t.approvedBy} is null and ${t.tokenHash} is null))
+          and (${t.state} not in ('issued','accepted') or (${t.approvedBy} is not null and ${t.tokenHash} is not null and ${t.expiresAt} is not null))
+          and (${t.state} = 'accepted') = (${t.acceptedAccount} is not null)
+          and (${t.state} in ('pending','issued')) = (${t.closedAt} is null)`,
+    ),
+  ],
+);

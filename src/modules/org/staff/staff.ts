@@ -73,6 +73,38 @@ export async function acceptWithNewAccount(
   }
 }
 
+// The first-owner invitation of a new tenant (DEC-033), issued from the vendor console.
+export type OwnerInviteInfo = { email: string; displayName: string; clinic: string };
+export async function lookupOwnerInvite(app: pg.Pool, token: string): Promise<OwnerInviteInfo | null> {
+  const { rows } = await app.query(`select * from tenant_owner_invite_lookup($1)`, [hashToken(token)]);
+  return rows[0] ? { email: rows[0].email, displayName: rows[0].display_name, clinic: rows[0].clinic } : null;
+}
+export async function acceptOwnerInvite(app: pg.Pool, token: string, accountId: string): Promise<{ tenantId: string; staffId: string }> {
+  return call(async () => {
+    const { rows } = await app.query(`select * from tenant_owner_invite_accept($1, $2)`, [hashToken(token), accountId]);
+    return { tenantId: rows[0].tenant_id, staffId: rows[0].staff_id };
+  });
+}
+// As acceptWithNewAccount, for the first-owner link.
+export async function acceptOwnerWithNewAccount(
+  app: pg.Pool, auth: AccountMaker, token: string, password: string,
+): Promise<{ tenantId: string; staffId: string; accountId: string } | null> {
+  const info = await lookupOwnerInvite(app, token);
+  if (!info) return null;
+  const { id } = await auth.createStaffAccount({ email: info.email, name: info.displayName, password });
+  try {
+    return { ...(await acceptOwnerInvite(app, token, id)), accountId: id };
+  } catch (e) {
+    try {
+      await auth.discardNewAccount(id);
+    } catch (cleanup) {
+      console.error("owner invitation: could not remove the new account after a failed accept", { userId: id, cleanup });
+    }
+    if (e instanceof CommandError) return null;
+    throw e;
+  }
+}
+
 export type StaffRow = {
   staffId: string;
   name: string;

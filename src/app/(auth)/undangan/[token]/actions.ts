@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 import { getAuth } from "../../../../auth/instance";
 import { AccountExistsError, PasswordPolicyError } from "../../../../auth/server";
 import { appPool } from "../../../../modules/org/context/store";
-import { acceptWithNewAccount } from "../../../../modules/org/staff/staff";
+import { acceptOwnerWithNewAccount, acceptWithNewAccount, lookupOwnerInvite } from "../../../../modules/org/staff/staff";
 
 export type AcceptState = { error?: string };
 
@@ -24,7 +24,12 @@ export async function acceptAction(_prev: AcceptState, form: FormData): Promise<
   if (password !== confirm) return { error: "Kedua kata sandi tidak sama." };
   let accepted;
   try {
-    accepted = await acceptWithNewAccount(await appPool(), await getAuth(), token, password);
+    const pool = await appPool();
+    // The same link path serves the first-owner invitation (DEC-033); its token lives in
+    // another table, so at most one of the two lookups matches.
+    accepted = (await lookupOwnerInvite(pool, token))
+      ? await acceptOwnerWithNewAccount(pool, await getAuth(), token, password)
+      : await acceptWithNewAccount(pool, await getAuth(), token, password);
   } catch (e) {
     if (e instanceof PasswordPolicyError) return { error: e.message };
     if (e instanceof AccountExistsError) return { error: "Email ini sudah punya akun. Masuk dulu, lalu buka tautan undangan lagi." };

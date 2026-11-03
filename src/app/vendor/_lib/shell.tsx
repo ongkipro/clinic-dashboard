@@ -2,7 +2,7 @@
 // pages a role cannot use are absent (NAV-1). The rest of the 19 §3 tree arrives with
 // its tasks (T-023 tenant detail, T-024 onboarding, T-118 health, T-129 full tree).
 // Tenant-controlled strings are rendered as React text only (escaped), never as markup.
-import { Building2 } from "lucide-react";
+import { Building2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { ConsoleUser, VendorRole } from "./server";
 import { VendorSignOut } from "./sign-out";
@@ -16,7 +16,10 @@ export const VENDOR_ROLE_LABEL: Record<VendorRole, string> = {
   vendor_auditor: "Auditor Vendor",
 };
 
-const PAGES = [{ href: "/vendor/tenant", label: "Tenant", icon: Building2, roles: "all" as const }];
+const PAGES = [
+  { href: "/vendor/tenant", label: "Tenant", icon: Building2, roles: "all" as const },
+  { href: "/vendor/keamanan", label: "Keamanan Akun", icon: ShieldCheck, roles: "all" as const },
+];
 
 export function ConsoleShell({ user, current, children }: { user: ConsoleUser; current: string; children: React.ReactNode }) {
   return (
@@ -29,7 +32,7 @@ export function ConsoleShell({ user, current, children }: { user: ConsoleUser; c
         <ul className={s.nav}>
           {PAGES.map((p) => (
             <li key={p.href}>
-              <Link className={s.navLink} href={p.href} aria-current={current === p.href ? "page" : undefined} prefetch={false}>
+              <Link className={s.navLink} href={p.href} aria-current={current === p.href || current.startsWith(`${p.href}/`) ? "page" : undefined} prefetch={false}>
                 <p.icon aria-hidden="true" strokeWidth={1.75} />
                 {p.label}
               </Link>

@@ -274,6 +274,20 @@
       "when": 1793709371520,
       "tag": "0038_tenant_lifecycle_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1793711462306,
+      "tag": "0039_tenant_owner_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1793711463309,
+      "tag": "0040_tenant_provisioning_rules",
+      "breakpoints": true
     }
   ]
 }

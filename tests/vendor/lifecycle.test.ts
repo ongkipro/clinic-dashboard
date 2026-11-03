@@ -160,7 +160,11 @@ describe("TEN-12 edges and maker-checker", () => {
     const c = await clinic("provisioning");
     const step = (token: string, to = "onboarding", ip = IP) =>
       consoleDb.query(`select vendor_console_tenant_advance($1, $2, $3, $4, 'Mulai onboarding klinik baru') as r`, [token, ip, c.tenantId, to]).then((r) => r.rows[0].r, (e) => ({ raw: e.code }));
-    expect(await step(ONBTok)).toEqual({ raw: "42501" }); // processor agreement not approved
+    // Processor agreement not approved: refused and logged (T-023 review round 2).
+    expect(await step(ONBTok)).toMatchObject({ ok: false, reason: "processor_agreement" });
+    expect((await h.admin.query(`select action, outcome, reason_code from vendor_actions order by seq desc limit 1`)).rows[0]).toEqual({ action: "tenant_onboarding", outcome: "denied", reason_code: "processor_agreement" });
+    expect(await step(ONBTok, "closed")).toMatchObject({ ok: false, code: "ERR_INVALID_INPUT" });
+    expect((await h.admin.query(`select action, outcome, reason_code from vendor_actions order by seq desc limit 1`)).rows[0]).toEqual({ action: "tenant_advance", outcome: "denied", reason_code: "invalid_input" });
     const pdf = Buffer.from("%PDF-1.7\nPerjanjian pengolahan data sintetis\n%%EOF\n");
     const file = await asOwner(c, (db) => uploadEvidence(db, { obligationKey: "processor_agreement_signed", fileName: "dpa.pdf", content: pdf, expertName: "Konsultan Hukum Sintetis", documentDate: "2026-10-01" }));
     const item = (await h.admin.query(`select item_id from evidence_files where id = $1`, [file.fileId])).rows[0].item_id;

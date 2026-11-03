@@ -405,6 +405,8 @@ describe("functions (TEN-16)", () => {
     "staff_sessions(uuid)",
     "tenant_capability(text)",
     "tenant_lifecycle_status()",
+    "tenant_owner_invite_accept(text,uuid)",
+    "tenant_owner_invite_lookup(text)",
     "vendor_dual_identities()",
     "vendor_dual_identity_clinic_decide(uuid,boolean)",
     "vendor_go_live_allowed()",

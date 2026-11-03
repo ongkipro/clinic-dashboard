@@ -105,3 +105,29 @@
   background: #e7f5ea;
   color: #1e7a34;
 }
+
+/* Profil & Keamanan (DEC-033): sections, sessions list, secondary and destructive buttons. */
+.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; min-width: 0; }
+.section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+.heading { font-size: 1.3rem; line-height: 1.25; font-weight: 700; margin: 0; overflow-wrap: anywhere; }
+.secondaryButton, .destructive {
+  font: inherit;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  justify-self: start;
+  max-width: 100%;
+}
+.secondaryButton { background: #e9e9ee; color: #0a6e86; }
+.destructive { background: #fdecea; color: #c4281c; }
+.secondaryButton:focus-visible, .destructive:focus-visible { outline: 3px solid #0a6e86; outline-offset: 2px; }
+.secondaryButton[aria-disabled="true"], .destructive[aria-disabled="true"] { opacity: 0.6; cursor: progress; }
+.sessions { list-style: none; margin: 0; padding: 0; background: #fff; border-radius: 12px; min-width: 0; }
+.sessionRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 16px; border-bottom: 0.5px solid #c6c6c8; }
+.sessionRow:last-child { border-bottom: 0; }
+.sessionText { min-width: 0; flex: 1 1 14rem; }
+.sessionTitle { margin: 0 0 2px; font-weight: 600; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.badge { display: inline-flex; align-items: center; min-height: 1.5rem; padding: 0 8px; border-radius: 999px; background: #e3f1f4; color: #0a6e86; font-size: 0.82rem; font-weight: 600; }

@@ -1,6 +1,6 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-02
+Updated: 2026-11-03
 Status: Active
 State: INTEGRATING
 Review-Risk: R3
@@ -55,6 +55,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-021 Vendor console host, cookies, CSP | PASS; R3 review APPROVE (claude-code, two rounds) | `29c183c` |
 | HYG-002 Owner decisions applied (DEC-031) | PASS; R3 review APPROVE (claude rounds 1–2, codex round 3 — claude weekly limit reached) | `2d720ff` |
 | T-022 Tenant lifecycle and suspension effects | PASS; R3 review APPROVE (codex, two rounds) | `5a1031e` |
+| T-023 Tenant provisioning, first Owner, Profil & Keamanan (DEC-033) | PASS; R3 review APPROVE (codex, three rounds) | pending |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
@@ -119,6 +120,12 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Verification evidence
 
+- 2026-11-03 T-023: Buat Tenant in the vendor console writes the registry (provisioning), legal entity and first branch, plus a first-owner invitation naming the contract contact (DEC-033). Onboarding staff or a platform owner create it; a *different* platform owner approves it, and only the token hash is stored (the link is shown once, valid 7 days, cancellable, reissued only through the checker again). The link works once, only for that email, only while the tenant has no Owner (an Owner joining by any path closes it in the same transaction), and never for a vendor-staff account; accepting creates the Owner membership directly (audited `first_owner_joined`), and the Owner must enrol TOTP. Mulai Onboarding is refused, logged, until the Owner approves the processor agreement. The tenant detail shows no staff or patient data. Every console write is a JSON POST (proxy: JSON only, no form, no Next-Action) behind Origin, the session and `vendor_guard` with a 10-minute step-up; refusals from resolved accounts are logged. Saya › Profil & Keamanan and Konsol Vendor › Keamanan Akun:
+  - change password: IAM-1 policy, RATE-2, other sessions ended;
+  - authenticator: set up, new backup codes (old ones stop working), replace or turn off with the password plus a current code; TOTP-required roles go straight to re-enrolment;
+  - own sessions only, per surface.
+
+  Tests: 9 tenants, 8 security, host and lifecycle updates; 25 mutations each fail a test (one equivalent, kept as defence in depth). Browser (`tests/ui/tenant-provisioning.spec.ts`): 16 flows and 45 layouts at 390/820/1180/1440 and 200% text, no console error, no CSP violation; the browser check found and fixed a client function called from a server page and missing text wrapping. Review: codex, three rounds (rollback-safe invitation closing, logged refusals). Full suite 684 passing.
 - 2026-11-03 T-022: 11 lifecycle tests (PR-56 scenario: a live tenant suspended through finance → platform owner → executor refuses new bookings, public site and marketing with ERR_TENANT_SUSPENDED while clinical read/export, existing appointments, cashier, care messages, SATUSEHAT outbox, corrections, patient copies, data requests and purpose reads continue, for the owner and the facility head; the owner is notified and sees the reason, others see only the state; history with the consumed request and the login-anchored service; event carries states only. Care messages stay eligible while suspended; reactivation needs a platform owner's request and another platform owner's approval. Edges: provisioning→onboarding refused until the processor agreement is approved and only for onboarding/platform-owner staff; onboarding→live platform owner only; every other edge refused; a vendor edge without a consumed request, with another tenant's request or the wrong kind is refused; a request applies once; a failed transition rolls the consumption back; exit keeps read/export only; closed allows nothing. Five concurrent-application rounds serialise without deadlock. History append-only (update, delete, truncate refused); clinic_app reads no lifecycle table and cannot call the transition; the executor reads no table; capabilities follow the bound tenant only). 12 mutations each fail a test; full suite 666 passing.
 
 - 2026-11-03 HYG-002 review round 2 (claude) fixed: owners are notified when an invitation from Admin Pusat is accepted (`staff_joined_by_admin_invite`, accepted residual risk recorded in DEC-031 D1); open invitations naming Owner are cancelled by the migration; a branch clinical draft whose branch has no facility head goes to the owner; a confirmed Owner without TOTP is sent to enrolment (session gate test); the invite page already sends no-referrer and no-store, accepting is a POST (link previews do not consume the token) and account creation keeps the RATE-2 limits; the approvals_read policy recreated in 0036 is the 0022 policy plus the tenant-draft clause (no later migration changed it). 3 more mutations each fail a test.
@@ -161,4 +168,4 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 ## Next verified action
 
 Wave 5: T-015 ✓ (`5d30801`), T-017 ✓ (`47dffe4`), T-019 ✓ (`c53afdd`), T-020 ✓ (`25eb18a`); Wave 5 gate PASS (622 tests, image migrate, restore drill); pushed `0672220..591a27b`, GitHub run 41597523073 green. Next: Wave 6 — T-021 (vendor console host), then T-022.
-Wave 6: T-021 ✓ (`29c183c`), HYG-002 ✓ (`2d720ff`, owner decisions DEC-031), T-022 ✓ (`5a1031e`); Wave 6 gate PASS (667 tests, image migrate, restore drill); pushed `94f656d..f1a0e58`, GitHub run 41640186904 green. Next: T-023 (tenant provisioning, plan `docs/tasks/T-023.md`) — waiting for the owner's answer on the first-owner invitation (maker-checker or direct).
+Wave 6: T-021 ✓ (`29c183c`), HYG-002 ✓ (`2d720ff`, owner decisions DEC-031), T-022 ✓ (`5a1031e`); Wave 6 gate PASS (667 tests, image migrate, restore drill); pushed `94f656d..f1a0e58`, GitHub run 41640186904 green. T-023 ✓ (DEC-033: first Owner from the vendor console with maker-checker; Profil & Keamanan). Next: T-024 (onboarding grant, TEN-13).

@@ -31,5 +31,7 @@ export async function callAuth(path: string, body: unknown, base = "/api/auth"):
   if (res.status === 429) {
     return { ok: false, message: MESSAGES[String(data.code)] ?? "Terlalu banyak percobaan. Coba lagi sebentar lagi." };
   }
+  // The password policy message is our own Indonesian copy (src/auth/policy.ts).
+  if (data.code === "PASSWORD_POLICY" && typeof data.message === "string") return { ok: false, message: data.message };
   return { ok: false, message: MESSAGES[String(data.code)] ?? "Permintaan tidak dapat diproses. Coba Lagi." };
 }
