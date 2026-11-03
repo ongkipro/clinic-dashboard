@@ -47,13 +47,13 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-030 Ganti Cabang / Peran / Klinik with the active context | PASS; R3 review APPROVE (claude-code, two rounds) | `123f5c3` |
 | T-011 approvals engine | PASS; R3 review APPROVE (claude-code, two rounds) | `bc18eab` |
 | T-016 in-app notifications with acknowledgement | PASS; R3 review APPROVE (claude-code, two rounds) | `dd8cf2c` |
-| T-031 Staf & Undangan, Pengguna & Akses | PASS; R3 review APPROVE (claude-code, five rounds) | (pending) |
+| T-031 Staf & Undangan, Pengguna & Akses | PASS; R3 review APPROVE (claude-code, five rounds) | `d4b84ef` |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
 ## Active work
 
-Wave plan (owner 2026-11-02): waves 1–9 of M0 run back to back, each task independently reviewed and fixed before the next; after each wave gate the owner allowed commit + push once GitHub CI is green. Wave 1: T-008 ✓, T-012 ✓, T-029 ✓, HYG-002 ✓; gate PASS locally and on GitHub CI (run 41522105266), pushed `d8329ce`. Wave 2: T-009 ✓, T-013 ✓, T-018 ✓; gate PASS locally and on GitHub CI (run 41541975246), pushed `10a307e`. Wave 3: T-010 ✓, T-014 ✓, T-030 ✓; gate PASS locally and on GitHub CI (run 41553096331), pushed `002564c`. Wave 4: T-011 ✓, T-016 ✓, T-031 ✓ (commit pending).
+Wave plan (owner 2026-11-02): waves 1–9 of M0 run back to back, each task independently reviewed and fixed before the next; after each wave gate the owner allowed commit + push once GitHub CI is green. Wave 1: T-008 ✓, T-012 ✓, T-029 ✓, HYG-002 ✓; gate PASS locally and on GitHub CI (run 41522105266), pushed `d8329ce`. Wave 2: T-009 ✓, T-013 ✓, T-018 ✓; gate PASS locally and on GitHub CI (run 41541975246), pushed `10a307e`. Wave 3: T-010 ✓, T-014 ✓, T-030 ✓; gate PASS locally and on GitHub CI (run 41553096331), pushed `002564c`. Wave 4: T-011 ✓, T-016 ✓, T-031 ✓ (`d4b84ef`).
 
 Carried forward (outside the owning task's Allowed Paths):
 - Copy `public/` into the runtime image once it exists; upgrade Next.js to 16.4.4 after `minimumReleaseAge`.
