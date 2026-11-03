@@ -182,7 +182,9 @@ describe("the stored selection is re-validated (TEN-1)", () => {
   it("repeating the current choice records nothing", async () => {
     const acc = await account();
     const staffId = await member(acc, A, [["doctor", [A.b1, A.b2]]]);
-    const s1 = await switchContext(app, acc, {}, { kind: "branch", branchId: A.b2 });
+    // Start explicitly on b1: the default branch is the first by id (UUIDv7, so b1 or b2
+    // depending on timing), and the first switch must be a real change to be recorded.
+    const s1 = await switchContext(app, acc, { tenantId: A.tenantId, role: "doctor", branchId: A.b1 }, { kind: "branch", branchId: A.b2 });
     await switchContext(app, acc, s1, { kind: "branch", branchId: A.b2 });
     expect(await actions(staffId)).toHaveLength(1);
   });
