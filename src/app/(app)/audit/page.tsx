@@ -44,8 +44,6 @@ async function AuditList({ searchParams }: { searchParams: Promise<Record<string
   const q = await searchParams;
   const action = one(q.aksi);
   const page: AuditPage = await loadAuditPage({
-    tenantId: one(q.klinik),
-    role: one(q.peran),
     filter: {
       actingRole: one(q.sebagai) || undefined,
       action: action && (AUDIT_ACTIONS as readonly string[]).includes(action) ? (action as never) : undefined,
@@ -108,9 +106,6 @@ export default function AuditPageView({
         <h1 className={s.title}>Log Audit</h1>
         <p className={s.sub}>Akses rekam medis, akses darurat, persetujuan dan perubahan pengaturan.</p>
         <form className={s.filters} method="get" aria-label="Filter log audit">
-          <Suspense>
-            <HiddenContext searchParams={searchParams} />
-          </Suspense>
           <div className={s.field}>
             <label className={s.label} htmlFor="aksi">Aksi</label>
             <select className={s.input} id="aksi" name="aksi" defaultValue="">
@@ -144,15 +139,5 @@ export default function AuditPageView({
         </Suspense>
       </div>
     </main>
-  );
-}
-
-async function HiddenContext({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const q = await searchParams;
-  return (
-    <>
-      <input type="hidden" name="klinik" value={one(q.klinik) ?? ""} />
-      <input type="hidden" name="peran" value={one(q.peran) ?? ""} />
-    </>
   );
 }

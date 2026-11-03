@@ -1,12 +1,9 @@
-// Shell view model (NAV-3): the acting context for an authenticated account. Pure
-// server code without Next.js imports, so tests exercise exactly what the shell renders.
-// Until T-030 stores the chosen context, the shell acts in the account's first
-// membership (tenant order of account_memberships) with its first role in 07 order;
-// branch roles see only their branches.
+// Shell view model (NAV-3, PR-84): the active context of an authenticated account as the
+// shell shows it. Pure server code without Next.js imports, so tests exercise exactly
+// what the shell renders.
 import type pg from "pg";
-import { ROLES, type Role } from "../../auth/policy";
-import { withTenantContext } from "../../db/rls/context";
-import { accountMemberships, IdentityError, resolveContext } from "../../modules/org/identity";
+import type { Role } from "../../auth/policy";
+import { type ActiveContext, activeContext, type Selection } from "../../modules/org/context/context";
 import { ROLE_LABEL } from "./nav";
 
 export type Branch = { id: string; name: string };
@@ -20,6 +17,8 @@ export type ShellContext = {
   branches: Branch[]; // branches the acting role may switch to
   activeBranchId: string | null; // null = Semua Cabang (tenant-wide roles)
   tenantWide: boolean;
+  canSwitchRole: boolean; // Saya › Ganti Peran only with more than one role (17)
+  canSwitchClinic: boolean; // Saya › Ganti Klinik only with more than one membership (17)
 };
 
 export type ShellData =
@@ -27,42 +26,22 @@ export type ShellData =
   | { kind: "redirect"; to: string }
   | { kind: "blocked" };
 
-export async function shellFor(app: pg.Pool, accountId: string): Promise<ShellData> {
-  const c = await app.connect();
-  let memberships;
-  try {
-    memberships = await accountMemberships(c, accountId);
-  } finally {
-    c.release();
-  }
-  const first = memberships[0];
-  if (!first) return { kind: "blocked" };
-  const role = ROLES.find((r) => memberships.some((m) => m.tenantId === first.tenantId && m.role === r))!;
-  let ctx;
-  try {
-    ctx = await resolveContext(app, accountId, { tenantId: first.tenantId, actingRole: role });
-  } catch (e) {
-    if (e instanceof IdentityError) return { kind: "blocked" }; // e.g. a branch role with no branch yet
-    throw e; // infrastructure errors reach the error state, never "no role"
-  }
-  return withTenantContext(app, ctx, async (db) => {
-    const t = await db.query<{ legal_name: string }>(`select legal_name from tenants`);
-    const s = await db.query<{ display_name: string }>(`select display_name from staff where id = $1`, [ctx.staffId]);
-    const b = await db.query<Branch>(`select id, name from branches order by name`);
-    const branches =
-      ctx.allowedBranchIds === "*" ? b.rows : b.rows.filter((x) => (ctx.allowedBranchIds as readonly string[]).includes(x.id));
-    return {
-      kind: "ok",
-      context: {
-        staffId: ctx.staffId,
-        role,
-        roleLabel: ROLE_LABEL[role],
-        name: s.rows[0]?.display_name ?? "",
-        clinic: t.rows[0]?.legal_name ?? "",
-        branches,
-        activeBranchId: ctx.activeBranchId ?? null,
-        tenantWide: ctx.allowedBranchIds === "*",
-      },
-    };
-  });
+export function shellFromActive(a: ActiveContext): ShellContext {
+  return {
+    staffId: a.context.staffId,
+    role: a.context.actingRole,
+    roleLabel: ROLE_LABEL[a.context.actingRole],
+    name: a.staffName,
+    clinic: a.clinic.name,
+    branches: a.branches,
+    activeBranchId: a.context.activeBranchId ?? null,
+    tenantWide: a.tenantWide,
+    canSwitchRole: a.roles.length > 1,
+    canSwitchClinic: a.clinics.length > 1,
+  };
+}
+
+export async function shellFor(app: pg.Pool, accountId: string, selection: Selection = {}): Promise<ShellData> {
+  const a = await activeContext(app, accountId, selection);
+  return a ? { kind: "ok", context: shellFromActive(a) } : { kind: "blocked" };
 }

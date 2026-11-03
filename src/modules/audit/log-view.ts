@@ -17,14 +17,14 @@ export type AuditPage =
 export async function auditPageFor(
   p: pg.Pool,
   accountId: string,
-  sel: { tenantId?: string; role?: string; filter: AuditFilter },
+  sel: { tenantId?: string; role?: string; branchId?: string; filter: AuditFilter },
 ): Promise<Exclude<AuditPage, { kind: "redirect" }>> {
   if (!sel.tenantId || !sel.role || !(LOG_READERS as readonly string[]).includes(sel.role)) {
     return { kind: "forbidden" };
   }
   let ctx;
   try {
-    ctx = await resolveContext(p, accountId, { tenantId: sel.tenantId, actingRole: sel.role });
+    ctx = await resolveContext(p, accountId, { tenantId: sel.tenantId, actingRole: sel.role, activeBranchId: sel.branchId });
   } catch (e) {
     if (e instanceof IdentityError) return { kind: "forbidden" };
     throw e;

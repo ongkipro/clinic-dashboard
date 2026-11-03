@@ -13,7 +13,9 @@
   position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
   padding: max(env(safe-area-inset-top), var(--space-2)) var(--space-4) var(--space-2);
-  background: rgb(255 255 255 / 0.92);
+  /* Bar material from .bar-glass (UI-14: 92% white + 10 px blur, opaque with reduced
+     transparency); a top bar keeps its separator at the bottom edge. */
+  border-top: 0;
   border-bottom: 0.5px solid rgb(0 0 0 / 0.12);
 }
 .context { display: grid; min-width: 0; flex: 1 1 12rem; }

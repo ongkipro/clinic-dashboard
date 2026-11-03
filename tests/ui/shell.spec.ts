@@ -154,7 +154,7 @@ async function unitTests() {
           staffId,
           role: "owner", roleLabel: "Owner", name: "Ibu Owner", clinic: "PT Klinik Sintetis",
           branches: [{ id: br[0], name: "Cabang Kemang" }, { id: br[1], name: "Cabang Senopati" }],
-          activeBranchId: null, tenantWide: true,
+          activeBranchId: null, tenantWide: true, canSwitchRole: false, canSwitchClinic: false,
         },
       });
     });

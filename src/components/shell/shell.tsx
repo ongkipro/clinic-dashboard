@@ -54,6 +54,8 @@ export type ShellProps = {
   branches: { id: string; name: string }[];
   activeBranchId: string | null;
   tenantWide: boolean;
+  canSwitchRole: boolean;
+  canSwitchClinic: boolean;
   children: React.ReactNode;
 };
 
@@ -103,7 +105,11 @@ export function Shell(props: ShellProps) {
   const { role, children } = props;
   const path = usePathname();
   const groups = useMemo(() => menuFor(role), [role]);
-  const saya = useMemo(() => sayaFor(role), [role]);
+  const canSwitchBranch = props.branches.length > 1;
+  const saya = useMemo(
+    () => sayaFor(role, { roles: props.canSwitchRole, branches: canSwitchBranch, clinics: props.canSwitchClinic }),
+    [role, props.canSwitchRole, canSwitchBranch, props.canSwitchClinic],
+  );
   const tabs = useMemo(() => tabsFor(role), [role]);
   const all = useMemo(() => [...groups.flatMap((g) => g.pages), ...saya], [groups, saya]);
   // Exactly one current page (longest matching href); tabs share it.
@@ -343,7 +349,7 @@ function TopBar(props: ShellProps & { onSearch: () => void }) {
   const current = branches.find((b) => b.id === activeBranchId);
   const branchLabel = current?.name ?? (tenantWide ? "Semua Cabang" : (branches[0]?.name ?? ""));
   return (
-    <header className={s.topbar}>
+    <header className={`${s.topbar} bar-glass`}>
       <div className={s.context}>
         {branches.length > 1 ? (
           <Link className={s.branch} href="/saya/cabang" aria-label={`Ganti cabang. Cabang aktif: ${branchLabel}`}>
@@ -357,8 +363,9 @@ function TopBar(props: ShellProps & { onSearch: () => void }) {
             <span className={s.branchName}>{branchLabel}</span>
           </span>
         )}
-        <span className={s.roleLine}>
-          {props.name} · {props.roleLabel}
+        {/* PR-84: the active brand, branch and acting role (17: "Sebagai Dokter"). */}
+        <span className={s.roleLine} data-slot="active-context">
+          {props.clinic} · {props.name} · Sebagai {props.roleLabel}
         </span>
       </div>
       <div className={s.actions}>

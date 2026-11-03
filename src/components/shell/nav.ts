@@ -206,15 +206,16 @@ export const NAV: readonly NavGroup[] = [
 ];
 
 // §2.16 Saya: every role; commission/target only for roles with "Own commission &
-// target" in 07; vendor access for Owner (Admin Pusat read). Ganti Klinik appears with
-// T-030 (accounts with memberships in more than one clinic); Keluar is a control, not a
-// page (shell.tsx).
+// target" in 07; vendor access for Owner (Admin Pusat read). Ganti Peran, Ganti Cabang
+// and Ganti Klinik appear only when there is something to switch to (17 Navigation;
+// sayaFor's options); Keluar is a control, not a page (shell.tsx).
 const ALL = Object.keys(ABBR).join(" ");
 const OWN = "M FO CS BC D N T PH";
 export const SAYA: readonly NavPage[] = (
   [
     ["ganti-peran", "Ganti Peran", "/saya/peran", ALL],
     ["ganti-cabang", "Ganti Cabang", "/saya/cabang", ALL],
+    ["ganti-klinik", "Ganti Klinik", "/saya/klinik", ALL],
     ["keamanan", "Profil & Keamanan", "/saya/keamanan", ALL],
     ["komisi-saya", "Komisi Saya", "/saya/komisi", OWN],
     ["target-saya", "Target Saya", "/saya/target", OWN],
@@ -287,8 +288,17 @@ export function menuFor(role: Role): NavGroup[] {
   return NAV.map((g) => ({ ...g, pages: g.pages.filter((p) => p.roles.includes(role)) })).filter((g) => g.pages.length > 0);
 }
 
-export function sayaFor(role: Role): NavPage[] {
-  return SAYA.filter((p) => p.roles.includes(role));
+export type SwitchOptions = { roles: boolean; branches: boolean; clinics: boolean };
+const ALL_SWITCHES: SwitchOptions = { roles: true, branches: true, clinics: true };
+
+export function sayaFor(role: Role, can: SwitchOptions = ALL_SWITCHES): NavPage[] {
+  return SAYA.filter(
+    (p) =>
+      p.roles.includes(role) &&
+      (p.id !== "ganti-peran" || can.roles) &&
+      (p.id !== "ganti-cabang" || can.branches) &&
+      (p.id !== "ganti-klinik" || can.clinics),
+  );
 }
 
 const groupOf = (id: string) => NAV.find((g) => g.pages.some((p) => p.id === id))?.id ?? "saya";

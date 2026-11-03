@@ -1,7 +1,10 @@
 // T-008 browser evidence for Log Audit (UX-31) at 390/820/1180/1440 and 200% text: an
 // owner signs in, enrols TOTP (the owner role requires it), opens /audit and sees the
-// doctor's break-glass entry with reason and time; filters work; an unauthorised role
-// and a foreign tenant get the permission message; no session redirects to /masuk.
+// doctor's break-glass entry with reason and time; filters work; no session redirects to
+// /masuk. Since T-030 the clinic and role come from the active context (Saya), not the
+// URL: switching to a role that is not a log reader shows the permission message, URL
+// selectors are ignored, and a forged context cookie for another clinic falls back to
+// the account's own clinic. The seed gives the owner a second role (manager, branch B1).
 // Runs only on request (it needs a running server and a seed):
 //   RUN_UI=1 BASE_URL=... AUDIT_SEED=seed.json PLAYWRIGHT_CORE=... node tests/ui/audit.spec.ts out-dir
 // Vitest collects *.spec.ts too; without RUN_UI it registers one skipped test and stops.
@@ -41,7 +44,7 @@ const browser = await chromium.launch();
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
-  await page.goto(`${BASE}/audit?klinik=${seed.tenant}&peran=owner`);
+  await page.goto(`${BASE}/audit`);
   await page.waitForURL(`${BASE}/masuk`);
   flow.push(["no session redirects", page.url()]);
 
@@ -49,7 +52,7 @@ try {
   await page.getByLabel("Kata sandi").fill(PASSWORD);
   await page.getByRole("button", { name: "Masuk" }).click();
   await page.waitForURL(`${BASE}/`);
-  await page.goto(`${BASE}/audit?klinik=${seed.tenant}&peran=owner`);
+  await page.goto(`${BASE}/audit`);
   await page.waitForURL(`${BASE}/aktifkan-2fa`);
   flow.push(["owner without TOTP is sent to enrol", page.url()]);
   await page.getByLabel("Kata sandi").fill(PASSWORD);
@@ -59,7 +62,7 @@ try {
   await page.getByRole("button", { name: "Aktifkan" }).click();
   await page.waitForURL(`${BASE}/`);
 
-  const url = `${BASE}/audit?klinik=${seed.tenant}&peran=owner`;
+  const url = `${BASE}/audit`;
   for (const w of [390, 820, 1180, 1440]) {
     for (const zoom of [1, 2]) {
       await page.setViewportSize({ width: w, height: 900 });
@@ -89,8 +92,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(url);
   await page.getByText("Rantai log utuh.").waitFor();
-  flow.push(["hidden context", await page.evaluate(() => [...document.querySelectorAll("form input[type=hidden]")].map((i) => `${(i as HTMLInputElement).name}=${(i as HTMLInputElement).value ? "set" : "empty"}`))]);
-  await page.getByLabel("Aksi").selectOption("break_glass");
+  await page.getByRole("combobox", { name: "Aksi" }).selectOption("break_glass");
   await page.getByRole("button", { name: "Terapkan" }).click();
   await page.waitForURL(/aksi=break_glass/);
   flow.push(["after filter url", page.url().replace(BASE, "")]);
@@ -103,15 +105,24 @@ try {
   flow.push(["filtered empty state", true]);
   await page.screenshot({ path: `${OUT}/audit-empty-390.png`, fullPage: true });
 
-  for (const [label, q] of [
-    ["role not a log reader", `klinik=${seed.tenant}&peran=manager`],
-    ["role not held", `klinik=${seed.tenant}&peran=auditor`],
-    ["foreign tenant", `klinik=00000000-0000-7000-8000-000000000000&peran=owner`],
-  ]) {
-    await page.goto(`${BASE}/audit?${q}`);
-    await page.getByText("Anda tidak memiliki akses ke log audit.").waitFor();
-    flow.push([label, "permission message"]);
-  }
+  // URL selectors are ignored: the active context (owner) still decides.
+  await page.goto(`${BASE}/audit?klinik=00000000-0000-7000-8000-000000000000&peran=manager`);
+  await page.getByText("Rantai log utuh.").waitFor();
+  flow.push(["URL selectors ignored", true]);
+  // A forged context cookie for another clinic falls back to the owner's own clinic.
+  await ctx.addCookies([{ name: "clinic_context", value: JSON.stringify({ t: "00000000-0000-7000-8000-000000000000", r: "owner", b: null }), url: BASE }]);
+  await page.goto(url);
+  await page.getByText("Rantai log utuh.").waitFor();
+  const fellBack = (await page.locator("main").innerText()).includes("Akses darurat (break-glass)");
+  if (!fellBack) throw new Error("forged clinic cookie did not fall back to the owner's clinic");
+  flow.push(["forged clinic cookie falls back", fellBack]);
+  // Ganti Peran → Manajer (not a log reader): the permission message.
+  await page.goto(`${BASE}/saya/peran`);
+  await page.getByRole("button", { name: /^Manajer/ }).click();
+  await page.waitForURL(`${BASE}/saya`);
+  await page.goto(url);
+  await page.getByText("Anda tidak memiliki akses ke log audit.").waitFor();
+  flow.push(["role not a log reader (via Ganti Peran)", "permission message"]);
   await ctx.close();
 } catch (e) {
   report.error = String(e).split("\n")[0];
