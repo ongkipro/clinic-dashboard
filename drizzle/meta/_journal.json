@@ -288,6 +288,20 @@
       "when": 1793711463309,
       "tag": "0040_tenant_provisioning_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1793718879384,
+      "tag": "0041_vendor_staff_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1793718880189,
+      "tag": "0042_vendor_team_rules",
+      "breakpoints": true
     }
   ]
 }

@@ -13,6 +13,7 @@
     "db:migrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/db/migrate.ts",
     "db:migrate:local": "DB_LOCAL=1 pnpm db:migrate",
     "db:generate": "drizzle-kit generate",
+    "vendor:bootstrap": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/db/vendor-bootstrap.ts",
     "test": "vitest run",
     "test:rls": "vitest run tests/rls",
     "test:isolation": "vitest run tests/isolation",

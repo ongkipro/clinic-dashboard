@@ -92,3 +92,7 @@
 .back { justify-self: start; }
 .rowLink { color: inherit; text-decoration: none; }
 .rowLink:hover { text-decoration: underline; }
+.cardsAlways { display: grid; }
+@media (min-width: 700px) { .cardsAlways { display: grid; } }
+.check { display: flex; align-items: center; gap: var(--space-2); min-height: var(--target); font-size: 1rem; }
+.check input { width: 1.25rem; height: 1.25rem; accent-color: var(--tint); }

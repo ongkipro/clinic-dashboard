@@ -34,6 +34,11 @@ COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=prod-deps /app/node_modules ./migrate/node_modules
 COPY package.json ./migrate/package.json
 COPY src/db/migrate.ts ./migrate/src/db/migrate.ts
+# First platform owner (DEC-036), once per server, from the server terminal:
+#   cd /app/migrate && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/db/vendor-bootstrap.ts \
+#     --email ... --nama "..." --cidr ... --label "..."   (DATABASE_URL = migration role; password prompted)
+COPY src/db/vendor-bootstrap.ts ./migrate/src/db/vendor-bootstrap.ts
+COPY src/auth/policy.ts ./migrate/src/auth/policy.ts
 COPY drizzle ./migrate/drizzle
 USER node
 EXPOSE 3000

@@ -4,6 +4,8 @@
 // every outcome. The body is validated here for shape only; the database validates values.
 import { NextResponse } from "next/server";
 import { ipHeader, vendorAuth, vendorOrigin, vendorPool } from "../../../_lib/server";
+import { AccountExistsError, PasswordPolicyError } from "../../../../../auth/server";
+import { acceptMemberWithNewAccount, cancelMemberInvite, inviteMember, setMemberState } from "../../../../../modules/vendor/team/team";
 import {
   advanceTenant, approveOwnerInvite, cancelOwnerInvite, type ConsoleCall, createTenant, requestOwnerInvite,
 } from "../../../../../modules/vendor/tenants/tenants";
@@ -15,13 +17,30 @@ const json = (body: unknown, status = 200) => NextResponse.json(body, { status, 
 
 export async function POST(request: Request, { params }: { params: Promise<{ action: string }> }) {
   if (request.headers.get("origin") !== vendorOrigin()) return json({ ok: false, code: "ERR_FORBIDDEN" }, 403);
+  const { action } = await params;
+  // Accepting a Tim Vendor invitation (DEC-036) is the one action without a session: the
+  // token names the invitation; a new account for the invited email is created with the
+  // IAM-1 policy and removed again when accepting is refused.
+  if (action === "staff-invite-accept") {
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    const token = str(body?.token, 64);
+    const password = str(body?.password, 128);
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(token) || !password) return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
+    try {
+      const r = await acceptMemberWithNewAccount(await vendorPool(), await vendorAuth(), token, password);
+      return r.ok ? json({ ok: true }) : json({ ok: false, code: "ERR_NOT_FOUND" }, 404);
+    } catch (e) {
+      if (e instanceof PasswordPolicyError) return json({ ok: false, code: "PASSWORD_POLICY", message: e.message }, 400);
+      if (e instanceof AccountExistsError) return json({ ok: false, code: "ACCOUNT_EXISTS" }, 409);
+      throw e;
+    }
+  }
   const s = await (await vendorAuth()).checkSession(request.headers);
   if (s.gate !== "ok") return json({ ok: false, code: "ERR_UNAUTHENTICATED" }, 401);
   const c: ConsoleCall = { token: s.token, ip: request.headers.get(ipHeader()) ?? "" };
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body || typeof body !== "object") return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
   const db = await vendorPool();
-  const { action } = await params;
   let r;
   switch (action) {
     case "tenant-create":
@@ -59,6 +78,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
       const ended = await (await vendorAuth()).endOwnSession(request.headers, id);
       return ended ? json({ ok: true }) : json({ ok: false, code: "ERR_NOT_FOUND" }, 404);
     }
+    case "staff-invite": {
+      const roles = Array.isArray(body.roles) ? body.roles.filter((x): x is string => typeof x === "string").slice(0, 5) : [];
+      r = await inviteMember(db, c, str(body.email), str(body.name, 120), roles);
+      if (r.ok) return json({ ok: true, link: `${vendorOrigin()}/vendor/undangan/${r.data.token}` });
+      break;
+    }
+    case "staff-invite-cancel":
+      r = await cancelMemberInvite(db, c, uuid(body.invitationId));
+      break;
+    case "staff-state":
+      r = await setMemberState(db, c, uuid(body.staffId), str(body.state, 16));
+      break;
     default:
       return json({ ok: false, code: "ERR_NOT_FOUND" }, 404);
   }

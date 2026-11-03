@@ -335,3 +335,36 @@ export const tenantOwnerInvitations = pgTable(
     ),
   ],
 );
+
+// Tim Vendor invitations (HYG-003, DEC-036, UX-46): a platform owner invites a person with
+// vendor roles; the one-time link (token hash stored) lets them set their own password and
+// then enrol TOTP. Platform table; written only by the vendor_console_staff_* and
+// vendor_staff_invite_* functions (migration 0042).
+export const vendorStaffInvitations = pgTable(
+  "vendor_staff_invitations",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    email: text("email").notNull(),
+    displayName: text("display_name").notNull(),
+    roles: text("roles").array().notNull(),
+    tokenHash: text("token_hash").notNull(),
+    invitedBy: uuid("invited_by")
+      .notNull()
+      .references(() => vendorStaff.id, { onDelete: "restrict" }),
+    invitedAt: timestamp("invited_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    state: text("state", { enum: ["pending", "accepted", "cancelled", "expired"] }).notNull().default("pending"),
+    acceptedStaff: uuid("accepted_staff").references(() => vendorStaff.id, { onDelete: "restrict" }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [
+    unique("vendor_staff_invitations_token_key").on(t.tokenHash),
+    check("vendor_staff_invitations_state_check", sql`${t.state} in ('pending','accepted','cancelled','expired')`),
+    check("vendor_staff_invitations_email_check", sql`${t.email} = lower(${t.email}) and ${t.email} ~ '^[^@[:space:]]+@[^@[:space:]]+\\.[a-z]{2,}$' and length(${t.email}) <= 254`),
+    check("vendor_staff_invitations_name_check", sql`length(btrim(${t.displayName})) between 2 and 120`),
+    check("vendor_staff_invitations_roles_check", sql`cardinality(${t.roles}) >= 1 and ${t.roles} <@ array['platform_owner','onboarding','support','vendor_finance','vendor_auditor']::text[]`),
+    check("vendor_staff_invitations_token_check", sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check("vendor_staff_invitations_expiry_check", sql`${t.expiresAt} > ${t.invitedAt}`),
+    check("vendor_staff_invitations_close_check", sql`(${t.state} = 'pending') = (${t.closedAt} is null) and (${t.state} = 'accepted') = (${t.acceptedStaff} is not null)`),
+  ],
+);
