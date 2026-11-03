@@ -58,7 +58,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-023 Tenant provisioning, first Owner, Profil & Keamanan (DEC-033) | PASS; R3 review APPROVE (codex, three rounds) | `8c3a89e` |
 | HYG-003 Vendor bootstrap command and minimal Tim Vendor (DEC-036) | PASS; R3 review APPROVE (codex, three rounds) | `5d9bcf2` |
 | T-024 Onboarding grant (PR-58, TEN-13) | PASS; R4 review APPROVE (codex seven rounds, claude two) | `4ea416a` |
-| T-025 Support sessions (PR-53, TEN-6, TEN-14, TEN-17, TEN-19) | PASS; R4 review APPROVE (codex and claude, five rounds) | pending |
+| T-025 Support sessions (PR-53, TEN-6, TEN-14, TEN-17, TEN-19) | PASS; R4 review APPROVE (codex and claude, five rounds) | `c735ceb` |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
@@ -189,7 +189,7 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ### Resume here
 
-**T-025 support sessions (R4): done locally, review APPROVE (codex + claude, round 5), ledger finished; local commit only (push needs the owner's go-ahead).**
+**T-025 support sessions (R4): committed `c735ceb` (review APPROVE codex + claude, round 5; ledger PASS). Not pushed: push and CI watch need the owner's go-ahead.**
 
 **Next, in order (M0 focus, owner instruction 2026-11-04):**
 1. ~~T-025~~ done (push and CI watch pending owner approval).
