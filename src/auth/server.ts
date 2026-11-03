@@ -227,23 +227,34 @@ export function createAuth(config: AuthConfig) {
     },
   });
 
-  // Invitation flow (T-022) is the only caller. Enforces the IAM-1 password policy,
-  // which Better Auth's length checks do not cover.
+  // Invitation flow (T-031) is the only caller. Enforces the IAM-1 password policy,
+  // which Better Auth's length checks do not cover. Throws AccountExistsError when the
+  // email has an account already (that person signs in and accepts from it instead).
+  // emailVerified stays false: holding the invite link does not prove the mailbox.
   async function createStaffAccount(input: { email: string; name: string; password: string }) {
     const email = input.email.trim().toLowerCase();
     const problem = passwordProblem(input.password, email);
     if (problem) throw new PasswordPolicyError(problem);
     const ctx = await auth.$context;
-    const user = await ctx.internalAdapter.createUser(
-      { email, name: input.name, emailVerified: true },
-      { method: "admin" },
-    );
-    await ctx.internalAdapter.linkAccount({
-      userId: user.id,
-      providerId: "credential",
-      accountId: user.id,
-      password: await ctx.password.hash(input.password),
-    });
+    if (await ctx.internalAdapter.findUserByEmail(email)) throw new AccountExistsError();
+    const hash = await ctx.password.hash(input.password);
+    let user;
+    try {
+      user = await ctx.internalAdapter.createUser({ email, name: input.name, emailVerified: false }, { method: "admin" });
+    } catch (e) {
+      // A concurrent create for the same email (auth_user_email_key) is the same case.
+      if ((e as { code?: string }).code === "23505" || (e as { cause?: { code?: string } }).cause?.code === "23505") throw new AccountExistsError();
+      throw e;
+    }
+    try {
+      await ctx.internalAdapter.linkAccount({ userId: user.id, providerId: "credential", accountId: user.id, password: hash });
+    } catch (e) {
+      // Never leave a user without a credential: it would block this email for good.
+      await discardNewAccount(user.id).catch((cleanup) =>
+        console.error("auth: could not remove a user whose credential failed to link", { userId: user.id, cleanup }),
+      );
+      throw e;
+    }
     return user;
   }
 
@@ -302,7 +313,40 @@ export function createAuth(config: AuthConfig) {
     return true;
   }
 
-  return { auth, createStaffAccount, checkSession, unlock };
+  // PR-91 / IAM-16: ends one session server-side (a membership revocation covered every
+  // membership the session could act in).
+  async function endSession(sessionId: string): Promise<void> {
+    const row = await db.query.authSession.findFirst({ where: eq(schema.authSession.id, sessionId) });
+    if (row) await (await auth.$context).internalAdapter.deleteSession(row.token);
+  }
+
+  // Undo createStaffAccount when the invitation could not be accepted in the same request
+  // (cancelled or expired meanwhile), so the email is not left with an orphan account.
+  // One transaction: if the accept did commit after all (a lost response), the membership
+  // FK (ON DELETE RESTRICT) refuses the user delete and nothing — credential, sessions —
+  // is removed. (Better Auth's deleteUser deletes rows one by one, not atomically.)
+  async function discardNewAccount(userId: string): Promise<void> {
+    const c = await config.pool.connect();
+    try {
+      await c.query("begin");
+      for (const t of ["auth_session", "auth_two_factor", "auth_account"]) await c.query(`delete from ${t} where user_id = $1`, [userId]);
+      await c.query(`delete from auth_user where id = $1`, [userId]);
+      await c.query("commit");
+    } catch (e) {
+      await c.query("rollback").catch(() => {});
+      throw e;
+    } finally {
+      c.release();
+    }
+  }
+
+  return { auth, createStaffAccount, discardNewAccount, checkSession, unlock, endSession };
+}
+
+export class AccountExistsError extends Error {
+  constructor() {
+    super("an account for this email exists");
+  }
 }
 
 export class PasswordPolicyError extends Error {}

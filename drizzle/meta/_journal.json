@@ -176,6 +176,20 @@
       "when": 1793667742957,
       "tag": "0024_notifications_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793671848118,
+      "tag": "0025_staff_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793671848835,
+      "tag": "0026_staff_access_rules",
+      "breakpoints": true
     }
   ]
 }

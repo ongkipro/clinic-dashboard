@@ -38,6 +38,14 @@ export async function requestContext(opts: { activity?: boolean } = {}): Promise
   if (gate.gate === "locked") return { kind: "redirect", to: "/terkunci" };
   if (gate.gate !== "ok") return { kind: "redirect", to: "/masuk" }; // fail closed
   const selection = await storedSelection();
-  const active = await activeContext(await appPool(), gate.userId, selection);
-  return active ? { kind: "ok", accountId: gate.userId, active, selection } : { kind: "blocked", accountId: gate.userId };
+  const app = await appPool();
+  const active = await activeContext(app, gate.userId, selection, gate.sessionId);
+  if (active) return { kind: "ok", accountId: gate.userId, active, selection };
+  // No context left. If the account still has a usable membership, this session was
+  // revoked for all of them (PR-91): end the session server-side and sign in again.
+  if (await activeContext(app, gate.userId, selection)) {
+    await (await getAuth()).endSession(gate.sessionId);
+    return { kind: "redirect", to: "/masuk" };
+  }
+  return { kind: "blocked", accountId: gate.userId };
 }

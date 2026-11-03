@@ -117,6 +117,8 @@ export const EXEMPT: Exemption[] = [
   { kind: "route", id: "/aktifkan-2fa", reason: AUTH },
   { kind: "route", id: "/terkunci", reason: AUTH },
   { kind: "action", id: "app/(auth)/terkunci/actions", reason: AUTH },
+  { kind: "route", id: "/undangan/[token]", reason: "invitation link: before any membership; shows only the invited name, clinic and roles for a valid token (tests/org/access.test.ts)" },
+  { kind: "action", id: "app/(auth)/undangan/[token]/actions", reason: "invitation acceptance: creates the invited account and membership from the token only (tests/org/access.test.ts)" },
   { kind: "route", id: "/dev/galeri", reason: "development-only component gallery, refused in production (T-012)" },
   { kind: "route", id: "/dev/templat", reason: "development-only page-template gallery with static sample data, refused in production (T-014)" },
 ];

@@ -25,7 +25,8 @@
     "test:vendor": "vitest run tests/vendor",
     "test:events": "vitest run tests/events",
     "test:approvals": "vitest run tests/approvals",
-    "test:notifications": "vitest run tests/notifications"
+    "test:notifications": "vitest run tests/notifications",
+    "test:access": "vitest run tests/org/access.test.ts"
   },
   "dependencies": {
     "better-auth": "1.7.15",

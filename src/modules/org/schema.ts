@@ -254,3 +254,94 @@ export const roleRequests = pgTable(
       .where(sql`${t.state} = 'pending'`),
   ],
 );
+
+// PR-91, T-031: a staff session belongs to one account, but the access it carries is per
+// membership. A revocation (role or branch removed, membership ended, session revoked by
+// the owner) writes one membership_revocations row naming the sessions it ends; a request
+// on a listed session is refused for that membership (IAM-16: within 60 s — checked on
+// every request, so immediately). A session signed in later is not listed.
+export const membershipRevocations = pgTable(
+  "membership_revocations",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    membershipId: uuid("membership_id").notNull(),
+    // The sessions this revocation ends: listed when written (every unexpired session of the
+    // account for a membership-wide revocation, one for Cabut Sesi), so no clock comparison
+    // between the app (session created_at) and the database decides who is signed out.
+    sessionIds: uuid("session_ids").array().notNull(),
+    reason: text("reason").notNull(),
+    role: text("role"), // role_removed / branch_removed: which role
+    branchId: uuid("branch_id"), // branch_removed: which branch
+    revokedBy: uuid("revoked_by"),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.membershipId], foreignColumns: [memberships.tenantId, memberships.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.revokedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("membership_revocations_tenant_id_id_key").on(t.tenantId, t.id),
+    check("membership_revocations_reason_check", sql`${t.reason} in ('session_revoked','role_removed','branch_removed','membership_ended','duty_removed')`),
+    check("membership_revocations_detail_check", sql`(${t.reason} in ('role_removed','branch_removed')) = (${t.role} is not null) and (${t.reason} = 'branch_removed') = (${t.branchId} is not null)`),
+  ],
+);
+
+// IAM-13: duties are assignments on Owner or Admin Pusat, not roles.
+export const DUTIES = ["data_protection", "it_admin"] as const;
+export const staffDuties = pgTable(
+  "staff_duties",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
+    duty: text("duty", { enum: DUTIES }).notNull(),
+    assignedBy: uuid("assigned_by").notNull(),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+    endedBy: uuid("ended_by"),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.staffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.assignedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.endedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("staff_duties_tenant_id_id_key").on(t.tenantId, t.id),
+    uniqueIndex("staff_duties_one_active").on(t.tenantId, t.staffId, t.duty).where(sql`${t.endedAt} is null`),
+    check("staff_duties_duty_check", sql`${t.duty} in ('data_protection','it_admin')`),
+    check("staff_duties_end_check", sql`(${t.endedAt} is null) = (${t.endedBy} is null)`),
+  ],
+);
+
+// UX-3 Undangan: an invitation names the person, the roles and branches they will get
+// once they accept. The token is shown once to the inviter (delivery channel: owner
+// decision, see DEC-024); only its hash is stored.
+export const staffInvitations = pgTable(
+  "staff_invitations",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    email: text("email").notNull(),
+    displayName: text("display_name").notNull(),
+    roles: text("roles").array().notNull(),
+    branchIds: uuid("branch_ids").array().notNull(),
+    tokenHash: text("token_hash").notNull(),
+    invitedBy: uuid("invited_by").notNull(),
+    invitedAt: timestamp("invited_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    state: text("state", { enum: ["pending", "accepted", "cancelled", "expired"] }).notNull().default("pending"),
+    acceptedStaffId: uuid("accepted_staff_id"),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.invitedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.acceptedStaffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("staff_invitations_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("staff_invitations_token_hash_key").on(t.tokenHash),
+    uniqueIndex("staff_invitations_one_pending").on(t.tenantId, t.email).where(sql`${t.state} = 'pending'`),
+    check("staff_invitations_email_check", sql`${t.email} = lower(${t.email}) and ${t.email} ~ '^[^@[:space:]]+@[^@[:space:]]+\\.[a-z]{2,}$'`),
+    check("staff_invitations_name_check", sql`length(btrim(${t.displayName})) between 2 and 120`),
+    check("staff_invitations_roles_check", sql`cardinality(${t.roles}) >= 1 and ${t.roles} <@ array[${inList([...LEVEL2_ROLES, ...LEVEL3_ROLES])}]::text[]`),
+    check("staff_invitations_token_check", sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check("staff_invitations_state_check", sql`${t.state} in ('pending','accepted','cancelled','expired')`),
+    check("staff_invitations_close_check", sql`(${t.state} = 'pending') = (${t.closedAt} is null) and (${t.state} = 'accepted') = (${t.acceptedStaffId} is not null)`),
+    check("staff_invitations_expiry_check", sql`${t.expiresAt} > ${t.invitedAt}`),
+  ],
+);

@@ -97,3 +97,11 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.94rem;
 }
+.success {
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0 0 16px;
+  font-size: 0.94rem;
+  background: #e7f5ea;
+  color: #1e7a34;
+}

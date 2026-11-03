@@ -1,0 +1,216 @@
+{
+ "Staff & invitations": {
+  "owner": "full",
+  "admin_pusat": "limited",
+  "manager": "limited",
+  "facility_head": "limited"
+ },
+ "Catalog & branch prices": {
+  "owner": "full",
+  "admin_pusat": "limited",
+  "manager": "limited",
+  "facility_head": "limited",
+  "pharmacist": "limited"
+ },
+ "Patient identity": {
+  "owner": "full",
+  "admin_pusat": "limited",
+  "manager": "full",
+  "facility_head": "full",
+  "records_officer": "full",
+  "fo_cashier": "full",
+  "central_cs": "limited",
+  "bc": "limited",
+  "doctor": "full",
+  "nurse": "limited",
+  "therapist": "limited",
+  "pharmacist": "limited",
+  "finance": "limited",
+  "marketing": "limited"
+ },
+ "Booking & schedule": {
+  "owner": "limited",
+  "admin_pusat": "limited",
+  "manager": "full",
+  "fo_cashier": "full",
+  "central_cs": "full",
+  "bc": "limited",
+  "doctor": "limited",
+  "nurse": "limited",
+  "therapist": "limited"
+ },
+ "Staff schedules": {
+  "owner": "full",
+  "admin_pusat": "full",
+  "manager": "full"
+ },
+ "Intake / observasi kulit": {
+  "bc": "full",
+  "doctor": "full"
+ },
+ "Plan options & prices (no assessment, diagnosis, dose or rationale)": {
+  "fo_cashier": "limited",
+  "bc": "full",
+  "doctor": "full",
+  "nurse": "limited",
+  "therapist": "limited"
+ },
+ "Examination, plan, sign": {
+  "facility_head": "limited",
+  "doctor": "full"
+ },
+ "Clinical requests decide": {
+  "facility_head": "full",
+  "doctor": "full",
+  "nurse": "limited"
+ },
+ "Complaint tasks": {
+  "manager": "limited",
+  "facility_head": "full",
+  "fo_cashier": "limited",
+  "central_cs": "limited",
+  "bc": "limited",
+  "doctor": "full",
+  "nurse": "full",
+  "pharmacist": "full"
+ },
+ "Treatment checklist": {
+  "doctor": "full",
+  "nurse": "full",
+  "therapist": "full"
+ },
+ "Prescribe / dispense": {
+  "doctor": "limited",
+  "pharmacist": "full"
+ },
+ "Stock & purchasing": {
+  "owner": "limited",
+  "admin_pusat": "limited",
+  "manager": "full",
+  "nurse": "limited",
+  "therapist": "limited",
+  "pharmacist": "full",
+  "finance": "limited",
+  "purchasing": "full",
+  "auditor": "limited"
+ },
+ "Cashier & receipts": {
+  "owner": "limited",
+  "manager": "full",
+  "fo_cashier": "full",
+  "bc": "limited",
+  "finance": "limited",
+  "auditor": "limited"
+ },
+ "Cash refund approval": {
+  "owner": "full",
+  "manager": "limited"
+ },
+ "Write-off approval": {
+  "owner": "full",
+  "fo_cashier": "limited",
+  "finance": "limited"
+ },
+ "Late record correction approval": {
+  "facility_head": "full",
+  "records_officer": "full"
+ },
+ "Commission rules & batches": {
+  "owner": "full",
+  "manager": "limited",
+  "finance": "limited",
+  "auditor": "limited"
+ },
+ "Own commission & target": {
+  "manager": "limited",
+  "fo_cashier": "limited",
+  "central_cs": "limited",
+  "bc": "limited",
+  "doctor": "limited",
+  "nurse": "limited",
+  "therapist": "limited",
+  "pharmacist": "limited"
+ },
+ "WhatsApp inbox": {
+  "owner": "limited",
+  "manager": "full",
+  "fo_cashier": "full",
+  "central_cs": "full",
+  "bc": "full",
+  "marketing": "limited"
+ },
+ "Dashboards": {
+  "owner": "full",
+  "admin_pusat": "full",
+  "manager": "full",
+  "facility_head": "limited",
+  "fo_cashier": "limited",
+  "central_cs": "limited",
+  "bc": "limited",
+  "doctor": "limited",
+  "pharmacist": "limited",
+  "finance": "full",
+  "marketing": "limited",
+  "purchasing": "limited",
+  "auditor": "limited"
+ },
+ "Ledger, periods, exports": {
+  "owner": "limited",
+  "finance": "full",
+  "auditor": "limited"
+ },
+ "Audit log, data requests": {
+  "owner": "full",
+  "admin_pusat": "duty",
+  "facility_head": "full",
+  "records_officer": "limited",
+  "auditor": "limited"
+ },
+ "Tenant data export": {
+  "owner": "full"
+ },
+ "SATUSEHAT monitor": {
+  "owner": "full",
+  "admin_pusat": "limited",
+  "manager": "full",
+  "facility_head": "full",
+  "records_officer": "limited",
+  "doctor": "limited"
+ },
+ "Public site & promos": {
+  "owner": "full",
+  "admin_pusat": "full",
+  "marketing": "full",
+  "auditor": "limited"
+ },
+ "Templates & reminder rules": {
+  "owner": "full",
+  "admin_pusat": "full",
+  "manager": "limited",
+  "facility_head": "full",
+  "central_cs": "limited",
+  "marketing": "limited"
+ },
+ "Manual discount above limit (approve)": {
+  "owner": "full",
+  "manager": "full"
+ },
+ "Server-fee invoices (view, pay)": {
+  "owner": "full",
+  "admin_pusat": "limited",
+  "finance": "full",
+  "auditor": "limited"
+ },
+ "Vendor access (Akses Vendor)": {
+  "owner": "full",
+  "admin_pusat": "limited",
+  "auditor": "limited"
+ },
+ "Compliance register (PR-97)": {
+  "owner": "full",
+  "admin_pusat": "limited",
+  "facility_head": "limited",
+  "finance": "limited",
+  "auditor": "limited"
+ }
+}

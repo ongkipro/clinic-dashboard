@@ -49,11 +49,20 @@ const roleOrder = (r: Role) => ROLES.indexOf(r);
 // The context for this request: the stored selection where it is still valid, else the
 // defaults (first clinic in membership order; its first role in 07 order; a branch role's
 // only branch, or its first branch; tenant-wide roles on "Semua Cabang").
-export async function activeContext(app: pg.Pool, accountId: string, sel: Selection): Promise<ActiveContext | null> {
+// With a session id, memberships revoked for that session (IAM-16, PR-91) are left out:
+// the request continues in another clinic, or has no context at all.
+export async function activeContext(app: pg.Pool, accountId: string, sel: Selection, sessionId?: string): Promise<ActiveContext | null> {
   const c = await app.connect();
   let memberships: MembershipRole[];
   try {
     memberships = await accountMemberships(c, accountId);
+    if (sessionId) {
+      const ids = [...new Set(memberships.map((m) => m.membershipId))];
+      const revoked = new Set(
+        (await c.query<{ id: string }>(`select id from unnest($1::uuid[]) id where staff_session_revoked(id, $2)`, [ids, sessionId])).rows.map((r) => r.id),
+      );
+      memberships = memberships.filter((m) => !revoked.has(m.membershipId));
+    }
   } finally {
     c.release();
   }

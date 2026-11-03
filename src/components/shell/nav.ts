@@ -126,7 +126,7 @@ export const NAV: readonly NavGroup[] = [
   ]),
   group("staf", "Staf", [
     ["data-staf", "Data Staf", "/staf", "O AP FH M"],
-    ["undangan", "Undangan", "/staf/undangan", "O AP"],
+    ["undangan", "Undangan", "/staf?segmen=undangan", "O AP"],
     ["aturan-komisi", "Aturan Komisi", "/komisi/aturan", "O F M"],
     ["rekap-komisi", "Rekap Komisi & Batch", "/komisi", "O F"],
     ["target-staf", "Target & Scorecard Staf", "/staf/target", "O M"],
