@@ -161,3 +161,4 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 ## Next verified action
 
 Wave 5: T-015 ✓ (`5d30801`), T-017 ✓ (`47dffe4`), T-019 ✓ (`c53afdd`), T-020 ✓ (`25eb18a`); Wave 5 gate PASS (622 tests, image migrate, restore drill); pushed `0672220..591a27b`, GitHub run 41597523073 green. Next: Wave 6 — T-021 (vendor console host), then T-022.
+Wave 6: T-021 ✓ (`29c183c`), HYG-002 ✓ (`2d720ff`, owner decisions DEC-031), T-022 ✓ (`5a1031e`); Wave 6 gate PASS (667 tests, image migrate, restore drill); pushed `94f656d..f1a0e58`, GitHub run 41640186904 green. Next: T-023 (tenant provisioning, plan `docs/tasks/T-023.md`) — waiting for the owner's answer on the first-owner invitation (maker-checker or direct).
