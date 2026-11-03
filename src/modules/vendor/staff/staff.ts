@@ -63,7 +63,7 @@ export async function setVendorIpAllowlist(op: pg.ClientBase, c: VendorCaller, c
 }
 
 export type RequestPayload =
-  | { kind: "suspension" | "exit" }
+  | { kind: "suspension" | "exit" | "reactivation" | "closure" }
   | { kind: "server_fee_change"; amountRupiah: number; effectiveMonth: string }
   | { kind: "invoice_waiver"; invoiceId: string; amountRupiah: number }
   | { kind: "clinical_grant"; staffId: string }
@@ -71,7 +71,7 @@ export type RequestPayload =
 
 function payloadJson(p: RequestPayload): Record<string, unknown> {
   switch (p.kind) {
-    case "suspension": case "exit": return {};
+    case "suspension": case "exit": case "reactivation": case "closure": return {};
     case "server_fee_change": return { amount_rupiah: p.amountRupiah, effective_month: p.effectiveMonth };
     case "invoice_waiver": return { invoice_id: p.invoiceId, amount_rupiah: p.amountRupiah };
     case "clinical_grant": return { staff_id: p.staffId };
@@ -109,7 +109,7 @@ export async function consumeVendorRequest(
   }
 }
 
-const CONSUME_REFUSALS = new Set(["not_found", "not_approved", "already_consumed", "approval_expired", "effective_month_passed", "approver_inactive"]);
+export const CONSUME_REFUSALS = new Set(["not_found", "not_approved", "already_consumed", "approval_expired", "effective_month_passed", "approver_inactive"]);
 
 // The one way a worker applies an approved request: consume and the effect in one
 // transaction on a clinic_executor pool; on a consumption refusal the transaction is rolled

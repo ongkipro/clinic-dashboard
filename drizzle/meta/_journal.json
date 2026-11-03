@@ -260,6 +260,20 @@
       "when": 1793708528385,
       "tag": "0036_owner_decisions",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1793709370705,
+      "tag": "0037_tenant_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1793709371520,
+      "tag": "0038_tenant_lifecycle_rules",
+      "breakpoints": true
     }
   ]
 }

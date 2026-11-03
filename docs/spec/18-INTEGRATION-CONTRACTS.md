@@ -226,5 +226,6 @@ Posting eligibility, companion suppression and reversal ownership are defined ex
 | ERR_WA_BUDGET_REACHED | 422 | Batas kirim harian tercapai. Pesan dijadwalkan ulang. |
 | ERR_PERIOD_LOCKED | 422 | Periode akuntansi sudah dikunci. |
 | ERR_SETTING_NOT_ALLOWED | 422 | Pengaturan ini tidak tersedia. |
+| ERR_TENANT_SUSPENDED | 422 | Klinik sedang ditangguhkan. Hubungi vendor. |
 | ERR_OTP_INVALID | 422 | Kode OTP salah atau kedaluwarsa. |
 | ERR_RATE_LIMITED | 429 | Terlalu banyak percobaan. Coba lagi sebentar. |

@@ -187,7 +187,8 @@ export const vendorIpAllowlist = pgTable(
 // Maker-checker requests (PR-57): clinical-data grant, suspension, exit, server-fee change,
 // invoice waiver, and the dual vendor/clinic identity. The requester never decides; the
 // platform owner approves; a dual identity also needs that clinic owner's approval.
-export const VENDOR_REQUEST_KINDS = ["clinical_grant", "suspension", "exit", "server_fee_change", "invoice_waiver", "dual_identity"] as const;
+// reactivation (suspended → live) and closure (exit → closed) arrive with T-022 (PR-56).
+export const VENDOR_REQUEST_KINDS = ["clinical_grant", "suspension", "exit", "server_fee_change", "invoice_waiver", "dual_identity", "reactivation", "closure"] as const;
 
 export const vendorRequests = pgTable(
   "vendor_requests",
@@ -219,7 +220,7 @@ export const vendorRequests = pgTable(
     consumedAt: timestamp("consumed_at", { withTimezone: true }),
   },
   (t) => [
-    check("vendor_requests_kind_check", sql`${t.kind} in ('clinical_grant','suspension','exit','server_fee_change','invoice_waiver','dual_identity')`),
+    check("vendor_requests_kind_check", sql`${t.kind} in ('clinical_grant','suspension','exit','server_fee_change','invoice_waiver','dual_identity','reactivation','closure')`),
     check("vendor_requests_state_check", sql`${t.state} in ('pending','approved','rejected','cancelled')`),
     check("vendor_requests_reason_check", sql`length(btrim(${t.reason})) between 10 and 500`),
     check("vendor_requests_payload_check", sql`jsonb_typeof(${t.payload}) = 'object'`),
@@ -259,5 +260,33 @@ export const vendorActions = pgTable(
     check("vendor_actions_outcome_check", sql`${t.outcome} in ('success','denied')`),
     check("vendor_actions_reason_check", sql`${t.reasonCode} is null or ${t.reasonCode} ~ '^[a-z][a-z_]{1,60}$'`),
     check("vendor_actions_detail_check", sql`${t.detail} is null or ${t.detail} ~ '^[0-9A-Fa-f:./]{2,64}$'`),
+  ],
+);
+
+// T-022 (PR-56, TEN-12, DATA-48): every lifecycle transition of a tenant, append-only.
+// Platform table (no clinic_app access). A transition needing maker-checker names the
+// consumed vendor request; the actor is the executing service (vendor_request_consume) or,
+// for onboarding steps, the vendor staff member.
+export const tenantLifecycleEvents = pgTable(
+  "tenant_lifecycle_events",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    seq: integer("seq").generatedAlwaysAsIdentity(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenantsRegistry.id, { onDelete: "restrict" }),
+    fromState: text("from_state", { enum: tenantLifecycleStates }).notNull(),
+    toState: text("to_state", { enum: tenantLifecycleStates }).notNull(),
+    reason: text("reason").notNull(),
+    actorKind: text("actor_kind", { enum: ["service", "vendor_staff"] }).notNull(),
+    actor: text("actor").notNull(),
+    vendorRequestId: uuid("vendor_request_id").references(() => vendorRequests.id, { onDelete: "restrict" }),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("tenant_lifecycle_events_request_key").on(t.vendorRequestId),
+    check("tenant_lifecycle_events_states_check", sql`${t.fromState} in ('provisioning','onboarding','live','suspended','exit','closed') and ${t.toState} in ('provisioning','onboarding','live','suspended','exit','closed') and ${t.fromState} <> ${t.toState}`),
+    check("tenant_lifecycle_events_reason_check", sql`length(btrim(${t.reason})) between 10 and 500`),
+    check("tenant_lifecycle_events_actor_check", sql`${t.actorKind} in ('service','vendor_staff') and ${t.actor} ~ '^[a-z0-9][a-z0-9_.-]{1,80}$'`),
   ],
 );
