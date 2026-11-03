@@ -16,7 +16,13 @@ export const APPROVAL_TYPES: Record<string, { label: string; approverRoles: read
   commission_batch: { label: "Batch komisi", approverRoles: ["owner"] },
   stock_adjustment: { label: "Penyesuaian stok", approverRoles: ["owner", "manager"] },
   disposal: { label: "Pemusnahan", approverRoles: ["owner", "manager"] },
+  setting_change_owner: { label: "Perubahan pengaturan", approverRoles: ["owner"] },
+  setting_change_fh: { label: "Perubahan pengaturan klinis", approverRoles: ["facility_head"] },
 };
+
+// Approval types whose decision also applies a waiting draft (settings, T-017): the
+// detail decides them through their module so both happen in one transaction.
+export const SETTING_DRAFT_TYPES = new Set(["setting_change_owner", "setting_change_fh"]);
 
 // Integer rupiah as shown on screen (Rp1.250.000).
 export const rupiah = (n: number) => `Rp${new Intl.NumberFormat("id-ID").format(n)}`;

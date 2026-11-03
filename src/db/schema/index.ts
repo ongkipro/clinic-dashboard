@@ -8,3 +8,4 @@ export * from "../../modules/idempotency/schema";
 export * from "../../modules/events/schema";
 export * from "../../modules/approvals/schema";
 export * from "../../modules/notifications/schema";
+export * from "../../modules/settings/schema";

@@ -7,6 +7,8 @@ import { redirect } from "next/navigation";
 import { withTenantContext } from "../../../db/rls/context";
 import { CommandError } from "../../../lib/command";
 import { decideApproval } from "../../../modules/approvals/approvals";
+import { SETTING_DRAFT_TYPES } from "../../../modules/approvals/inbox";
+import { decideDraft } from "../../../modules/settings/settings";
 import { appPool, requestContext } from "../../../modules/org/context/store";
 
 export type DecideState = { error?: string; ok?: string; reason?: string };
@@ -32,7 +34,13 @@ export async function decideAction(_p: DecideState, f: FormData): Promise<Decide
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind === "blocked") return { error: MESSAGES.ERR_FORBIDDEN, reason };
   try {
-    await withTenantContext(await appPool(), rc.active.context, (db) => decideApproval(db, id, decision === "approve", reason || undefined));
+    await withTenantContext(await appPool(), rc.active.context, async (db) => {
+      // A settings draft is decided through the settings module (the draft applies with
+      // the decision); every other type through the approvals engine.
+      const type = (await db.query<{ type: string }>(`select type from approvals where id = $1`, [id])).rows[0]?.type;
+      const decideFn = type && SETTING_DRAFT_TYPES.has(type) ? decideDraft : decideApproval;
+      await decideFn(db, id, decision === "approve", reason || undefined);
+    });
   } catch (e) {
     if (e instanceof CommandError) {
       if (!MESSAGES[e.code]) console.error("persetujuan: unmapped decision error", { code: e.code });

@@ -125,7 +125,7 @@ describe("Persetujuan inbox rules (UX-26)", () => {
     expect(await code(as(ownA, (db) => decideApproval(db, id, true)))).toBe("ERR_NOT_FOUND");
   });
 
-  it("roles that decide none of today's types have an empty inbox (facility head, records officer, others)", async () => {
+  it("roles with no waiting request of their types have an empty inbox (facility head, records officer, others)", async () => {
     const ph = await person(A, ["pharmacist"], A.b1);
     await as(ph, (db) => requestApproval(db, { type: "stock_adjustment", subjectKind: "stock_count", subjectId: subject() }));
     for (const role of ["facility_head", "records_officer", "nurse", "pharmacist"] as const) {
@@ -174,6 +174,7 @@ describe("Persetujuan inbox rules (UX-26)", () => {
     );
     expect(rupiah(1_250_000)).toBe("Rp1.250.000");
     expect(decidableTypes("manager").sort()).toEqual(["attribution_correction", "disposal", "stock_adjustment"]);
-    expect(decidableTypes("facility_head")).toEqual([]);
+    expect(decidableTypes("facility_head")).toEqual(["setting_change_fh"]); // SET-48 drafts (T-017)
+    expect(decidableTypes("records_officer")).toEqual([]);
   });
 });
