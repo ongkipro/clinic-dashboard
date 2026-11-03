@@ -55,7 +55,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-021 Vendor console host, cookies, CSP | PASS; R3 review APPROVE (claude-code, two rounds) | `29c183c` |
 | HYG-002 Owner decisions applied (DEC-031) | PASS; R3 review APPROVE (claude rounds 1–2, codex round 3 — claude weekly limit reached) | `2d720ff` |
 | T-022 Tenant lifecycle and suspension effects | PASS; R3 review APPROVE (codex, two rounds) | `5a1031e` |
-| T-023 Tenant provisioning, first Owner, Profil & Keamanan (DEC-033) | PASS; R3 review APPROVE (codex, three rounds) | pending |
+| T-023 Tenant provisioning, first Owner, Profil & Keamanan (DEC-033) | PASS; R3 review APPROVE (codex, three rounds) | `8c3a89e` |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
@@ -168,4 +168,4 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 ## Next verified action
 
 Wave 5: T-015 ✓ (`5d30801`), T-017 ✓ (`47dffe4`), T-019 ✓ (`c53afdd`), T-020 ✓ (`25eb18a`); Wave 5 gate PASS (622 tests, image migrate, restore drill); pushed `0672220..591a27b`, GitHub run 41597523073 green. Next: Wave 6 — T-021 (vendor console host), then T-022.
-Wave 6: T-021 ✓ (`29c183c`), HYG-002 ✓ (`2d720ff`, owner decisions DEC-031), T-022 ✓ (`5a1031e`); Wave 6 gate PASS (667 tests, image migrate, restore drill); pushed `94f656d..f1a0e58`, GitHub run 41640186904 green. T-023 ✓ (DEC-033: first Owner from the vendor console with maker-checker; Profil & Keamanan). Next: T-024 (onboarding grant, TEN-13).
+Wave 6: T-021 ✓ (`29c183c`), HYG-002 ✓ (`2d720ff`, owner decisions DEC-031), T-022 ✓ (`5a1031e`); Wave 6 gate PASS (667 tests, image migrate, restore drill); pushed `94f656d..f1a0e58`, GitHub run 41640186904 green. T-023 ✓ (`8c3a89e`, DEC-033: first Owner from the vendor console with maker-checker; Profil & Keamanan). Next: T-024 (onboarding grant, TEN-13).
