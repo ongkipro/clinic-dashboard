@@ -362,6 +362,10 @@ describe("functions (TEN-16)", () => {
   // only those on this allow-list; each entry has its own tests (tests/org).
   const ALLOWED_DEFINER_FUNCTIONS: string[] = [
     "account_memberships(uuid)",
+    "approval_cancel(uuid)",
+    "approval_decide(uuid,boolean,text)",
+    "approval_owner_self(text,text,uuid,text,uuid,bigint)",
+    "approval_request(text,text,uuid,text,uuid,bigint)",
     "audit_append(text,text,uuid,text,text,text,uuid)",
     "audit_verify(uuid)",
     "events_claim(text,text,integer,integer)",

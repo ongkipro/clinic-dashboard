@@ -148,6 +148,20 @@
       "when": 1793662208968,
       "tag": "0020_domain_events_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793666752955,
+      "tag": "0021_approvals",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793666753575,
+      "tag": "0022_approvals_rules",
+      "breakpoints": true
     }
   ]
 }
