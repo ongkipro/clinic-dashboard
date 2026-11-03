@@ -305,6 +305,8 @@ describe("history and privileges", () => {
     expect(fns).toEqual([
       "vendor_console_ip_allowed(text)",
       "vendor_console_me(text, text)",
+      "vendor_console_onboarding_access(text, text, uuid, text)",
+      "vendor_console_onboarding_invite(text, text, uuid, text, text, text[], uuid[])",
       "vendor_console_owner_invite(text, text, uuid, text, text)",
       "vendor_console_owner_invite_approve(text, text, uuid, text)",
       "vendor_console_owner_invite_cancel(text, text, uuid)",

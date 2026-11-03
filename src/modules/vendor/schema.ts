@@ -368,3 +368,59 @@ export const vendorStaffInvitations = pgTable(
     check("vendor_staff_invitations_close_check", sql`(${t.state} = 'pending') = (${t.closedAt} is null) and (${t.state} = 'accepted') = (${t.acceptedStaff} is not null)`),
   ],
 );
+
+// Onboarding grant (T-024, PR-58, TEN-13): one per tenant, created when the tenant enters
+// onboarding, active for 30 days (renewable once by the clinic Owner) while the tenant is
+// in onboarding; ended at go-live or when the tenant leaves onboarding. Platform table.
+export const onboardingGrants = pgTable(
+  "onboarding_grants",
+  {
+    tenantId: uuid("tenant_id")
+      .primaryKey()
+      .references(() => tenantsRegistry.id, { onDelete: "restrict" }),
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    renewedAt: timestamp("renewed_at", { withTimezone: true }),
+    renewedByStaff: uuid("renewed_by_staff"),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    endReason: text("end_reason", { enum: ["go_live", "left_onboarding"] }),
+  },
+  (t) => [
+    check("onboarding_grants_expiry_check", sql`${t.expiresAt} > ${t.grantedAt}`),
+    check("onboarding_grants_renew_check", sql`(${t.renewedAt} is null) = (${t.renewedByStaff} is null)`),
+    check("onboarding_grants_end_check", sql`(${t.endedAt} is null) = (${t.endReason} is null) and (${t.endReason} is null or ${t.endReason} in ('go_live','left_onboarding'))`),
+  ],
+);
+
+// Staff invitations prepared by onboarding staff under the grant: drafts until the clinic
+// Owner confirms each invitee and role set (TEN-13). Confirming creates a normal invitation
+// from the Owner (staff_invite). Level 3 roles only; never a vendor account's email.
+export const onboardingInvitationDrafts = pgTable(
+  "onboarding_invitation_drafts",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenantsRegistry.id, { onDelete: "restrict" }),
+    email: text("email").notNull(),
+    displayName: text("display_name").notNull(),
+    roles: text("roles").array().notNull(),
+    branchIds: uuid("branch_ids").array().notNull(),
+    draftedBy: uuid("drafted_by")
+      .notNull()
+      .references(() => vendorStaff.id, { onDelete: "restrict" }),
+    draftedAt: timestamp("drafted_at", { withTimezone: true }).notNull().defaultNow(),
+    state: text("state", { enum: ["draft", "confirmed", "declined"] }).notNull().default("draft"),
+    decidedByStaff: uuid("decided_by_staff"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    invitationId: uuid("invitation_id"),
+  },
+  (t) => [
+    unique("onboarding_invitation_drafts_tenant_id_id_key").on(t.tenantId, t.id),
+    check("onboarding_invitation_drafts_state_check", sql`${t.state} in ('draft','confirmed','declined')`),
+    check("onboarding_invitation_drafts_email_check", sql`${t.email} = lower(${t.email}) and ${t.email} ~ '^[^@[:space:]]+@[^@[:space:]]+\\.[a-z]{2,}$' and length(${t.email}) <= 254`),
+    check("onboarding_invitation_drafts_name_check", sql`length(btrim(${t.displayName})) between 2 and 120`),
+    check("onboarding_invitation_drafts_roles_check", sql`cardinality(${t.roles}) >= 1 and ${t.roles} <@ array['manager','fo_cashier','bc','doctor','nurse','therapist','pharmacist','central_cs','marketing','purchasing']::text[]`),
+    check("onboarding_invitation_drafts_decided_check", sql`(${t.state} = 'draft') = (${t.decidedAt} is null) and (${t.state} = 'draft') = (${t.decidedByStaff} is null) and (${t.state} = 'confirmed') = (${t.invitationId} is not null)`),
+  ],
+);

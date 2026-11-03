@@ -302,6 +302,20 @@
       "when": 1793718880189,
       "tag": "0042_vendor_team_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1793721065421,
+      "tag": "0043_onboarding_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1793721066546,
+      "tag": "0044_onboarding_grant_rules",
+      "breakpoints": true
     }
   ]
 }

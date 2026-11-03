@@ -64,6 +64,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Research evidence: captured third-party bundles, never linted.
     "docs/research/**",
+    // Local agent scratch (git-excluded on the device; never in CI).
+    ".pi/**",
   ]),
 ]);
 
