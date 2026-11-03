@@ -51,7 +51,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-015 Persetujuan inbox (UX-26) | PASS; R2 review APPROVE (claude-code, three rounds) | `5d30801` |
 | T-017 Settings registry and Pengaturan | PASS; R3 review APPROVE (claude-code, three rounds, split in database / registry+UI / tests) | `47dffe4` |
 | T-019 Compliance register (Kepatuhan) | PASS; R3 review APPROVE (claude-code, two rounds, database / UI+tests) | `c53afdd` |
-| T-020 Vendor staff, roles and maker-checker | PASS; R4 reviewed (claude APPROVE round 4, codex APPROVE round 7) | (pending) |
+| T-020 Vendor staff, roles and maker-checker | PASS; R4 reviewed (claude APPROVE round 4, codex APPROVE round 7) | `25eb18a` |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
@@ -144,4 +144,4 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Next verified action
 
-Wave 5: T-015 ✓ (`5d30801`), T-017 ✓ (`47dffe4`), T-019 ✓ (`c53afdd`), T-020 ✓ (commit pending); then the Wave 5 gate.
+Wave 5: T-015 ✓ (`5d30801`), T-017 ✓ (`47dffe4`), T-019 ✓ (`c53afdd`), T-020 ✓ (`25eb18a`); then the Wave 5 gate.
