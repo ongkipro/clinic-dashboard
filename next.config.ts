@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   // Docker image runs the traced standalone server (DEL-4).
   output: "standalone",
   cacheComponents: true,
+  experimental: {
+    // PR-97 evidence files are up to 5 MB (multipart overhead included); every action
+    // still validates its own input sizes.
+    serverActions: { bodySizeLimit: "6mb" },
+  },
   partialPrefetching: true,
   turbopack: {
     rules: {

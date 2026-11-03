@@ -27,7 +27,8 @@
     "test:approvals": "vitest run tests/approvals",
     "test:notifications": "vitest run tests/notifications",
     "test:access": "vitest run tests/org/access.test.ts",
-    "test:settings": "vitest run tests/settings"
+    "test:settings": "vitest run tests/settings",
+    "test:compliance": "vitest run tests/compliance"
   },
   "dependencies": {
     "better-auth": "1.7.15",

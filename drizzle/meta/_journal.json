@@ -204,6 +204,20 @@
       "when": 1793680537290,
       "tag": "0028_settings_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793683624470,
+      "tag": "0029_compliance",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1793683625219,
+      "tag": "0030_compliance_rules",
+      "breakpoints": true
     }
   ]
 }
