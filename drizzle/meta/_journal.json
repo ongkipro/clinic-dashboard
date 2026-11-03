@@ -218,6 +218,20 @@
       "when": 1793683625219,
       "tag": "0030_compliance_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793689783262,
+      "tag": "0031_vendor_staff",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793689783992,
+      "tag": "0032_vendor_staff_rules",
+      "breakpoints": true
     }
   ]
 }

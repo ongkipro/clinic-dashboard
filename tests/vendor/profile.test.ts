@@ -54,6 +54,13 @@ beforeAll(async () => {
   op = await opPool.connect();
   owner = { accountId: await account("owner"), vendorRole: "platform_owner" };
   support = { accountId: await account("support"), vendorRole: "support" };
+  // Go-live also needs two active vendor staff incl. a platform owner (IAM-10, T-020);
+  // these tests are about the profile blockers, so that part is satisfied here.
+  const po = await h.admin.query(`insert into vendor_staff (account_id, display_name) values ($1, 'Pemilik Platform') returning id`, [owner.accountId]);
+  await h.admin.query(`insert into vendor_staff_roles (staff_id, role) values ($1, 'platform_owner')`, [po.rows[0].id]);
+  const sp = await h.admin.query(`insert into vendor_staff (account_id, display_name) values ($1, 'Dukungan') returning id`, [support.accountId]);
+  await h.admin.query(`insert into vendor_staff_roles (staff_id, role) values ($1, 'vendor_finance')`, [sp.rows[0].id]);
+  await h.admin.query(`update auth_user set two_factor_enabled = true where id in ($1, $2)`, [support.accountId, owner.accountId]);
 });
 
 afterAll(async () => {
