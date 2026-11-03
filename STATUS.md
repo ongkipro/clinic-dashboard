@@ -53,7 +53,7 @@ Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), D
 
 ## Active work
 
-Wave plan (owner 2026-11-02): waves 1–9 of M0 run back to back, each task independently reviewed and fixed before the next; after each wave gate the owner allowed commit + push once GitHub CI is green. Wave 1: T-008 ✓, T-012 ✓, T-029 ✓, HYG-002 ✓; gate PASS locally and on GitHub CI (run 41522105266), pushed `d8329ce`. Wave 2: T-009 ✓, T-013 ✓, T-018 ✓; gate PASS locally and on GitHub CI (run 41541975246), pushed `10a307e`. Wave 3: T-010 ✓, T-014 ✓, T-030 ✓; gate PASS locally and on GitHub CI (run 41553096331), pushed `002564c`. Wave 4: T-011 ✓, T-016 ✓, T-031 ✓ (`d4b84ef`).
+Wave plan (owner 2026-11-02): waves 1–9 of M0 run back to back, each task independently reviewed and fixed before the next; after each wave gate the owner allowed commit + push once GitHub CI is green. Wave 1: T-008 ✓, T-012 ✓, T-029 ✓, HYG-002 ✓; gate PASS locally and on GitHub CI (run 41522105266), pushed `d8329ce`. Wave 2: T-009 ✓, T-013 ✓, T-018 ✓; gate PASS locally and on GitHub CI (run 41541975246), pushed `10a307e`. Wave 3: T-010 ✓, T-014 ✓, T-030 ✓; gate PASS locally and on GitHub CI (run 41553096331), pushed `002564c`. Wave 4: T-011 ✓, T-016 ✓, T-031 ✓; gate PASS locally and on GitHub CI (run 41568222746), pushed `0672220`. Wave 5: T-015, T-017, T-019, T-020.
 
 Carried forward (outside the owning task's Allowed Paths):
 - Copy `public/` into the runtime image once it exists; upgrade Next.js to 16.4.4 after `minimumReleaseAge`.
@@ -130,4 +130,4 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Next verified action
 
-Wave 4 gate (CI simulation), push, GitHub CI; then Wave 5: T-015, T-017, T-019, T-020.
+Wave 5: T-015, then T-017, T-019, T-020.
