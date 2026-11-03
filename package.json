@@ -24,7 +24,8 @@
     "test:ui": "RUN_UI=1 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/ui/shell.spec.ts",
     "test:vendor": "vitest run tests/vendor",
     "test:events": "vitest run tests/events",
-    "test:approvals": "vitest run tests/approvals"
+    "test:approvals": "vitest run tests/approvals",
+    "test:notifications": "vitest run tests/notifications"
   },
   "dependencies": {
     "better-auth": "1.7.15",

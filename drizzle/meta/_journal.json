@@ -162,6 +162,20 @@
       "when": 1793666753575,
       "tag": "0022_approvals_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793667742302,
+      "tag": "0023_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793667742957,
+      "tag": "0024_notifications_rules",
+      "breakpoints": true
     }
   ]
 }

@@ -245,3 +245,13 @@ describe("roles, scope and lifecycle", () => {
     }
   });
 });
+
+describe("regression: app_branch_allowed never fails open (T-016)", () => {
+  it("a manager context with an empty branch list cannot decide a branch request", async () => {
+    const fo = await person(T1, ["fo_cashier"], T1.b1);
+    const id = await as(fo, (db) => requestApproval(db, { type: "attribution_correction", subjectKind: "invoice_line", subjectId: subject() }));
+    const mgr = await person(T1, ["manager"], T1.b1);
+    const ctx = { tenantId: T1.tenantId, allowedBranchIds: [] as string[], activeBranchId: T1.b1, roles: ["manager"], staffId: mgr.staffId };
+    expect(await code(withTenantContext(app, ctx, (db) => decideApproval(db, id, true)))).toBe("ERR_NOT_FOUND");
+  });
+});
