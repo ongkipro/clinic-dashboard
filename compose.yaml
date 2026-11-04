@@ -3,6 +3,12 @@
 services:
   postgres:
     image: postgres:16.15-bookworm
+    # HYG-005: Docker's init is PID 1, not the postmaster. PostgreSQL treats any adopted orphan that
+    # exits with a status other than 0/1 as a crashed backend and crash-recovers the whole cluster;
+    # a timed-out healthcheck leaves exactly such an orphan (its pg_isready, exit 2). 60 s lets the
+    # server shut down cleanly.
+    init: true
+    stop_grace_period: 60s
     environment:
       POSTGRES_USER: clinic
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clinic_local_only}
@@ -12,7 +18,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U clinic -d clinic_dashboard"]
+      # Exec form (no shell); -t 2 ends the probe before Docker's 3 s timeout.
+      test: ["CMD", "pg_isready", "-U", "clinic", "-d", "clinic_dashboard", "-t", "2"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -23,6 +30,8 @@ services:
   postgres-backup:
     profiles: ["backup"]
     build: ops/pgbackrest
+    # The image's entrypoint is tini (HYG-005): no `init: true` here, it would nest two inits.
+    stop_grace_period: 60s
     environment:
       POSTGRES_USER: clinic
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clinic_local_only}

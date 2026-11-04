@@ -60,6 +60,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-024 Onboarding grant (PR-58, TEN-13) | PASS; R4 review APPROVE (codex seven rounds, claude two) | `4ea416a` |
 | T-025 Support sessions (PR-53, TEN-6, TEN-14, TEN-17, TEN-19) | PASS; R4 review APPROVE (codex and claude, five rounds) | `c735ceb` |
 | T-026 Support-session scope approval and read audit (PR-60, TEN-14) | PASS; R4 review APPROVE (codex and claude, four rounds) | `56d6084` |
+| HYG-005 PostgreSQL crash-restart from orphaned child processes (init/tini; local, CI, production image) | PASS locally (CI after push); R3 review APPROVE (GPT and claude, plan 3 rounds, implementation 5 rounds) | pending |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
@@ -68,6 +69,7 @@ Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), D
 Wave plan (owner 2026-11-02): waves 1–9 of M0 run back to back, each task independently reviewed and fixed before the next; after each wave gate the owner allowed commit + push once GitHub CI is green. Wave 1: T-008 ✓, T-012 ✓, T-029 ✓, HYG-002 ✓; gate PASS locally and on GitHub CI (run 41522105266), pushed `d8329ce`. Wave 2: T-009 ✓, T-013 ✓, T-018 ✓; gate PASS locally and on GitHub CI (run 41541975246), pushed `10a307e`. Wave 3: T-010 ✓, T-014 ✓, T-030 ✓; gate PASS locally and on GitHub CI (run 41553096331), pushed `002564c`. Wave 4: T-011 ✓, T-016 ✓, T-031 ✓; gate PASS locally and on GitHub CI (run 41568222746), pushed `0672220`. Wave 5: T-015 ✓, T-017 ✓, T-019 ✓, T-020 ✓.
 
 Carried forward (outside the owning task's Allowed Paths):
+- Deploy task (HYG-005, DEC-040 K5): on the deployed Coolify database container verify PID 1 is tini (the pgBackRest image provides it; a platform init on top is harmless), the healthcheck (if any) uses `pg_isready -t` below its timeout, the stop grace period lets the archiver push the last WAL (Docker's default 10 s can force crash recovery), and restores run through the image entrypoint or else postgres is not PID 1 (DR runbook note).
 - Copy `public/` into the runtime image once it exists; upgrade Next.js to 16.4.4 after `minimumReleaseAge`.
 - TEN-4 (tenant keys in caches; lint against tenant-less `"use cache"`, `cacheTag`/`cacheLife`, `unstable_cache`, cached `fetch`; dynamic `(app)`/vendor/API routes): owner Paduka Ongki (DEC-031 D9); the lint lands before the first cached page.
 - Isolation lint gaps to close later: env lookups such as `process.env.<TENANT>`, identity props `tenant.id`/`brand`/`host`, map lookups keyed by tenant, and a grep for tenant literals outside `src/` (scripts, seeds, config).
@@ -123,6 +125,12 @@ Carried forward (outside the owning task's Allowed Paths):
 None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, PR-18, PR-71, PR-83), G2 (H-02d, Q-08, Q-10, Q-11, Q-15, Q-17, R-01), G3 (Q-05, Q-06). See `docs/spec/02-PRD.md` §13 and `PLAN.md`.
 
 ## Verification evidence
+
+- 2026-11-04 HYG-005:
+  - **Cause, reproduced:** the local PostgreSQL ran as PID 1 in its container, so it reaped every orphan; a timed-out Docker healthcheck left its `pg_isready` orphaned (exit 2), and PostgreSQL crash-recovered the whole cluster — the two crash-restarts during today's full suites (08:49Z, 09:30Z) have this signature. Reproduced on a disposable instance (probe timeout → adopted `pg_isready` → `server process … exited with exit code 2` → `reinitializing`).
+  - **Fix:** `compose.yaml` `init: true`, exec-form `pg_isready -t 2`, 60 s stop grace; CI service `--init`; pgBackRest production image with `tini` as entrypoint (covers Coolify, the drill and restores). Deploy carry-forward recorded above.
+  - **Evidence:** orphan regression (baseline crashes, fixed does not), image tini check, probe-timeout reproduction, local rollout (same volume and data), restore drill with the rebuilt image, three full suites with no crash line (no probe timeout occurred in that window). Details: `docs/tasks/HYG-005.md`.
+  - **Local development database:** the configuration rollout kept the old database, which turned out to hold only 47 of 48 migrations (0045/0046 had been applied from the first T-025 draft and edited before the commit, so the migrator refused with a drift error). The owner then authorized rebuilding it (option A, empty database, backup kept): it now holds 48/48 migrations with hashes equal to the repository files and the T-026 functions and indexes; each of the five application group roles (app, auth, vendor, operator, executor) was checked for its allowed and refused access, and logins of app, auth, vendor and operator pass the app's startup check (executor connects; workers use no startup check) (`docs/tasks/HYG-005.md`, "Local development database rebuilt").
 
 - 2026-11-04 T-026 recovery after a power outage:
   - **What happened:** the power cut hit while the T-026 commit was being written. The git object for that commit was left empty and the repository was briefly corrupted.

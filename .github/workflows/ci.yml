@@ -30,8 +30,11 @@ jobs:
           POSTGRES_DB: clinic_dashboard
         ports:
           - 5432:5432
+        # --init (HYG-005): the postmaster must not be PID 1, or an orphaned health probe that exits 2
+        # makes PostgreSQL restart the whole cluster mid-suite. -t 2 ends the probe before the 3 s timeout.
         options: >-
-          --health-cmd "pg_isready -U clinic -d clinic_dashboard"
+          --init
+          --health-cmd "pg_isready -U clinic -d clinic_dashboard -t 2"
           --health-interval 2s --health-timeout 3s --health-retries 30
     env:
       NEXT_TELEMETRY_DISABLED: "1"
