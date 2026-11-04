@@ -60,7 +60,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-024 Onboarding grant (PR-58, TEN-13) | PASS; R4 review APPROVE (codex seven rounds, claude two) | `4ea416a` |
 | T-025 Support sessions (PR-53, TEN-6, TEN-14, TEN-17, TEN-19) | PASS; R4 review APPROVE (codex and claude, five rounds) | `c735ceb` |
 | T-026 Support-session scope approval and read audit (PR-60, TEN-14) | PASS; R4 review APPROVE (codex and claude, four rounds) | `56d6084` |
-| HYG-005 PostgreSQL crash-restart from orphaned child processes (init/tini; local, CI, production image) | PASS locally (CI after push); R3 review APPROVE (GPT and claude, plan 3 rounds, implementation 5 rounds) | pending |
+| HYG-005 PostgreSQL crash-restart from orphaned child processes (init/tini; local, CI, production image) | PASS locally (CI after push); R3 review APPROVE (GPT and claude, plan 3 rounds, implementation 5 rounds) | `baae0c8` |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
