@@ -75,7 +75,7 @@ const read = (tok: string, sessionId: string, sql: string) =>
   withSupportSession(consoleDb, opDb, as(tok), sessionId, async (db) => (await db.query(sql)).rows);
 
 let PO: string; let SUP: string; let SUP2: string; let ONB: string;
-let supTok: string; let sup2Tok: string; let poTok: string; let onbTok: string;
+let supTok: string; let sup2Tok: string; let onbTok: string;
 
 beforeAll(async () => {
   h = await createHarness();
@@ -105,7 +105,7 @@ beforeAll(async () => {
   } finally {
     c.release();
   }
-  poTok = await session(PO); supTok = await session(SUP); sup2Tok = await session(SUP2); onbTok = await session(ONB);
+  supTok = await session(SUP); sup2Tok = await session(SUP2); onbTok = await session(ONB);
 });
 afterAll(async () => {
   await opDb?.end();

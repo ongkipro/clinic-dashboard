@@ -64,3 +64,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 ### Repository state changes
 
 - 2026-11-04: repository made **public** for free CI (DEC-037); gitleaks over all commits found no project secret.
+
+## 2026-11-04 — T-026 commit lost to a power outage, recovered
+
+- **What happened:** the power cut hit exactly while the T-026 commit was being written. The commit's git object was left empty and the repository was briefly corrupted; the ledger run had already finished PASS (`RUN-20261104T061556Z-361f478c`), so only the commit was lost.
+- **Repair (owner):** repository repaired to a clean `git fsck`; `main` reset to the last valid commit `aa27347`; the 14 T-026 files put back in the staging area; full snapshot kept at `/data/backups/recovery-20261104T1400/clinic-dashboard-full.tgz` (not restored). After the repair `git fsck --full` still reported the empty tree `4b825dc6…` missing (only `refs/pi-rewind/store`, written by `pi-rewind-hook`, referenced it); the owner rewrote that object in all four repositories and deleted the corrupted ref.
+- **Recovery:** the staged content, unchanged, became `56d6084` (T-026), then `2eb1d25` (status note). Its code equals the round-4-approved review material; the gates were re-run on the final surface in `RUN-20261104T071947Z-08502d65`: typecheck, lint (0 problems), docs:check, support-scope (13 tests), support, rls, vendor and the full suite PASS (executed through the ledger, exit 0); mutation gate 28/28 killed with the files equal to HEAD afterwards; each heavy suite started only with the one-minute load at most 4 and no browser or test suite of any project running.
+- **Lessons:**
+  - After a crash, verify every recorded hash with `git cat-file -t` before trusting it; one status update had recorded a hash that never existed.
+  - `git cat-file -t 4b825dc6…` answers `tree` even when the object is missing (git knows the empty tree built in); only `git fsck --full` shows it is absent from disk.
+  - Do not write into `.git` to repair objects inside a task: stop and report; the owner repairs or restores.
+  - Heavy suites (full suite, mutation gate) wait until the one-minute load is at most 4 and no browser or test suite of any project runs (`/data/tmp/t026-waitgate.sh`).

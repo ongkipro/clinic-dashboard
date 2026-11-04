@@ -124,8 +124,14 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Verification evidence
 
+- 2026-11-04 T-026 recovery after a power outage:
+  - **What happened:** the power cut hit while the T-026 commit was being written. The git object for that commit was left empty and the repository was briefly corrupted.
+  - **Repair (owner):** the repository was repaired to a clean state (`git fsck` without errors), `main` reset to the last valid commit `aa27347`, and the full T-026 change put back in the staging area (14 files). A full snapshot was kept at `/data/backups/recovery-20261104T1400/clinic-dashboard-full.tgz` (not restored). Later the owner rewrote the empty tree object `4b825dc6…` (missing after the repair, referenced only by `refs/pi-rewind/store`) in clinic-dashboard, bukalaris, geraiexpress and 99ribu, and deleted the corrupted `refs/pi-rewind/store`; `git fsck --full` is clean.
+  - **Recovered intact:** the staged content was committed unchanged as `56d6084` (parent `aa27347`), followed by the status note `2eb1d25`. Before committing, `drizzle/0047_support_scope_approval.sql` and `src/modules/vendor/support/scope.ts` were byte-identical to the copies the final mutation run used, and the committed code equals what codex and claude approved in round 4 (round-3 bundle plus the round-4 delta). A first attempt to record the hash wrote a non-existent hash (`fe0bd9a`) into this file; it was corrected before `2eb1d25`.
+  - **Re-verified on the final surface:** ledger run `RUN-20261104T071947Z-08502d65` (job verification, head `2eb1d25`): typecheck, lint (0 problems), docs:check, support-scope (13 tests), support, rls, vendor and the full suite PASS (executed through the ledger, exit 0); mutation gate 28/28 killed with the files equal to HEAD afterwards; each heavy suite started only with the one-minute load at most 4 and no browser or test suite of any project running. An earlier re-verification run (`RUN-20261104T071042Z-496044bc`) finished BLOCKED: its full suite was stopped because the host load was above 4 while another project's browser suite ran.
+
 - 2026-11-04 T-026:
-  - **Approval:** the acting Owner alone approves or rejects a pending (personal/clinical) session (`support_session_owner_decide`, under `staff_access`); TTL starts at approval; refused for another tenant, a non-pending session, a closed tenant, an inactive operator (approve) or the opener's own account (approve; dual identity may reject); every decision and refusal in the tenant chain, attributed to the Owner. An approved personal/clinical scope is never extended (DEC-039).
+  - **Approval:** the acting Owner alone approves or rejects a pending (personal/clinical) session (`support_session_owner_decide`, under `staff_access`); TTL starts at approval; refused for another tenant, a non-pending session, a closed tenant, an inactive operator (approve) or the opener's own account (approve; dual identity may reject); every decision and every refusal returned to the Owner in the tenant chain, attributed to the Owner (a caller who is not the acting Owner gets `ERR_FORBIDDEN`, rolled back, no chain row). An approved personal/clinical scope is never extended (DEC-039).
   - **Akses Vendor data (page T-028):** Owner and Admin Pusat see every session (operator, purpose, scope with classes, state, times, counts) and a paginated event log per session — access windows, refused binds, every record read with `row_found` (deleted rows and forged records stay listed). Indexes on `vendor_actions(object_id, action)` and `support_bind_tickets(session_id)`.
   - **Scenarios PR-60:** owner sees access and ends it; clinical/personal scope without approval stays pending, cannot bind, is audited; expired grant (day 31) denies the catalog.
   - **Evidence:** 13 tests in `tests/vendor/support-scope.test.ts`; 28 mutants killed; full suite 759 passing; codex and claude APPROVE (round 4).
@@ -196,12 +202,12 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ### Resume here
 
-**T-026 (R4): committed `56d6084` (review APPROVE codex + claude, round 4; ledger PASS). T-025 and T-026 are not pushed: push and CI watch need the owner's go-ahead.**
+**T-026 (R4): committed `56d6084` (review APPROVE codex + claude, round 4; ledger PASS), status note `2eb1d25`. The commit was lost to a power outage and recovered intact (see Verification evidence, 2026-11-04 T-026 recovery); re-verified in `RUN-20261104T071947Z-08502d65`. T-025 and T-026 stay local: no push until the owner says otherwise. T-027 not started (owner instruction).**
 
 **Next, in order (M0 focus, owner instruction 2026-11-04):**
 1. ~~T-025~~ done (push and CI watch pending owner approval).
 2. ~~T-026~~ done (push pending owner approval).
-3. **T-027:** onboarding checklist and go-live confirmation (R3, UI with browser evidence). It can run in parallel with T-026 under DEC-035, because T-026 has no migration unless needed.
+3. **T-027:** onboarding checklist and go-live confirmation (R3, UI with browser evidence). It adds a migration (`drizzle/**`), so it runs alone in its wave (DEC-035).
 4. **T-028:** Saya › Akses Vendor page (UI). Carry from T-026: label events ("Jendela akses dibuka" for `window`, refusal reasons incl. `unknown`, `row_found` false = "data tidak ditemukan"); keyset paging on `(at, kind, key)`; paginate the session list; decide Q1 (pending requests never expire) and Q2 (TOTP step-up for the approval).
 5. **T-032:** M0 exit review (R4), then the wave gate and push.
 
