@@ -59,7 +59,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | HYG-003 Vendor bootstrap command and minimal Tim Vendor (DEC-036) | PASS; R3 review APPROVE (codex, three rounds) | `5d9bcf2` |
 | T-024 Onboarding grant (PR-58, TEN-13) | PASS; R4 review APPROVE (codex seven rounds, claude two) | `4ea416a` |
 | T-025 Support sessions (PR-53, TEN-6, TEN-14, TEN-17, TEN-19) | PASS; R4 review APPROVE (codex and claude, five rounds) | `c735ceb` |
-| T-026 Support-session scope approval and read audit (PR-60, TEN-14) | PASS; R4 review APPROVE (codex and claude, four rounds) | `fe0bd9a` |
+| T-026 Support-session scope approval and read audit (PR-60, TEN-14) | PASS; R4 review APPROVE (codex and claude, four rounds) | `56d6084` |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
@@ -196,7 +196,7 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ### Resume here
 
-**T-026 (R4): committed `fe0bd9a` (review APPROVE codex + claude, round 4; ledger PASS). T-025 and T-026 are not pushed: push and CI watch need the owner's go-ahead.**
+**T-026 (R4): committed `56d6084` (review APPROVE codex + claude, round 4; ledger PASS). T-025 and T-026 are not pushed: push and CI watch need the owner's go-ahead.**
 
 **Next, in order (M0 focus, owner instruction 2026-11-04):**
 1. ~~T-025~~ done (push and CI watch pending owner approval).
