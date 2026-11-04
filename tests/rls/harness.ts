@@ -24,6 +24,9 @@ export type Harness = {
   close(): Promise<void>;
 };
 
+// A close slower than this is reported with its per-step timings (HYG-004).
+const SLOW_CLOSE_MS = 5_000;
+
 export async function createHarness(): Promise<Harness> {
   const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
   const dbName = `rls_${suffix}`;
@@ -131,14 +134,30 @@ export async function createHarness(): Promise<Harness> {
     },
     async close() {
       // Best effort per step so one failure never leaves the database or roles behind.
-      for (const c of clients) await c.end().catch(() => {});
-      for (const p of pools) await p.end().catch(() => {});
-      await admin.end().catch(() => {});
+      // Each step is timed; a close slower than SLOW_CLOSE_MS names its steps on stderr
+      // (HYG-004), so a hook timeout under a busy suite shows which step was slow.
+      const t0 = performance.now();
+      const steps: [string, number][] = [];
+      const step = async (name: string, fn: () => Promise<unknown>) => {
+        const s = performance.now();
+        try {
+          await fn();
+        } finally {
+          steps.push([name, Math.round(performance.now() - s)]);
+        }
+      };
+      await step("clients", async () => { for (const c of clients) await c.end().catch(() => {}); });
+      await step("pools", async () => { for (const p of pools) await p.end().catch(() => {}); });
+      await step("admin", () => admin.end().catch(() => {}));
       try {
-        await server.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`);
-        for (const r of roles) await server.query(`DROP ROLE IF EXISTS ${r}`).catch(() => {});
+        await step("drop_database", () => server.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`));
+        await step("drop_roles", async () => { for (const r of roles) await server.query(`DROP ROLE IF EXISTS ${r}`).catch(() => {}); });
       } finally {
         await server.end();
+        const total = Math.round(performance.now() - t0);
+        if (total >= SLOW_CLOSE_MS) {
+          console.error(`[harness] slow close of ${dbName}: ${total} ms (${steps.map(([n, ms]) => `${n} ${ms}`).join(", ")})`);
+        }
       }
     },
   };
