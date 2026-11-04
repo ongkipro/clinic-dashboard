@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, date, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, date, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { authUser } from "../../auth/schema";
 
 // Platform registry of every tenant (DATA-10, TEN-9, TEN-12). Policy kind: platform.
@@ -260,6 +260,8 @@ export const vendorActions = pgTable(
     check("vendor_actions_outcome_check", sql`${t.outcome} in ('success','denied')`),
     check("vendor_actions_reason_check", sql`${t.reasonCode} is null or ${t.reasonCode} ~ '^[a-z][a-z_]{1,60}$'`),
     check("vendor_actions_detail_check", sql`${t.detail} is null or ${t.detail} ~ '^[0-9A-Fa-f:./]{2,64}$'`),
+    // The Owner's access log reads refused binds by session (T-026); operators can grow this table.
+    index("vendor_actions_object_idx").on(t.objectId, t.action),
   ],
 );
 
@@ -517,7 +519,7 @@ export const supportBindTickets = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
   },
-  (t) => [unique("support_bind_tickets_txid_key").on(t.txid), check("support_bind_tickets_expiry_check", sql`${t.expiresAt} > ${t.issuedAt} and ${t.expiresAt} <= ${t.issuedAt} + interval '2 minutes'`)],
+  (t) => [unique("support_bind_tickets_txid_key").on(t.txid), index("support_bind_tickets_session_idx").on(t.sessionId), check("support_bind_tickets_expiry_check", sql`${t.expiresAt} > ${t.issuedAt} and ${t.expiresAt} <= ${t.issuedAt} + interval '2 minutes'`)],
 );
 
 // The records an operator's queries touched in a session (TEN-14): written by the operator RLS

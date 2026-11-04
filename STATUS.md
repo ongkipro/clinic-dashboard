@@ -59,6 +59,7 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | HYG-003 Vendor bootstrap command and minimal Tim Vendor (DEC-036) | PASS; R3 review APPROVE (codex, three rounds) | `5d9bcf2` |
 | T-024 Onboarding grant (PR-58, TEN-13) | PASS; R4 review APPROVE (codex seven rounds, claude two) | `4ea416a` |
 | T-025 Support sessions (PR-53, TEN-6, TEN-14, TEN-17, TEN-19) | PASS; R4 review APPROVE (codex and claude, five rounds) | `c735ceb` |
+| T-026 Support-session scope approval and read audit (PR-60, TEN-14) | PASS; R4 review APPROVE (codex and claude, four rounds) | `fe0bd9a` |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
@@ -122,6 +123,12 @@ Carried forward (outside the owning task's Allowed Paths):
 None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, PR-18, PR-71, PR-83), G2 (H-02d, Q-08, Q-10, Q-11, Q-15, Q-17, R-01), G3 (Q-05, Q-06). See `docs/spec/02-PRD.md` §13 and `PLAN.md`.
 
 ## Verification evidence
+
+- 2026-11-04 T-026:
+  - **Approval:** the acting Owner alone approves or rejects a pending (personal/clinical) session (`support_session_owner_decide`, under `staff_access`); TTL starts at approval; refused for another tenant, a non-pending session, a closed tenant, an inactive operator (approve) or the opener's own account (approve; dual identity may reject); every decision and refusal in the tenant chain, attributed to the Owner. An approved personal/clinical scope is never extended (DEC-039).
+  - **Akses Vendor data (page T-028):** Owner and Admin Pusat see every session (operator, purpose, scope with classes, state, times, counts) and a paginated event log per session — access windows, refused binds, every record read with `row_found` (deleted rows and forged records stay listed). Indexes on `vendor_actions(object_id, action)` and `support_bind_tickets(session_id)`.
+  - **Scenarios PR-60:** owner sees access and ends it; clinical/personal scope without approval stays pending, cannot bind, is audited; expired grant (day 31) denies the catalog.
+  - **Evidence:** 13 tests in `tests/vendor/support-scope.test.ts`; 28 mutants killed; full suite 759 passing; codex and claude APPROVE (round 4).
 
 - 2026-11-04 T-025:
   - **Sessions:** a vendor operator (support, onboarding, platform owner) opens a reasoned session (purpose 10–500, 5–120 min, one extension with a new reason) for declared tables; config-only scopes activate at once, personal/clinical scopes stay `pending_approval` (T-026). Opener, Owner, TTL and the expiry sweep (also for closed tenants) end it, audited in the tenant chain (PR-53 scenario).
@@ -189,13 +196,13 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ### Resume here
 
-**T-025 support sessions (R4): committed `c735ceb` (review APPROVE codex + claude, round 5; ledger PASS). Not pushed: push and CI watch need the owner's go-ahead.**
+**T-026 (R4): committed `fe0bd9a` (review APPROVE codex + claude, round 4; ledger PASS). T-025 and T-026 are not pushed: push and CI watch need the owner's go-ahead.**
 
 **Next, in order (M0 focus, owner instruction 2026-11-04):**
 1. ~~T-025~~ done (push and CI watch pending owner approval).
-2. **T-026:** the Owner approves personal or clinical scopes and clinical extensions, and the read listing for the Owner (R4, may add a migration per DEC-038). Carry from T-025: label `ticket_issued` as "access window opened"; join bind refusals by session id (`vendor_actions.tenant_id` is null for them); list only read records that match an existing row; test the extension rule for personal scopes.
+2. ~~T-026~~ done (push pending owner approval).
 3. **T-027:** onboarding checklist and go-live confirmation (R3, UI with browser evidence). It can run in parallel with T-026 under DEC-035, because T-026 has no migration unless needed.
-4. **T-028:** Saya › Akses Vendor page (UI).
+4. **T-028:** Saya › Akses Vendor page (UI). Carry from T-026: label events ("Jendela akses dibuka" for `window`, refusal reasons incl. `unknown`, `row_found` false = "data tidak ditemukan"); keyset paging on `(at, kind, key)`; paginate the session list; decide Q1 (pending requests never expire) and Q2 (TOTP step-up for the approval).
 5. **T-032:** M0 exit review (R4), then the wave gate and push.
 
 ### Working rules (owner instructions, standing)

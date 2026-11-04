@@ -33,11 +33,11 @@ Record only durable implementation changes, validation evidence, and gotchas tha
 - Executed: docs traceability PASS (131 tasks, 0 findings); isolated generator reproduction identical; static checks PASS for dependency order, UI contracts, migration risks and canonical schema permissions; project-check full VERIFIED (types/lint/build); dotuiux validation PASSED with direction-selection/composition warnings deferred to UI work; delivery-ledger VERIFIED READY.
 - No feature development, provider call, provisioning or deployment. T-001 remains next and unstarted.
 
-## 2026-11-02 → 2026-11-04 — M0 foundation built (T-001–T-025 except T-026–T-028, T-032; HYG-001–003)
+## 2026-11-02 → 2026-11-04 — M0 foundation built (T-001–T-026 except T-027–T-028, T-032; HYG-001–003)
 
 Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/tasks/`, decisions in `DECISIONS.md` (DEC-005–DEC-037), ledger runs in `.delivery/`. Pushed waves are green in GitHub Actions (latest wave 7a: run 41668902765).
 
-- Built: repository/CI/Docker, database core with RLS and scope map, isolation gates, platform basics (keys, hosts, backup drill), staff auth with TOTP and lockout, identity chain, audit chain, idempotency, events outbox, approvals and inbox, notifications, settings registry, compliance register, design tokens and templates, clinic shell and context switching, staff and access, vendor staff with maker-checker, vendor console host, tenant lifecycle, tenant provisioning with first-owner invitation, Profil & Keamanan, vendor bootstrap command and Tim Vendor, onboarding grant, support sessions.
+- Built: repository/CI/Docker, database core with RLS and scope map, isolation gates, platform basics (keys, hosts, backup drill), staff auth with TOTP and lockout, identity chain, audit chain, idempotency, events outbox, approvals and inbox, notifications, settings registry, compliance register, design tokens and templates, clinic shell and context switching, staff and access, vendor staff with maker-checker, vendor console host, tenant lifecycle, tenant provisioning with first-owner invitation, Profil & Keamanan, vendor bootstrap command and Tim Vendor, onboarding grant, support sessions with Owner approval and read audit.
 - Review practice: every R3/R4 task independently reviewed until APPROVE (codex; claude for R4, through 9Router when the claude CLI hit its weekly limit); key controls mutation-tested; UI tasks with browser evidence at 390/820/1180/1440 and 200% text.
 
 ### Gotchas worth keeping
@@ -56,6 +56,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Anything an RLS policy writes (read records) and anything logged inside the reader's transaction disappears on its ROLLBACK. For a durable trace, commit it from another connection first and bind it to the reader's `(pg_backend_pid(), txid_current())`; txids (with epoch) are never reused. Verify a caller-supplied pair against `pg_locks` (`transactionid`, granted, that pid) — T-025.
 - An RLS policy runs before non-leakproof user filters, LIMIT, joins and aggregates: a per-row side effect in a policy sees a superset of the returned rows — T-025.
 - Never write the tenant audit chain from a long-lived read transaction: `vendor_log` with a tenant takes the per-tenant audit lock until commit — T-025.
+- An audit listing must not filter on the current state of the audited object: a real read whose row was deleted later disappears. List everything and flag it (`row_found`) — T-026.
+- Paginate the whole answer, not one array of it: any part a third party can grow (refused attempts) is an amplification vector — T-026.
+- `audit_events.reason` is reserved for break-glass (CHECK); other decisions carry a reason code only — T-026.
+- bg_run commands start immediately: never read a file in a bg command that a parallel tool call is still writing (empty prompt) — T-026.
 
 ### Repository state changes
 

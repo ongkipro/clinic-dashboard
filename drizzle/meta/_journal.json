@@ -330,6 +330,13 @@
       "when": 1793733608319,
       "tag": "0046_support_session_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793772963658,
+      "tag": "0047_support_scope_approval",
+      "breakpoints": true
     }
   ]
 }
