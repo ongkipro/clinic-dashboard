@@ -243,6 +243,7 @@ async function browserRun() {
     }
   } catch (e) {
     report.error = String(e).split("\n").slice(0, 3).join(" ");
+    process.exitCode = 1; // HYG-010 C-01: a failed flow fails the runner (the report is kept)
   } finally {
     await browser.close();
   }

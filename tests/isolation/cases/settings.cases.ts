@@ -6,7 +6,7 @@ import { withTenantContext } from "../../../src/db/rls/context";
 import { CommandError } from "../../../src/lib/command";
 import { assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { cancelDraft, changeSetting, groupRows } from "../../../src/modules/settings/settings";
-import { defineCases, type IsolationEnv } from "../case";
+import { defineCases, expectLive, type IsolationEnv } from "../case";
 
 type Member = { acc: string };
 const members = new Map<string, Member>(); // `${tenantId}:${role}`
@@ -88,12 +88,22 @@ export default defineCases(
     marker: (env) => seeded.get(env.victim.tenantId)?.approvalId ?? "",
     async run(env) {
       const v = await victimSettings(env);
-      const body: Record<string, string> = {
+      // A fresh waiting draft in B for each run (the positive control withdraws its draft), so
+      // the negative run tries to withdraw a draft B itself still could (HYG-010 N-1).
+      const t = env.victim.tenantId;
+      const draftReason = `Usulan rahasia ulang ${crypto.randomUUID().slice(0, 8)}`;
+      const fresh = await as(env, t, "admin_pusat", (db) => changeSetting(db, { key: "SET-49", branchId: null, value: 30, reason: draftReason }));
+      env.victimSecret(draftReason);
+      env.victimSecret(fresh.approvalId!);
+      seeded.set(t, { ...v, approvalId: fresh.approvalId! });
+      await expectLive(env, "B's settings draft", `exists (select 1 from approvals where id = $1 and state = 'pending')`, [fresh.approvalId]);
+      const attempts = {
+        // A's owner changing B's branch value (B's branch id is not A's): refused.
         change: await refused(as(env, env.actor.tenantId, "owner", (db) => changeSetting(db, { key: "SET-13", branchId: env.victim.branchId, value: 1_000, reason: "Ubah cabang lain" }))),
         // B's own admin withdrawing its draft is the positive control (names the approval).
-        withdraw: await refused(as(env, env.actor.tenantId, "admin_pusat", (db) => cancelDraft(db, v.approvalId))),
+        withdraw: await refused(as(env, env.actor.tenantId, "admin_pusat", (db) => cancelDraft(db, fresh.approvalId!))),
       };
-      return body.withdraw === "done" ? { withdrew: v.approvalId } : body;
+      return { attempts, body: attempts.withdraw === "done" ? { withdrew: fresh.approvalId! } : attempts };
     },
   },
 );

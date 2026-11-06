@@ -118,6 +118,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Pass the rendered context from the page loader that read the form's data, never from the layout: a layout can outlive a switch.
   - `approval_request` keeps its own branch rule, so widening a caller's branch check does not widen drafts; test the refusal so it stays visible.
 
+- **HYG-010** (isolation gate):
+  - A negative case that only looks for the victim's secrets cannot see a cross-tenant write that succeeds silently; report every attempt's outcome and require a refusal.
+  - A refusal on already-consumed victim state proves nothing; seed it fresh for each run and assert it is live before the attempt (`expectLive`). Mutations that drop the fresh seed survived until the liveness check existed.
+  - A browser runner that catches its error must also set `process.exitCode`, or a failed flow exits 0.
+  - A positive control must require every attempt to succeed as the owning tenant; "at least one" let an attempt the owner could not make either (a duty to a cashier) pass as a refusal (review P1).
+  - A hole demonstration must undo every new guard on the path it exercises; one that stops at a new check proves nothing (rerun it).
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

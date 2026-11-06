@@ -7,7 +7,7 @@ import { CommandError } from "../../../src/lib/command";
 import { decideApproval, requestApproval } from "../../../src/modules/approvals/approvals";
 import { inboxDetail, listInbox } from "../../../src/modules/approvals/inbox";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
-import { defineCases, type IsolationEnv } from "../case";
+import { defineCases, expectLive, type IsolationEnv } from "../case";
 
 type Member = { acc: string; staffId: string };
 const owners = new Map<string, Member>();
@@ -40,7 +40,8 @@ const pharmacists = new Map<string, Member>();
 async function victimApproval(env: IsolationEnv, use: "view" | "decide") {
   const t = env.victim;
   const known = waiting.get(`${t.tenantId}:${use}`);
-  if (known) return known;
+  // The decide case consumes its approval: each run seeds a fresh one (HYG-010 N-1).
+  if (known && use === "view") return known;
   const ph = pharmacists.get(t.tenantId) ?? (await member(env, t.tenantId, "pharmacist", t.branchId));
   pharmacists.set(t.tenantId, ph);
   const ctx = await resolveContext(env.app, ph.acc, { tenantId: t.tenantId, actingRole: "pharmacist", activeBranchId: t.branchId });
@@ -93,10 +94,11 @@ export default defineCases(
     async run(env) {
       const v = await victimApproval(env, "decide");
       // The positive control runs this as B's own owner: the decision succeeds and names B's
-      // approval; as A's owner it is not found.
-      const outcome = await asOwner(env, (db) => refused(decideApproval(db, v.id, false, "Ditolak uji")));
-      const body: Record<string, string> = outcome === "done" ? { decided: v.id } : { refused: outcome };
-      return body;
+      // approval; as A's owner it is refused (not found) on a fresh, still-waiting approval.
+      await expectLive(env, "B's approval", `exists (select 1 from approvals where id = $1 and state = 'pending')`, [v.id]);
+      const decide = await asOwner(env, (db) => refused(decideApproval(db, v.id, false, "Ditolak uji")));
+      const body: Record<string, string> = decide === "done" ? { decided: v.id } : { refused: decide };
+      return { attempts: { decide }, body };
     },
   },
 );

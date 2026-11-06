@@ -95,7 +95,7 @@ Shared UI: `src/components/shell` (role-filtered navigation), `templates`, `visi
 
 ## Data
 
-PostgreSQL 16, 50 migrations (`drizzle/0000`–`0049`), applied migrations immutable (`src/db/migrate.ts` refuses drift). Policy kinds in use: tenant-shared, tenant-ledger, platform (clinical and branch-scoped arrive with their modules). Encryption helpers: `src/lib/keys` (envelope encryption, KEK file). No patient data exists yet.
+PostgreSQL 16, 51 migrations (`drizzle/0000`–`0050`), applied migrations immutable (`src/db/migrate.ts` refuses drift). Policy kinds in use: tenant-shared, tenant-ledger, platform (clinical and branch-scoped arrive with their modules). Encryption helpers: `src/lib/keys` (envelope encryption, KEK file). No patient data exists yet.
 
 ## Operations
 

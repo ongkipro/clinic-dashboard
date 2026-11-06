@@ -294,6 +294,7 @@ async function run() {
   } catch (e) {
     for (const [i, p] of open.entries()) await p.screenshot({ path: `${OUT}/fail-${i}.png` }).catch(() => {});
     report.error = `${(report.flow as unknown[]).length} flows done: ` + String(e).split("\n").slice(0, 4).join(" ");
+    process.exitCode = 1; // HYG-010 C-01: a failed flow fails the runner (the report is kept)
   } finally {
     await browser.close();
     writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 2));

@@ -192,6 +192,12 @@ describe("cross-tenant negative cases", () => {
     it(`${c.kind}:${c.id} never returns tenant B data`, async () => {
       const unwrap = (r: unknown) =>
         c.kind === "route" ? (r as { status: number; body: unknown }) : { status: 200, body: r };
+      // Actions and jobs: every attempt is reported (HYG-010 N-1).
+      const attemptsOf = (r: unknown) => {
+        const a = (r as { attempts?: unknown }).attempts;
+        expect(a && typeof a === "object" && Object.keys(a).length > 0, "action/job case must report attempts").toBe(true);
+        return a as Record<string, string>;
+      };
 
       // One secret set for both runs: secrets a case registers while seeding B in the
       // positive control are checked in the negative run too.
@@ -208,6 +214,13 @@ describe("cross-tenant negative cases", () => {
         marker,
       );
       secrets.add(marker);
+      if (c.kind !== "route") {
+        // Every attempt must succeed as B itself (review P1): an attempt B could not make either
+        // would accept any refusal from A and hide a cross-tenant regression.
+        for (const [name, outcome] of Object.entries(attemptsOf(ownResult.body))) {
+          expect(outcome, `${name}: positive control, the attempt as B itself must succeed`).toBe("done");
+        }
+      }
 
       // Negative: as A, nothing of B may appear.
       const env = envFor(a, secrets);
@@ -215,6 +228,13 @@ describe("cross-tenant negative cases", () => {
       expect(isPlainJson(result.body), "result must be plain JSON").toBe(true);
       const text = JSON.stringify(result.body) ?? "";
       for (const secret of secrets) expect(text).not.toContain(secret);
+      if (c.kind !== "route") {
+        const attempts = attemptsOf(result.body);
+        for (const [name, outcome] of Object.entries(attempts)) {
+          expect(outcome, `${name}: as tenant A an attempt on B must be refused`).not.toBe("done");
+          expect(outcome, `${name}: refusal must be an error code`).toMatch(/^(ERR_[A-Z_]+|refused|not_seen)$/);
+        }
+      }
       if (c.kind === "route" && c.expect === "not-found") expect(result.status).toBe(404);
       if (c.kind === "route" && c.expect === "filtered") {
         expect(result.status).toBeGreaterThanOrEqual(200);

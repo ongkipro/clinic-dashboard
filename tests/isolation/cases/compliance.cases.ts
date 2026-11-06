@@ -7,7 +7,7 @@ import { withTenantContext } from "../../../src/db/rls/context";
 import { CommandError } from "../../../src/lib/command";
 import { decideEvidence, downloadEvidence, itemDetail, register, uploadEvidence } from "../../../src/modules/compliance/compliance";
 import { assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
-import { defineCases, type IsolationEnv } from "../case";
+import { defineCases, expectLive, type IsolationEnv } from "../case";
 
 const owners = new Map<string, string>(); // tenantId -> owner account
 const finances = new Map<string, string>(); // tenantId -> finance account
@@ -112,10 +112,18 @@ export default defineCases(
     marker: (env) => seeded.get(env.victim.tenantId)?.itemId ?? "",
     async run(env) {
       const v = await victimEvidence(env);
+      // A fresh file version for each run (a decided version cannot be decided again), so the
+      // negative run attempts a decision B itself could still make (HYG-010 N-1).
+      const t = env.victim.tenantId;
+      const fileId = await as(env, t, "finance", async (db) =>
+        (await uploadEvidence(db, { obligationKey: "tax_advice", fileName: `ulang-${crypto.randomUUID()}.pdf`, content: Buffer.from(`%PDF-1.7 ${crypto.randomUUID()}`), expertName: v.expert, documentDate: "2026-10-02" })).fileId,
+      );
+      env.victimSecret(fileId);
+      await expectLive(env, "B's new evidence version", `exists (select 1 from evidence_items where id = $1 and state = 'submitted')`, [v.itemId]);
       // As B's owner the decision succeeds (positive control names B's item); as A it is not found.
-      const outcome = await refused(as(env, env.actor.tenantId, "owner", (db) => decideEvidence(db, v.itemId, v.fileId, "rejected", "Uji lintas klinik")));
-      const body: Record<string, string> = outcome === "done" ? { decided: v.itemId } : { refused: outcome };
-      return body;
+      const decide = await refused(as(env, env.actor.tenantId, "owner", (db) => decideEvidence(db, v.itemId, fileId, "rejected", "Uji lintas klinik")));
+      const body: Record<string, string> = decide === "done" ? { decided: v.itemId } : { refused: decide };
+      return { attempts: { decide }, body };
     },
   },
 );

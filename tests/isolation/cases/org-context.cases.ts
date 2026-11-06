@@ -58,17 +58,18 @@ export default defineCases(
     marker: (env) => env.victim.branchId,
     async run(env) {
       const acc = await ownerOf(env, env.actor.tenantId);
-      const attempts: Record<string, unknown> = {};
+      const attempts: Record<string, string> = {};
+      const next: Record<string, unknown> = {};
       for (const [name, req] of [
         ["clinic", { kind: "clinic", tenantId: env.victim.tenantId }],
         ["branch", { kind: "branch", branchId: env.victim.branchId }],
       ] as const) {
         attempts[name] = await switchContext(env.app, acc, {}, req).then(
-          (next) => next,
+          (r) => ((next[name] = r), "done"),
           (e) => (e instanceof ContextSwitchError ? "refused" : Promise.reject(e)),
         );
       }
-      return attempts as never;
+      return { attempts, body: { attempts, next } as never };
     },
   },
 );

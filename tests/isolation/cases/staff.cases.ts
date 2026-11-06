@@ -9,7 +9,7 @@ import { accessLog, endMembership, removeRole, revokeSession, setBranch, setDuty
 import { assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { answerOwnerGrant, assignRole as grantRole, myOwnerGrants } from "../../../src/modules/org/roles/roles";
 import { cancelInvite, invite, listInvitations, listStaff } from "../../../src/modules/org/staff/staff";
-import { defineCases, type IsolationEnv } from "../case";
+import { defineCases, expectLive, type IsolationEnv } from "../case";
 
 const owners = new Map<string, string>();
 // A separate B staff member (finance) for the Owner-grant case: the staff action case ends
@@ -31,7 +31,8 @@ async function grantee(env: IsolationEnv): Promise<{ acc: string; staffId: strin
   grantees.set(t, g);
   return g;
 }
-const victims = new Map<string, { staffId: string; name: string; email: string; invitationId: string; branchId: string }>();
+type Victim = { staffId: string; name: string; email: string; invitationId: string; branchId: string };
+const victims = new Map<string, Victim>();
 
 async function ownerOf(env: IsolationEnv, tenantId: string): Promise<string> {
   const known = owners.get(tenantId);
@@ -48,19 +49,32 @@ async function ownerOf(env: IsolationEnv, tenantId: string): Promise<string> {
   return acc;
 }
 
-async function victimStaff(env: IsolationEnv) {
+// `fresh`: a new victim for each run. The staff action case consumes its victim (the positive
+// control ends the membership and cancels the invitation), so its negative run needs one B
+// itself could still act on (HYG-010 N-1).
+async function victimStaff(env: IsolationEnv, fresh = false): Promise<Victim> {
   const t = env.victim.tenantId;
   const known = victims.get(t);
-  if (known) return known;
-  const name = `Staf Rahasia ${t.slice(0, 8)}`;
-  const acc = (await env.owner.query(`insert into auth_user (name, email) values ('V', $1) returning id`, [`victim.${t}@klinik-sintetis.test`])).rows[0].id as string;
+  if (known && !fresh) return known;
+  const tag = fresh ? crypto.randomUUID().slice(0, 8) : t.slice(0, 8);
+  const name = `Staf Rahasia ${tag}`;
+  const acc = (await env.owner.query(`insert into auth_user (name, email) values ('V', $1) returning id`, [`victim.${tag}.${t}@klinik-sintetis.test`])).rows[0].id as string;
   const { staffId } = await createMembership(env.owner, { tenantId: t, accountId: acc, displayName: name });
+  const c = await env.owner.connect();
+  try {
+    // fo_cashier for the branch and role attempts; admin_pusat so B's owner may assign it a
+    // duty (staff_duty_set targets Owner or Admin Pusat only; review P1).
+    await assignRole(c, { tenantId: t, staffId, role: "fo_cashier" });
+    await assignRole(c, { tenantId: t, staffId, role: "admin_pusat" });
+  } finally {
+    c.release();
+  }
   const ctx = await resolveContext(env.app, await ownerOf(env, t), { tenantId: t, actingRole: "owner" });
-  const email = `undangan.${t.slice(0, 8)}@klinik-sintetis.test`;
+  const email = `undangan.${tag}@klinik-sintetis.test`;
   const { invitationId } = await withTenantContext(env.app, ctx, (db) => invite(db, { email, name: "Calon Rahasia", roles: ["finance"], branchIds: [] }));
   const branchId = (await env.owner.query(`select id from branches where tenant_id = $1 limit 1`, [t])).rows[0]?.id as string;
   const v = { staffId, name, email, invitationId, branchId };
-  victims.set(t, v);
+  if (!fresh || !known) victims.set(t, v);
   env.victimSecret(name);
   env.victimSecret(email);
   env.victimSecret(staffId);
@@ -69,10 +83,9 @@ async function victimStaff(env: IsolationEnv) {
 
 // B's owner grants Owner to the victim staff (waiting for confirmation); id registered secret.
 const grants = new Map<string, string>();
+// A fresh grant for every run: the positive control declines its grant (HYG-010 N-1).
 async function victimGrant(env: IsolationEnv, staffId: string): Promise<string> {
   const t = env.victim.tenantId;
-  const known = grants.get(t);
-  if (known) return known;
   const ctx = await resolveContext(env.app, await ownerOf(env, t), { tenantId: t, actingRole: "owner" });
   const r = await withTenantContext(env.app, ctx, (db) => grantRole(db, staffId, "owner"));
   const id = (r as { requestId: string }).requestId;
@@ -106,15 +119,17 @@ export default defineCases(
   {
     kind: "route",
     id: "/staf/[id]",
-    expect: "filtered",
+    // By-id route (TEN-1): another tenant's staff member is not found (HYG-010 N-3). The page
+    // loader (loadStaffDetail) answers not-found when listStaff has no such id.
+    expect: "not-found",
     marker: (env) => victims.get(env.victim.tenantId)?.name ?? "",
     async run(env) {
       const v = await victimStaff(env);
-      const body = await asOwner(env, async (db) => ({
-        found: (await listStaff(db)).filter((s) => s.staffId === v.staffId).map((s) => s.name),
-        sessions: await refused(staffSessions(db, v.staffId)),
-      }));
-      return { status: 200, body: body as never };
+      return asOwner(env, async (db) => {
+        const staff = (await listStaff(db)).find((s) => s.staffId === v.staffId);
+        if (!staff) return { status: 404, body: null };
+        return { status: 200, body: { name: staff.name, sessions: await refused(staffSessions(db, v.staffId)) } as never };
+      });
     },
   },
   {
@@ -136,19 +151,25 @@ export default defineCases(
     id: "modules/org/staff/actions",
     marker: (env) => victims.get(env.victim.tenantId)?.name ?? "",
     async run(env) {
-      const v = await victimStaff(env);
-      // Each action in its own transaction, as a Server Action request would run it.
-      const body = {
-        revoke: await refused(asOwner(env, (db) => revokeSession(db, v.staffId, null))),
-        end: await refused(asOwner(env, (db) => endMembership(db, v.staffId))),
+      const v = await victimStaff(env, true);
+      await expectLive(env, "B's staff member and invitation",
+        `exists (select 1 from staff s join memberships m on m.tenant_id = s.tenant_id and m.id = s.membership_id where s.id = $1 and (m.effective_to is null or m.effective_to > now()))
+         and exists (select 1 from staff_invitations where id = $2 and state = 'pending')
+         and exists (select 1 from staff_roles where staff_id = $1 and role = 'admin_pusat')
+         and exists (select 1 from staff_roles where staff_id = $1 and role = 'fo_cashier')`, [v.staffId, v.invitationId]);
+      // Each action in its own transaction, as a Server Action request would run it. Order:
+      // reversible changes first, ending the membership last (it revokes everything after it).
+      const attempts = {
         duty: await refused(asOwner(env, (db) => setDuty(db, v.staffId, "it_admin", true))),
-        role: await refused(asOwner(env, (db) => removeRole(db, v.staffId, "finance"))),
-        branch: await refused(asOwner(env, (db) => setBranch(db, v.staffId, "nurse", v.branchId ?? v.staffId, true))),
+        branch: await refused(asOwner(env, (db) => setBranch(db, v.staffId, "fo_cashier", v.branchId, true))),
+        role: await refused(asOwner(env, (db) => removeRole(db, v.staffId, "fo_cashier"))),
+        revoke: await refused(asOwner(env, (db) => revokeSession(db, v.staffId, null))),
         cancel: await refused(asOwner(env, (db) => cancelInvite(db, v.invitationId))),
-        // Positive control: the caller's own staff list (contains the victim only for B).
-        staff: await asOwner(env, async (db) => (await listStaff(db)).map((s) => s.name)),
+        end: await refused(asOwner(env, (db) => endMembership(db, v.staffId))),
       };
-      return body as never;
+      // The caller's own staff list contains the victim only for B (positive control marker).
+      const staff = await asOwner(env, async (db) => (await listStaff(db)).map((s) => s.name));
+      return { attempts, body: { attempts, staff } };
     },
   },
   {
@@ -160,13 +181,21 @@ export default defineCases(
     async run(env) {
       const g = await grantee(env);
       const id = await victimGrant(env, g.staffId);
-      const answer = await asOwner(env, (db) => answerOwnerGrant(db, id, true)).then(() => "done", (e) => (e as { code?: string }).code ?? "error");
-      const mine = await asOwner(env, async (db) => (await myOwnerGrants(db)).map((g) => g.requestId));
-      // Positive control: in its own tenant the victim staff sees the grant.
-      const own = env.actor.tenantId === env.victim.tenantId
-        ? await withTenantContext(env.app, await resolveContext(env.app, g.acc, { tenantId: env.victim.tenantId, actingRole: "finance" }), async (db) => (await myOwnerGrants(db)).map((x) => x.requestId))
-        : [];
-      return { answer, mine, own } as never;
+      await expectLive(env, "B's Owner grant", `exists (select 1 from role_requests where id = $1 and state = 'awaiting_confirmation')`, [id]);
+      // The answering party: in B, the grantee itself (positive control: its decline succeeds and
+      // it lists the grant); in A, A's owner (refused: no grant waits for A). A decline creates
+      // no Owner, so the grantee stays a plain member for later runs.
+      const asGrantee = env.actor.tenantId === env.victim.tenantId;
+      const answerAs = <T>(fn: (db: never) => Promise<T>) =>
+        asGrantee
+          ? resolveContext(env.app, g.acc, { tenantId: env.victim.tenantId, actingRole: "finance" }).then((ctx) => withTenantContext(env.app, ctx, fn as never) as Promise<T>)
+          : asOwner<T>(env, fn as never);
+      const mine = await answerAs(async (db) => (await myOwnerGrants(db)).map((x) => x.requestId));
+      const answer = await answerAs((db) => answerOwnerGrant(db, id, false)).then(
+        () => "done",
+        (e) => ((e as { code?: string }).code === "P0002" ? "ERR_NOT_FOUND" : Promise.reject(e)),
+      );
+      return { attempts: { answer }, body: { answer, mine } };
     },
   },
 );
