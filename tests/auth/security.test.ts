@@ -110,15 +110,18 @@ describe("authenticator", () => {
     expect((await d.post("/two-factor/verify-totp", { code: totp(secret) })).status).toBe(200);
   });
 
-  it("new backup codes need the password and replace the old ones; each works once", async () => {
+  it("new backup codes need the password and a current code, and replace the old ones; each works once", async () => {
     const u = await staff(["finance"]);
     const c = await signedIn(u.email);
     const enable = await c.post("/two-factor/enable", { password: PASSWORD });
     const oldCodes = enable.json.backupCodes as string[];
-    expect((await c.post("/two-factor/verify-totp", { code: totp(secretFromUri(String(enable.json.totpURI))) })).status).toBe(200);
-    expect((await c.post("/two-factor/generate-backup-codes", {})).status).toBe(400);
-    expect((await c.post("/two-factor/generate-backup-codes", { password: "salah sekali kata sandinya" })).status).toBe(400);
-    const r = await c.post("/two-factor/generate-backup-codes", { password: PASSWORD });
+    const secret = secretFromUri(String(enable.json.totpURI));
+    expect((await c.post("/two-factor/verify-totp", { code: totp(secret) })).status).toBe(200);
+    // HYG-007 (DEC-041 (1)): a current authenticator code is required as well as the password.
+    expect((await c.post("/two-factor/generate-backup-codes", { password: PASSWORD })).status).toBe(401);
+    expect((await c.post("/two-factor/generate-backup-codes", { code: totp(secret) })).status).toBe(400);
+    expect((await c.post("/two-factor/generate-backup-codes", { password: "salah sekali kata sandinya", code: totp(secret) })).status).toBe(400);
+    const r = await c.post("/two-factor/generate-backup-codes", { password: PASSWORD, code: totp(secret) });
     expect(r.status).toBe(200);
     const fresh = r.json.backupCodes as string[];
     expect(fresh).toHaveLength(10);

@@ -1,6 +1,6 @@
 # Architecture — clinic-dashboard
 
-Updated: 2026-11-05 (after T-026 and HYG-004–006; M0 29/32 tasks; HYG-007–011 planned from the foundation review)
+Updated: 2026-11-06 (after HYG-006 and HYG-007; M0 29/32 tasks; HYG-008–011 planned from the foundation review)
 Stack: Next.js 16.4.3 (App Router, TypeScript), PostgreSQL 16 + Drizzle, Better Auth 1.7.15, Tailwind v4 + shadcn/ui, Vitest + Playwright, pnpm, Docker (Coolify target).
 
 This file describes only what the code does today. Target design: `docs/spec/03`, `04`; decisions: `DECISIONS.md` (DEC-*), `docs/spec/DECISION-REGISTER.md`.
@@ -83,6 +83,7 @@ Shared UI: `src/components/shell` (role-filtered navigation), `templates`, `visi
 | Tenant data (clinic app) | Information disclosure across tenants | Mitigate: RLS + server-resolved context; no BYPASSRLS | `src/db/rls/context.ts`, migrations; `tests/rls`, `tests/isolation` |
 | Auth surfaces | Spoofing (session reuse across app/vendor) | Mitigate: session surface check, host-only cookies | `src/auth/server.ts`; `tests/vendor/host.test.ts` |
 | Staff accounts | Spoofing (weak passwords, brute force) | Mitigate: IAM-1 policy, RATE-2 lockout, TOTP for PR-3 roles | `src/auth/policy.ts`, `server.ts`; `tests/auth` |
+| Second factor | Spoofing (a copied authenticator, guessed codes from an open session) | Mitigate (HYG-007, DEC-041 (1)): the TOTP secret is shown once at enrolment (`get-totp-uri` refused); new backup codes need the password and a current authenticator code; codes from an open session (step-up, enrolment completion) count toward the per-account lockout shared with sign-in (5 failures, 15 min), serialized by the `auth_two_factor` row lock; backup codes stored encrypted | `src/auth/server.ts`; `tests/auth/second-factor.test.ts` |
 | Vendor console | Elevation (vendor reading clinic data) | Mitigate: no table privilege; guard + allowlist + step-up; grant limited to configuration kinds | 0032, 0034, 0044; `tests/vendor/*` |
 | Vendor actions | Repudiation | Mitigate: `vendor_actions` + tenant audit chain, append-only | 0031/0032 triggers; tests |
 | Maker-checker (fees, lifecycle, first owner) | Elevation by one person | Mitigate: requester ≠ approver, consumed once | 0032, 0040; `tests/vendor` |
@@ -108,10 +109,6 @@ PostgreSQL 16, 48 migrations (`drizzle/0000`–`0047`; 0048 planned in HYG-008),
 
 This section lists decided changes so the map shows where it is going. Each moves into the sections above when its task is committed.
 
-- **Second factor (HYG-007, DEC-041 (1)):**
-  - The TOTP secret is shown once, at enrolment; `get-totp-uri` is refused.
-  - New backup codes need the password and a current authenticator code.
-  - Codes from an open session (step-up, enrolment completion) count toward the per-account lockout shared with sign-in (DEC-010: 5 failures, 15 min).
 - **Authority checks (HYG-008, migration 0048):**
   - A SECURITY DEFINER writer takes the tenant's `staff_access` lock first, then judges the actor (membership, role, branch) with `clock_timestamp()`, never with the transaction-start `now()`.
   - The operator RLS predicate re-checks a support-capable vendor role on every row.

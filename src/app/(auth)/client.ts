@@ -2,13 +2,15 @@
 // raw server messages are never shown.
 export type ApiResult = { ok: true; data: Record<string, unknown> } | { ok: false; message: string };
 
-const MESSAGES: Record<string, string> = {
+export const MESSAGES: Record<string, string> = {
   INVALID_EMAIL_OR_PASSWORD: "Email atau kata sandi salah.",
   LOGIN_TEMPORARILY_LOCKED: "Terlalu banyak percobaan masuk. Coba lagi dalam 15 menit.",
   INVALID_CODE: "Kode tidak cocok. Periksa jam di ponsel Anda lalu coba lagi.",
   INVALID_PASSWORD: "Kata sandi salah.",
   TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: "Terlalu banyak percobaan. Masuk ulang untuk mencoba lagi.",
-  ACCOUNT_LOCKED: "Akun dikunci sementara. Coba lagi dalam 15 menit.",
+  // Better Auth's second-factor lockout (DEC-010: 5 wrong codes, 15 minutes), at sign-in and
+  // at a step-up (HYG-007).
+  ACCOUNT_TEMPORARILY_LOCKED: "Akun dikunci sementara. Coba lagi dalam 15 menit.",
   ADDRESS_NOT_ALLOWED: "Masuk hanya dari jaringan kantor yang diizinkan.",
 };
 

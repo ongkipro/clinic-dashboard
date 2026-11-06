@@ -11,7 +11,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { twoFactor } from "better-auth/plugins/two-factor";
+import { TWO_FACTOR_ERROR_CODES, twoFactor } from "better-auth/plugins/two-factor";
 import { and, count, eq, gte, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type pg from "pg";
@@ -52,11 +52,19 @@ export type AuthConfig = {
   // Client IP header set by the trusted origin proxy (Traefik). Never read from a
   // header the client controls directly.
   ipAddressHeaders?: string[];
+  // Test-only (tests/auth/security.test.ts): called inside the step-up counting transaction,
+  // with that transaction's backend pid before the row is locked, and after it is read.
+  twoFactorCountHooks?: { onBackend?: (pid: number) => Promise<void> | void; afterRead?: () => Promise<void> };
 };
 
 export const LOGIN_LOCKED_CODE = "LOGIN_TEMPORARILY_LOCKED";
 export const SESSION_LOCKED_CODE = "SESSION_LOCKED";
 export const PASSWORD_POLICY_CODE = "PASSWORD_POLICY";
+export const TOTP_URI_UNAVAILABLE_CODE = "TOTP_URI_UNAVAILABLE";
+// Better Auth's own code for an account whose second factor is locked (DEC-010).
+export const TWO_FACTOR_LOCKED_CODE = "ACCOUNT_TEMPORARILY_LOCKED";
+const TWO_FACTOR_MAX_FAILURES = 5;
+const TWO_FACTOR_LOCK_MS = 15 * 60_000;
 export type OwnSecurity = { email: string; totpEnabled: boolean; totpRequired: boolean; sessions: OwnSession[] };
 export type OwnSession = { id: string; createdAt: Date; ipAddress: string | null; userAgent: string | null; current: boolean };
 
@@ -67,14 +75,18 @@ const PASSWORD_PATHS = new Set([
   "/verify-password",
   "/two-factor/enable",
   "/two-factor/disable",
-  "/two-factor/get-totp-uri",
   "/two-factor/generate-backup-codes",
 ]);
 // Session endpoints that stay usable while the session is locked or gated: reading it
 // (the UI needs the gate) and ending it.
 const LOCK_EXEMPT_PATHS = new Set(["/get-session", "/sign-out", "/ok", "/error"]);
 // Endpoints a session needing TOTP enrolment may still call.
-const ENROL_PATHS = new Set(["/two-factor/enable", "/two-factor/verify-totp", "/two-factor/get-totp-uri"]);
+const ENROL_PATHS = new Set(["/two-factor/enable", "/two-factor/verify-totp"]);
+// Code checks that the plugin counts per account only at sign-in; from an open session (a
+// step-up, or completing enrolment) this file counts them (HYG-007, DEC-041 (1)).
+const CODE_PATHS = new Set(["/two-factor/verify-totp", "/two-factor/verify-backup-code"]);
+// Endpoints that change the second factor: they need the password and a current code.
+const POSSESSION_PATHS = new Set(["/two-factor/disable", "/two-factor/generate-backup-codes"]);
 // A successful call proves the second factor for the session it creates or continues.
 const SECOND_FACTOR_PATHS = new Set(["/two-factor/verify-totp", "/two-factor/verify-backup-code"]);
 
@@ -127,6 +139,51 @@ export function createAuth(config: AuthConfig) {
       code: LOGIN_LOCKED_CODE,
       message: "Terlalu banyak percobaan masuk. Coba lagi dalam 15 menit.",
     });
+
+  // Second-factor codes from an open session (HYG-007). The plugin counts code failures per
+  // account only at sign-in; here a step-up or an enrolment completion counts the same way
+  // (DEC-010: 5 failures lock 15 minutes) on the plugin's own row and clock (Date.now()),
+  // so sign-in and step-up share one budget. The user's row lock serializes concurrent
+  // counts; the count is a pending attempt until the after hook clears it on success.
+  // The plugin's own error (code and message), so sign-in and step-up answer the same way.
+  const twoFactorLocked = () => APIError.from("TOO_MANY_REQUESTS", TWO_FACTOR_ERROR_CODES.ACCOUNT_TEMPORARILY_LOCKED);
+  const countSecondFactorAttempt = async (userId: string): Promise<void> =>
+    db.transaction(async (tx) => {
+      const hooks = config.twoFactorCountHooks;
+      if (hooks?.onBackend) {
+        const pid = await tx.execute(sql`select pg_backend_pid() as pid`);
+        await hooks.onBackend(Number((pid.rows[0] as { pid: number }).pid));
+      }
+      const [row] = await tx
+        .select({ id: schema.authTwoFactor.id, failed: schema.authTwoFactor.failedVerificationCount, lockedUntil: schema.authTwoFactor.lockedUntil })
+        .from(schema.authTwoFactor)
+        .where(eq(schema.authTwoFactor.userId, userId))
+        .for("update");
+      if (!row) return; // no second factor: the plugin answers TOTP_NOT_ENABLED itself
+      if (hooks?.afterRead) await hooks.afterRead();
+      const at = Date.now();
+      let failed = row.failed;
+      if (row.lockedUntil && row.lockedUntil.getTime() > at) throw twoFactorLocked();
+      if (row.lockedUntil) failed = 0; // an expired lock starts a fresh budget (as the plugin does)
+      // The attempt counts before the code is checked (it is a pending attempt, as RATE-2):
+      // a correct 5th code sets locked_until until the after hook clears it moments later, so
+      // a concurrent sign-in in that gap is refused once. Accepted: it never lets a guess through.
+      failed += 1;
+      await tx
+        .update(schema.authTwoFactor)
+        .set({ failedVerificationCount: failed, lockedUntil: failed >= TWO_FACTOR_MAX_FAILURES ? new Date(at + TWO_FACTOR_LOCK_MS) : null })
+        .where(eq(schema.authTwoFactor.id, row.id));
+    });
+  const clearSecondFactorAttempts = async (userId: string) => {
+    await db
+      .update(schema.authTwoFactor)
+      .set({ failedVerificationCount: 0, lockedUntil: null })
+      .where(eq(schema.authTwoFactor.userId, userId));
+  };
+  // Which user a counted code check is about, decided once in the before hook and read in
+  // the after hook: a successful enrolment replaces the session, so it is never re-derived.
+  // Keyed on the request's headers object, which both hooks of one request share.
+  const countedFor = new WeakMap<Headers, string>();
 
   // Which account a password endpoint is about: the body email on sign-in, the session
   // user elsewhere.
@@ -211,7 +268,10 @@ export function createAuth(config: AuthConfig) {
       twoFactor({
         issuer: "Clinic Dashboard",
         // No email/SMS OTP: the second factor is an authenticator app (IAM-1).
-        accountLockout: { enabled: true, maxFailedAttempts: 5, durationSeconds: 15 * 60 },
+        accountLockout: { enabled: true, maxFailedAttempts: TWO_FACTOR_MAX_FAILURES, durationSeconds: TWO_FACTOR_LOCK_MS / 1000 },
+        // Backup codes are stored encrypted (the library default, pinned; tests assert no
+        // issued code is stored in plain text).
+        backupCodeOptions: { storeBackupCodes: "encrypted" },
       }),
     ],
     hooks: {
@@ -231,6 +291,13 @@ export function createAuth(config: AuthConfig) {
           if (!(await config.allowAddress(ip))) {
             throw APIError.from("FORBIDDEN", { code: "ADDRESS_NOT_ALLOWED", message: "Alamat jaringan ini tidak diizinkan." });
           }
+        }
+
+        // HYG-007 (DEC-041 (1)): the authenticator secret is shown once, at enrolment
+        // (/two-factor/enable returns the URI). Reading it again would give anyone with a
+        // session and the password a working copy of the device.
+        if (ctx.path === "/two-factor/get-totp-uri") {
+          throw APIError.from("FORBIDDEN", { code: TOTP_URI_UNAVAILABLE_CODE, message: "Authenticator setup is shown only once." });
         }
 
         // IAM-1: a trusted-device cookie would skip TOTP on later sign-ins; never issue one.
@@ -259,6 +326,16 @@ export function createAuth(config: AuthConfig) {
           }
         }
 
+        // HYG-007: a code checked from an open session of this surface is counted per account.
+        // A sign-in (no valid session; the plugin's isSignIn) is counted by the plugin.
+        if (CODE_PATHS.has(ctx.path) && ctx.headers) {
+          const current = await sessionRow(ctx.headers);
+          if (current) {
+            await countSecondFactorAttempt(current.s.user.id);
+            countedFor.set(ctx.headers, current.s.user.id);
+          }
+        }
+
         // Profil & Keamanan (DEC-033): a new password follows the IAM-1 policy (checked
         // before the current password, so a weak choice does not count toward RATE-2), and
         // changing it always ends every other session.
@@ -282,10 +359,11 @@ export function createAuth(config: AuthConfig) {
         }
 
         // Turning the authenticator off (to replace it, or for a role that does not require
-        // it) needs the password and a current code: possession of the device, not only of
-        // the session. A wrong code keeps the RATE-2 claim above. Roles that require TOTP
-        // are sent straight back to enrolment by the session gate (PR-3).
-        if (ctx.path === "/two-factor/disable") {
+        // it) and making new backup codes (DEC-041 (1)) need the password and a current code:
+        // possession of the device, not only of the session. A wrong code keeps the RATE-2
+        // claim above and counts once as a second-factor failure (the nested verify-totp).
+        // Roles that require TOTP are sent straight back to enrolment by the session gate (PR-3).
+        if (POSSESSION_PATHS.has(ctx.path)) {
           const code = String((ctx.body as { code?: unknown } | undefined)?.code ?? "").replace(/\s/g, "");
           if (!/^[0-9]{6}$/.test(code)) throw APIError.from("UNAUTHORIZED", { code: "INVALID_CODE", message: "Invalid code" });
           await auth.api.verifyTOTP({ headers: ctx.headers ?? new Headers(), body: { code } });
@@ -299,6 +377,11 @@ export function createAuth(config: AuthConfig) {
         if (SECOND_FACTOR_PATHS.has(ctx.path) && !failed && !(returned instanceof Error)) {
           const id = ctx.context.newSession?.session.id ?? (await sessionRow(ctx.headers))?.row.id;
           if (id) await db.update(schema.authSession).set({ secondFactorAt: now() }).where(eq(schema.authSession.id, id));
+        }
+        // HYG-007: a counted code check that succeeded clears that account's budget.
+        const counted = ctx.headers ? countedFor.get(ctx.headers) : undefined;
+        if (counted && CODE_PATHS.has(ctx.path) && !failed && !(returned instanceof Error)) {
+          await clearSecondFactorAttempts(counted);
         }
         if (!PASSWORD_PATHS.has(ctx.path)) return;
         const email =

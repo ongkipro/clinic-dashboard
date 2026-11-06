@@ -87,10 +87,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Root cause, reproduced: a timed-out healthcheck left an orphaned `pg_isready`. The postmaster as PID 1 reaped it, saw exit status 2, and crash-recovered the whole cluster mid-suite.
   - The local development database was rebuilt to 48/48 migrations (owner option A).
 - **HYG-004** (`67d256b`): integration hooks get 120 s (`vitest.config.mts`, `.mts` for Vite's native loader). The harness `close()` prints its per-step timing when slow.
-- **HYG-006** (code done, reviewed; finish pending):
+- **HYG-006** (`3acf40e`; CI 42164189650 green; test bodies 30 s folded in, full suite ×3 all green):
   - Root cause of an intermittent 5 s test timeout: concurrent `CREATE DATABASE` / `DROP DATABASE` by test files. Each create fsyncs the relation map under one cluster-wide lock that every new backend reads at start, and each drop forces an immediate checkpoint, so new connections stalled for up to seconds on the local SSD.
   - Evidence: per-second stall watch, a reproduction, PostgreSQL 16.15 source, and alternating stress pairs. It is in `/data/tmp/hyg006/`.
   - Fix: `createTestDatabase` (exclusive advisory lock) and `dropTestDatabase` (shared) are the only DDL path, enforced by a structural test. 20 deterministic lock tests, 30 mutations.
+- **HYG-007** (second factor, DEC-041 (1)):
+  - A test hook that holds a counted code check must arm only around the calls under test: completing TOTP enrolment is itself a counted code check, so an always-armed `afterRead` hook held enrolment forever.
+  - Better Auth 1.7.15 rate-limits `/two-factor/*` to 3 calls per 10 s per address, and its limiter resets the count only when 10 s pass since the last call on that rule; any steady pace under 10 s reaches the 4th-call refusal (429, not counted toward the account lockout). Browser checks of the lockout space attempts more than 10 s apart.
+  - A mutation that calls `sessionRow()` from the auth `after` hook for every path recurses (the session read goes through the same hooks) until the JavaScript heap is exhausted; it showed as a vitest worker SIGABRT with no test run, not as a caught mutation. Scope such mutations to the paths they target.
 - **Foundation review** (owner instruction 2026-11-05): read-only, three lanes (database/RLS, auth/API, ops/tests/docs), each reviewed by GPT and claude.
   - Verified 5 HIGH, 9 MEDIUM and 9 LOW. One finding was rejected with its reason: idempotency for settings.
   - Plans: HYG-007 (auth, plan approved), HYG-008 (database, migration 0048, plan drafted), HYG-009 (stale-context writes and app fixes), HYG-010 (isolation gate and docs), HYG-011 (timing-bound test limits).

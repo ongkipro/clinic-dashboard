@@ -138,7 +138,8 @@ function TotpSection({ base, here, enrolPath, totpEnabled, totpRequired }: Omit<
           const form = e.currentTarget;
           const f = new FormData(form);
           codes.run(async () => {
-            const r = await callAuth("/two-factor/generate-backup-codes", { password: f.get("password") }, base);
+            const code = String(f.get("code") ?? "").replace(/\s/g, "");
+            const r = await callAuth("/two-factor/generate-backup-codes", { password: f.get("password"), code }, base);
             if (!r.ok) return r.message;
             form.reset();
             setBackup((r.data.backupCodes as string[]) ?? []);
@@ -159,6 +160,24 @@ function TotpSection({ base, here, enrolPath, totpEnabled, totpRequired }: Omit<
             Kata sandi
           </label>
           <input className={s.input} id="codesPassword" name="password" type="password" autoComplete="current-password" required />
+        </div>
+        <div className={s.field}>
+          <label className={s.label} htmlFor="codesCode">
+            Kode autentikator
+          </label>
+          <input
+            className={`${s.input} ${s.code}`}
+            id="codesCode"
+            name="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9 ]{6,7}"
+            aria-describedby="codesCodeHelp"
+            required
+          />
+          <p id="codesCodeHelp" className={s.help}>
+            Isi kata sandi dan 6 digit dari aplikasi autentikator Anda: kode cadangan baru dibuat hanya dengan keduanya.
+          </p>
         </div>
         <button className={s.secondaryButton} type="submit" aria-disabled={codes.busy}>
           {codes.busy ? "Membuat…" : "Buat Kode Cadangan Baru"}

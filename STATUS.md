@@ -61,9 +61,9 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-025 Support sessions (PR-53, TEN-6, TEN-14, TEN-17, TEN-19) | PASS; R4 review APPROVE (codex and claude, five rounds) | `c735ceb` |
 | T-026 Support-session scope approval and read audit (PR-60, TEN-14) | PASS; R4 review APPROVE (codex and claude, four rounds) | `56d6084` |
 | HYG-004 Test hook timeout under a busy full suite (`vitest.config.mts` hookTimeout 120 s; harness close reports slow steps) | PASS locally (CI after push); review APPROVE (codex r1, GPT r2) | `67d256b` |
-| HYG-006 Test harness: database creates never run beside other database creates or drops (advisory lock: CREATE exclusive, DROP shared) | PASS locally (CI after push); plan review APPROVE (GPT r7, claude r8); implementation review APPROVE (GPT and claude, round 2); final run: one intermittent timing-bound test timeout recorded (DEC-041 (2), HYG-011) | `3acf40e` |
+| HYG-006 Test harness: database creates never run beside other database creates or drops (advisory lock: CREATE exclusive, DROP shared) | PASS; CI run 42164189650 green; full suite ×3 all green; review APPROVE (GPT and claude r2; GPT-6.1 Sol r3–r5) | `3acf40e` |
 | HYG-005 PostgreSQL crash-restart from orphaned child processes (init/tini; local, CI, production image) | PASS locally (CI after push); R3 review APPROVE (GPT and claude, plan 3 rounds, implementation 5 rounds) | `baae0c8` |
-| HYG-007 Second factor: possession to read or mint factors; step-up codes counted per account (foundation review F1–F3, DEC-041 (1)) | PLANNED: plan APPROVE (GPT r3, claude focused); implementation drafted in `/data/tmp/hyg007/impl/`, early review findings of GPT and claude applied there; not yet in the repository | — |
+| HYG-007 Second factor: possession to read or mint factors; step-up codes counted per account (foundation review F1–F3, DEC-041 (1)) | PASS; auth tests 68/68, 11 mutations caught, full suite 797 passed, browser 8/8 flows and 17 layouts; review APPROVE (GPT-6.1 Sol) | pending |
 | HYG-008 Database authority checks: wall-clock validity after the tenant lock, operator projections, support-session races, history guards (foundation review lane A, migration 0048) | PLANNED: plan drafted in `/data/tmp/hyg008/HYG-008.plan.md`, not reviewed yet | — |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
@@ -212,93 +212,17 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 
 ## Next verified action
 
-### CHECKPOINT 2026-11-05 ~20:30 WIB (machine maintenance; session may be force-closed)
+### Now (2026-11-06)
 
-**Current task:** HYG-006 (test-harness database DDL lock), R3. Ledger run `RUN-20261104T230534Z-779db699` is **open**, state INTEGRATING. Nothing of HYG-006 is committed or pushed. `origin/main` = local `main` = `ff336a1`; CI run 41974781029 green.
+- **HYG-006 done:** `3acf40e` (+ `c947002`), pushed `ff336a1..c947002`. Full suite ×3 all green (780/780 each, at load 10.8–15.0) after the test-body limit was raised to 30 s (measured; folded in from HYG-011). Review: GPT and claude (plan, implementation r2), GPT-6.1 Sol r1–r5 (APPROVE r3–r5).
+- **HYG-007 in progress:** ledger run `RUN-20261106T044421Z-c508d0f2`. The plans HYG-007…012 and the foundation and HYG-007 review reports are back in the repository; DEC-041 (1)'s consequence corrected. Gate scripts: `/data/tmp/hyg007/` (`gates1.sh`, `gates2.sh`, `mutations.sh`), heavy work only through `heavy-run --lock clinic-dashboard-env`.
+- **Queue** (plan: `/data/tmp/clinic-dashboard/PLAN-2026-11-06.md`): HYG-007 → HYG-008a (clinic authority) → HYG-008b (vendor/operator authority) → HYG-009 → HYG-010 → HYG-011 (rest: `hosts.spec.ts`) → wave gate → T-027 → T-028 → T-032. Each: own ledger run, GPT-6.1 Sol review (max 3 rounds), STATUS/BUILD-LOG/ARCHITECTURE updated, commit, push, CI green.
 
-**Done (verified):**
-- HYG-006 code, plan and implementation reviews: APPROVE by GPT and claude (r2).
-- In the latest re-run on the final files: typecheck, lint, docs, lock tests, mutations (30/30) and the stress gate all PASS (ledger).
-- Full-suite run 1 of 3 passed (`/data/tmp/hyg006/full-1793895519/full-1.log`: 779 passed).
-- Gate script fix in `/data/tmp/t026-waitgate.sh`: processes under `playwright-mcp` (an interactive browser tool) no longer count as test suites. A backup of the old script is in `/data/backups/session-2026-11-05/`.
+### Open for the owner
 
-**Unverified:**
-- **Full suites 2 and 3 of that run did not run.** I stopped them at the checkpoint, before they started. The ledger's latest `test-full` record is still the earlier FAIL (`hosts.spec.ts` "next start did not come up", suite 2 of `/data/tmp/hyg006/full-1793862561/`, cause unknown).
-- HYG-007 (`/data/tmp/hyg007/impl/`) has never been executed.
-- The HYG-008 plan is frozen but not implemented.
-
-**Exact next steps:**
-1. `cd ~/Projects/clinic-dashboard && delivery-ledger status` must show the HYG-006 run active.
-2. Run `/data/tmp/hyg006/commit-push.sh` (as a background task). It re-runs every check (the notes edited at this checkpoint make them stale), finishes the run, commits only HYG-006's files plus these notes, records the hash and pushes.
-   - It stops on any failure other than the recorded environment cases. On a stop, read `/data/tmp/hyg006/full-<epoch>/` and report to the owner.
-3. Watch CI: `gh run list --branch main --limit 1`.
-4. Then follow `docs/tasks/NEXT-BREAKDOWN-2026-11-05.md` from step 2 (HYG-007). Bring back the held docs first: `/data/tmp/session-docs/` holds HYG-007…012, the `DEC-042` row and the review reports.
-
-**Open decisions (owner):**
-- HYG-008 is split into 008a (clinic authority) and 008b (vendor/operator authority). The plan is frozen; proof is by tests and at most 2 implementation-review rounds. Proposed 2026-11-05, owner's reply pending.
-- DEC-042 (no enforced vendor IP allowlist; second factor mandatory; passkeys optional) was decided by the owner. Its row is drafted in `/data/tmp/session-docs/DEC-042.row.md` and goes into DECISIONS.md with HYG-007.
-
-**Commands to resume:**
-- `cd ~/Projects/clinic-dashboard && git status --short && delivery-ledger status`
-- `/data/tmp/t026-waitgate.sh` (the host rule: load ≤ 4, no other suite)
-- `/data/tmp/hyg006/commit-push.sh`
-- `cat docs/tasks/NEXT-BREAKDOWN-2026-11-05.md`
-
-### Resume here (session ended 2026-11-05 ~14:40 WIB; owner: "kita berhenti dulu … lanjutkan nanti")
-
-Step-by-step breakdown: `docs/tasks/NEXT-BREAKDOWN-2026-11-05.md`. The queue order is in `TASKS.md` ("Hygiene queue").
-
-**Pushed 2026-11-05** (owner "comit push"): T-025 (`c735ceb`, `aa27347`), T-026 (`56d6084`, `2eb1d25`, `1cbdeec`), HYG-005 (`baae0c8`, `7677bab`), HYG-004 (`67d256b`, `ff336a1`). Range `5315817..ff336a1`.
-- CI run 41974781029 **green** (job `verify`, 3 m 21 s): 35 test files passed, 760 tests, the pgBackRest restore drill passed, and the image migration passed.
-- The PostgreSQL service container was created with `--init` and the `pg_isready` health command, so HYG-005 is verified in CI.
-- HYG-006 is committed and pushed after its checks re-run.
-
-**Local database (2026-11-05):**
-- Container `clinic-dashboard-postgres-1`: `Init=true` (PID 1 is `docker-init`, then `postgres`), healthcheck `CMD pg_isready -U clinic -d clinic_dashboard -t 2`, healthy, 60 s stop grace, 0 restarts.
-- 48/48 migrations applied; no leftover test databases.
-- Production carry-forward: verify the same on the Coolify database container at the deploy task (HYG-005 note above).
-
-**Working tree (uncommitted, belongs to HYG-006 only):** `tests/rls/harness.ts`, `tests/rls/harness-lock.test.ts`, `tests/db/migrations.test.ts`, `docs/tasks/HYG-006.md`, `STATUS.md`, `BUILD-LOG.md`, `ARCHITECTURE.md`, `DECISIONS.md` (DEC-041), `.delivery/**`. Ledger run `RUN-20261104T230534Z-779db699` is open (INTEGRATING).
-
-**Next, in order:**
-
-1. **Finish HYG-006** (code done, plan and implementation APPROVE by GPT and claude).
-   - **2026-11-05 14:10:** `/data/tmp/hyg006/commit-push.sh` re-ran every check. All passed except test-full: suite 2 failed `tests/platform/hosts.spec.ts` `beforeAll` ("next start did not come up", cause unknown: server output discarded; see `docs/tasks/HYG-006.md`, last section). The script stopped correctly: nothing committed or pushed. The ledger run stays open.
-   - **Resume with:** `/data/tmp/hyg006/commit-push.sh`. It re-runs everything, then finishes, commits only HYG-006's files, records the hash and pushes. The docs edits made after 14:10 (this note, HYG-006.md) make the checks stale, so the full re-run is needed anyway.
-   - The final evidence run's test-full failed one timing-bound test in suite 3 (`events.test.ts` 200-event drain, 5 s limit, during slow checkpoints). Owner decision DEC-041 (2): finish with it recorded; HYG-011 fixes the limit.
-   - The required full suite is to be re-run on the same files: `/data/tmp/hyg006/finish-dec041.sh`. It re-checks docs and the full suite ×3, checks that the surface is unchanged, then records the boundary, the review and the finish.
-   - The session's STATUS/BUILD-LOG/DEC-041 notes changed the surface after the last checks, so every required check is stale. Run `/data/tmp/hyg006/rerun-all.sh` first (typecheck, lint, docs, lock tests, mutations, stress, full suite), then `finish-dec041.sh`.
-   - If the full suite fails again only on a timing-bound test, record it and proceed under DEC-041 (2). Any other failure stops the finish.
-   - Then commit (stage only HYG-006's files, review the staged diff), put the hash in STATUS, and push.
-2. **HYG-007** (R3, auth):
-   - Correct DEC-041 (1)'s consequence sentence (`/data/tmp/hyg007/dec041-fix.py`: backup codes recover sign-in only; replacing a lost authenticator needs it or an admin reset).
-   - `delivery-ledger start` with allowed paths `src/auth/server.ts`, `src/app/(auth)/security-panel.tsx`, `src/app/(auth)/client.ts`, `tests/auth/**`, `docs/tasks/HYG-007.md`, `STATUS.md`, `BUILD-LOG.md`, `ARCHITECTURE.md`, `DECISIONS.md`.
-   - Copy `/data/tmp/hyg007/impl/{server.ts,client.ts,security-panel.tsx,security.test.ts,second-factor.test.ts}` to their places.
-   - Then typecheck, lint, tests, mutations (plan list), browser evidence (390/820/1180/1440, 200 %), full suite ×3, implementation review by GPT and claude, commit.
-   - Plan: `/data/tmp/hyg007/HYG-007.plan.md` → copy to `docs/tasks/HYG-007.md`.
-3. **HYG-008** (R3, migration 0048): plan review by GPT and claude (plan `/data/tmp/hyg008/HYG-008.plan.md`), then implement.
-4. **HYG-009** (R3, app): stale-context writes (B2-1: `pengaturan`, `kepatuhan` upload, `inviteAction` write into the clinic in the current cookie; post the rendered context and refuse a mismatch on every clinic write action); `/staf/<id>` crash for Admin Pusat (N1); Owner with an active branch cannot save branch settings (N2); `switchContext` ignores session revocation (N3).
-5. **HYG-010** (R2, tests/docs):
-   - Isolation gate: action and job negatives must prove refusal, and consumable victim state must be re-seeded (N-1 HIGH, C-02).
-   - `/staf/[id]` must be declared not-found (N-3).
-   - Browser runners must exit non-zero on failure (C-01).
-   - Stale STATUS/ARCHITECTURE lines (C-03, N-4) and the DEC-015/DEC-024/DEC-031 supersedes marks (N-5).
-6. **HYG-011** (R2, tests): measure the timing-bound tests and set measured limits (`events.test.ts` 200-event drain first). Also make `tests/platform/hosts.spec.ts` keep the standalone server's output and take a port the OS confirms free, so its "next start did not come up" failure shows its cause.
-7. **Wave gate** (simulate CI, image migrate, restore drill), **push**, then watch CI. For the 2026-11-05 push (run 41974781029): check its "Initialize containers" step shows `--init` on the PostgreSQL service (HYG-005).
-8. **T-027**, **T-028**, **T-032** (M0 exit review), as before.
-
-**Foundation review (2026-11-05)**, read-only, three lanes, each by GPT and claude: reports in `/data/tmp/foundation-review/` (`out-a.md`, `cross-out-a.md`, `out-b1a.md`, `out-b1b.md`, `out-b2.md`, `cross-out-b2.md`, `out-c.md`, `cross-out-c.md`).
-- Verified findings: 5 HIGH (A-01, A-02, B2-1, N-1, F1), 9 MEDIUM, 9 LOW.
-- Rejected: B2-2 (idempotency for settings), because AGENTS.md scopes idempotency to money, stock, session and commission, and API-2 is a Proposal.
-- They are assigned to HYG-007 … HYG-010 above.
-
-**Where the work-in-progress lives** (the `/data/tmp` files are working copies; a backup is in `/data/backups/session-2026-11-05/`):
-- HYG-007 implementation: `/data/tmp/hyg007/impl/`.
-- Plans `HYG-007.md` … `HYG-011.md` and the review reports `foundation-2026-11-05/` and `hyg007/`: kept in `/data/tmp/session-docs/` until HYG-006 is committed (they are outside its ledger run). Move them back with HYG-007: plans to `docs/tasks/`, reports to `docs/research/reviews/`.
-- HYG-006's own review reports are in `docs/research/reviews/hyg006/`, added to its run by scope expansion.
-- HYG-006 scripts: `/data/tmp/hyg006/` (`rerun-all.sh`, `finish-dec041.sh`, `mutations.sh`, `final-stress.sh`, `full3.sh`, `stress.sh`, `stress-report.py`).
-
-**Host rule (standing):** start a suite only when the 1-minute load is ≤ 4 and no other test or browser suite runs on the machine (`/data/tmp/t026-waitgate.sh`). Do not report gate waits; just wait.
+- (Resolved 2026-11-06) HYG-008 is split into 008a (clinic authority) and 008b (vendor/operator authority), a revisable default (owner: "rekomendasi terbaikmu aja kerjakan, kalau butuh bisa diubah nanti"; supervisor confirmed). The DECISIONS row is added when HYG-008a starts.
+- (Resolved 2026-11-06) Pushing `main` is allowed for a task whose ledger finished PASS and whose review approved; CI is watched after each push. Nothing is deployed (RELEASE.md: no release approved).
+- HYG-010 input: `tests/isolation/cases/approvals.cases.ts` `ownerOf()` caches the owner only after the insert resolves; a timed-out first case leaves its insert committed and the next case hits `auth_user_email_key` (seen once in HYG-006's controlled run 3). A cascade of a timeout, not a tenant leak.
 
 ### Working rules (owner instructions, standing)
 
