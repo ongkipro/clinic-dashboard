@@ -337,6 +337,13 @@
       "when": 1793772963658,
       "tag": "0047_support_scope_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793944384215,
+      "tag": "0048_clinic_authority_wall_clock",
+      "breakpoints": true
     }
   ]
 }

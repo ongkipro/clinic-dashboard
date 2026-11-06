@@ -81,9 +81,11 @@ export async function itemDetail(db: pg.ClientBase, itemId: string): Promise<{ f
     id: r.id, uploadedBy: r.uploaded_by, version: r.version, fileName: r.file_name, mediaType: r.media_type, sizeBytes: Number(r.size_bytes), sha256: r.sha256,
     expertName: r.expert_name, documentDate: r.document_date, uploadedName: r.uploaded_name, uploadedAs: r.uploaded_as, uploadedAt: r.uploaded_at,
   }));
+  // Newest first in the gate's order (seq), which the app may not read (HYG-008a, B-03):
+  // evidence_decisions() orders by it inside and applies the same read rule.
   const decisions = (await db.query(
     `select file_id, decision, reason, valid_until::text, decided_name, decided_as, decided_at, config_version
-       from evidence_approvals where item_id = $1 order by seq desc`, [itemId])).rows.map((r) => ({
+       from evidence_decisions($1)`, [itemId])).rows.map((r) => ({
     fileId: r.file_id, decision: r.decision, reason: r.reason, validUntil: r.valid_until, decidedName: r.decided_name, decidedAs: r.decided_as,
     decidedAt: r.decided_at, configVersion: r.config_version,
   }));

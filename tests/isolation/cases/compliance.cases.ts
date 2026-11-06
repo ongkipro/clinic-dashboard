@@ -43,6 +43,10 @@ async function victimEvidence(env: IsolationEnv) {
     (await uploadEvidence(db, { obligationKey: "tax_advice", fileName: `rahasia-${t.slice(0, 8)}.pdf`, content: Buffer.from(`%PDF-1.7 rahasia ${t}`), expertName: expert, documentDate: "2026-10-01" })).fileId,
   );
   const itemId = (await as(env, t, "owner", async (db) => (await register(db)).find((r) => r.obligationKey === "tax_advice")!.itemId!)) as string;
+  // A decision with a secret reason, read back through evidence_decisions() (HYG-008a, 9c).
+  const decisionReason = `Ditolak rahasia ${t.slice(0, 8)}`;
+  await as(env, t, "owner", (db) => decideEvidence(db, itemId, fileId, "rejected", decisionReason));
+  env.victimSecret(decisionReason);
   const v = { itemId, fileId, expert };
   seeded.set(t, v);
   env.victimSecret(expert);
@@ -78,7 +82,12 @@ export default defineCases(
         const own = (await register(db)).find((r) => r.obligationKey === "tax_advice");
         const mine = own?.itemId ? await itemDetail(db, own.itemId) : { files: [], decisions: [] };
         const theirs = await itemDetail(db, v.itemId);
-        return { mine: mine.files.map((f) => f.expertName), theirs: theirs.files.map((f) => f.expertName) };
+        // HYG-008a: decisions come from evidence_decisions(); B's decision reason must not appear.
+        return {
+          mine: mine.files.map((f) => f.expertName),
+          theirs: theirs.files.map((f) => f.expertName),
+          theirDecisions: theirs.decisions.map((d) => d.reason ?? ""),
+        };
       });
       return { status: 200, body };
     },

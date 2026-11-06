@@ -64,7 +64,8 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | HYG-006 Test harness: database creates never run beside other database creates or drops (advisory lock: CREATE exclusive, DROP shared) | PASS; CI run 42164189650 green; full suite ×3 all green; review APPROVE (GPT and claude r2; GPT-6.1 Sol r3–r5) | `3acf40e` |
 | HYG-005 PostgreSQL crash-restart from orphaned child processes (init/tini; local, CI, production image) | PASS locally (CI after push); R3 review APPROVE (GPT and claude, plan 3 rounds, implementation 5 rounds) | `baae0c8` |
 | HYG-007 Second factor: possession to read or mint factors; step-up codes counted per account (foundation review F1–F3, DEC-041 (1)) | PASS; auth tests 68/68, 11 mutations caught, full suite 797 passed, browser 8/8 flows and 17 layouts; review APPROVE (GPT-6.1 Sol) | `34169c8` |
-| HYG-008 Database authority checks: wall-clock validity after the tenant lock, operator projections, support-session races, history guards (foundation review lane A, migration 0048) | PLANNED: plan drafted in `/data/tmp/hyg008/HYG-008.plan.md`, not reviewed yet | — |
+| HYG-008a Clinic authority: wall-clock actor after the tenant lock (DEC-043, migration 0048) | PASS; authority tests 39, drift check, 30 mutations caught, isolation gate; review APPROVE (GPT-6.1 Sol r3) | pending |
+| HYG-008b Vendor and operator authority: session re-check after every wait, operator predicate and projections, sweep (migration 0049) | PLANNED (frozen plan, split per DEC-043) | — |
 
 Built so far: see `DECISIONS.md` DEC-005 (toolchain), DEC-006 (database core), DEC-007 (RLS foundation), DEC-008 (isolation gate), DEC-009 (keys, hosts, backups), DEC-010 (staff authentication), DEC-011 (migrations), DEC-012 (identity chain), DEC-013 (audit), DEC-014 (design system) and DEC-015 (role readers); `ARCHITECTURE.md` is updated when runtime behaviour exists.
 
@@ -215,8 +216,9 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 ### Now (2026-11-06)
 
 - **HYG-006 done:** `3acf40e` (+ `c947002`), pushed `ff336a1..c947002`. Full suite ×3 all green (780/780 each, at load 10.8–15.0) after the test-body limit was raised to 30 s (measured; folded in from HYG-011). Review: GPT and claude (plan, implementation r2), GPT-6.1 Sol r1–r5 (APPROVE r3–r5).
-- **HYG-007 in progress:** ledger run `RUN-20261106T044421Z-c508d0f2`. The plans HYG-007…012 and the foundation and HYG-007 review reports are back in the repository; DEC-041 (1)'s consequence corrected. Gate scripts: `/data/tmp/hyg007/` (`gates1.sh`, `gates2.sh`, `mutations.sh`), heavy work only through `heavy-run --lock clinic-dashboard-env`.
-- **Queue** (plan: `/data/tmp/clinic-dashboard/PLAN-2026-11-06.md`): HYG-007 → HYG-008a (clinic authority) → HYG-008b (vendor/operator authority) → HYG-009 → HYG-010 → HYG-011 (rest: `hosts.spec.ts`) → wave gate → T-027 → T-028 → T-032. Each: own ledger run, GPT-6.1 Sol review (max 3 rounds), STATUS/BUILD-LOG/ARCHITECTURE updated, commit, push, CI green.
+- **HYG-007 done:** `34169c8` (+ `19202f1`), CI 42167939946 green.
+- **HYG-008a in progress:** ledger run `RUN-20261106T055016Z-307f9e7b`. Migration `drizzle/0048_clinic_authority_wall_clock.sql` (24 functions re-created from their 0047 bodies, `tenant_actor_lock`, `evidence_decisions`, B-03/B-04), tests `tests/rls/authority-clock.test.ts` and `tests/db/authority-drift.test.ts`. Scripts and evidence: `/data/tmp/clinic-dashboard/hyg008a/` (`gen.py` builds the migration, `mutations.sh`). Heavy work only through `heavy-run --lock clinic-dashboard-env`.
+- **Queue** (plan: `/data/tmp/clinic-dashboard/PLAN-2026-11-06.md`): HYG-008a (clinic authority) → HYG-008b (vendor/operator authority) → HYG-009 → HYG-010 → HYG-011 (rest: `hosts.spec.ts`) → wave gate → T-027 → T-028 → T-032. Each: own ledger run, GPT-6.1 Sol review (max 3 rounds), STATUS/BUILD-LOG/ARCHITECTURE updated, commit, push, CI green.
 
 ### Open for the owner
 

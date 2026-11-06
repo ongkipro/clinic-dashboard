@@ -1,0 +1,250 @@
+{
+  "approval_actor()": {
+    "removed": [
+      "          AND m.effective_from <= now() AND (m.effective_to IS NULL OR m.effective_to > now())"
+    ],
+    "added": [
+      "          AND m.effective_from <= clock_timestamp() AND (m.effective_to IS NULL OR m.effective_to > clock_timestamp())"
+    ]
+  },
+  "approval_request(text,text,uuid,text,uuid,bigint)": {
+    "removed": [
+      "  SELECT * INTO a FROM public.approval_actor();"
+    ],
+    "added": [
+      "  SELECT * INTO a FROM public.tenant_actor_lock();"
+    ]
+  },
+  "approval_owner_self(text,text,uuid,text,uuid,bigint)": {
+    "removed": [
+      "  SELECT * INTO a FROM public.approval_actor();"
+    ],
+    "added": [
+      "  SELECT * INTO a FROM public.tenant_actor_lock();"
+    ]
+  },
+  "approval_cancel(uuid)": {
+    "removed": [
+      "  SELECT * INTO a FROM public.approval_actor();"
+    ],
+    "added": [
+      "  SELECT * INTO a FROM public.tenant_actor_lock();"
+    ]
+  },
+  "notification_ack(uuid)": {
+    "removed": [
+      "                    AND m.effective_from <= now() AND (m.effective_to IS NULL OR m.effective_to > now())) THEN"
+    ],
+    "added": [
+      "                    AND m.effective_from <= clock_timestamp() AND (m.effective_to IS NULL OR m.effective_to > clock_timestamp())) THEN"
+    ]
+  },
+  "staff_invite_accept(text,uuid)": {
+    "removed": [
+      "  IF NOT FOUND OR inv.state <> 'pending' OR inv.expires_at <= now()",
+      "  SELECT * INTO inv FROM public.staff_invitations WHERE token_hash = p_token_hash FOR UPDATE;"
+    ],
+    "added": [
+      "    RAISE EXCEPTION 'ERR_NOT_FOUND: invitation not valid' USING ERRCODE = 'P0002';",
+      "  -- An unknown token is refused at once (same generic answer); a token that appears later is",
+      "  -- HYG-008a (R1-M3): staff_access before the invitation row (the order staff_end_membership ->",
+      "  -- not picked up by the locked re-read, which must name the tenant resolved here (review r1).",
+      "  -- staff_invitations_recheck uses), then the checks on the wall clock.",
+      "  END IF;",
+      "  IF NOT FOUND OR inv.state <> 'pending' OR inv.expires_at <= clock_timestamp()",
+      "  IF NOT FOUND THEN",
+      "  PERFORM pg_advisory_xact_lock(hashtextextended('staff_access:' || v_role_id::text, 0));",
+      "  SELECT * INTO inv FROM public.staff_invitations i WHERE i.token_hash = p_token_hash AND i.tenant_id = v_role_id FOR UPDATE;",
+      "  SELECT i.tenant_id INTO v_role_id FROM public.staff_invitations i WHERE i.token_hash = p_token_hash;"
+    ]
+  },
+  "setting_set(text,uuid,jsonb,timestamp with time zone,text,boolean)": {
+    "removed": [
+      "  SELECT * INTO a FROM public.approval_actor();"
+    ],
+    "added": [
+      "  SELECT * INTO a FROM public.tenant_actor_lock();"
+    ]
+  },
+  "setting_draft_decide(uuid,boolean,text)": {
+    "removed": [
+      "  -- Same lock order as the plain path (approval row, then the draft and the per-setting",
+      "  -- lock in setting_draft_sync), so concurrent deciders wait instead of deadlocking."
+    ],
+    "added": [
+      "  -- HYG-008a lock order: staff_access, then the approval row (approval_decide/cancel take it",
+      "  -- through tenant_actor_lock; taking the row first would invert the order and deadlock).",
+      "  PERFORM pg_advisory_xact_lock(hashtextextended('staff_access:' || v_tenant::text, 0));"
+    ]
+  },
+  "setting_draft_cancel(uuid)": {
+    "removed": [],
+    "added": [
+      "  -- HYG-008a lock order: staff_access, then the approval row (approval_decide/cancel take it",
+      "  -- through tenant_actor_lock; taking the row first would invert the order and deadlock).",
+      "  PERFORM pg_advisory_xact_lock(hashtextextended('staff_access:' || v_tenant::text, 0));"
+    ]
+  },
+  "role_owner_grants_lapse(uuid,uuid)": {
+    "removed": [
+      "              AND (r.decided_at < now() - interval '14 days' OR NOT public.tenant_staff_has_role(p_tenant, r.decided_by, 'owner'))"
+    ],
+    "added": [
+      "              AND (r.decided_at < clock_timestamp() - interval '14 days' OR NOT public.tenant_staff_has_role(p_tenant, r.decided_by, 'owner'))"
+    ]
+  },
+  "evidence_upload(text,text,text,bytea,text,text,date)": {
+    "removed": [
+      "  SELECT * INTO a FROM public.approval_actor();"
+    ],
+    "added": [
+      "  SELECT * INTO a FROM public.tenant_actor_lock();"
+    ]
+  },
+  "memberships_vendor_guard()": {
+    "removed": [
+      "  IF NEW.effective_to IS NOT NULL AND NEW.effective_to <= now() THEN"
+    ],
+    "added": [
+      "     AND NEW.account_id = OLD.account_id AND NEW.tenant_id = OLD.tenant_id AND NEW.effective_from = OLD.effective_from THEN",
+      "  -- HYG-008a (B-02): an end (written at clock_timestamp(), later than now()) is always allowed;",
+      "  -- only the end transition, nothing else changed.",
+      "  IF TG_OP = 'UPDATE' AND NEW.effective_to IS NOT NULL AND NEW.effective_to <= clock_timestamp()"
+    ]
+  },
+  "tenant_has_role(uuid,text,uuid)": {
+    "removed": [
+      "                    AND m.effective_from <= now() AND (m.effective_to IS NULL OR m.effective_to > now()))"
+    ],
+    "added": [
+      "                    AND m.effective_from <= clock_timestamp() AND (m.effective_to IS NULL OR m.effective_to > clock_timestamp()))"
+    ]
+  },
+  "vendor_dual_identity_clinic_decide(uuid,boolean)": {
+    "removed": [
+      "  SELECT * INTO a FROM public.approval_actor();"
+    ],
+    "added": [
+      "  SELECT * INTO a FROM public.tenant_actor_lock();"
+    ]
+  },
+  "approval_decide(uuid,boolean,text)": {
+    "removed": [
+      "  SELECT * INTO a FROM public.approval_actor();"
+    ],
+    "added": [
+      "  SELECT * INTO a FROM public.tenant_actor_lock();"
+    ]
+  },
+  "evidence_decide(uuid,uuid,text,text,date)": {
+    "removed": [
+      "          a.staff_id, a.role, v_name);",
+      "  INSERT INTO public.evidence_approvals (item_id, tenant_id, file_id, config_version, decision, reason, valid_until, decided_by, decided_as, decided_name)",
+      "  SELECT * INTO a FROM public.approval_actor();"
+    ],
+    "added": [
+      "          a.staff_id, a.role, v_name, clock_timestamp());",
+      "  INSERT INTO public.evidence_approvals (item_id, tenant_id, file_id, config_version, decision, reason, valid_until, decided_by, decided_as, decided_name, decided_at)",
+      "  SELECT * INTO a FROM public.tenant_actor_lock();"
+    ]
+  },
+  "role_owner_confirm(uuid,boolean)": {
+    "removed": [
+      "  IF p_accept AND (r.decided_at < now() - interval '14 days' OR NOT public.tenant_staff_has_role(a.tenant_id, r.decided_by, 'owner')) THEN",
+      "  SELECT * INTO a FROM public.approval_actor();"
+    ],
+    "added": [
+      "  IF p_accept AND (r.decided_at < clock_timestamp() - interval '14 days' OR NOT public.tenant_staff_has_role(a.tenant_id, r.decided_by, 'owner')) THEN",
+      "  SELECT * INTO a FROM public.tenant_actor_lock();"
+    ]
+  },
+  "role_assign(uuid,text)": {
+    "removed": [
+      "                    AND m.effective_from <= now() AND (m.effective_to IS NULL OR m.effective_to > now())) THEN",
+      "                    AND m.effective_from <= now() AND (m.effective_to IS NULL OR m.effective_to > now())) THEN",
+      "                   JOIN public.memberships m ON m.tenant_id = s.tenant_id AND m.id = s.membership_id",
+      "                   JOIN public.staff_roles r ON r.tenant_id = s.tenant_id AND r.staff_id = s.id AND r.role = v_as",
+      "                  WHERE s.tenant_id = v_tenant AND s.id = v_actor",
+      "    RAISE EXCEPTION 'bound context is not an active membership with that role' USING ERRCODE = '42501';",
+      "  END IF;",
+      "  IF NOT EXISTS (SELECT 1 FROM public.staff s",
+      "  IF v_tenant IS NULL OR v_actor IS NULL OR v_as IS NULL OR v_as NOT IN ('owner','admin_pusat') THEN",
+      "  PERFORM pg_advisory_xact_lock(hashtextextended('staff_access:' || v_tenant::text, 0));"
+    ],
+    "added": [
+      "                    AND m.effective_from <= clock_timestamp() AND (m.effective_to IS NULL OR m.effective_to > clock_timestamp())) THEN",
+      "  -- HYG-008a: staff_access first, then the actor on the wall clock (tenant_actor_lock).",
+      "  IF v_as NOT IN ('owner','admin_pusat') THEN",
+      "  PERFORM public.tenant_actor_lock();"
+    ]
+  },
+  "role_owner_grant_withdraw(uuid)": {
+    "removed": [
+      "  SELECT * INTO a FROM public.approval_actor();"
+    ],
+    "added": [
+      "  SELECT * INTO a FROM public.tenant_actor_lock();"
+    ]
+  },
+  "role_owner_grants_mine()": {
+    "removed": [
+      "     AND r.state = 'awaiting_confirmation' AND r.decided_at > now() - interval '14 days'"
+    ],
+    "added": [
+      "     AND r.state = 'awaiting_confirmation' AND r.decided_at > clock_timestamp() - interval '14 days'"
+    ]
+  },
+  "tenant_owner_invite_accept(text,uuid)": {
+    "removed": [],
+    "added": [
+      "    RAISE EXCEPTION 'ERR_NOT_FOUND: invitation not valid' USING ERRCODE = 'P0002';",
+      "  -- HYG-008a (R1-L1): the expiry is judged again after the staff_access wait, on the wall clock.",
+      "  -- Order kept (invitation row, then staff_access): nothing takes staff_access then this row.",
+      "  END IF;",
+      "  IF o.expires_at <= clock_timestamp() THEN"
+    ]
+  },
+  "role_request_decide(uuid,boolean)": {
+    "removed": [
+      "                       AND m.effective_from <= now() AND (m.effective_to IS NULL OR m.effective_to > now())) THEN",
+      "                      JOIN public.memberships m ON m.tenant_id = s.tenant_id AND m.id = s.membership_id",
+      "                      JOIN public.staff_roles sr ON sr.tenant_id = s.tenant_id AND sr.staff_id = s.id AND sr.role = 'owner'",
+      "                     WHERE s.tenant_id = v_tenant AND s.id = v_actor",
+      "          AND m.effective_from <= now() AND (m.effective_to IS NULL OR m.effective_to > now())) THEN",
+      "     OR NOT EXISTS (SELECT 1 FROM public.staff s",
+      "  IF v_tenant IS NULL OR v_actor IS NULL OR public.app_acting_role() IS DISTINCT FROM 'owner'",
+      "  PERFORM pg_advisory_xact_lock(hashtextextended('staff_access:' || v_tenant::text, 0));"
+    ],
+    "added": [
+      "          AND m.effective_from <= clock_timestamp() AND (m.effective_to IS NULL OR m.effective_to > clock_timestamp())) THEN",
+      "  -- HYG-008a: staff_access first, then the actor on the wall clock (tenant_actor_lock).",
+      "  IF public.app_acting_role() IS DISTINCT FROM 'owner' THEN",
+      "  PERFORM public.tenant_actor_lock();"
+    ]
+  },
+  "audit_append(text,text,uuid,text,text,text,uuid)": {
+    "removed": [
+      "     AND m.effective_from <= now() AND (m.effective_to IS NULL OR m.effective_to > now())"
+    ],
+    "added": [
+      "                      WHERE b.tenant_id = v_tenant AND b.staff_role_id = r.id AND b.branch_id = v_branch))) THEN",
+      "             AND EXISTS (SELECT 1 FROM public.branches b WHERE b.tenant_id = v_tenant AND b.id = v_branch)",
+      "          OR EXISTS (SELECT 1 FROM public.staff_branches b",
+      "          OR r.role IN ('owner','admin_pusat','finance','central_cs','marketing','purchasing','auditor')",
+      "      USING ERRCODE = '42501';",
+      "     AND (v_branch IS NULL",
+      "     AND m.effective_from <= clock_timestamp() AND (m.effective_to IS NULL OR m.effective_to > clock_timestamp())",
+      "     AND m.effective_from <= clock_timestamp() AND (m.effective_to IS NULL OR m.effective_to > clock_timestamp())",
+      "    FROM public.staff s",
+      "    JOIN public.memberships m ON m.tenant_id = s.tenant_id AND m.id = s.membership_id",
+      "    JOIN public.staff_roles r ON r.tenant_id = s.tenant_id AND r.staff_id = s.id AND r.role = v_role",
+      "    RAISE EXCEPTION 'bound context ended while waiting for the audit lock'",
+      "   WHERE s.tenant_id = v_tenant AND s.id = v_staff",
+      "  -- HYG-008a (R1-H2): the same rule again after the audit lock, on the wall clock: a caller whose",
+      "  -- membership, acting role or branch scope ended while it waited (the changing transaction holds",
+      "  -- this lock) is refused.",
+      "  END IF;",
+      "  IF NOT EXISTS (SELECT 1"
+    ]
+  }
+}

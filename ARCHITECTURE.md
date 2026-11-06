@@ -1,6 +1,6 @@
 # Architecture — clinic-dashboard
 
-Updated: 2026-11-06 (after HYG-006 and HYG-007; M0 29/32 tasks; HYG-008–011 planned from the foundation review)
+Updated: 2026-11-06 (after HYG-006, HYG-007 and HYG-008a; M0 29/32 tasks; HYG-008b–011 planned from the foundation review)
 Stack: Next.js 16.4.3 (App Router, TypeScript), PostgreSQL 16 + Drizzle, Better Auth 1.7.15, Tailwind v4 + shadcn/ui, Vitest + Playwright, pnpm, Docker (Coolify target).
 
 This file describes only what the code does today. Target design: `docs/spec/03`, `04`; decisions: `DECISIONS.md` (DEC-*), `docs/spec/DECISION-REGISTER.md`.
@@ -83,6 +83,7 @@ Shared UI: `src/components/shell` (role-filtered navigation), `templates`, `visi
 | Tenant data (clinic app) | Information disclosure across tenants | Mitigate: RLS + server-resolved context; no BYPASSRLS | `src/db/rls/context.ts`, migrations; `tests/rls`, `tests/isolation` |
 | Auth surfaces | Spoofing (session reuse across app/vendor) | Mitigate: session surface check, host-only cookies | `src/auth/server.ts`; `tests/vendor/host.test.ts` |
 | Staff accounts | Spoofing (weak passwords, brute force) | Mitigate: IAM-1 policy, RATE-2 lockout, TOTP for PR-3 roles | `src/auth/policy.ts`, `server.ts`; `tests/auth` |
+| Clinic authority | Elevation (an ended or demoted actor keeps acting inside an open transaction or after waiting on a lock) | Mitigate (HYG-008a, DEC-043): clinic SECURITY DEFINER writers take the tenant's `staff_access` lock first, then judge the actor on the wall clock (`tenant_actor_lock`, `VOLATILE`); `audit_append` re-checks after its audit lock; `staff_access` precedes every row lock (`setting_draft_decide`/`_cancel` fixed); `staff_invite_accept` locks `staff_access` before the invitation; `clinic_app` cannot read `evidence_approvals.seq` (decisions through `evidence_decisions()`) | `drizzle/0048_clinic_authority_wall_clock.sql`; `tests/rls/authority-clock.test.ts`, `tests/db/authority-drift.test.ts` |
 | Second factor | Spoofing (a copied authenticator, guessed codes from an open session) | Mitigate (HYG-007, DEC-041 (1)): the TOTP secret is shown once at enrolment (`get-totp-uri` refused); new backup codes need the password and a current authenticator code; codes from an open session (step-up, enrolment completion) count toward the per-account lockout shared with sign-in (5 failures, 15 min), serialized by the `auth_two_factor` row lock; backup codes stored encrypted | `src/auth/server.ts`; `tests/auth/second-factor.test.ts` |
 | Vendor console | Elevation (vendor reading clinic data) | Mitigate: no table privilege; guard + allowlist + step-up; grant limited to configuration kinds | 0032, 0034, 0044; `tests/vendor/*` |
 | Vendor actions | Repudiation | Mitigate: `vendor_actions` + tenant audit chain, append-only | 0031/0032 triggers; tests |
@@ -92,7 +93,7 @@ Shared UI: `src/components/shell` (role-filtered navigation), `templates`, `visi
 
 ## Data
 
-PostgreSQL 16, 48 migrations (`drizzle/0000`–`0047`; 0048 planned in HYG-008), applied migrations immutable (`src/db/migrate.ts` refuses drift). Policy kinds in use: tenant-shared, tenant-ledger, platform (clinical and branch-scoped arrive with their modules). Encryption helpers: `src/lib/keys` (envelope encryption, KEK file). No patient data exists yet.
+PostgreSQL 16, 49 migrations (`drizzle/0000`–`0048`; 0049 planned in HYG-008b), applied migrations immutable (`src/db/migrate.ts` refuses drift). Policy kinds in use: tenant-shared, tenant-ledger, platform (clinical and branch-scoped arrive with their modules). Encryption helpers: `src/lib/keys` (envelope encryption, KEK file). No patient data exists yet.
 
 ## Operations
 
@@ -109,10 +110,10 @@ PostgreSQL 16, 48 migrations (`drizzle/0000`–`0047`; 0048 planned in HYG-008),
 
 This section lists decided changes so the map shows where it is going. Each moves into the sections above when its task is committed.
 
-- **Authority checks (HYG-008, migration 0048):**
-  - A SECURITY DEFINER writer takes the tenant's `staff_access` lock first, then judges the actor (membership, role, branch) with `clock_timestamp()`, never with the transaction-start `now()`.
-  - The operator RLS predicate re-checks a support-capable vendor role on every row.
-  - `clinic_operator` gets the same column grants as `clinic_app` (no `evidence_files.content`, no `staff_invitations.token_hash`).
+- **Vendor and operator authority (HYG-008b, migration 0049):**
+  - Vendor console entry points re-check the session, second factor, staff state and role after their last wait (`vendor_authority_recheck`), and a refusal is logged in its own transaction.
+  - The operator RLS predicate re-checks a support-capable vendor role, TOTP and the second-factor age on every row.
+  - `clinic_operator` gets the same column grants as `clinic_app` (no `evidence_files.content`, no `staff_invitations.token_hash`, no `evidence_approvals.seq`).
   - The support expiry sweep re-checks a session after the lock.
 - **Clinic write actions (HYG-009):** every Server Action posts the context it was rendered in (tenant, role, branch) and refuses a mismatch with the current selection, because tabs share one selection cookie.
 - **Isolation gate (HYG-010):**

@@ -16,21 +16,21 @@ import { readMigrationFiles } from "drizzle-orm/migrator";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 
-const MIGRATIONS_FOLDER = fileURLToPath(new URL("../../drizzle", import.meta.url));
+export const MIGRATIONS_FOLDER = fileURLToPath(new URL("../../drizzle", import.meta.url));
 export const MIGRATION_LOCK_KEY = 7_202_611_020; // arbitrary, stable advisory-lock key for migrations
 export const LOCAL_DATABASE_URL =
   "postgres://clinic:clinic_local_only@127.0.0.1:5432/clinic_dashboard";
 
 export class MigrationDriftError extends Error {}
 
-async function assertNoDrift(client: pg.Client): Promise<void> {
+async function assertNoDrift(client: pg.Client, folder: string): Promise<void> {
   const exists = await client.query(`select to_regclass('drizzle.__drizzle_migrations') as t`);
   if (!exists.rows[0].t) return;
   const applied = await client.query<{ hash: string; created_at: string }>(
     `select hash, created_at from drizzle.__drizzle_migrations order by created_at`,
   );
   const files = new Map(
-    readMigrationFiles({ migrationsFolder: MIGRATIONS_FOLDER }).map((m) => [String(m.folderMillis), m.hash]),
+    readMigrationFiles({ migrationsFolder: folder }).map((m) => [String(m.folderMillis), m.hash]),
   );
   // Drizzle runs only files newer than the newest applied one, so an unapplied file with
   // an older timestamp (e.g. merged from another branch) would be skipped silently.
@@ -56,7 +56,10 @@ async function assertNoDrift(client: pg.Client): Promise<void> {
   }
 }
 
-export async function runMigrations(url: string): Promise<void> {
+// `folder`: the migrations to apply (default drizzle/). Tests pass a truncated copy to migrate a
+// database to an earlier point (HYG-008a drift check).
+export async function runMigrations(url: string, opts: { folder?: string } = {}): Promise<void> {
+  const folder = opts.folder ?? MIGRATIONS_FOLDER;
   const client = new pg.Client({
     connectionString: url,
     options: "-c lock_timeout=5s -c statement_timeout=30s",
@@ -70,8 +73,8 @@ export async function runMigrations(url: string): Promise<void> {
     await client.query("select pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
     await client.query("reset lock_timeout");
     await client.query("reset statement_timeout");
-    await assertNoDrift(client);
-    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS_FOLDER });
+    await assertNoDrift(client, folder);
+    await migrate(drizzle(client), { migrationsFolder: folder });
   } finally {
     await client.end(); // ends the session, releasing the advisory lock
   }

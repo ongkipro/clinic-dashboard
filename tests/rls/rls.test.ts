@@ -374,6 +374,7 @@ describe("functions (TEN-16)", () => {
     "compliance_register()",
     "events_claim(text,text,integer,integer)",
     "evidence_decide(uuid,uuid,text,text,date)",
+    "evidence_decisions(uuid)", // HYG-008a: decisions newest first without seq (B-03, 9c)
     "evidence_file_content(uuid)",
     "evidence_upload(text,text,text,bytea,text,text,date)",
     "feature_gate_lock(text)",
