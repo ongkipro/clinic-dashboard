@@ -54,6 +54,9 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - ESLint must ignore `.pi/**` (local agent scratch, git-excluded).
 - Never run PostgreSQL as PID 1 in a container: it reaps every orphan in the namespace and crash-recovers the whole cluster when one exits with a status other than 0/1. A timed-out Docker healthcheck leaves exactly such an orphan (`sh -c pg_isready`: on timeout the probe's `sh` disappears, its `pg_isready` is adopted and exits 2; reproduced on Docker 29.9.2), as do pgBackRest's async workers. Use `init: true` / `--init` or tini in the image (HYG-005); prove a crash with the log lines, not `pg_postmaster_start_time()` (crash recovery keeps the postmaster). To freeze a PID-1 process for a test, signal it from the host (`docker kill -s SIGSTOP`); a signal sent from inside the namespace to its init is dropped.
 - A hook timeout fails a file whose tests all passed: integration `afterAll` hooks drop a database and roles, which can exceed vitest's 10 s default when the full suite loads the host. `vitest.config.mts` sets `hookTimeout: 120_000` (HYG-004); test bodies keep their own limits.
+- A 5 s test-body limit fails integration tests on a shared machine: at load 14–16 (other projects' suites in the other heavy slot) auth, security, events and isolation tests crossed 5 s although they take 1.5–4 s at load 12 and pass alone. `vitest.config.mts` sets `testTimeout: 30_000` (HYG-006, measured in `docs/tasks/HYG-006.md`); a hang is still caught. A timed-out case can leave its insert committed: case helpers that create shared fixtures must be idempotent (HYG-010).
+- Never let test files run `CREATE DATABASE` beside other database creates or drops on one cluster: each create fsyncs the relation map under one cluster-wide lock that every new backend reads at start, and each drop forces an immediate checkpoint, so new connections stall for seconds on a slow disk. `tests/rls/harness.ts` `createTestDatabase` (exclusive advisory lock) and `dropTestDatabase` (shared) are the only way tests create or drop a database; a structural test enforces it (HYG-006).
+- A test whose time limit is only about twice its normal duration fails when the shared local database is slow (slow checkpoints while other work loads the disk): `events.test.ts` "four workers draining 200 events" (normally 2–3 s) timed out at 5 s in one of three suites. Record such failures, never re-run until green to hide them; HYG-011 sets measured limits.
 - RLS revocation needs READ COMMITTED: a REPEATABLE READ/SERIALIZABLE reader judges the session, staff and login rows from its snapshot, so a predicate that reads them misses an end or a sign-out. Check `transaction_isolation` at bind — T-025.
 - Anything an RLS policy writes (read records) and anything logged inside the reader's transaction disappears on its ROLLBACK. For a durable trace, commit it from another connection first and bind it to the reader's `(pg_backend_pid(), txid_current())`; txids (with epoch) are never reused. Verify a caller-supplied pair against `pg_locks` (`transactionid`, granted, that pid) — T-025.
 - An RLS policy runs before non-leakproof user filters, LIMIT, joins and aggregates: a per-row side effect in a policy sees a superset of the returned rows — T-025.
@@ -77,3 +80,39 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - `git cat-file -t 4b825dc6…` answers `tree` even when the object is missing (git knows the empty tree built in); only `git fsck --full` shows it is absent from disk.
   - Do not write into `.git` to repair objects inside a task: stop and report; the owner repairs or restores.
   - Heavy suites (full suite, mutation gate) wait until the one-minute load is at most 4 and no browser or test suite of any project runs (`/data/tmp/t026-waitgate.sh`).
+
+## 2026-11-04 → 2026-11-05 — Test infrastructure hardening and the foundation review
+
+- **HYG-005** (`baae0c8`): PostgreSQL never runs as PID 1. It runs under Docker's init locally and in CI (`--init`), and the pgBackRest image runs tini.
+  - Root cause, reproduced: a timed-out healthcheck left an orphaned `pg_isready`. The postmaster as PID 1 reaped it, saw exit status 2, and crash-recovered the whole cluster mid-suite.
+  - The local development database was rebuilt to 48/48 migrations (owner option A).
+- **HYG-004** (`67d256b`): integration hooks get 120 s (`vitest.config.mts`, `.mts` for Vite's native loader). The harness `close()` prints its per-step timing when slow.
+- **HYG-006** (code done, reviewed; finish pending):
+  - Root cause of an intermittent 5 s test timeout: concurrent `CREATE DATABASE` / `DROP DATABASE` by test files. Each create fsyncs the relation map under one cluster-wide lock that every new backend reads at start, and each drop forces an immediate checkpoint, so new connections stalled for up to seconds on the local SSD.
+  - Evidence: per-second stall watch, a reproduction, PostgreSQL 16.15 source, and alternating stress pairs. It is in `/data/tmp/hyg006/`.
+  - Fix: `createTestDatabase` (exclusive advisory lock) and `dropTestDatabase` (shared) are the only DDL path, enforced by a structural test. 20 deterministic lock tests, 30 mutations.
+- **Foundation review** (owner instruction 2026-11-05): read-only, three lanes (database/RLS, auth/API, ops/tests/docs), each reviewed by GPT and claude.
+  - Verified 5 HIGH, 9 MEDIUM and 9 LOW. One finding was rejected with its reason: idempotency for settings.
+  - Plans: HYG-007 (auth, plan approved), HYG-008 (database, migration 0048, plan drafted), HYG-009 (stale-context writes and app fixes), HYG-010 (isolation gate and docs), HYG-011 (timing-bound test limits).
+  - Reports: `/data/tmp/foundation-review/`.
+- **Decisions** (DEC-041, owner 2026-11-05): decisions are revisable defaults, each change logged here, in STATUS and in the ARCHITECTURE system map.
+  - (1) New backup codes need the password and a current authenticator code. `get-totp-uri` is refused. Step-up codes count toward the same per-account lockout as at sign-in.
+  - (2) HYG-006 finishes with one recorded intermittent timing failure.
+
+### Gotchas worth keeping (added 2026-11-05)
+
+- `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).
+- PostgreSQL advisory locks are per database: participants coordinate only when they connect to the same database.
+- `vitest -t` matches the full test name, including the describe prefix, so `^` anchors match nothing. A run where no test ran must count as invalid, never as "not caught" or "passed" (mutation scripts judge "Tests … passed|failed" first).
+- A mutation that removes one of two redundant cleanup paths survives by design. Mutate both, or the mutation proves nothing.
+- Review agents: give each one a narrow scope and a tool budget. Wide lanes timed out twice (claude) with no report.
+- Better Auth 1.7.15 two-factor:
+  - The plugin counts code failures per account only at sign-in (`isSignIn` = no valid session). Step-up from an open session is not counted (fixed in HYG-007).
+  - `get-totp-uri` returns the live secret to anyone with a session and the password.
+  - `generate-backup-codes` mints a working second factor with the password alone.
+
+## 2026-11-05 ~20:30 WIB — Checkpoint (machine maintenance)
+
+- HYG-006 is not yet committed. The re-run passed every check except the full suite, of which only suite 1 of 3 ran (779 passed) before the checkpoint stopped it. The ledger run stays open; resume with `/data/tmp/hyg006/commit-push.sh` (see STATUS "CHECKPOINT").
+- Gotcha: the host gate (`/data/tmp/t026-waitgate.sh`) matched "playwright" in process arguments. It counted Chrome launched by an interactive browser tool (`playwright-mcp`, whose profile path contains "playwright") as a test suite, and stayed closed for hours. The gate now skips the whole `playwright-mcp` process tree; real suites (`playwright test`, `vitest`, `test-backend-isolated`) still count. Check process ancestry, not only a command-line word.
+- A plan file edit once inserted a block between every character, because an empty search pattern was replaced (29 MB). It was recovered exactly from its repeated insert. Every scripted text replacement now asserts a non-empty pattern that occurs exactly once.

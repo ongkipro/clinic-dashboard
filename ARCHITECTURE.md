@@ -1,6 +1,6 @@
 # Architecture — clinic-dashboard
 
-Updated: 2026-11-04 (after T-026; M0 27/32 tasks + HYG-001–003)
+Updated: 2026-11-05 (after T-026 and HYG-004–006; M0 29/32 tasks; HYG-007–011 planned from the foundation review)
 Stack: Next.js 16.4.3 (App Router, TypeScript), PostgreSQL 16 + Drizzle, Better Auth 1.7.15, Tailwind v4 + shadcn/ui, Vitest + Playwright, pnpm, Docker (Coolify target).
 
 This file describes only what the code does today. Target design: `docs/spec/03`, `04`; decisions: `DECISIONS.md` (DEC-*), `docs/spec/DECISION-REGISTER.md`.
@@ -91,7 +91,7 @@ Shared UI: `src/components/shell` (role-filtered navigation), `templates`, `visi
 
 ## Data
 
-PostgreSQL 16, 45 migrations (`drizzle/0000`–`0044`), applied migrations immutable (`src/db/migrate.ts` refuses drift). Policy kinds in use: tenant-shared, tenant-ledger, platform (clinical and branch-scoped arrive with their modules). Encryption helpers: `src/lib/keys` (envelope encryption, KEK file). No patient data exists yet.
+PostgreSQL 16, 48 migrations (`drizzle/0000`–`0047`; 0048 planned in HYG-008), applied migrations immutable (`src/db/migrate.ts` refuses drift). Policy kinds in use: tenant-shared, tenant-ledger, platform (clinical and branch-scoped arrive with their modules). Encryption helpers: `src/lib/keys` (envelope encryption, KEK file). No patient data exists yet.
 
 ## Operations
 
@@ -102,4 +102,22 @@ PostgreSQL 16, 45 migrations (`drizzle/0000`–`0044`), applied migrations immut
 
 ## Verification
 
-`pnpm typecheck`, `pnpm lint`, `pnpm docs:check`, `pnpm test` (718 tests, real PostgreSQL), `pnpm run build`; browser evidence specs under `tests/ui` (run on request, `RUN_UI=1`); wave gate scripts run the CI order locally plus image migration and restore drill.
+`pnpm typecheck`, `pnpm lint`, `pnpm docs:check`, `pnpm test` (real PostgreSQL; the current count is in STATUS.md), `pnpm run build`; browser evidence specs under `tests/ui` (run on request, `RUN_UI=1`); wave gate scripts run the CI order locally plus image migration and restore drill. Integration tests each create a throwaway database through `tests/rls/harness.ts`; its `createTestDatabase` (exclusive advisory lock) and `dropTestDatabase` (shared) are the only way a test creates or drops one, so creates never run beside other database DDL on the shared cluster (HYG-006; a structural test enforces it). Vitest limits (`vitest.config.mts`): hooks 120 s (HYG-004), test bodies 30 s (HYG-006, measured on the shared machine); a test whose timing is its point sets its own limit.
+
+## Planned changes from the foundation review (not built yet; 2026-11-05)
+
+This section lists decided changes so the map shows where it is going. Each moves into the sections above when its task is committed.
+
+- **Second factor (HYG-007, DEC-041 (1)):**
+  - The TOTP secret is shown once, at enrolment; `get-totp-uri` is refused.
+  - New backup codes need the password and a current authenticator code.
+  - Codes from an open session (step-up, enrolment completion) count toward the per-account lockout shared with sign-in (DEC-010: 5 failures, 15 min).
+- **Authority checks (HYG-008, migration 0048):**
+  - A SECURITY DEFINER writer takes the tenant's `staff_access` lock first, then judges the actor (membership, role, branch) with `clock_timestamp()`, never with the transaction-start `now()`.
+  - The operator RLS predicate re-checks a support-capable vendor role on every row.
+  - `clinic_operator` gets the same column grants as `clinic_app` (no `evidence_files.content`, no `staff_invitations.token_hash`).
+  - The support expiry sweep re-checks a session after the lock.
+- **Clinic write actions (HYG-009):** every Server Action posts the context it was rendered in (tenant, role, branch) and refuses a mismatch with the current selection, because tabs share one selection cookie.
+- **Isolation gate (HYG-010):**
+  - Action and job negatives must prove a refusal, not only the absence of tenant B's secrets.
+  - Consumable victim state is re-seeded for the negative run.

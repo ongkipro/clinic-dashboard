@@ -24,36 +24,185 @@ export type Harness = {
   close(): Promise<void>;
 };
 
-// A close slower than this is reported with its per-step timings (HYG-004).
-const SLOW_CLOSE_MS = 5_000;
+// A close or a DDL-lock wait slower than this is reported on stderr (HYG-004, HYG-006).
+const SLOW_MS = 5_000;
 
-export async function createHarness(): Promise<Harness> {
-  const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
-  const dbName = `rls_${suffix}`;
-  const server = new pg.Client({ connectionString: adminUrl });
-  await server.connect();
-  // Each run holds a session advisory lock keyed on its database name for its whole
-  // lifetime; leftovers of crashed runs are dropped only when their lock is free, so a
-  // concurrent run (parallel files, CI shards) is never swept.
-  const lockKey = (name: string) => `hashtext('${name}')`;
-  await server.query(`select pg_advisory_lock(${lockKey(dbName)})`);
-  const stale = await server.query<{ d: string }>(
-    `select datname as d from pg_database where datname ~ '^rls_[0-9a-f]{12}$'`,
-  );
-  for (const { d } of stale.rows) {
-    const free = await server.query<{ ok: boolean }>(
-      `select pg_try_advisory_lock(${lockKey(d)}) as ok`,
-    );
-    if (!free.rows[0].ok) continue;
+// HYG-006: database creates and drops by test files. In PostgreSQL every CREATE DATABASE
+// writes and fsyncs a relation map under one cluster-wide lock that every new backend also
+// reads at start, and every DROP DATABASE forces an immediate checkpoint; parallel test files
+// doing both at once stalled new connections for seconds on a slow disk. So a create takes
+// this advisory key exclusively and a drop takes it shared: drops still run together (one
+// forced checkpoint serves several) but never beside a create, and creates never overlap.
+// - Advisory locks are per database: every participant takes the key on a connection to the
+//   same admin database (TEST_DATABASE_URL, or the local default). CI uses one URL per job.
+// - The key is above 2^31, so it cannot equal a hashtext() per-database key (int32), and it is
+//   not MIGRATION_LOCK_KEY (7_202_611_020).
+// - Lock order: a harness takes its own per-database lifetime lock first and this key only
+//   around one statement; while holding it, it never blocks on another harness advisory lock.
+// - The helper is not reentrant and never upgrades shared to exclusive (PostgreSQL would allow
+//   a nested acquisition; the contract forbids it). PostgreSQL's lock queue keeps newly arriving
+//   shared requests from passing a queued exclusive one, so drops cannot starve a create.
+export const DDL_LOCK_KEY = BigInt("7202611030");
+
+type Query = (sql: string, values?: unknown[]) => Promise<unknown>;
+
+// Test-only knobs (tests/rls/harness-lock.test.ts): a private key so no other file queues on
+// it, a hook after acquisition, a replaceable SQL runner and a shorter slow-wait threshold.
+export type DdlLockOptions = {
+  ddlLockKey?: bigint;
+  afterAcquire?: () => Promise<void>;
+  run?: Query;
+  slowMs?: number;
+  // The time spent waiting for the lock, reported whether or not the acquisition succeeded.
+  onLockWait?: (ms: number) => void;
+  observerName?: string;
+  // Builds the observer connection (test-only: a test injects one that never connects).
+  observer?: (name: string) => pg.Client;
+};
+
+// The slow-wait report runs beside the waiting acquisition, on its own connection: a query
+// queued on the waiting client could not run until the lock is granted. It never delays the
+// operation: when the acquisition settles, a report still in flight is cut off by ending its
+// connection (its line is then not printed), and the observer connects and queries with
+// short timeouts. `observerName` and `observer` are test-only: a test finds this call's
+// observer by name, or injects one that never connects to prove it cannot block.
+const defaultObserver = (name: string) =>
+  new pg.Client({ connectionString: adminUrl, application_name: name, connectionTimeoutMillis: 2_000, statement_timeout: 2_000 });
+function startHolderReport(key: bigint, mode: string, slowMs: number, observerName: string, make: (name: string) => pg.Client) {
+  const observer = make(observerName);
+  observer.on("error", () => {});
+  let stopped = false;
+  const done = (async () => {
     try {
-      await server.query(`DROP DATABASE IF EXISTS ${d} WITH (FORCE)`);
-      const leftover = await server.query<{ r: string }>(
-        `select rolname as r from pg_roles where rolname ~ $1`,
-        [`^${d}_[0-9]+$`],
+      await observer.connect();
+      const { rows } = await observer.query<{ pid: number; mode: string; state: string; q: string }>(
+        `select l.pid, l.mode, a.state, left(a.query, 60) as q
+           from pg_locks l join pg_stat_activity a on a.pid = l.pid
+          where l.locktype = 'advisory' and l.granted and l.objsubid = 1
+            and ((l.classid::bigint << 32) | l.objid::bigint) = $1`,
+        [key.toString()],
       );
-      for (const { r } of leftover.rows) await server.query(`DROP ROLE IF EXISTS ${r}`);
+      if (!stopped) {
+        console.error(
+          `[harness] ${mode} DDL lock wait over ${slowMs} ms; holders: ${rows.map((r) => `pid ${r.pid} ${r.mode} ${r.state} "${r.q}"`).join("; ") || "none visible"}`,
+        );
+      }
+    } catch (e) {
+      if (!stopped) console.error(`[harness] ${mode} DDL lock wait over ${slowMs} ms; holder report failed: ${String(e).slice(0, 80)}`);
     } finally {
-      await server.query(`select pg_advisory_unlock(${lockKey(d)})`);
+      await observer.end().catch(() => {});
+    }
+  })();
+  // Fire and forget: ends the observer's connection; never awaited by the operation.
+  const stop = () => {
+    stopped = true;
+    void observer.end().catch(() => {});
+  };
+  return { stop, done };
+}
+
+// Runs `fn` holding the DDL key in `mode` on `server`'s session. Error precedence:
+// - acquisition fails: neither fn nor the unlock runs; the acquisition error is thrown and
+//   the caller still owns (and ends) its connection;
+// - fn throws, unlock succeeds: fn's error;
+// - fn throws, unlock fails: the connection is ended (that releases the session lock) and
+//   fn's error is thrown, with the unlock error as its cause when it has none;
+// - fn succeeds, unlock fails: the connection is ended and the unlock error is thrown, so a
+//   statement that ran is never hidden behind a success on a connection in an unknown state.
+// Ending the connection is best effort and never replaces the error being thrown.
+export async function withDatabaseDdlLock<T>(
+  server: pg.Client,
+  mode: "exclusive" | "shared",
+  fn: () => Promise<T>,
+  opts: DdlLockOptions = {},
+): Promise<T> {
+  const key = opts.ddlLockKey ?? DDL_LOCK_KEY;
+  const run: Query = opts.run ?? ((sql, values) => server.query(sql, values));
+  const slowMs = opts.slowMs ?? SLOW_MS;
+  const suffix = mode === "shared" ? "_shared" : "";
+  let report: ReturnType<typeof startHolderReport> | undefined;
+  const timer = setTimeout(() => {
+    report = startHolderReport(key, mode, slowMs, opts.observerName ?? "harness:lock-observer", opts.observer ?? defaultObserver);
+  }, slowMs);
+  const t0 = performance.now();
+  try {
+    await run(`select pg_advisory_lock${suffix}($1)`, [key.toString()]);
+  } finally {
+    clearTimeout(timer);
+    report?.stop();
+    // Reporting the wait is diagnostics: it never replaces an acquisition error and never
+    // leaves an acquired lock without its unlock handling.
+    try {
+      opts.onLockWait?.(Math.round(performance.now() - t0));
+    } catch {
+      // ignored
+    }
+  }
+  let result: T;
+  try {
+    if (opts.afterAcquire) await opts.afterAcquire();
+    result = await fn();
+  } catch (error) {
+    try {
+      await run(`select pg_advisory_unlock${suffix}($1)`, [key.toString()]);
+    } catch (unlockError) {
+      await server.end().catch(() => {});
+      // Best effort: a frozen or exotic error must still be rethrown as itself (GPT review
+      // 2026-11-06), so attaching the cause can never replace it.
+      try {
+        if (error instanceof Error && error.cause === undefined) error.cause = unlockError;
+      } catch {
+        // the original error stays as thrown
+      }
+    }
+    throw error;
+  }
+  try {
+    await run(`select pg_advisory_unlock${suffix}($1)`, [key.toString()]);
+  } catch (unlockError) {
+    await server.end().catch(() => {});
+    throw unlockError;
+  }
+  return result;
+}
+
+// The only two places a test creates or drops a database (a structural test enforces it).
+// ddl-wrapper:begin
+export function createTestDatabase(server: pg.Client, name: string, opts: DdlLockOptions = {}): Promise<unknown> {
+  return withDatabaseDdlLock(server, "exclusive", () => server.query(`CREATE DATABASE ${name}`), opts);
+}
+export function dropTestDatabase(server: pg.Client, name: string, opts: DdlLockOptions = {}): Promise<unknown> {
+  return withDatabaseDdlLock(server, "shared", () => server.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`), opts);
+}
+// ddl-wrapper:end
+
+const lockKey = (name: string) => `hashtext('${name}')`;
+export const STALE_PATTERN = "^rls_[0-9a-f]{12}$";
+
+// Leftovers of crashed runs are dropped only when their lifetime lock is free, so a concurrent
+// run (parallel files, CI shards) is never swept. `pattern` is a test-only knob.
+export async function sweepStaleDatabases(
+  server: pg.Client,
+  opts: DdlLockOptions & { pattern?: string } = {},
+): Promise<void> {
+  const pattern = opts.pattern ?? STALE_PATTERN;
+  const stale = await server.query<{ d: string }>(`select datname as d from pg_database where datname ~ $1`, [pattern]);
+  for (const { d } of stale.rows) {
+    const free = await server.query<{ ok: boolean }>(`select pg_try_advisory_lock(${lockKey(d)}) as ok`);
+    if (!free.rows[0].ok) continue;
+    let failed = false;
+    try {
+      await dropTestDatabase(server, d, opts);
+      const leftover = await server.query<{ r: string }>(`select rolname as r from pg_roles where rolname ~ $1`, [`^${d}_[0-9]+$`]);
+      for (const { r } of leftover.rows) await server.query(`DROP ROLE IF EXISTS ${r}`);
+    } catch (error) {
+      failed = true;
+      throw error;
+    } finally {
+      // After a failure the connection may be ended (an unlock failure ends it, which also
+      // releases this lock); an unlock error then must not replace the real one.
+      const unlock = server.query(`select pg_advisory_unlock(${lockKey(d)})`);
+      await (failed ? unlock.catch(() => {}) : unlock);
     }
   }
   const orphans = await server.query<{ r: string; d: string }>(
@@ -62,9 +211,7 @@ export async function createHarness(): Promise<Harness> {
        and substring(rolname from '^(rls_[0-9a-f]{12})_') not in (select datname from pg_database)`,
   );
   for (const { r, d } of orphans.rows) {
-    const free = await server.query<{ ok: boolean }>(
-      `select pg_try_advisory_lock(${lockKey(d)}) as ok`,
-    );
+    const free = await server.query<{ ok: boolean }>(`select pg_try_advisory_lock(${lockKey(d)}) as ok`);
     if (!free.rows[0].ok) continue;
     try {
       await server.query(`DROP ROLE IF EXISTS ${r}`);
@@ -72,7 +219,27 @@ export async function createHarness(): Promise<Harness> {
       await server.query(`select pg_advisory_unlock(${lockKey(d)})`);
     }
   }
-  await server.query(`CREATE DATABASE ${dbName}`);
+}
+
+// Test-only knobs for createHarness (tests/rls/harness-lock.test.ts).
+export type HarnessOptions = Omit<DdlLockOptions, "onLockWait"> & {
+  migrate?: (url: string) => Promise<void>;
+  stalePattern?: string;
+};
+
+export async function createHarness(opts: HarnessOptions = {}): Promise<Harness> {
+  const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
+  const dbName = `rls_${suffix}`;
+  const server = new pg.Client({ connectionString: adminUrl, application_name: `harness:${dbName}` });
+  // A backend terminated while the client is idle must not surface as an unhandled error.
+  server.on("error", () => {});
+  const ddl: DdlLockOptions = {
+    ddlLockKey: opts.ddlLockKey, afterAcquire: opts.afterAcquire, run: opts.run, slowMs: opts.slowMs,
+    observerName: opts.observerName, observer: opts.observer,
+  };
+  const t0 = performance.now();
+  let createLockWait = 0;
+  await server.connect();
   const urlFor = (user?: string, password?: string) => {
     const u = new URL(adminUrl);
     u.pathname = `/${dbName}`;
@@ -83,13 +250,29 @@ export async function createHarness(): Promise<Harness> {
     return u.toString();
   };
   const admin = new pg.Client({ connectionString: urlFor() });
+  admin.on("error", () => {});
+  let created = false;
   try {
-    await runMigrations(urlFor());
+    // Each run holds a session advisory lock keyed on its database name for its whole lifetime.
+    await server.query(`select pg_advisory_lock(${lockKey(dbName)})`);
+    await sweepStaleDatabases(server, { ...ddl, pattern: opts.stalePattern });
+    await createTestDatabase(server, dbName, { ...ddl, onLockWait: (ms) => (createLockWait = ms) });
+    created = true;
+    await (opts.migrate ?? runMigrations)(urlFor());
     await admin.connect();
   } catch (error) {
-    await server.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`);
-    await server.end();
+    // Best effort: an ended connection (an unlock failure) cannot drop; a later sweep does,
+    // because ending the session released this database's lifetime lock.
+    if (created) await dropTestDatabase(server, dbName, ddl).catch(() => {});
+    await admin.end().catch(() => {});
+    await server.end().catch(() => {});
     throw error;
+  } finally {
+    // A slow setup names its DDL-lock wait (HYG-006), like close() names its slow steps.
+    const total = Math.round(performance.now() - t0);
+    if (total >= (opts.slowMs ?? SLOW_MS)) {
+      console.error(`[harness] slow setup of ${dbName}: ${total} ms (lock_wait ${createLockWait})`);
+    }
   }
 
   const roles: string[] = [];
@@ -134,8 +317,9 @@ export async function createHarness(): Promise<Harness> {
     },
     async close() {
       // Best effort per step so one failure never leaves the database or roles behind.
-      // Each step is timed; a close slower than SLOW_CLOSE_MS names its steps on stderr
-      // (HYG-004), so a hook timeout under a busy suite shows which step was slow.
+      // Each step is timed; a close slower than SLOW_MS names its steps on stderr (HYG-004),
+      // so a hook timeout under a busy suite shows which step was slow. drop_database includes
+      // the wait for the DDL lock, which is also reported as lock_wait (even when the drop fails).
       const t0 = performance.now();
       const steps: [string, number][] = [];
       const step = async (name: string, fn: () => Promise<unknown>) => {
@@ -150,12 +334,12 @@ export async function createHarness(): Promise<Harness> {
       await step("pools", async () => { for (const p of pools) await p.end().catch(() => {}); });
       await step("admin", () => admin.end().catch(() => {}));
       try {
-        await step("drop_database", () => server.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`));
+        await step("drop_database", () => dropTestDatabase(server, dbName, { ...ddl, onLockWait: (ms) => steps.push(["lock_wait", ms]) }));
         await step("drop_roles", async () => { for (const r of roles) await server.query(`DROP ROLE IF EXISTS ${r}`).catch(() => {}); });
       } finally {
-        await server.end();
+        await server.end().catch(() => {});
         const total = Math.round(performance.now() - t0);
-        if (total >= SLOW_CLOSE_MS) {
+        if (total >= (opts.slowMs ?? SLOW_MS)) {
           console.error(`[harness] slow close of ${dbName}: ${total} ms (${steps.map(([n, ms]) => `${n} ${ms}`).join(", ")})`);
         }
       }

@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setTimeout as sleep } from "node:timers/promises";
 import { LOCAL_DATABASE_URL, MIGRATION_LOCK_KEY, MigrationDriftError, runMigrations } from "../../src/db/migrate";
 import { contractViolations } from "./contract";
+import { createTestDatabase, dropTestDatabase } from "../rls/harness";
 
 // Tests create a throwaway database on TEST_DATABASE_URL's server. Only loopback hosts
 // are accepted outside CI so a developer shell pointed at a shared server is refused.
@@ -28,7 +29,7 @@ let db: pg.Client;
 beforeAll(async () => {
   admin = new pg.Client({ connectionString: adminUrl });
   await admin.connect();
-  await admin.query(`CREATE DATABASE ${dbName}`);
+  await createTestDatabase(admin, dbName);
   await runMigrations(testUrl);
   db = new pg.Client({ connectionString: testUrl });
   await db.connect();
@@ -36,7 +37,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db?.end();
-  await admin?.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`);
+  if (admin) await dropTestDatabase(admin, dbName);
   await admin?.end();
 });
 
@@ -56,7 +57,7 @@ describe("fresh database migration", () => {
 
   it("two concurrent runners on a fresh database both succeed", async () => {
     const name = `${dbName}_c`;
-    await admin.query(`CREATE DATABASE ${name}`);
+    await createTestDatabase(admin, name);
     try {
       const u = new URL(testUrl);
       u.pathname = `/${name}`;
@@ -64,13 +65,13 @@ describe("fresh database migration", () => {
         Promise.all([runMigrations(u.toString()), runMigrations(u.toString())]),
       ).resolves.toEqual([undefined, undefined]);
     } finally {
-      await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+      await dropTestDatabase(admin, name);
     }
   }, 60_000); // two full runs of every migration; CI runs the restore drill beside this suite
 
   it("a runner waits for the migration lock longer than the 5 s DDL lock timeout", async () => {
     const name = `${dbName}_w`;
-    await admin.query(`CREATE DATABASE ${name}`);
+    await createTestDatabase(admin, name);
     const u = new URL(testUrl);
     u.pathname = `/${name}`;
     const holder = new pg.Client({ connectionString: u.toString() });
@@ -84,7 +85,7 @@ describe("fresh database migration", () => {
       await expect(run).resolves.toBeUndefined();
     } finally {
       await holder.end();
-      await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+      await dropTestDatabase(admin, name);
     }
   }, 60_000);
 

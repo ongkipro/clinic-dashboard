@@ -1,6 +1,6 @@
 # Tasks — Clinic Dashboard
 
-Updated: 2026-11-02
+Updated: 2026-11-05
 
 Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR-9, PR-14, PR-15, PR-18, PR-71, PR-83). Root execution queue of `~/Projects/clinic-dashboard` (DEL-1). Every task traces to exactly one primary `PR-*` in `02-PRD.md`; other IDs are constraints. Task state lives in `STATUS.md` and `.delivery/`, not here.
 
@@ -29,6 +29,20 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 | M9 | T-120–T-131 (12) |
 
 ## Pending
+
+### Hygiene queue (owner-authorised, runs before the remaining M0 tasks)
+
+Owner instructions 2026-11-04/05 (foundation review: "jika ada bugs dan kekurangan kamu sempurnakan"; DEC-040, DEC-041). These are not `T-*` tasks and trace to no PR: each fixes verified defects in finished M0 work. Each has a plan in `docs/tasks/<ID>.md` and goes through the delivery ledger, independent review (GPT and claude for R3) and a local commit, like a task. Order is binding: one at a time, top to bottom, then T-027, T-028, T-032.
+
+| Order | ID | Risk | Scope | Plan | State |
+|---|---|---|---|---|---|
+| 1 | HYG-006 | R3 | Test harness: database creates never beside other database DDL (advisory lock). Allowed: `tests/rls/harness.ts`, `tests/rls/harness-lock.test.ts`, `tests/db/migrations.test.ts`, docs | `docs/tasks/HYG-006.md` | Built and reviewed (APPROVE); the final re-run failed one environment-bound suite; re-run, finish, commit, push |
+| 2 | HYG-007 | R3 | Second factor: `get-totp-uri` refused, backup codes need a current code, step-up codes counted per account (F1–F3, DEC-041 (1)). Allowed: `src/auth/server.ts`, `src/app/(auth)/security-panel.tsx`, `src/app/(auth)/client.ts`, `tests/auth/**`, docs | `docs/tasks/HYG-007.md` | Plan APPROVE; implementation drafted in `/data/tmp/hyg007/impl/`, early review findings applied |
+| 3 | HYG-008 | R3 | Database authority: actor validity on the wall clock after `staff_access`; operator role re-check and column grants; sweep re-check; offboarding guard; `seq`; TRUNCATE guard. Migration `drizzle/0048_*`; allowed: `drizzle/**`, `src/db/rls/operator.sql`, `tests/rls/**`, docs | `docs/tasks/HYG-008.md` | Plan drafted, not reviewed |
+| 4 | HYG-009 | R3 | Clinic write actions refuse a stale context (two tabs); `/staf/<id>` for Admin Pusat; Owner branch settings; context switch honours session revocation. Allowed: `src/app/(app)/**/actions.ts`, forms, `src/modules/org/**`, `drizzle/**` (settings branch rule), tests, docs | `docs/tasks/HYG-009.md` | Findings verified; plan to write |
+| 5 | HYG-010 | R2 | Isolation gate that can fail for cross-tenant writes; outbox negative; `/staf/[id]` not-found; browser runners exit non-zero; stale STATUS/ARCHITECTURE lines; DECISIONS supersedes marks. Allowed: `tests/isolation/**`, `tests/ui/**`, docs | `docs/tasks/HYG-010.md` | Findings verified; plan to write |
+| 6 | HYG-011 | R2 | Measured limits for timing-bound tests (the 5 s test timeout under load was raised to 30 s inside HYG-006, 2026-11-06; what remains: tests whose timing is the point); `hosts.spec.ts` keeps server output and takes a free port. Allowed: `tests/**`, docs | `docs/tasks/HYG-011.md` | Findings recorded; plan to write |
+| 7 | — | — | Wave gate (CI order locally, image migration, restore drill), push, CI green | `STATUS.md` | After HYG-011 |
 
 ### Milestone M0
 
