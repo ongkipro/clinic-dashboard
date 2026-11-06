@@ -7,25 +7,34 @@ import type pg from "pg";
 import { call as orgCall } from "../../org/access/access";
 import { hashToken } from "../../org/staff/staff";
 import type { ConsoleCall, Result } from "../tenants/tenants";
+import { type RefusalSubject, withAuthorityRecheck } from "../authority";
 
 export const GRANT_KINDS = ["branches", "catalog", "staff_invitations", "imports", "branding", "templates"] as const;
 export type GrantKind = (typeof GRANT_KINDS)[number];
 
-async function call<T>(db: pg.Pool, sql: string, args: unknown[]): Promise<Result<T>> {
-  const r = (await db.query<{ r: { ok: boolean; code?: string; reason?: string } & T }>(sql, args)).rows[0].r;
-  return r.ok ? { ok: true, data: r } : { ok: false, code: r.code ?? "ERR_FORBIDDEN", reason: r.reason };
+async function call<T>(db: pg.Pool, sql: string, args: unknown[], subject: RefusalSubject = { object: null }): Promise<Result<T>> {
+  // HYG-008b: the entry point re-reads its caller's authority after its last wait; a refusal
+  // there rolls the statement back and is logged in its own transaction, attributed to `subject`
+  // (withAuthorityRecheck). Calls that are not console entry points never raise it.
+  const fn = /select (vendor_console_[a-z_]+)\(/.exec(sql)?.[1];
+  const once = async () => {
+    const r = (await db.query<{ r: { ok: boolean; code?: string; reason?: string } & T }>(sql, args)).rows[0].r;
+    return r.ok ? ({ ok: true, data: r } as const) : ({ ok: false, code: r.code ?? "ERR_FORBIDDEN", reason: r.reason } as const);
+  };
+  if (!fn) return once();
+  return withAuthorityRecheck(db, { token: String(args[0]), ip: String(args[1]) }, fn, subject, once);
 }
 
 // May this vendor caller open <kind> in this tenant now? Any kind outside the grant —
 // patient records, clinical notes, photos, consents, messages — is refused and audited.
 export function onboardingAccess(db: pg.Pool, c: ConsoleCall, tenantId: string | null, kind: string) {
-  return call<{ expires_at: string }>(db, `select vendor_console_onboarding_access($1, $2, $3, $4) as r`, [c.token, c.ip, tenantId, kind]);
+  return call<{ expires_at: string }>(db, `select vendor_console_onboarding_access($1, $2, $3, $4) as r`, [c.token, c.ip, tenantId, kind], { tenant: tenantId });
 }
 
 export type DraftInput = { email: string; name: string; roles: string[]; branchIds: string[] };
 export function draftInvitation(db: pg.Pool, c: ConsoleCall, tenantId: string | null, d: DraftInput) {
   return call<{ id: string }>(db, `select vendor_console_onboarding_invite($1, $2, $3, $4, $5, $6, $7) as r`,
-    [c.token, c.ip, tenantId, d.email, d.name, d.roles, d.branchIds]);
+    [c.token, c.ip, tenantId, d.email, d.name, d.roles, d.branchIds], { tenant: tenantId });
 }
 
 // ── the clinic Owner (inside withTenantContext) ─────────────────────────────────────────

@@ -303,6 +303,8 @@ describe("history and privileges", () => {
                                        where n.nspname = 'public' and has_function_privilege('clinic_vendor', p.oid, 'EXECUTE')
                                          and not has_function_privilege('public', p.oid, 'EXECUTE') order by 1`)).rows.map((r) => r.f);
     expect(fns).toEqual([
+      // HYG-008b: the console logs an authority re-check refusal in its own transaction.
+      "vendor_authority_refused(text, text, text, text, uuid, uuid, text)",
       "vendor_console_ip_allowed(text)",
       "vendor_console_me(text, text)",
       "vendor_console_onboarding_access(text, text, uuid, text)",

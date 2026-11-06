@@ -8,10 +8,19 @@ import { AccountExistsError } from "../../../auth/server";
 import { hashToken } from "../../org/staff/staff";
 import type { ConsoleCall, Result } from "../tenants/tenants";
 import type { VendorRole } from "../staff/staff";
+import { type RefusalSubject, withAuthorityRecheck } from "../authority";
 
-async function call<T>(db: pg.Pool, sql: string, args: unknown[]): Promise<Result<T>> {
-  const r = (await db.query<{ r: { ok: boolean; code?: string; reason?: string } & T }>(sql, args)).rows[0].r;
-  return r.ok ? { ok: true, data: r } : { ok: false, code: r.code ?? "ERR_FORBIDDEN", reason: r.reason };
+async function call<T>(db: pg.Pool, sql: string, args: unknown[], subject: RefusalSubject = { object: null }): Promise<Result<T>> {
+  // HYG-008b: the entry point re-reads its caller's authority after its last wait; a refusal
+  // there rolls the statement back and is logged in its own transaction, attributed to `subject`
+  // (withAuthorityRecheck). Calls that are not console entry points never raise it.
+  const fn = /select (vendor_console_[a-z_]+)\(/.exec(sql)?.[1];
+  const once = async () => {
+    const r = (await db.query<{ r: { ok: boolean; code?: string; reason?: string } & T }>(sql, args)).rows[0].r;
+    return r.ok ? ({ ok: true, data: r } as const) : ({ ok: false, code: r.code ?? "ERR_FORBIDDEN", reason: r.reason } as const);
+  };
+  if (!fn) return once();
+  return withAuthorityRecheck(db, { token: String(args[0]), ip: String(args[1]) }, fn, subject, once);
 }
 
 export type TeamMember = { id: string; name: string; email: string; state: "active" | "suspended" | "exited"; totp: boolean; roles: VendorRole[] };
@@ -29,11 +38,11 @@ export async function inviteMember(db: pg.Pool, c: ConsoleCall, email: string, n
 }
 
 export function cancelMemberInvite(db: pg.Pool, c: ConsoleCall, invitationId: string | null) {
-  return call<object>(db, `select vendor_console_staff_invite_cancel($1, $2, $3) as r`, [c.token, c.ip, invitationId]);
+  return call<object>(db, `select vendor_console_staff_invite_cancel($1, $2, $3) as r`, [c.token, c.ip, invitationId], { object: invitationId });
 }
 
 export function setMemberState(db: pg.Pool, c: ConsoleCall, staffId: string | null, state: string) {
-  return call<object>(db, `select vendor_console_staff_state($1, $2, $3, $4) as r`, [c.token, c.ip, staffId, state]);
+  return call<object>(db, `select vendor_console_staff_state($1, $2, $3, $4) as r`, [c.token, c.ip, staffId, state], { object: staffId });
 }
 
 // ── accepting (no session) ──────────────────────────────────────────────────────────────

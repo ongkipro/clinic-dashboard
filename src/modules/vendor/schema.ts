@@ -494,6 +494,10 @@ export const supportSessionBindings = pgTable(
     // would block deactivating the operator (the predicate joins vendor_staff instead).
     staffId: uuid("staff_id").notNull(),
     boundAt: timestamp("bound_at", { withTimezone: true }).notNull().defaultNow(),
+    // HYG-008b (DEC-042): the address the bind came from; the operator predicate checks it
+    // against the vendor allowlist on every row while enforcement is on. Bindings made before
+    // 0049 have none and are refused under enforcement (bindings live one transaction).
+    clientIp: text("client_ip"),
   },
   (t) => [unique("support_session_bindings_key").on(t.backendPid, t.txid)],
 );

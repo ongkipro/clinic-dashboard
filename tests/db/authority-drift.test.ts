@@ -1,24 +1,27 @@
 // HYG-008a drift check: 0048 re-creates functions from their latest definitions with only the
-// planned lines changed. A database is migrated to 0047 (a copy of drizzle/ without 0048), every
-// public function body is captured, then 0048 is applied and each body is compared again. Each
+// planned lines changed. A database is migrated to exactly 0047 (a copy of drizzle/ that ends
+// there), every public function body is captured, then to exactly 0048 (a copy that ends there)
+// and each body is compared again. Later migrations (0049, HYG-008b) are never applied here: this
+// proof stays about 0048 alone. Each
 // change must equal the expected removed/added lines in authority-drift.expected.json; every
 // other function must be byte-identical, and signatures, volatility, SECURITY DEFINER,
 // search_path and grants (proacl) must not change.
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MIGRATIONS_FOLDER, runMigrations } from "../../src/db/migrate";
+import { migrationsUpTo } from "./migrations-up-to";
 import { createHarness, type Harness } from "../rls/harness";
 
-const LAST_TAG = "0048_clinic_authority_wall_clock";
+const BEFORE_TAG = "0047_support_scope_approval";
+const AFTER_TAG = "0048_clinic_authority_wall_clock";
 type Fn = { def: string; volatile: string; secdef: boolean; config: string | null; acl: string | null };
 
 let h: Harness;
 let before: Map<string, Fn>;
 let after: Map<string, Fn>;
-let dir: string;
+let dirs: string[] = [];
 
 async function capture(db: pg.ClientBase): Promise<Map<string, Fn>> {
   const r = await db.query<{ k: string; def: string; volatile: string; secdef: boolean; config: string[] | null; acl: string | null }>(
@@ -45,25 +48,19 @@ function lineDiff(a: string, b: string): { removed: string[]; added: string[] } 
 }
 
 beforeAll(async () => {
-  // A copy of drizzle/ without 0048: the database is migrated to 0047, captured, then 0048 runs.
-  dir = mkdtempSync(join(tmpdir(), "hyg008a-drift-"));
-  cpSync(MIGRATIONS_FOLDER, dir, { recursive: true });
-  rmSync(join(dir, `${LAST_TAG}.sql`));
-  rmSync(join(dir, "meta/0048_snapshot.json"));
-  const journal = JSON.parse(readFileSync(join(dir, "meta/_journal.json"), "utf8")) as { entries: { tag: string }[] };
-  expect(journal.entries.at(-1)?.tag).toBe(LAST_TAG);
-  journal.entries.pop();
-  writeFileSync(join(dir, "meta/_journal.json"), JSON.stringify(journal));
+  const to0047 = migrationsUpTo(BEFORE_TAG);
+  const to0048 = migrationsUpTo(AFTER_TAG);
+  dirs = [to0047, to0048];
   let url = "";
-  h = await createHarness({ migrate: async (u) => { url = u; await runMigrations(u, { folder: dir }); } });
+  h = await createHarness({ migrate: async (u) => { url = u; await runMigrations(u, { folder: to0047 }); } });
   before = await capture(h.admin);
-  await runMigrations(url);
+  await runMigrations(url, { folder: to0048 });
   after = await capture(h.admin);
 }, 300_000);
 
 afterAll(async () => {
   await h?.close();
-  if (dir) rmSync(dir, { recursive: true, force: true });
+  for (const d of dirs) rmSync(d, { recursive: true, force: true });
 });
 
 describe("HYG-008a: 0048 changes only the planned lines", () => {

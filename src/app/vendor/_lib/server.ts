@@ -19,6 +19,7 @@ import type pg from "pg";
 import { AUTH_GROUP_ROLE, VENDOR_GROUP_ROLE } from "../../../db/rls/context";
 import { openAppPool } from "../../../db/rls/pool";
 import { type Auth, createAuth } from "../../../auth/server";
+import { withAuthorityRecheck } from "../../../modules/vendor/authority";
 
 let auth: Promise<Auth> | undefined;
 let pool: Promise<pg.Pool> | undefined;
@@ -104,10 +105,13 @@ type Result<T> = { ok: true; data: T } | { ok: false; code: string; reason?: str
 // One function call, committed on its own (a refusal's log row must survive).
 export async function call<T>(fn: "vendor_console_me" | "vendor_console_tenants", c: Caller): Promise<Result<T>> {
   const db = await vendorPool();
-  const r = (await db.query<{ r: { ok: boolean; code?: string; reason?: string } & T }>(
-    `select public.${fn}($1, $2) as r`,
-    [c.token, c.ip],
-  )).rows[0].r;
-  if (!r.ok) return { ok: false, code: r.code ?? "ERR_FORBIDDEN", reason: r.reason };
-  return { ok: true, data: r };
+  // HYG-008b: a refusal of the authority re-check is logged on its own and answered as usual.
+  return withAuthorityRecheck(db, c, fn, { tenant: null }, async () => {
+    const r = (await db.query<{ r: { ok: boolean; code?: string; reason?: string } & T }>(
+      `select public.${fn}($1, $2) as r`,
+      [c.token, c.ip],
+    )).rows[0].r;
+    if (!r.ok) return { ok: false, code: r.code ?? "ERR_FORBIDDEN", reason: r.reason } as const;
+    return { ok: true, data: r } as const;
+  });
 }

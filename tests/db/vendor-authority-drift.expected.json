@@ -1,0 +1,307 @@
+{
+  "vendor_guard(uuid,text,text[],text,uuid,uuid,timestamp with time zone,interval)": {
+    "removed": [
+      "    WHEN p_second_factor_at IS NULL OR p_second_factor_at > now() + interval '1 minute' OR p_second_factor_at < now() - p_max_age THEN 'totp_not_verified'",
+      "  -- action (or this action sees it)."
+    ],
+    "added": [
+      "    WHEN p_second_factor_at IS NULL OR p_second_factor_at > clock_timestamp() + interval '1 minute' OR p_second_factor_at < clock_timestamp() - p_max_age THEN 'totp_not_verified'",
+      "  -- action (or this action sees it). HYG-008b: TOTP enrolment is read after that wait."
+    ]
+  },
+  "vendor_request_consume(uuid,text,uuid,text)": {
+    "removed": [
+      "    WHEN q.decided_at < now() - interval '30 days' THEN 'approval_expired'"
+    ],
+    "added": [
+      "    WHEN q.decided_at < clock_timestamp() - interval '30 days' THEN 'approval_expired'"
+    ]
+  },
+  "vendor_session(text)": {
+    "removed": [
+      "     AND s.expires_at > now() AND s.locked_at IS NULL"
+    ],
+    "added": [
+      "     AND s.expires_at > clock_timestamp() AND s.locked_at IS NULL"
+    ]
+  },
+  "vendor_console_guard(text,text,text)": {
+    "removed": [
+      "    WHEN v.second_factor_at IS NULL OR v.second_factor_at > now() + interval '1 minute' OR v.second_factor_at < now() - interval '12 hours' THEN 'totp_not_verified'"
+    ],
+    "added": [
+      "    WHEN v.second_factor_at IS NULL OR v.second_factor_at > clock_timestamp() + interval '1 minute' OR v.second_factor_at < clock_timestamp() - interval '12 hours' THEN 'totp_not_verified'"
+    ]
+  },
+  "vendor_console_me(text,text)": {
+    "removed": [
+      "  RETURN jsonb_build_object('ok', true,"
+    ],
+    "added": [
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner','onboarding','support','vendor_finance','vendor_auditor'], interval '12 hours');",
+      "  RETURN v_resp;",
+      "  v_resp := jsonb_build_object('ok', true,",
+      "  v_resp jsonb;"
+    ]
+  },
+  "vendor_console_tenants(text,text)": {
+    "removed": [
+      "  RETURN jsonb_build_object('ok', true, 'rows', coalesce(("
+    ],
+    "added": [
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner','onboarding','support','vendor_finance','vendor_auditor'], interval '12 hours');",
+      "  RETURN v_resp;",
+      "  v_resp := jsonb_build_object('ok', true, 'rows', coalesce((",
+      "  v_resp jsonb;"
+    ]
+  },
+  "vendor_console_owner_invite(text,text,uuid,text,text)": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');"
+    ]
+  },
+  "vendor_console_tenant_create(text,text,text,text,text,text,text,text,text)": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');"
+    ]
+  },
+  "vendor_console_owner_invite_approve(text,text,uuid,text)": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');"
+    ]
+  },
+  "vendor_console_owner_invite_cancel(text,text,uuid)": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');"
+    ]
+  },
+  "vendor_console_tenant_detail(text,text,uuid)": {
+    "removed": [
+      "  RETURN jsonb_build_object('ok', true,"
+    ],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner','onboarding','support','vendor_finance','vendor_auditor'], interval '12 hours');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner','onboarding','support','vendor_finance','vendor_auditor'], interval '12 hours');",
+      "  RETURN v_resp;",
+      "  v_resp := jsonb_build_object('ok', true,",
+      "  v_resp jsonb;"
+    ]
+  },
+  "vendor_console_staff_state(text,text,uuid,text)": {
+    "removed": [
+      "  RETURN public.vendor_staff_update(v.account_id, p_ip, v.second_factor_at, p_staff, v_roles, p_state);"
+    ],
+    "added": [
+      "  RETURN public.vendor_staff_update_checked(p_token, v.account_id, p_ip, v.second_factor_at, p_staff, v_roles, p_state);"
+    ]
+  },
+  "vendor_console_staff_list(text,text)": {
+    "removed": [
+      "  RETURN jsonb_build_object('ok', true,"
+    ],
+    "added": [
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '12 hours');",
+      "  RETURN v_resp;",
+      "  v_resp := jsonb_build_object('ok', true,",
+      "  v_resp jsonb;"
+    ]
+  },
+  "vendor_console_staff_invite(text,text,text,text,text[],text)": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');"
+    ]
+  },
+  "vendor_console_staff_invite_cancel(text,text,uuid)": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner'], interval '10 minutes');"
+    ]
+  },
+  "vendor_staff_invite_accept(text,uuid)": {
+    "removed": [
+      "  IF i.state <> 'pending' OR i.expires_at <= now() THEN"
+    ],
+    "added": [
+      "  IF i.state <> 'pending' OR i.expires_at <= clock_timestamp() THEN"
+    ]
+  },
+  "vendor_console_onboarding_access(text,text,uuid,text)": {
+    "removed": [
+      "  RETURN jsonb_build_object('ok', true,"
+    ],
+    "added": [
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '12 hours');",
+      "  RETURN v_resp;",
+      "  v_resp := jsonb_build_object('ok', true,",
+      "  v_resp jsonb;"
+    ]
+  },
+  "vendor_console_onboarding_invite(text,text,uuid,text,text,text[],uuid[])": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['onboarding','platform_owner'], interval '10 minutes');"
+    ]
+  },
+  "vendor_console_tenant_advance(text,text,uuid,text,text)": {
+    "removed": [],
+    "added": [
+      "      -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "      PERFORM public.vendor_authority_recheck(p_token, p_ip, CASE WHEN p_to = 'live' THEN ARRAY['platform_owner'] ELSE ARRAY['onboarding','platform_owner'] END, interval '10 minutes');",
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, CASE WHEN p_to = 'live' THEN ARRAY['platform_owner'] ELSE ARRAY['onboarding','platform_owner'] END, interval '10 minutes');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, CASE WHEN p_to = 'live' THEN ARRAY['platform_owner'] ELSE ARRAY['onboarding','platform_owner'] END, interval '10 minutes');"
+    ]
+  },
+  "operator_scope_allows(text)": {
+    "removed": [],
+    "added": [
+      "       -- 9f (DEC-042): the binding's address is allowed while the allowlist is enforced.",
+      "       -- HYG-008b (A-01, R1-M2): the opener still holds a support-capable role, TOTP is still",
+      "       -- enrolled and the session's second factor is within 12 h, on every row.",
+      "       AND EXISTS (SELECT 1 FROM public.auth_user u WHERE u.id = v.account_id AND u.two_factor_enabled)",
+      "       AND EXISTS (SELECT 1 FROM public.vendor_staff_roles r WHERE r.staff_id = v.id AND r.role IN ('support','onboarding','platform_owner'))",
+      "       AND a.second_factor_at IS NOT NULL AND a.second_factor_at > clock_timestamp() - interval '12 hours'",
+      "       AND b.client_ip IS NOT NULL AND public.vendor_ip_allowed(b.client_ip)"
+    ]
+  },
+  "operator_row_read(text,uuid,uuid)": {
+    "removed": [],
+    "added": [
+      "    RETURN false;",
+      "  -- HYG-008b (5a): the insert can wait on another reader's uncommitted record of the same row;",
+      "  -- a revocation committed during that wait is seen by judging the scope again after it.",
+      "  END IF;",
+      "  IF NOT public.operator_scope_allows(p_table) THEN"
+    ]
+  },
+  "support_read_caller(text,text)": {
+    "removed": [
+      "    WHEN v.second_factor_at IS NULL OR v.second_factor_at > now() + interval '1 minute' OR v.second_factor_at < now() - interval '12 hours' THEN 'totp_not_verified'"
+    ],
+    "added": [
+      "    WHEN v.second_factor_at IS NULL OR v.second_factor_at > clock_timestamp() + interval '1 minute' OR v.second_factor_at < clock_timestamp() - interval '12 hours' THEN 'totp_not_verified'"
+    ]
+  },
+  "vendor_console_support_open(text,text,uuid,text,text[],integer)": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['support','onboarding','platform_owner'], interval '10 minutes');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['support','onboarding','platform_owner'], interval '10 minutes');"
+    ]
+  },
+  "vendor_console_support_extend(text,text,uuid,text,integer)": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['support','onboarding','platform_owner'], interval '10 minutes');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['support','onboarding','platform_owner'], interval '10 minutes');"
+    ]
+  },
+  "vendor_console_support_end(text,text,uuid)": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['support','onboarding','platform_owner'], interval '12 hours');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['support','onboarding','platform_owner'], interval '12 hours');"
+    ]
+  },
+  "vendor_console_support_list(text,text,uuid)": {
+    "removed": [
+      "  RETURN jsonb_build_object('ok', true, 'rows', coalesce(("
+    ],
+    "added": [
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['platform_owner','onboarding','support','vendor_finance','vendor_auditor'], interval '12 hours');",
+      "  RETURN v_resp;",
+      "  v_resp := jsonb_build_object('ok', true, 'rows', coalesce((",
+      "  v_resp jsonb;"
+    ]
+  },
+  "support_session_expire()": {
+    "removed": [],
+    "added": [
+      "         AND (s.state = 'active' AND s.ends_at <= clock_timestamp() OR t.lifecycle_state = 'closed'));",
+      "       WHERE s.id = r.id AND s.state <> 'ended'",
+      "      SELECT 1 FROM public.support_sessions s JOIN public.tenants_registry t ON t.id = s.tenant_id",
+      "    -- HYG-008b (A-03): judged again after the lock: an extension committed while the sweep waited",
+      "    -- keeps the session.",
+      "    CONTINUE WHEN NOT EXISTS ("
+    ]
+  },
+  "vendor_console_support_ticket(text,text,uuid,integer,bigint)": {
+    "removed": [],
+    "added": [
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['support','onboarding','platform_owner'], interval '12 hours');",
+      "    PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['support','onboarding','platform_owner'], interval '12 hours');",
+      "  -- HYG-008b: authority re-read after the last wait, before this exit.",
+      "  PERFORM public.vendor_authority_recheck(p_token, p_ip, ARRAY['support','onboarding','platform_owner'], interval '12 hours');"
+    ]
+  },
+  "support_session_bind(text,text,uuid,uuid)": {
+    "removed": [
+      "                                                staff_id = EXCLUDED.staff_id, bound_at = clock_timestamp();",
+      "  INSERT INTO public.support_session_bindings (session_id, backend_pid, txid, auth_session_id, staff_id)",
+      "  VALUES (p_session, pg_backend_pid(), txid_current(), (SELECT a.id FROM public.auth_session a WHERE a.token = p_token), c.staff_id)"
+    ],
+    "added": [
+      "                                                staff_id = EXCLUDED.staff_id, bound_at = clock_timestamp(), client_ip = EXCLUDED.client_ip;",
+      "  INSERT INTO public.support_session_bindings (session_id, backend_pid, txid, auth_session_id, staff_id, client_ip)",
+      "  VALUES (p_session, pg_backend_pid(), txid_current(), (SELECT a.id FROM public.auth_session a WHERE a.token = p_token), c.staff_id, left(p_ip, 64))"
+    ]
+  }
+}
