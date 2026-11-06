@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { withTenantContext } from "../../../db/rls/context";
+import { STALE_CONTEXT, staleContext } from "../context/context";
 import { appPool, requestContext } from "../context/store";
 import { answerOwnerGrant } from "./roles";
 
@@ -19,6 +20,7 @@ export async function answerOwnerGrantAction(_p: OwnerGrantState, f: FormData): 
   const rc = await requestContext();
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind === "blocked") return { error: "Anda tidak punya akses untuk tindakan ini." };
+  if (staleContext(f, rc.active.context)) return { error: STALE_CONTEXT };
   try {
     const r = await withTenantContext(await appPool(), rc.active.context, (db) => answerOwnerGrant(db, id, answer === "terima"));
     revalidatePath("/saya/peran");

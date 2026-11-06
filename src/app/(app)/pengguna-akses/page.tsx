@@ -34,7 +34,7 @@ async function Body() {
             <Row key={s.staffId} href={`/staf/${s.staffId}`} title={s.name} subtitle={s.roles.map((r) => ROLE_LABEL[r.role]).join(", ")}>
               {s.staffId !== p.selfId && (
                 <div className="relative z-10 justify-self-start">
-                  <RevokeSession staffId={s.staffId} label="Cabut Semua Sesi" />
+                  <RevokeSession staffId={s.staffId} label="Cabut Semua Sesi" ctx={p.ctx} />
                 </div>
               )}
             </Row>
@@ -53,7 +53,7 @@ async function Body() {
                 {(Object.keys(DUTY_LABEL) as Duty[]).map((duty) => {
                   const assigned = p.duties.some((d) => d.staffId === s.staffId && d.duty === duty);
                   return p.isOwner ? (
-                    <DutyToggle key={duty} staffId={s.staffId} duty={duty} assigned={assigned} label={DUTY_LABEL[duty]} />
+                    <DutyToggle key={duty} staffId={s.staffId} duty={duty} assigned={assigned} label={DUTY_LABEL[duty]} ctx={p.ctx} />
                   ) : (
                     <span key={duty} className="text-[0.88rem] text-[var(--label-2)]">{DUTY_LABEL[duty]}: {assigned ? "ya" : "tidak"}</span>
                   );

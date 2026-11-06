@@ -1,4 +1,5 @@
 // Server data for Pengaturan (19 §2.17, PR-38). Server only.
+import { type RenderedContext, renderedContext } from "../../../modules/org/context/context";
 import "server-only";
 import type { Role } from "../../../auth/policy";
 import { withTenantContext } from "../../../db/rls/context";
@@ -34,6 +35,7 @@ export type GroupPage =
       branch: { id: string; name: string } | null; // branch-scoped rows show this branch
       tenantWide: boolean;
       branches: { id: string; name: string }[];
+      ctx: RenderedContext;
     };
 
 // `cabang` selects the branch of branch-scoped rows for tenant-wide roles (empty = the
@@ -51,5 +53,5 @@ export async function loadGroup(slug: string, cabang: string | undefined): Promi
     ? (branches.find((b) => b.id === cabang) ?? null)
     : (branches.find((b) => b.id === activeBranchId) ?? null);
   const rows = await withTenantContext(await appPool(), rc.active.context, (db) => groupRows(db, role, g.slug, branch?.id ?? null));
-  return { kind: "ok", group: g, role, rows, branch, tenantWide: rc.active.tenantWide, branches };
+  return { kind: "ok", group: g, role, rows, branch, tenantWide: rc.active.tenantWide, branches, ctx: renderedContext(rc.active.context) };
 }

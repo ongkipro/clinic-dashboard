@@ -1,6 +1,8 @@
 "use client";
 // Unggah Bukti and the decision on the newest file (UX-58). Tandai Disetujui is the one
 // prominent action; Tolak and Cabut ask for a reason first.
+import { ContextFields } from "../../../components/context-fields";
+import type { RenderedContext } from "../../../modules/org/context/context";
 import { useActionState, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { decideAction, type EvidenceState, uploadAction } from "./actions";
@@ -13,13 +15,14 @@ function Message({ state }: { state: EvidenceState }) {
   return null;
 }
 
-export function UploadForm({ obligationKey }: { obligationKey: string }) {
+export function UploadForm({ obligationKey, ctx }: { obligationKey: string; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<EvidenceState, FormData>(uploadAction, {});
   const [open, setOpen] = useState(false);
   if (!open) return <Button type="button" variant="secondary" onClick={() => setOpen(true)}>Unggah Bukti</Button>;
   return (
     <form action={action} className="grid min-w-0 gap-4">
       <input type="hidden" name="key" value={obligationKey} />
+      <ContextFields ctx={ctx} />
       <label className="grid min-w-0 gap-1">
         <span className="font-semibold">Berkas (PDF, PNG atau JPEG, maks. 5 MB)</span>
         <input className={`${input} py-2`} type="file" name="file" accept="application/pdf,image/png,image/jpeg" required />
@@ -41,12 +44,13 @@ export function UploadForm({ obligationKey }: { obligationKey: string }) {
   );
 }
 
-export function DecideForm({ obligationKey, itemId, fileId, approved }: { obligationKey: string; itemId: string; fileId: string; approved: boolean }) {
+export function DecideForm({ obligationKey, itemId, fileId, approved, ctx }: { obligationKey: string; itemId: string; fileId: string; approved: boolean; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<EvidenceState, FormData>(decideAction, {});
   const [mode, setMode] = useState<"none" | "rejected" | "revoked">("none");
   return (
     <form action={action} className="grid min-w-0 gap-3">
       <input type="hidden" name="key" value={obligationKey} />
+      <ContextFields ctx={ctx} />
       <input type="hidden" name="item" value={itemId} />
       <input type="hidden" name="file" value={fileId} />
       {mode !== "none" && (

@@ -9,6 +9,7 @@ import { CommandError } from "../../../lib/command";
 import { decideApproval } from "../../../modules/approvals/approvals";
 import { SETTING_DRAFT_TYPES } from "../../../modules/approvals/inbox";
 import { decideDraft } from "../../../modules/settings/settings";
+import { STALE_CONTEXT, staleContext } from "../../../modules/org/context/context";
 import { appPool, requestContext } from "../../../modules/org/context/store";
 
 export type DecideState = { error?: string; ok?: string; reason?: string };
@@ -33,6 +34,7 @@ export async function decideAction(_p: DecideState, f: FormData): Promise<Decide
   const rc = await requestContext();
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind === "blocked") return { error: MESSAGES.ERR_FORBIDDEN, reason };
+  if (staleContext(f, rc.active.context)) return { error: STALE_CONTEXT, reason };
   try {
     await withTenantContext(await appPool(), rc.active.context, async (db) => {
       // A settings draft is decided through the settings module (the draft applies with

@@ -113,6 +113,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - (1) New backup codes need the password and a current authenticator code. `get-totp-uri` is refused. Step-up codes count toward the same per-account lockout as at sign-in.
   - (2) HYG-006 finishes with one recorded intermittent timing failure.
 
+- **HYG-009** (stale-context writes, migration 0050):
+  - A drift proof that compares changed lines as a multiset cannot see reordered authorization checks; compare the whole new definition with the old one with an exact block replaced (review P2).
+  - Pass the rendered context from the page loader that read the form's data, never from the layout: a layout can outlive a switch.
+  - `approval_request` keeps its own branch rule, so widening a caller's branch check does not widen drafts; test the refusal so it stays visible.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

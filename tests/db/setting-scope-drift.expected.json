@@ -1,0 +1,6 @@
+{
+  "setting_set(text,uuid,jsonb,timestamp with time zone,text,boolean)": {
+    "old": "  -- (branch null) is for tenant-wide roles only.\n  IF p_branch IS NOT NULL AND a.branch_id IS NOT NULL AND p_branch <> a.branch_id THEN\n    RAISE EXCEPTION 'ERR_FORBIDDEN: outside the acting role''s branch' USING ERRCODE = '42501';\n  END IF;\n  IF p_branch IS NULL AND a.branch_id IS NOT NULL AND d.scope = 'branch' THEN",
+    "new": "  -- (branch null) is for tenant-wide roles only. HYG-009 N2: the checks follow the acting\n  -- role's level (the Level 3 list of tenant_actor_lock), not whether a branch is selected,\n  -- so a tenant-wide role with a branch selected keeps exactly its rights without one (DEC-026).\n  IF p_branch IS NOT NULL AND a.role IN ('manager','facility_head','records_officer','fo_cashier','bc','doctor','nurse','therapist','pharmacist') AND p_branch IS DISTINCT FROM a.branch_id THEN\n    RAISE EXCEPTION 'ERR_FORBIDDEN: outside the acting role''s branch' USING ERRCODE = '42501';\n  END IF;\n  IF p_branch IS NULL AND a.role IN ('manager','facility_head','records_officer','fo_cashier','bc','doctor','nurse','therapist','pharmacist') AND d.scope = 'branch' THEN"
+  }
+}

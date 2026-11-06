@@ -22,7 +22,7 @@ export function appPool(): Promise<pg.Pool> {
 }
 
 export type RequestContext =
-  | { kind: "ok"; accountId: string; active: ActiveContext; selection: Selection }
+  | { kind: "ok"; accountId: string; sessionId: string; active: ActiveContext; selection: Selection }
   | { kind: "redirect"; to: "/masuk" | "/aktifkan-2fa" | "/terkunci" }
   | { kind: "blocked"; accountId: string };
 
@@ -40,7 +40,7 @@ export async function requestContext(opts: { activity?: boolean } = {}): Promise
   const selection = await storedSelection();
   const app = await appPool();
   const active = await activeContext(app, gate.userId, selection, gate.sessionId);
-  if (active) return { kind: "ok", accountId: gate.userId, active, selection };
+  if (active) return { kind: "ok", accountId: gate.userId, sessionId: gate.sessionId, active, selection };
   // No context left. If the account still has a usable membership, this session was
   // revoked for all of them (PR-91): end the session server-side and sign in again.
   if (await activeContext(app, gate.userId, selection)) {

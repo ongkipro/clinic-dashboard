@@ -1,6 +1,8 @@
 "use client";
 // Forms of Staf & Undangan and Pengguna & Akses (UX-3). Each submits one server action
 // and shows its message (10 State Copy Patterns: short past tense on success).
+import { ContextFields } from "../../../components/context-fields";
+import type { RenderedContext } from "../../../modules/org/context/context";
 import { useActionState, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -32,7 +34,7 @@ function Message({ state }: { state: ActionState }) {
 const field = "grid min-w-0 gap-1.5";
 const input = "min-h-[var(--target)] w-full min-w-0 rounded-[var(--radius-field)] border border-[var(--control-border)] bg-white px-3";
 
-export function InviteSheet({ roles, branches }: { roles: { value: string; label: string; branch: boolean }[]; branches: { id: string; name: string }[] }) {
+export function InviteSheet({ roles, branches, ctx }: { roles: { value: string; label: string; branch: boolean }[]; branches: { id: string; name: string }[]; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(inviteAction, {});
   const [copied, setCopied] = useState(false);
   return (
@@ -46,6 +48,7 @@ export function InviteSheet({ roles, branches }: { roles: { value: string; label
           <DrawerDescription>Staf membuat kata sandinya sendiri dari tautan undangan.</DrawerDescription>
         </DrawerHeader>
         <form action={action} className="grid max-h-[60vh] gap-4 overflow-y-auto px-4">
+          <ContextFields ctx={ctx} />
           <label className={field}>
             <span className="font-semibold">Nama</span>
             <input className={input} name="name" required minLength={2} maxLength={120} autoComplete="off" />
@@ -105,22 +108,24 @@ export function InviteSheet({ roles, branches }: { roles: { value: string; label
   );
 }
 
-export function CancelInvite({ id }: { id: string }) {
+export function CancelInvite({ id, ctx }: { id: string; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(cancelInviteAction, {});
   return (
     <form action={action} className="grid gap-1">
       <input type="hidden" name="id" value={id} />
+      <ContextFields ctx={ctx} />
       <Button type="submit" variant="plain" aria-disabled={pending}>Batalkan</Button>
       <Message state={state} />
     </form>
   );
 }
 
-export function RevokeSession({ staffId, sessionId, label }: { staffId: string; sessionId?: string; label: string }) {
+export function RevokeSession({ staffId, sessionId, label, ctx }: { staffId: string; sessionId?: string; label: string; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(revokeSessionAction, {});
   return (
     <form action={action} className="grid gap-1">
       <input type="hidden" name="staff" value={staffId} />
+      <ContextFields ctx={ctx} />
       <input type="hidden" name="session" value={sessionId ?? ""} />
       <Button type="submit" variant="destructive" aria-disabled={pending}>{label}</Button>
       <Message state={state} />
@@ -128,11 +133,12 @@ export function RevokeSession({ staffId, sessionId, label }: { staffId: string; 
   );
 }
 
-export function RemoveRole({ staffId, role, label }: { staffId: string; role: string; label: string }) {
+export function RemoveRole({ staffId, role, label, ctx }: { staffId: string; role: string; label: string; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(removeRoleAction, {});
   return (
     <form action={action} className="grid gap-1">
       <input type="hidden" name="staff" value={staffId} />
+      <ContextFields ctx={ctx} />
       <input type="hidden" name="role" value={role} />
       <Button type="submit" variant="plain" aria-disabled={pending}>{`Cabut ${label}`}</Button>
       <Message state={state} />
@@ -140,12 +146,13 @@ export function RemoveRole({ staffId, role, label }: { staffId: string; role: st
   );
 }
 
-export function EndMembership({ staffId }: { staffId: string }) {
+export function EndMembership({ staffId, ctx }: { staffId: string; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(endMembershipAction, {});
   const [confirm, setConfirm] = useState(false);
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="staff" value={staffId} />
+      <ContextFields ctx={ctx} />
       {confirm ? (
         <>
           <p className="m-0">Akhiri keanggotaan? Semua sesi staf ini dicabut dan riwayatnya tetap tersimpan.</p>
@@ -162,11 +169,12 @@ export function EndMembership({ staffId }: { staffId: string }) {
   );
 }
 
-export function DutyToggle({ staffId, duty, assigned, label }: { staffId: string; duty: string; assigned: boolean; label: string }) {
+export function DutyToggle({ staffId, duty, assigned, label, ctx }: { staffId: string; duty: string; assigned: boolean; label: string; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(dutyAction, {});
   return (
     <form action={action} className="grid gap-1">
       <input type="hidden" name="staff" value={staffId} />
+      <ContextFields ctx={ctx} />
       <input type="hidden" name="duty" value={duty} />
       <input type="hidden" name="assign" value={assigned ? "0" : "1"} />
       <Button type="submit" variant={assigned ? "plain" : "secondary"} aria-disabled={pending}>

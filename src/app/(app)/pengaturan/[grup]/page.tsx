@@ -2,6 +2,7 @@
 // draft. Each row: current value, default and its source, bounds, effective date, history,
 // Ubah, Kembalikan ke default; drafts show "Menunggu persetujuan {peran}". Rows whose data
 // is owned by another page link there.
+import type { RenderedContext } from "../../../../modules/org/context/context";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -47,7 +48,7 @@ function ValueLines({ spec, value, strong }: { spec: Spec; value: Value; strong?
   return <span className={strong ? "font-semibold" : undefined}>{formatValue(spec, value)}</span>;
 }
 
-function SettingCard({ row, branchId, group }: { row: Row; branchId: string | null; group: string }) {
+function SettingCard({ row, branchId, group, ctx }: { row: Row; branchId: string | null; group: string; ctx: RenderedContext }) {
   const d = row.def;
   const id = d.key.replace(".", "-");
   return (
@@ -96,7 +97,7 @@ function SettingCard({ row, branchId, group }: { row: Row; branchId: string | nu
                 <StatusBadge tone="warning">{`Menunggu persetujuan ${APPROVER[(d.drafts.find((x) => x.by === row.draft!.changedAs)?.approver ?? "owner")]}`}</StatusBadge>{" "}
                 {formatValue(d.spec, row.draft.value)} · diusulkan {row.draft.changedName}, berlaku {row.draft.effectiveFrom > new Date() ? `mulai ${fmt.format(row.draft.effectiveFrom)}` : "saat disetujui"}
               </p>
-              {row.access.mode === "draft" && row.draft.approvalId && <WithdrawDraft approvalId={row.draft.approvalId} group={group} />}
+              {row.access.mode === "draft" && row.draft.approvalId && <WithdrawDraft approvalId={row.draft.approvalId} group={group} ctx={ctx} />}
               {d.drafts.some((x) => x.approver === row.role) && row.draft.approvalId && (
                 <Link href={`/persetujuan/${row.draft.approvalId}`} className="inline-flex min-h-[var(--target)] items-center self-start font-semibold text-[var(--tint)]">Buka di Persetujuan</Link>
               )}
@@ -111,6 +112,7 @@ function SettingCard({ row, branchId, group }: { row: Row; branchId: string | nu
               branchId={d.scope === "branch" ? branchId : null}
               draftMode={row.access.mode === "draft" ? APPROVER[row.access.approver] : null}
               isDefault={row.isDefault}
+              ctx={ctx}
             />
           )}
           {row.history.length > 0 && (
@@ -176,7 +178,7 @@ async function Body({ params, searchParams }: { params: Promise<{ grup: string }
         <p className="m-0 text-[0.94rem] text-[var(--label-2)]">Nilai &quot;Semua cabang&quot; berlaku untuk cabang yang belum punya nilai sendiri.</p>
       )}
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
-        {p.rows.map((r) => <SettingCard key={r.def.key} row={r} branchId={p.branch?.id ?? null} group={p.group.slug} />)}
+        {p.rows.map((r) => <SettingCard key={r.def.key} row={r} branchId={p.branch?.id ?? null} group={p.group.slug} ctx={p.ctx} />)}
       </div>
     </>
   );

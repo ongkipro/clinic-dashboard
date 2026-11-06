@@ -4,7 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type pg from "pg";
 import type { Role } from "../../../auth/policy";
 import { CommandError } from "../../../lib/command";
-import { call } from "../access/access";
+import { call, type StaffSession, staffSessions } from "../access/access";
 
 export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
@@ -143,4 +143,20 @@ export async function listInvitations(db: pg.ClientBase): Promise<InvitationRow[
   return (await db.query(`select id, email, display_name, roles, state, expires_at from staff_invitations order by invited_at desc limit 200`)).rows.map((r) => ({
     id: r.id, email: r.email, name: r.display_name, roles: r.roles, state: r.state === "pending" && r.expires_at <= new Date() ? "expired" : r.state, expiresAt: r.expires_at,
   }));
+}
+
+// Staff detail (HYG-009 N1): the member's sessions when the acting role may manage that member,
+// else null. The rule is the database's own (staff_sessions applies staff_admin_may_touch and
+// answers ERR_NOT_FOUND otherwise), tried under a savepoint so the page's transaction survives.
+export async function manageableSessions(db: pg.ClientBase, staffId: string): Promise<StaffSession[] | null> {
+  await db.query("savepoint staff_sessions_probe");
+  try {
+    const r = await staffSessions(db, staffId);
+    await db.query("release savepoint staff_sessions_probe");
+    return r;
+  } catch (e) {
+    await db.query("rollback to savepoint staff_sessions_probe");
+    if (e instanceof CommandError && e.code === "ERR_NOT_FOUND") return null;
+    throw e;
+  }
 }

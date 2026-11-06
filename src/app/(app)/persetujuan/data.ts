@@ -1,4 +1,5 @@
 // Server data for Persetujuan (UX-26, PR-44). Server only.
+import { type RenderedContext, renderedContext } from "../../../modules/org/context/context";
 import "server-only";
 import type { Role } from "../../../auth/policy";
 import { withTenantContext } from "../../../db/rls/context";
@@ -26,7 +27,7 @@ export type DetailPage =
   | { kind: "redirect"; to: string }
   | { kind: "forbidden" }
   | { kind: "not-found" }
-  | { kind: "ok"; detail: InboxDetail };
+  | { kind: "ok"; detail: InboxDetail; ctx: RenderedContext };
 
 export async function loadDetail(id: string): Promise<DetailPage> {
   const rc = await requestContext();
@@ -35,5 +36,5 @@ export async function loadDetail(id: string): Promise<DetailPage> {
   const { staffId, actingRole: role } = rc.active.context;
   if (!INBOX_READERS.includes(role)) return { kind: "forbidden" };
   const detail = await withTenantContext(await appPool(), rc.active.context, (db) => inboxDetail(db, { staffId, role }, id));
-  return detail ? { kind: "ok", detail } : { kind: "not-found" };
+  return detail ? { kind: "ok", detail, ctx: renderedContext(rc.active.context) } : { kind: "not-found" };
 }

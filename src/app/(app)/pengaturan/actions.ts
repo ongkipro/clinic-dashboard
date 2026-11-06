@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { withTenantContext } from "../../../db/rls/context";
 import { CommandError } from "../../../lib/command";
+import { STALE_CONTEXT, staleContext } from "../../../modules/org/context/context";
 import { appPool, requestContext } from "../../../modules/org/context/store";
 import { SETTING_BY_KEY } from "../../../modules/settings/registry";
 import { cancelDraft, changeSetting, SettingBoundsError } from "../../../modules/settings/settings";
@@ -52,6 +53,7 @@ export async function saveAction(_p: SaveState, f: FormData): Promise<SaveState>
   const rc = await requestContext();
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind === "blocked") return { error: MESSAGES.ERR_FORBIDDEN };
+  if (staleContext(f, rc.active.context)) return { error: STALE_CONTEXT, values: echo(f) };
   let r;
   try {
     // fromForm never throws (unparseable input comes back as text the validator refuses).
@@ -81,6 +83,7 @@ export async function withdrawAction(_p: SaveState, f: FormData): Promise<SaveSt
   const rc = await requestContext();
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind === "blocked") return { error: MESSAGES.ERR_FORBIDDEN };
+  if (staleContext(f, rc.active.context)) return { error: STALE_CONTEXT };
   try {
     await withTenantContext(await appPool(), rc.active.context, (db) => cancelDraft(db, approval));
   } catch (e) {

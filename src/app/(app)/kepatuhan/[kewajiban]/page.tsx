@@ -72,7 +72,7 @@ async function Body({ params }: { params: Promise<{ kewajiban: string }> }) {
                         ))}
                       </ol>
                     )}
-                    {row.mayAct && <UploadForm obligationKey={row.obligationKey} />}
+                    {row.mayAct && <UploadForm obligationKey={row.obligationKey} ctx={p.ctx} />}
                   </div>
                 ),
               },
@@ -100,7 +100,7 @@ async function Body({ params }: { params: Promise<{ kewajiban: string }> }) {
                     )}
                     {row.mayAct && row.itemId && latest && row.latestFileId && (row.status === "submitted" || row.status === "expired" || row.status === "approved") && (
                       row.mayDecide || row.status === "approved" ? (
-                        <DecideForm obligationKey={row.obligationKey} itemId={row.itemId} fileId={row.latestFileId} approved={row.status === "approved"} />
+                        <DecideForm obligationKey={row.obligationKey} itemId={row.itemId} fileId={row.latestFileId} approved={row.status === "approved"} ctx={p.ctx} />
                       ) : (
                         <BlockedState reason="Anda pengunggah berkas terbaru" unblock="Penanggung bidang lain atau owner yang menyetujuinya" />
                       )

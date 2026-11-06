@@ -1,17 +1,20 @@
 "use client";
 // One choice list for Ganti Cabang / Ganti Peran / Ganti Klinik (PR-84): each option is
 // a full-width 44 px row submitting the switch action; the current one is marked.
+import { ContextFields } from "../../../components/context-fields";
+import type { RenderedContext } from "../../../modules/org/context/context";
 import { Check } from "lucide-react";
 import { useActionState } from "react";
 import { type SwitchState, switchAction } from "../../../modules/org/context/actions";
 
 export type SwitchOption = { value: string; label: string; detail?: string; current: boolean };
 
-export function SwitchForm({ kind, label, options }: { kind: "clinic" | "role" | "branch"; label: string; options: SwitchOption[] }) {
+export function SwitchForm({ kind, label, options, ctx }: { kind: "clinic" | "role" | "branch"; label: string; options: SwitchOption[]; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<SwitchState, FormData>(switchAction, {});
   return (
     <form action={action} aria-label={label} className="grid gap-3">
       <input type="hidden" name="kind" value={kind} />
+      <ContextFields ctx={ctx} />
       <ul className="m-0 grid list-none overflow-hidden rounded-[var(--radius-group)] bg-[var(--surface)] p-0">
         {options.map((o) => (
           <li key={o.value} className="border-b border-[var(--separator)] last:border-b-0 [border-bottom-width:0.5px]">

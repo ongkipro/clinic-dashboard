@@ -58,7 +58,7 @@ async function Body({ searchParams }: { searchParams: Promise<Record<string, str
               <span className="text-[0.88rem] text-[var(--label-2)] [overflow-wrap:anywhere]">
                 {i.email} · {i.roles.map((r) => ROLE_LABEL[r]).join(", ")} · berlaku sampai {fmt.format(i.expiresAt)}
               </span>
-              {i.state === "pending" && <CancelInvite id={i.id} />}
+              {i.state === "pending" && <CancelInvite id={i.id} ctx={page.ctx} />}
             </li>
           ))}
         </RowList>
@@ -95,7 +95,7 @@ async function Body({ searchParams }: { searchParams: Promise<Record<string, str
     >
       {page.canManage && (
         <div className="flex flex-wrap gap-2">
-          <InviteSheet roles={inviteRoles} branches={page.branches} />
+          <InviteSheet roles={inviteRoles} branches={page.branches} ctx={page.ctx} />
         </div>
       )}
       <RowList label="Daftar staf">

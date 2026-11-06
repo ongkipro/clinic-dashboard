@@ -4,7 +4,7 @@
 // the account's memberships, recorded (org_actions) and then stored for this device.
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ContextSwitchError, serializeSelection, type SwitchRequest, switchContext } from "./context";
+import { ContextSwitchError, serializeSelection, STALE_CONTEXT, staleContext, type SwitchRequest, switchContext } from "./context";
 import { appPool, CONTEXT_COOKIE, requestContext } from "./store";
 
 export type SwitchState = { error?: string };
@@ -22,9 +22,10 @@ export async function switchAction(_prev: SwitchState, form: FormData): Promise<
   const rc = await requestContext();
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind === "blocked") return { error: "Akun Anda belum punya peran atau cabang aktif." };
+  if (staleContext(form, rc.active.context)) return { error: STALE_CONTEXT };
   let next;
   try {
-    next = await switchContext(await appPool(), rc.accountId, rc.selection, req);
+    next = await switchContext(await appPool(), rc.accountId, rc.selection, req, rc.sessionId);
   } catch (e) {
     if (e instanceof ContextSwitchError) return { error: "Pilihan ini tidak tersedia untuk akun Anda." };
     throw e;

@@ -46,7 +46,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
                     <span className="font-semibold">{ROLE_LABEL[r.role]}</span>
                     {r.branchIds.length > 0 && <span className="text-[var(--label-2)]"> · {r.branchIds.map((b) => branchName.get(b) ?? "cabang lain").join(", ")}</span>}
                   </span>
-                  {manage && d.staff.active && <RemoveRole staffId={d.staff.staffId} role={r.role} label={ROLE_LABEL[r.role]} />}
+                  {manage && d.staff.active && <RemoveRole staffId={d.staff.staffId} role={r.role} label={ROLE_LABEL[r.role]} ctx={d.ctx} />}
                 </li>
               ))}
               {d.staff.roles.length === 0 && <li className="text-[var(--label-2)]">Tanpa peran.</li>}
@@ -71,7 +71,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
                               Terakhir aktif {fmt.format(s.lastActiveAt)}{s.revoked ? " · dicabut" : ""}
                             </span>
                           </span>
-                          {manage && !s.revoked && <RevokeSession staffId={d.staff.staffId} sessionId={s.sessionId} label="Cabut Sesi" />}
+                          {manage && !s.revoked && <RevokeSession staffId={d.staff.staffId} sessionId={s.sessionId} label="Cabut Sesi" ctx={d.ctx} />}
                         </li>
                       ))}
                     </ul>
@@ -80,10 +80,10 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
             ]
           : []),
         ...(manage && d.staff.active
-          ? [{ id: "keanggotaan", label: "Keanggotaan", content: <EndMembership staffId={d.staff.staffId} /> }]
+          ? [{ id: "keanggotaan", label: "Keanggotaan", content: <EndMembership staffId={d.staff.staffId} ctx={d.ctx} /> }]
           : []),
       ]}
-      auditHref={d.canManage ? "/pengguna-akses" : undefined}
+      auditHref={d.canAudit ? "/pengguna-akses" : undefined}
     />
   );
 }

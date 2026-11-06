@@ -134,6 +134,24 @@ export type SwitchRequest =
 
 export class ContextSwitchError extends Error {}
 
+// HYG-009 B2-1: the context a page was rendered in travels with its form (hidden fields
+// ctx_t, ctx_r, ctx_b) and is compared with the freshly resolved context before any write.
+// Tabs share one stored selection, so another tab may have switched clinic, role or branch
+// since the form was shown. The fields are an expectation only: a write always runs in the
+// freshly resolved context, and a missing or different field refuses it.
+export type RenderedContext = { t: string; r: string; b: string };
+export const STALE_CONTEXT = "Halaman ini sudah berganti klinik, peran atau cabang di tab lain. Muat ulang lalu coba lagi.";
+
+export function renderedContext(c: ActingContext): RenderedContext {
+  return { t: c.tenantId, r: c.actingRole, b: c.activeBranchId ?? "" };
+}
+
+export function staleContext(form: FormData, c: ActingContext): boolean {
+  const now = renderedContext(c);
+  const got = { t: form.get("ctx_t"), r: form.get("ctx_r"), b: form.get("ctx_b") };
+  return got.t !== now.t || got.r !== now.r || got.b !== now.b;
+}
+
 // Applies one switch to the current selection, validates the result against the
 // account's memberships and records it (org_actions context_selected, IAM-3): the new
 // active clinic, branch and acting role are on that row. Returns the selection to store.
@@ -142,8 +160,9 @@ export async function switchContext(
   accountId: string,
   current: Selection,
   req: SwitchRequest,
+  sessionId?: string, // HYG-009 N3: memberships whose sessions were revoked are not offered
 ): Promise<{ tenantId: string; role: string; branchId: string | null }> {
-  const now = await activeContext(app, accountId, current);
+  const now = await activeContext(app, accountId, current, sessionId);
   if (!now) throw new ContextSwitchError("no active membership");
   let next: Selection;
   if (req.kind === "clinic") {
@@ -159,7 +178,7 @@ export async function switchContext(
     }
     next = { tenantId: now.context.tenantId, role: now.context.actingRole, branchId: req.branchId };
   }
-  const after = await activeContext(app, accountId, next);
+  const after = await activeContext(app, accountId, next, sessionId);
   if (!after) throw new ContextSwitchError("no active membership");
   const unchanged =
     after.context.tenantId === now.context.tenantId &&

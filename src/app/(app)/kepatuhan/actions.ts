@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { withTenantContext } from "../../../db/rls/context";
 import { CommandError } from "../../../lib/command";
 import { decideEvidence, EvidenceFileError, MAX_BYTES, uploadEvidence } from "../../../modules/compliance/compliance";
+import { STALE_CONTEXT, staleContext } from "../../../modules/org/context/context";
 import { appPool, requestContext } from "../../../modules/org/context/store";
 
 export type EvidenceState = { error?: string; ok?: string };
@@ -26,10 +27,11 @@ const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jak
 // A real calendar date (2026-02-31 is not one).
 const realDate = (s: string) => DATE.test(s) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
 
-async function inContext(fn: Parameters<typeof withTenantContext>[2]): Promise<EvidenceState | null> {
+async function inContext(f: FormData, fn: Parameters<typeof withTenantContext>[2]): Promise<EvidenceState | null> {
   const rc = await requestContext();
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind === "blocked") return { error: MESSAGES.ERR_FORBIDDEN };
+  if (staleContext(f, rc.active.context)) return { error: STALE_CONTEXT };
   try {
     await withTenantContext(await appPool(), rc.active.context, fn);
     return null;
@@ -54,7 +56,7 @@ export async function uploadAction(_p: EvidenceState, f: FormData): Promise<Evid
   if (date > today()) return { error: "Tanggal dokumen tidak boleh di masa depan." };
   const content = Buffer.from(await file.arrayBuffer());
   let created = true;
-  const r = await inContext(async (db) => {
+  const r = await inContext(f, async (db) => {
     created = (await uploadEvidence(db, { obligationKey: key, fileName: file.name, content, expertName: expert, documentDate: date })).created;
   });
   if (r) return r;
@@ -74,7 +76,7 @@ export async function decideAction(_p: EvidenceState, f: FormData): Promise<Evid
   if (decision !== "approved" && (reason.length < 3 || reason.length > 500)) return { error: "Tulis alasannya (3–500 karakter)." };
   if (valid && !realDate(valid)) return { error: "Tanggal berlaku tidak valid." };
   if (valid && valid < today()) return { error: "Tanggal berlaku tidak boleh di masa lalu." };
-  const r = await inContext((db) => decideEvidence(db, item, fileId, decision as "approved" | "rejected" | "revoked", reason || undefined, valid || undefined));
+  const r = await inContext(f, (db) => decideEvidence(db, item, fileId, decision as "approved" | "rejected" | "revoked", reason || undefined, valid || undefined));
   if (r) return r;
   revalidatePath("/kepatuhan");
   revalidatePath(`/kepatuhan/${key}`);

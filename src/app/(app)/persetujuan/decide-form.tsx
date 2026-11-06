@@ -1,11 +1,13 @@
 "use client";
 // Setujui / Tolak in the Persetujuan detail (UX-26): Setujui is the one prominent action;
 // Tolak opens a reason field first (a rejection needs a reason).
+import { ContextFields } from "../../../components/context-fields";
+import type { RenderedContext } from "../../../modules/org/context/context";
 import { useActionState, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { decideAction, type DecideState } from "./actions";
 
-export function DecideForm({ id }: { id: string }) {
+export function DecideForm({ id, ctx }: { id: string; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<DecideState, FormData>(decideAction, {});
   const [rejecting, setRejecting] = useState(Boolean(state.reason));
   // The decision buttons are disabled while one is in flight: a second click would only
@@ -17,6 +19,7 @@ export function DecideForm({ id }: { id: string }) {
   return (
     <form action={action} className="grid gap-3">
       <input type="hidden" name="id" value={id} />
+      <ContextFields ctx={ctx} />
       {rejecting && (
         <label className="grid min-w-0 gap-1.5">
           <span className="font-semibold">Alasan penolakan</span>

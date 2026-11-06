@@ -1,4 +1,5 @@
 // Server data for Kepatuhan & Pendapat Ahli (UX-58, PR-97). Server only.
+import { type RenderedContext, renderedContext } from "../../../modules/org/context/context";
 import "server-only";
 import type { Role } from "../../../auth/policy";
 import { withTenantContext } from "../../../db/rls/context";
@@ -30,7 +31,7 @@ export type ItemPage =
   | { kind: "redirect"; to: string }
   | { kind: "forbidden" }
   | { kind: "not-found" }
-  | { kind: "ok"; row: RegisterRow; files: EvidenceFile[]; decisions: EvidenceDecision[] };
+  | { kind: "ok"; row: RegisterRow; files: EvidenceFile[]; decisions: EvidenceDecision[]; ctx: RenderedContext };
 
 // One obligation by key: tenant items show files and decisions; vendor items status only.
 export async function loadItem(key: string): Promise<ItemPage> {
@@ -42,6 +43,6 @@ export async function loadItem(key: string): Promise<ItemPage> {
     const row = (await register(db)).find((r) => r.obligationKey === key);
     if (!row) return { kind: "not-found" as const };
     const detail = row.itemId && row.mayRead ? await itemDetail(db, row.itemId) : { files: [], decisions: [] };
-    return { kind: "ok" as const, row, ...detail };
+    return { kind: "ok" as const, row, ...detail, ctx: renderedContext(rc.active.context) };
   });
 }

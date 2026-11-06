@@ -2,6 +2,8 @@
 // One setting row in Pengaturan (19 §2.17): current value, default and its source, bounds,
 // effective date, history, Ubah (inline form generated from the value spec) and
 // Kembalikan ke default; drafts show "Menunggu persetujuan {peran}".
+import { ContextFields } from "../../../components/context-fields";
+import type { RenderedContext } from "../../../modules/org/context/context";
 import { useActionState, useId, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import type { Spec, Value } from "../../../modules/settings/spec";
@@ -145,9 +147,9 @@ function Message({ state }: { state: SaveState }) {
 }
 
 export function SettingEditor({
-  settingKey, label, spec, value, branchId, draftMode, isDefault,
+  settingKey, label, spec, value, branchId, draftMode, isDefault, ctx,
 }: {
-  settingKey: string; label: string; spec: Spec; value: Value; branchId: string | null;
+  settingKey: string; label: string; spec: Spec; value: Value; branchId: string | null; ctx: RenderedContext;
   draftMode: string | null; // "Owner" when this role only proposes
   isDefault: boolean;
 }) {
@@ -181,6 +183,7 @@ export function SettingEditor({
       {(open || confirmRestore) && (
         <form action={action} className="grid min-w-0 gap-4 rounded-[var(--radius-field)] bg-[var(--bg-grouped)] p-3">
           <input type="hidden" name="key" value={settingKey} />
+          <ContextFields ctx={ctx} />
           <input type="hidden" name="branch" value={branchId ?? ""} />
           <input type="hidden" name="intent" value={confirmRestore ? "restore" : "change"} />
           {confirmRestore ? (
@@ -214,11 +217,12 @@ export function SettingEditor({
   );
 }
 
-export function WithdrawDraft({ approvalId, group }: { approvalId: string; group: string }) {
+export function WithdrawDraft({ approvalId, group, ctx }: { approvalId: string; group: string; ctx: RenderedContext }) {
   const [state, action, pending] = useActionState<SaveState, FormData>(withdrawAction, {});
   return (
     <form action={action} className="grid gap-1">
       <input type="hidden" name="approval" value={approvalId} />
+      <ContextFields ctx={ctx} />
       <input type="hidden" name="group" value={group} />
       <Button type="submit" variant="plain" disabled={pending}>Tarik Usulan</Button>
       <Message state={state} />

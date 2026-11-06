@@ -351,6 +351,13 @@
       "when": 1793949700001,
       "tag": "0049_vendor_authority_wall_clock",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793977306510,
+      "tag": "0050_setting_branch_scope",
+      "breakpoints": true
     }
   ]
 }

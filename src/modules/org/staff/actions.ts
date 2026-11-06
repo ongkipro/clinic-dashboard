@@ -7,6 +7,7 @@ import { ROLES, type Role } from "../../../auth/policy";
 import { withTenantContext } from "../../../db/rls/context";
 import { CommandError } from "../../../lib/command";
 import { endMembership, removeRole, revokeSession, setDuty } from "../access/access";
+import { STALE_CONTEXT, staleContext } from "../context/context";
 import { appPool, requestContext } from "../context/store";
 import { cancelInvite, invite } from "./staff";
 
@@ -19,10 +20,11 @@ const MESSAGES: Record<string, string> = {
   ERR_IDEMPOTENCY_CONFLICT: "Undangan untuk email ini masih menunggu.",
 };
 
-async function inContext<T>(fn: (db: Parameters<Parameters<typeof withTenantContext>[2]>[0]) => Promise<T>): Promise<T | ActionState> {
+async function inContext<T>(f: FormData, fn: (db: Parameters<Parameters<typeof withTenantContext>[2]>[0]) => Promise<T>): Promise<T | ActionState> {
   const rc = await requestContext();
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind === "blocked") return { error: MESSAGES.ERR_FORBIDDEN };
+  if (staleContext(f, rc.active.context)) return { error: STALE_CONTEXT };
   try {
     return await withTenantContext(await appPool(), rc.active.context, fn);
   } catch (e) {
@@ -42,7 +44,7 @@ export async function inviteAction(_p: ActionState, f: FormData): Promise<Action
   if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(email) || name.length < 2 || roles.length === 0) {
     return { error: "Isi email, nama dan minimal satu peran." };
   }
-  const r = await inContext((db) => invite(db, { email, name, roles, branchIds }));
+  const r = await inContext(f, (db) => invite(db, { email, name, roles, branchIds }));
   if ("error" in r) return r as ActionState;
   revalidatePath("/staf");
   const origin = process.env.APP_URL ?? "";
@@ -52,7 +54,7 @@ export async function inviteAction(_p: ActionState, f: FormData): Promise<Action
 export async function cancelInviteAction(_p: ActionState, f: FormData): Promise<ActionState> {
   const id = str(f, "id");
   if (!UUID.test(id)) return { error: MESSAGES.ERR_NOT_FOUND };
-  const r = await inContext((db) => cancelInvite(db, id));
+  const r = await inContext(f, (db) => cancelInvite(db, id));
   if (r && typeof r === "object" && "error" in r) return r;
   revalidatePath("/staf");
   return { ok: "Undangan dibatalkan." };
@@ -62,7 +64,7 @@ export async function revokeSessionAction(_p: ActionState, f: FormData): Promise
   const staffId = str(f, "staff");
   const session = str(f, "session");
   if (!UUID.test(staffId) || (session && !UUID.test(session))) return { error: MESSAGES.ERR_NOT_FOUND };
-  const r = await inContext((db) => revokeSession(db, staffId, session || null));
+  const r = await inContext(f, (db) => revokeSession(db, staffId, session || null));
   if (r && typeof r === "object" && "error" in r) return r;
   revalidatePath("/pengguna-akses");
   revalidatePath(`/staf/${staffId}`); // the detail lists the session as "dicabut"
@@ -72,7 +74,7 @@ export async function revokeSessionAction(_p: ActionState, f: FormData): Promise
 export async function endMembershipAction(_p: ActionState, f: FormData): Promise<ActionState> {
   const staffId = str(f, "staff");
   if (!UUID.test(staffId)) return { error: MESSAGES.ERR_NOT_FOUND };
-  const r = await inContext((db) => endMembership(db, staffId));
+  const r = await inContext(f, (db) => endMembership(db, staffId));
   if (r && typeof r === "object" && "error" in r) return r;
   revalidatePath("/staf");
   return { ok: "Keanggotaan diakhiri. Semua sesinya dicabut." };
@@ -82,7 +84,7 @@ export async function removeRoleAction(_p: ActionState, f: FormData): Promise<Ac
   const staffId = str(f, "staff");
   const role = str(f, "role");
   if (!UUID.test(staffId) || !(ROLES as readonly string[]).includes(role)) return { error: MESSAGES.ERR_NOT_FOUND };
-  const r = await inContext((db) => removeRole(db, staffId, role as Role));
+  const r = await inContext(f, (db) => removeRole(db, staffId, role as Role));
   if (r && typeof r === "object" && "error" in r) return r;
   revalidatePath(`/staf/${staffId}`);
   return { ok: "Peran dicabut." };
@@ -93,7 +95,7 @@ export async function dutyAction(_p: ActionState, f: FormData): Promise<ActionSt
   const duty = str(f, "duty");
   const assign = str(f, "assign") === "1";
   if (!UUID.test(staffId) || (duty !== "data_protection" && duty !== "it_admin")) return { error: MESSAGES.ERR_NOT_FOUND };
-  const r = await inContext((db) => setDuty(db, staffId, duty, assign));
+  const r = await inContext(f, (db) => setDuty(db, staffId, duty, assign));
   if (r && typeof r === "object" && "error" in r) return r;
   revalidatePath("/pengguna-akses");
   return { ok: assign ? "Tugas diberikan." : "Tugas diakhiri." };

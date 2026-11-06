@@ -403,6 +403,32 @@ describe("who changes what (07, 19 §5 'Changed by')", () => {
     expect(await code(as(own, (db) => db.query(`select setting_set('SET-8', $1, '400'::jsonb, now(), 'cabang', false)`, [A.b1])))).toBe("raw:P0422");
   });
 
+  it("HYG-009 N2: a tenant-wide role with a branch selected changes any branch and the tenant value, exactly as unbound; a branch role is still held to its branch", async () => {
+    const at = async <R>(p: P, branch: string, fn: (db: pg.PoolClient) => Promise<R>) =>
+      withTenantContext(app, await resolveContext(app, p.acc, { tenantId: p.tenantId, actingRole: p.role, activeBranchId: branch }), fn);
+    const own = await person(A, ["owner"]);
+    const ap = await person(A, ["admin_pusat"]);
+    // Owner bound to B1 (DEC-026: the owner changes every row).
+    expect(await at(own, A.b1, (db) => changeSetting(db, { key: "SET-38", branchId: A.b2, value: 25, reason: "Owner di B1 ubah B2" }))).toMatchObject({ state: "active" });
+    expect(await at(own, A.b1, (db) => changeSetting(db, { key: "SET-38", branchId: null, value: 22, reason: "Owner di B1 ubah semua cabang" }))).toMatchObject({ state: "active" });
+    expect(await as(own, (db) => settingValue(db, "SET-38", A.b2))).toBe(25);
+    // Admin Pusat bound to B1 keeps exactly its unbound rights: a branch row it changes, any branch.
+    expect(await at(ap, A.b1, (db) => changeSetting(db, { key: "SET-16", branchId: A.b2, value: { horizon: 21, batas: 2, dp_pasien_baru: false }, reason: "AP di B1 ubah B2" }))).toMatchObject({ state: "active" });
+    // ...and no more: a row it may not change stays refused whatever branch is selected.
+    const unbound = await code(as(ap, (db) => changeSetting(db, { key: "SET-38", branchId: A.b2, value: 26, reason: "AP tanpa cabang" })));
+    expect(await code(at(ap, A.b1, (db) => changeSetting(db, { key: "SET-38", branchId: A.b2, value: 26, reason: "AP di B1" })))).toBe(unbound);
+    // Not widened here: a draft for another branch while a branch is selected is still refused, by
+    // approval_request's own branch check (approvals engine, outside N2), and leaves no draft.
+    const drafts = async () => Number((await h.admin.query(`select count(*) from setting_versions where tenant_id = $1 and key = 'SET-13' and state = 'draft'`, [A.tenantId])).rows[0].count);
+    const d0 = await drafts();
+    expect(await code(at(ap, A.b1, (db) => changeSetting(db, { key: "SET-13", branchId: A.b2, value: 66_000, reason: "Usulan AP di B1 untuk B2" })))).toBe("ERR_FORBIDDEN");
+    expect(await drafts()).toBe(d0);
+    // A Level 3 role stays at its branch.
+    const mgr = await person(A, ["manager"], A.b1);
+    expect(await code(set(mgr, "SET-38", 30, A.b2))).toBe("ERR_FORBIDDEN");
+    expect(await code(set(mgr, "SET-38", 30, null))).toBe("ERR_FORBIDDEN");
+  });
+
   it("Admin Pusat drafts a money setting; it waits in Persetujuan, the owner approves and it takes effect", async () => {
     const ap = await person(A, ["admin_pusat"]);
     const own = await person(A, ["owner"]);

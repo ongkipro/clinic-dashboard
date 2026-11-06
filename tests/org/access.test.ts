@@ -7,10 +7,10 @@ import { APP_GROUP_ROLE, AUTH_GROUP_ROLE, withTenantContext } from "../../src/db
 import { openAppPool } from "../../src/db/rls/pool";
 import { CommandError } from "../../src/lib/command";
 import { accessLog, call, CAPABILITY_LABEL, duties, endMembership, permissionMatrix, removeRole, revokeSession, setBranch, setDuty, staffSessions } from "../../src/modules/org/access/access";
-import { activeContext } from "../../src/modules/org/context/context";
+import { activeContext, ContextSwitchError, switchContext } from "../../src/modules/org/context/context";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { AccountExistsError, createAuth } from "../../src/auth/server";
-import { acceptInvite, acceptWithNewAccount, cancelInvite, invite, listInvitations, listStaff, lookupInvite } from "../../src/modules/org/staff/staff";
+import { acceptInvite, acceptWithNewAccount, cancelInvite, invite, listInvitations, listStaff, lookupInvite, manageableSessions } from "../../src/modules/org/staff/staff";
 import { BASE_URL, Client, PASSWORD } from "../auth/helpers";
 import { createHarness, type Harness } from "../rls/harness";
 
@@ -102,6 +102,43 @@ describe("scenario PR-91 revoke session", () => {
     expect(after).not.toBeNull();
     expect(after!.context.tenantId).toBe(B.tenantId); // A is gone for this session, B remains
     expect(after!.clinics.map((c) => c.tenantId)).toEqual([B.tenantId]);
+  });
+
+  it("HYG-009 N1: staff detail lists sessions only for members the viewer may manage; a refused probe leaves the page's transaction usable", async () => {
+    const own = await person(A, ["owner"]);
+    const ap = await person(A, ["admin_pusat"]);
+    const fin = await person(A, ["finance"]);
+    const fo = await person(A, ["fo_cashier"], A.b1);
+    const s = await session(fo.acc);
+    const r = await as(ap, async (db) => {
+      const priv = await manageableSessions(db, fin.staffId);
+      const self = await manageableSessions(db, ap.staffId);
+      const ok = await manageableSessions(db, fo.staffId);
+      const after = (await listStaff(db)).some((x) => x.staffId === fin.staffId); // the transaction still runs
+      return { priv, self, ok, after };
+    });
+    expect(r.priv).toBeNull();
+    expect(r.self).toBeNull();
+    expect(r.ok!.map((x) => x.sessionId)).toEqual([s]);
+    expect(r.after).toBe(true);
+    expect(await as(own, (db) => manageableSessions(db, fin.staffId))).toEqual([]);
+  });
+
+  it("HYG-009 N3: a session revoked for clinic A cannot switch back into A and records nothing there", async () => {
+    const ownA = await person(A, ["owner"]);
+    const acc = await account();
+    const inA = await person(A, ["fo_cashier"], A.b1, acc);
+    await person(B, ["fo_cashier"], B.b1, acc);
+    const s = await session(acc);
+    await as(ownA, (db) => revokeSession(db, inA.staffId, null));
+    const rows = async () => Number((await h.admin.query(`select count(*) from org_actions where tenant_id = $1 and staff_id = $2`, [A.tenantId, inA.staffId])).rows[0].count);
+    const before = await rows();
+    await expect(switchContext(app, acc, { tenantId: B.tenantId }, { kind: "clinic", tenantId: A.tenantId }, s)).rejects.toBeInstanceOf(ContextSwitchError);
+    expect(await rows()).toBe(before);
+    // Control: a session signed in after the revocation still switches into A (and records it).
+    const fresh = await session(acc, 0);
+    expect(await switchContext(app, acc, { tenantId: B.tenantId }, { kind: "clinic", tenantId: A.tenantId }, fresh)).toMatchObject({ tenantId: A.tenantId });
+    expect(await rows()).toBe(before + 1);
   });
 
   it("a session signed in after the revocation works again, whatever its created_at says (no clock comparison)", async () => {

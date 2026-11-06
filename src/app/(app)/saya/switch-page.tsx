@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { ROLE_LABEL } from "../../../components/shell/nav";
 import { withTenantContext } from "../../../db/rls/context";
+import { renderedContext } from "../../../modules/org/context/context";
 import { appPool, requestContext } from "../../../modules/org/context/store";
 import { myOwnerGrants } from "../../../modules/org/roles/roles";
 import { OwnerGrant } from "./owner-grant";
@@ -13,6 +14,7 @@ export async function SwitchBody({ kind }: { kind: "clinic" | "role" | "branch" 
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind === "blocked") return <BlockedState reason="Akun Anda belum punya peran atau cabang aktif" unblock="Owner atau Admin Pusat klinik Anda dapat menambahkannya" />;
   const a = rc.active;
+  const ctx = renderedContext(a.context);
   let options: SwitchOption[];
   let label: string;
   if (kind === "branch") {
@@ -38,14 +40,14 @@ export async function SwitchBody({ kind }: { kind: "clinic" | "role" | "branch" 
         Aktif: {a.clinic.name} · {a.context.activeBranchId ? a.branches.find((b) => b.id === a.context.activeBranchId)?.name : "Semua Cabang"} · Sebagai {ROLE_LABEL[a.context.actingRole]}
       </p>
       {grants.map((g) => (
-        <OwnerGrant key={g.requestId} id={g.requestId} grantedBy={g.grantedBy} at={when.format(g.at)} />
+        <OwnerGrant key={g.requestId} id={g.requestId} grantedBy={g.grantedBy} at={when.format(g.at)} ctx={ctx} />
       ))}
       {nothingToSwitch ? (
         <p role="status" className="m-0 rounded-[var(--radius-group)] bg-[var(--surface)] p-4 text-[var(--label-2)]">
           {kind === "branch" ? "Anda hanya punya satu cabang." : kind === "role" ? "Anda hanya punya satu peran." : "Anda hanya terdaftar di satu klinik."}
         </p>
       ) : (
-        <SwitchForm kind={kind} label={label} options={options} />
+        <SwitchForm kind={kind} label={label} options={options} ctx={ctx} />
       )}
     </div>
   );

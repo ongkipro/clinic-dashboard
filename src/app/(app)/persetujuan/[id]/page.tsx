@@ -52,7 +52,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
         {d.decisionReason ? ` · ${d.decisionReason}` : ""}
       </p>
     )
-    : <DecideForm id={d.id} />;
+    : <DecideForm id={d.id} ctx={p.ctx} />;
   return (
     <DetailPage
       as="section"

@@ -2,9 +2,10 @@
 import "server-only";
 import type { Role } from "../../../auth/policy";
 import { withTenantContext } from "../../../db/rls/context";
-import { type AccessChange, accessLog, type Duty, duties, staffSessions, type StaffSession } from "../access/access";
+import { type AccessChange, accessLog, type Duty, duties, type StaffSession } from "../access/access";
+import { type RenderedContext, renderedContext } from "../context/context";
 import { appPool, requestContext } from "../context/store";
-import { type InvitationRow, listInvitations, listStaff, type StaffRow } from "./staff";
+import { type InvitationRow, listInvitations, listStaff, manageableSessions, type StaffRow } from "./staff";
 
 export type StaffPage =
   | { kind: "redirect"; to: string }
@@ -17,6 +18,7 @@ export type StaffPage =
       staff: StaffRow[];
       invitations: InvitationRow[];
       branches: { id: string; name: string }[];
+      ctx: RenderedContext;
     };
 
 const STAFF_READERS: readonly Role[] = ["owner", "admin_pusat", "manager", "facility_head"];
@@ -36,6 +38,7 @@ export async function loadStaffPage(): Promise<StaffPage> {
     staff: await listStaff(db),
     invitations: canManage ? await listInvitations(db) : [],
     branches: rc.active.branches,
+    ctx: renderedContext(rc.active.context),
   }));
 }
 
@@ -43,7 +46,7 @@ export type StaffDetail =
   | { kind: "redirect"; to: string }
   | { kind: "forbidden" }
   | { kind: "not-found" }
-  | { kind: "ok"; canManage: boolean; self: boolean; staff: StaffRow; sessions: StaffSession[]; branches: { id: string; name: string }[] };
+  | { kind: "ok"; canManage: boolean; canAudit: boolean; self: boolean; staff: StaffRow; sessions: StaffSession[]; branches: { id: string; name: string }[]; ctx: RenderedContext };
 
 export async function loadStaffDetail(staffId: string): Promise<StaffDetail> {
   const rc = await requestContext();
@@ -52,17 +55,21 @@ export async function loadStaffDetail(staffId: string): Promise<StaffDetail> {
   const role = rc.active.context.actingRole;
   if (!STAFF_READERS.includes(role)) return { kind: "forbidden" };
   if (!/^[0-9a-f-]{36}$/i.test(staffId)) return { kind: "not-found" };
-  const canManage = role === "owner" || role === "admin_pusat";
+  const admin = role === "owner" || role === "admin_pusat";
   return withTenantContext(await appPool(), rc.active.context, async (db) => {
     const staff = (await listStaff(db)).find((s) => s.staffId === staffId);
     if (!staff) return { kind: "not-found" as const };
+    // HYG-009 N1: Admin Pusat may not manage privileged members; the database decides.
+    const sessions = admin ? await manageableSessions(db, staffId) : null;
     return {
       kind: "ok" as const,
-      canManage,
+      canManage: sessions !== null,
+      canAudit: admin,
       self: staffId === rc.active.context.staffId,
       staff,
-      sessions: canManage ? await staffSessions(db, staffId) : [],
+      sessions: sessions ?? [],
       branches: rc.active.branches,
+      ctx: renderedContext(rc.active.context),
     };
   });
 }
@@ -70,7 +77,7 @@ export async function loadStaffDetail(staffId: string): Promise<StaffDetail> {
 export type AccessPage =
   | { kind: "redirect"; to: string }
   | { kind: "forbidden" }
-  | { kind: "ok"; isOwner: boolean; selfId: string; staff: StaffRow[]; duties: { staffId: string; duty: Duty; assignedAt: Date }[]; log: AccessChange[]; branches: { id: string; name: string }[] };
+  | { kind: "ok"; isOwner: boolean; selfId: string; staff: StaffRow[]; duties: { staffId: string; duty: Duty; assignedAt: Date }[]; log: AccessChange[]; ctx: RenderedContext; branches: { id: string; name: string }[] };
 
 export async function loadAccessPage(): Promise<AccessPage> {
   const rc = await requestContext();
@@ -86,5 +93,6 @@ export async function loadAccessPage(): Promise<AccessPage> {
     duties: await duties(db),
     log: await accessLog(db, 50),
     branches: rc.active.branches,
+    ctx: renderedContext(rc.active.context),
   }));
 }
