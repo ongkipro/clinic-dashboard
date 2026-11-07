@@ -3,8 +3,8 @@
 export const CHECKLIST_ITEMS = ["entity_tax", "catalog", "staff_credentials", "money_settings", "payment_port", "waba", "satusehat", "branch_setup"] as const;
 export type ChecklistItemKey = (typeof CHECKLIST_ITEMS)[number];
 
-// The blocker string the database names (`checklist:<item>[@<branch code>]`, `vendor:<reason>`,
-// `clinical:<obligation>`) as Indonesian text for the console.
+// The blocker string the database names (`agreement:processor_agreement_signed`, `checklist:<item>[@<branch code>]`,
+// `vendor:<reason>`, `clinical:<obligation>`) as Indonesian text for the console.
 export const ITEM_LABEL: Record<ChecklistItemKey, string> = {
   entity_tax: "Badan usaha & status pajak",
   catalog: "Katalog layanan",
@@ -42,6 +42,8 @@ export function blockerLabel(b: string): string {
   }
   if (kind === "vendor") return VENDOR_LABEL[rest] ?? (rest.startsWith("placeholder:") ? `Profil vendor masih placeholder: ${rest.slice(12)}` : rest.startsWith("storage_undeclared:") ? `Lokasi penyimpanan belum dinyatakan: ${rest.slice(19)}` : `Profil vendor: ${rest}`);
   if (kind === "clinical") return `${CLINICAL_LABEL[rest] ?? rest} belum disetujui (Kepatuhan klinik)`;
+  // HYG-014 (PR-59, DEC-045): the processor agreement is checked again at go-live.
+  if (kind === "agreement") return "Perjanjian pengolahan data belum berlaku (disetujui klinik di Kepatuhan)";
   return b;
 }
 

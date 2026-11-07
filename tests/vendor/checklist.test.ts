@@ -10,6 +10,7 @@ import { APP_GROUP_ROLE, withTenantContext } from "../../src/db/rls/context";
 import { openAppPool } from "../../src/db/rls/pool";
 import { decideEvidence, uploadEvidence } from "../../src/modules/compliance/compliance";
 import { checklist, setChecklistItem } from "../../src/modules/vendor/checklist/checklist";
+import { blockerLabel } from "../../src/modules/vendor/checklist/labels";
 import { assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { applyLifecycleRequest } from "../../src/modules/vendor/lifecycle/lifecycle";
 import { bootstrapVendor, createVendorStaff, decideVendorRequest, requestVendorAction, type VendorCaller } from "../../src/modules/vendor/staff/staff";
@@ -199,6 +200,110 @@ describe("scenario PR-59 go-live gate", () => {
     const lives = (await h.admin.query(`select from_state, at from tenant_lifecycle_events where tenant_id = $1 and to_state = 'live' order by seq`, [c.tenantId])).rows;
     expect(lives.map((x) => x.from_state)).toEqual(["onboarding", "suspended"]);
     expect(((await h.admin.query(`select tenant_go_live_at($1) as at`, [c.tenantId])).rows[0].at as Date).getTime()).toBe(first.getTime());
+  });
+});
+
+// HYG-014 (DEC-045, PR-59): go-live re-checks the processor agreement. Onboarding needed it (TEN-12);
+// an agreement revoked, or replaced by a new unapproved file, after onboarding must block go-live too.
+describe("scenario PR-59: the processor agreement is checked again at go-live (HYG-014)", () => {
+  // A clinic in onboarding with every other blocker cleared (checklist, clinical evidence, and the
+  // vendor maker-checker pair, which the go-live scenario above creates; created here when this block
+  // runs alone): only the agreement decides.
+  async function readyClinic(): Promise<Clinic> {
+    if (!FIN) {
+      FIN = await account();
+      await createVendorStaff(op, caller(PO), FIN, "Keuangan Vendor", ["vendor_finance"]);
+      FINTok = await session(FIN);
+    }
+    const x = await clinic();
+    expect(await advance(x, "onboarding", ONBTok)).toMatchObject({ ok: true });
+    await h.admin.query(
+      `update onboarding_checklist_items
+          set status = CASE WHEN item IN ('payment_port','waba','satusehat') THEN 'not_applicable' ELSE 'done' END,
+              note = CASE WHEN item IN ('payment_port','waba','satusehat') THEN 'Tidak dipakai dalam uji' END
+        where tenant_id = $1`, [x.tenantId]);
+    for (const k of CLINICAL) await approveEvidence(x, k);
+    expect((await h.admin.query(`select tenant_go_live_blockers($1) as b`, [x.tenantId])).rows[0].b).toEqual([]);
+    return x;
+  }
+  const agreementItem = async (x: Clinic) =>
+    (await h.admin.query(`select id from evidence_items where tenant_id = $1 and obligation_key = 'processor_agreement_signed'`, [x.tenantId])).rows[0].id as string;
+  const latestFile = async (item: string) =>
+    (await h.admin.query(`select id from evidence_files where item_id = $1 order by version desc limit 1`, [item])).rows[0].id as string;
+
+  it("an agreement revoked after onboarding: go-live is refused naming it; nothing changes; approved again, go-live succeeds", async () => {
+    const x = await readyClinic();
+    const item = await agreementItem(x);
+    await asOwner(x, async (db) => decideEvidence(db, item, await latestFile(item), "revoked", "Perjanjian ditarik untuk ditinjau ulang"));
+    const r = await advance(x, "live");
+    expect(r).toMatchObject({ ok: false, reason: "go_live_blocked", blocker: "agreement:processor_agreement_signed" });
+    expect(await state(x.tenantId)).toBe("onboarding");
+    expect(await lastLog()).toEqual({ action: "tenant_live", outcome: "denied", reason_code: "go_live_blocked" });
+    const c2 = await read(x);
+    expect(c2.ok && c2.data.blockers).toEqual(["agreement:processor_agreement_signed"]);
+    // Approved again (a new decision on the current file): go-live goes through.
+    await asOwner(x, async (db) => decideEvidence(db, item, await latestFile(item), "approved"));
+    expect(await advance(x, "live")).toEqual({ ok: true, data: { ok: true, state: "live" } });
+  });
+
+  it("an agreement replaced by a new unapproved version after onboarding blocks go-live, ahead of any open checklist item", async () => {
+    const x = await readyClinic();
+    const pdf = Buffer.from(`%PDF-1.7
+processor_agreement_signed versi baru ${++n}
+%%EOF
+`);
+    await asOwner(x, (db) => uploadEvidence(db, { obligationKey: "processor_agreement_signed", fileName: "dpa-v2.pdf", content: pdf, expertName: "Konsultan Sintetis", documentDate: "2026-11-01" }));
+    await h.admin.query(`update onboarding_checklist_items set status = 'open' where tenant_id = $1 and item = 'catalog'`, [x.tenantId]);
+    // Named first: no tenant data commitments go live without a current agreement (PRIV-8).
+    expect((await h.admin.query(`select tenant_go_live_blockers($1) as b`, [x.tenantId])).rows[0].b).toEqual(["agreement:processor_agreement_signed", "checklist:catalog"]);
+    expect(await advance(x, "live")).toMatchObject({ ok: false, reason: "go_live_blocked", blocker: "agreement:processor_agreement_signed" });
+    expect(await state(x.tenantId)).toBe("onboarding");
+  });
+
+  // Mutation "agreement-state-only" (review of the mutation run): revoking and a new file both change the
+  // item state; an expired agreement keeps state 'approved', so only evidence_item_open sees it.
+  it("an agreement that expired since onboarding (still approved) blocks go-live", async () => {
+    const x = await readyClinic();
+    await h.admin.query(`update evidence_items set valid_until = current_date - 1 where tenant_id = $1 and obligation_key = 'processor_agreement_signed'`, [x.tenantId]);
+    expect((await h.admin.query(`select state from evidence_items where tenant_id = $1 and obligation_key = 'processor_agreement_signed'`, [x.tenantId])).rows[0].state).toBe("approved");
+    expect(await advance(x, "live")).toMatchObject({ ok: false, reason: "go_live_blocked", blocker: "agreement:processor_agreement_signed" });
+    expect(await state(x.tenantId)).toBe("onboarding");
+  });
+
+  // Review notes (HYG-014 R3): a tenant without any agreement item at runtime; the console label;
+  // reactivation (suspended -> live) is not the go-live gate, even with a revoked agreement.
+  it("a tenant with no agreement item at all is blocked (runtime, not only the drift check)", async () => {
+    // A tenant row without any evidence (as one created before compliance existed); its checklist is
+    // not seeded either, so both are named, the agreement first.
+    const bare = (await h.admin.query(`insert into tenants_registry default values returning id`)).rows[0].id as string;
+    expect((await h.admin.query(`select count(*)::int as n from evidence_items where tenant_id = $1`, [bare])).rows[0].n).toBe(0);
+    expect((await h.admin.query(`select tenant_go_live_blockers($1) as b`, [bare])).rows[0].b.slice(0, 2)).toEqual(["agreement:processor_agreement_signed", "checklist:not_seeded"]);
+  });
+
+  it("the console names the agreement blocker in Indonesian", () => {
+    expect(blockerLabel("agreement:processor_agreement_signed")).toBe("Perjanjian pengolahan data belum berlaku (disetujui klinik di Kepatuhan)");
+  });
+
+  it("reactivation is not gated by a revoked agreement (only onboarding -> live is)", async () => {
+    const x = await readyClinic();
+    expect(await advance(x, "live")).toEqual({ ok: true, data: { ok: true, state: "live" } });
+    const s1 = await requestVendorAction(op, caller(FIN), x.tenantId, { kind: "suspension" }, "Permintaan suspension untuk uji perjanjian");
+    expect(await decideVendorRequest(op, caller(PO), s1, true)).toBe("approved");
+    expect(await applyLifecycleRequest(exec, s1, "suspension", x.tenantId, "lifecycle.worker")).toBe("suspended");
+    const item = await agreementItem(x);
+    await asOwner(x, async (db) => decideEvidence(db, item, await latestFile(item), "revoked", "Perjanjian ditarik untuk ditinjau ulang"));
+    expect((await h.admin.query(`select tenant_go_live_blockers($1) as b`, [x.tenantId])).rows[0].b).toEqual(["agreement:processor_agreement_signed"]);
+    const re = await requestVendorAction(op, caller(PO), x.tenantId, { kind: "reactivation" }, "Permintaan reactivation untuk uji perjanjian");
+    expect(await decideVendorRequest(op, caller(PO2), re, true)).toBe("approved");
+    expect(await applyLifecycleRequest(exec, re, "reactivation", x.tenantId, "lifecycle.worker")).toBe("live");
+  });
+
+  it("another tenant's approved agreement does not satisfy this tenant", async () => {
+    const x = await readyClinic();
+    const item = await agreementItem(x);
+    await asOwner(x, async (db) => decideEvidence(db, item, await latestFile(item), "revoked", "Perjanjian ditarik untuk ditinjau ulang"));
+    await clinic(); // another tenant, its agreement approved
+    expect((await h.admin.query(`select tenant_go_live_blockers($1) as b`, [x.tenantId])).rows[0].b).toEqual(["agreement:processor_agreement_signed"]);
   });
 });
 

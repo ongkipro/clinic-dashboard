@@ -1,0 +1,9 @@
+{
+  "tenant_go_live_blockers(uuid)": [
+    {
+      "at": 7,
+      "old": "",
+      "new": "    -- HYG-014 (PR-59, DEC-045): the signed processor agreement, checked when onboarding started, is\n    -- checked again here: revoked, replaced by an unapproved file or expired since, it blocks go-live\n    -- and is named first.\n    SELECT 0 AS o, '' AS k, 'agreement:processor_agreement_signed' AS x\n     WHERE NOT coalesce((SELECT public.evidence_item_open(i.id) FROM public.evidence_items i\n                          WHERE i.tenant_id = p_tenant AND i.obligation_key = 'processor_agreement_signed'), false)\n    UNION ALL"
+    }
+  ]
+}

@@ -148,6 +148,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Take locks in the order the competing writer takes them: a row UPDATE locks the tuple first and its trigger takes the advisory lock second, so a function that needs both locks the row first.
   - A concurrency test must run the real competing write and assert it is blocked (`pg_blocking_pids`); holding the advisory lock alone cannot show a row-lock cycle.
 
+- **HYG-014** (go-live re-checks the processor agreement, migration 0053):
+  - A gate checked once at an earlier step is not a gate at a later step: evidence that can be revoked, replaced or expire must be re-read where the decision is taken.
+  - Write the regression before the fix and run it against the unchanged code; keep that red run as evidence.
+  - A mutation that survives can expose a missing case, not only a weak test: replacing `evidence_item_open` by the item state survived until an expired-but-approved case existed.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).
