@@ -143,6 +143,7 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["role_owner_confirm", async () => ["select role_owner_confirm($1, true)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["role_owner_grant_withdraw", async () => ["select role_owner_grant_withdraw($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["vendor_dual_identity_clinic_decide", async () => ["select vendor_dual_identity_clinic_decide($1, true)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["vendor_dual_identity_clinic_revoke", async () => ["select vendor_dual_identity_clinic_revoke($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

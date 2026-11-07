@@ -3,6 +3,8 @@
 // (here a personal-data scope; the database treats personal and clinical alike, TEN-14) and the Owner
 // approves it. Plus: Admin Pusat sees the same sessions read-only, without the grant section or buttons;
 // the session log lists every record read, flagging one that no longer exists. No console error.
+// HYG-013 (DEC-044): the Owner revokes an effective dual identity ("Cabut", with a confirmation);
+// Admin Pusat sees it without Cabut.
 import { createHmac } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
@@ -99,6 +101,9 @@ try {
   const apText = await ap.locator("main").innerText();
   flow.push(["Admin Pusat sees sessions read-only (no decision buttons, no onboarding section)",
     apText.includes("Hanya baca") && apText.includes("Memeriksa pengaturan cabang") && !apText.includes("Setujui Akses Klinis") && !apText.includes("Akhiri Sesi") && !apText.includes("Akses onboarding")]);
+  // HYG-013: Admin Pusat sees the effective dual identity but cannot revoke it.
+  const apDual = await ap.locator("main li").filter({ hasText: "Dimas Ganda" }).first().innerText();
+  flow.push(["Admin Pusat sees the effective dual identity without Cabut", apDual.includes("Berlaku") && !apDual.includes("Cabut")]);
   await layouts(ap, "/saya/akses-vendor", "ap");
   await apCtx.close();
 
@@ -154,6 +159,25 @@ try {
   await o.getByRole("heading", { name: "Sesi dukungan" }).waitFor();
   flow.push(["no request waits after the approval; the session is listed active", after.includes("Tidak ada permintaan yang menunggu") && (await o.locator("main li").filter({ hasText: "Memeriksa data staf yang tidak bisa masuk" }).first().innerText()).includes("Aktif")]);
   await o.screenshot({ path: `${OUT}/approved-1440.png`, fullPage: true });
+  // HYG-013 (DEC-044): the Owner revokes the effective dual identity; the confirmation names the
+  // consequence; the result notice; the identity is listed as revoked, without Cabut.
+  await o.setViewportSize({ width: 390, height: 900 });
+  const dualCard = o.locator("main li").filter({ hasText: "Dimas Ganda" }).first();
+  await dualCard.getByRole("button", { name: "Cabut" }).click();
+  await dualCard.getByRole("button", { name: "Batal" }).waitFor();
+  const confirmText = await dualCard.innerText();
+  await o.screenshot({ path: `${OUT}/cabut-confirm-390.png`, fullPage: true });
+  await measure(o, "cabut-confirm-390");
+  await dualCard.getByRole("button", { name: "Cabut" }).click();
+  await o.waitForURL(`${BASE}/saya/akses-vendor`);
+  await o.getByText("Identitas ganda dicabut. Akun itu tidak lagi menjadi staf klinik ini.").waitFor();
+  flow.push(["Owner revokes the dual identity after a confirmation naming the consequence", confirmText.includes("langsung berhenti menjadi staf klinik ini") && confirmText.includes("Akun vendornya tidak berubah")]);
+  await o.screenshot({ path: `${OUT}/cabut-done-390.png`, fullPage: true });
+  await o.goto(`${BASE}/saya/akses-vendor`);
+  await o.getByRole("heading", { name: "Identitas ganda" }).waitFor();
+  const revoked = await o.locator("main li").filter({ hasText: "Dimas Ganda" }).first().innerText();
+  flow.push(["the revoked identity is listed as Dicabut with its date, without Cabut", revoked.includes("Dicabut") && revoked.includes("dicabut Owner") && !/\bCabut\b/.test(revoked.replace("Dicabut", "").replace("dicabut", ""))]);
+  await o.setViewportSize({ width: 1440, height: 900 });
   await oCtx.close();
 } catch (e) {
   report.error = String(e).split("\n").slice(0, 3).join(" ");

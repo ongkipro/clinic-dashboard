@@ -216,6 +216,10 @@ export const vendorRequests = pgTable(
     // The clinic approver's account: one person never supplies both halves.
     clinicApprovedAccount: uuid("clinic_approved_account").references(() => authUser.id, { onDelete: "restrict" }),
     clinicApprovedAt: timestamp("clinic_approved_at", { withTimezone: true }),
+    // dual_identity: the clinic Owner's revocation (DEC-030 (1), DEC-044); the request is kept.
+    clinicRevokedBy: uuid("clinic_revoked_by"),
+    clinicRevokedAccount: uuid("clinic_revoked_account").references(() => authUser.id, { onDelete: "restrict" }),
+    clinicRevokedAt: timestamp("clinic_revoked_at", { withTimezone: true }),
     // An approved request is executed once, by the task that owns its effect, within 30
     // days of approval (vendor_request_consume). Dual identity is a standing state instead.
     consumedAt: timestamp("consumed_at", { withTimezone: true }),
@@ -231,6 +235,7 @@ export const vendorRequests = pgTable(
     check("vendor_requests_cancel_check", sql`${t.state} <> 'cancelled' or ${t.decidedBy} is null`),
     check("vendor_requests_approved_check", sql`${t.state} <> 'approved' or ${t.decidedBy} is not null`),
     check("vendor_requests_clinic_check", sql`(${t.clinicApprovedAt} is null) = (${t.clinicApprovedBy} is null) and (${t.clinicApprovedAt} is null) = (${t.clinicApprovedAccount} is null) and (${t.clinicApprovedAt} is null or ${t.kind} = 'dual_identity')`),
+    check("vendor_requests_clinic_revoked_check", sql`(${t.clinicRevokedAt} is null) = (${t.clinicRevokedBy} is null) and (${t.clinicRevokedAt} is null) = (${t.clinicRevokedAccount} is null) and (${t.clinicRevokedAt} is null or ${t.clinicApprovedAt} is not null and ${t.kind} = 'dual_identity')`),
     check("vendor_requests_consumed_check", sql`${t.consumedAt} is null or ${t.state} = 'approved' and ${t.kind} <> 'dual_identity'`),
   ],
 );

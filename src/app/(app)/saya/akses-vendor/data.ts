@@ -36,6 +36,7 @@ const RESULT = new Map<string, string>([
   ["sesi-diakhiri", "Sesi diakhiri. Vendor tidak bisa membaca data lagi lewat sesi ini."],
   ["identitas-disetujui", "Identitas ganda disetujui."],
   ["identitas-ditolak", "Identitas ganda ditolak."],
+  ["identitas-dicabut", "Identitas ganda dicabut. Akun itu tidak lagi menjadi staf klinik ini."],
 ]);
 export function verifiedResult(raw: string | undefined, sessions: OwnerSession[], dual: DualIdentity[]): string | null {
   const m = /^([a-z-]{1,32}):([0-9a-f-]{36})$/i.exec(raw ?? "");
@@ -48,7 +49,8 @@ export function verifiedResult(raw: string | undefined, sessions: OwnerSession[]
     (code === "akses-ditolak" && s && s.state === "ended" && s.activated_at === null && s.end_reason === "owner") ||
     (code === "sesi-diakhiri" && s && s.state === "ended" && s.end_reason === "owner") ||
     (code === "identitas-disetujui" && d && d.clinicApprovedAt !== null) ||
-    (code === "identitas-ditolak" && d && d.state === "rejected");
+    (code === "identitas-ditolak" && d && d.state === "rejected") ||
+    (code === "identitas-dicabut" && d && d.revokedAt !== null);
   return holds ? RESULT.get(code)! : null;
 }
 

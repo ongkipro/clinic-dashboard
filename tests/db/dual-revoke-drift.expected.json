@@ -1,0 +1,33 @@
+{
+  "vendor_dual_approved(uuid,uuid)": [
+    {
+      "at": 8,
+      "old": "                    AND r.clinic_approved_at IS NOT NULL AND r.payload ->> 'account_id' = p_account::text)",
+      "new": "                    AND r.clinic_approved_at IS NOT NULL AND r.payload ->> 'account_id' = p_account::text\n                    AND r.clinic_revoked_at IS NULL)"
+    }
+  ],
+  "vendor_history_guard()": [
+    {
+      "at": 9,
+      "old": "",
+      "new": "  v_revoke_same boolean;"
+    },
+    {
+      "at": 21,
+      "old": "",
+      "new": "  -- HYG-013: the revocation columns change only by the clinic revocation, once, of a dual identity\n  -- carrying the clinic approval (effective, or still awaiting the platform), with nothing else changed;\n  -- every other transition keeps them as they were (a revoked pending request may still be decided by\n  -- the platform, but stays revoked, so it never becomes effective).\n  v_revoke_same := (NEW.clinic_revoked_by, NEW.clinic_revoked_account, NEW.clinic_revoked_at)\n                   IS NOT DISTINCT FROM (OLD.clinic_revoked_by, OLD.clinic_revoked_account, OLD.clinic_revoked_at);\n  IF NOT v_revoke_same THEN\n    IF OLD.kind = 'dual_identity' AND OLD.state IN ('pending','approved') AND NEW.state = OLD.state AND OLD.clinic_approved_at IS NOT NULL\n       AND OLD.clinic_revoked_at IS NULL AND NEW.clinic_revoked_at IS NOT NULL AND v_same_decision AND v_same_clinic\n       AND NEW.consumed_at IS NOT DISTINCT FROM OLD.consumed_at THEN\n      RETURN NEW;\n    END IF;\n    RAISE EXCEPTION 'a decided vendor request is final' USING ERRCODE = '42501';\n  END IF;"
+    }
+  ],
+  "vendor_dual_identities()": [
+    {
+      "at": 1,
+      "old": " RETURNS TABLE(request_id uuid, account_id uuid, vendor_name text, state text, requested_at timestamp with time zone, platform_decided_at timestamp with time zone, clinic_approved_at timestamp with time zone, effective boolean)",
+      "new": " RETURNS TABLE(request_id uuid, account_id uuid, vendor_name text, state text, requested_at timestamp with time zone, platform_decided_at timestamp with time zone, clinic_approved_at timestamp with time zone, effective boolean, revoked_at timestamp with time zone)"
+    },
+    {
+      "at": 16,
+      "old": "         q.state = 'approved' AND q.clinic_approved_at IS NOT NULL",
+      "new": "         q.state = 'approved' AND q.clinic_approved_at IS NOT NULL AND q.clinic_revoked_at IS NULL, q.clinic_revoked_at"
+    }
+  ]
+}

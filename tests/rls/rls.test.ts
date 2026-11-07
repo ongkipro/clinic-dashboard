@@ -418,6 +418,7 @@ describe("functions (TEN-16)", () => {
     "tenant_owner_invite_lookup(text)",
     "vendor_dual_identities()",
     "vendor_dual_identity_clinic_decide(uuid,boolean)",
+    "vendor_dual_identity_clinic_revoke(uuid)",
     "vendor_go_live_allowed()",
     "vendor_identity()",
   ];

@@ -143,6 +143,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A `"use server"` file may export only async functions; typecheck does not catch it, the build does.
   - A cross-tenant negative for a list must seed the victim row and require the victim to see it; an empty list proves nothing.
 
+- **HYG-013** (dual-identity revoke, migration 0052):
+  - Revoking an approval must cover every outstanding request that already carries it, not only the effective one; otherwise the other party's later decision resurrects it.
+  - Take locks in the order the competing writer takes them: a row UPDATE locks the tuple first and its trigger takes the advisory lock second, so a function that needs both locks the row first.
+  - A concurrency test must run the real competing write and assert it is blocked (`pg_blocking_pids`); holding the advisory lock alone cannot show a row-lock cycle.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

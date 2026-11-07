@@ -172,11 +172,22 @@ export async function vendorDualIdentityClinicDecide(db: pg.ClientBase, requestI
   return { refused: CLINIC_REFUSAL[reason] ?? "ERR_FORBIDDEN" };
 }
 
-export type DualIdentity = { requestId: string; accountId: string; vendorName: string | null; state: string; effective: boolean; requestedAt: Date; platformDecidedAt: Date | null; clinicApprovedAt: Date | null };
+// Saya › Akses Vendor › Cabut (DEC-030 (1), DEC-044): the acting Owner revokes an effective dual
+// identity; the subject's clinic membership in this tenant ends at once (the database decides).
+const REVOKE_REFUSAL: Record<string, string> = {
+  not_owner: "ERR_FORBIDDEN", not_found: "ERR_NOT_FOUND", self: "ERR_FORBIDDEN_SELF", not_effective: "ERR_VERSION_CONFLICT",
+};
+export async function vendorDualIdentityClinicRevoke(db: pg.ClientBase, requestId: string): Promise<"revoked" | { refused: string }> {
+  const s = (await db.query<{ s: string }>(`select vendor_dual_identity_clinic_revoke($1) as s`, [requestId])).rows[0].s;
+  if (s === "revoked") return s;
+  return { refused: REVOKE_REFUSAL[s.replace(/^refused:/, "")] ?? "ERR_FORBIDDEN" };
+}
+
+export type DualIdentity = { requestId: string; accountId: string; vendorName: string | null; state: string; effective: boolean; requestedAt: Date; platformDecidedAt: Date | null; clinicApprovedAt: Date | null; revokedAt: Date | null };
 
 export async function vendorDualIdentities(db: pg.ClientBase): Promise<DualIdentity[]> {
   return (await db.query(`select * from vendor_dual_identities()`)).rows.map((r) => ({
     requestId: r.request_id, accountId: r.account_id, vendorName: r.vendor_name, state: r.state, effective: r.effective,
-    requestedAt: r.requested_at, platformDecidedAt: r.platform_decided_at, clinicApprovedAt: r.clinic_approved_at,
+    requestedAt: r.requested_at, platformDecidedAt: r.platform_decided_at, clinicApprovedAt: r.clinic_approved_at, revokedAt: r.revoked_at,
   }));
 }

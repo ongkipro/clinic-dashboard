@@ -14,7 +14,7 @@ import { StatusBadge } from "../../../../components/ui/status-badge";
 import type { OwnerSession } from "../../../../modules/vendor/support/scope";
 import { type AksesVendorPage, LOG_PAGE, loadAksesVendor } from "./data";
 import { RESULT_COOKIE } from "./result-cookie";
-import { DualIdentityDecision, EndSession, ScopeDecision } from "./forms";
+import { DualIdentityDecision, EndSession, RevokeDualIdentity, ScopeDecision } from "./forms";
 
 export const metadata: Metadata = { title: "Akses Vendor — Clinic Dashboard" };
 
@@ -206,7 +206,7 @@ async function Body({ searchParams }: { searchParams: Promise<Record<string, str
         </Section>
       )}
 
-      <Section id="identitas" title="Identitas ganda" lead="Akun yang sekaligus staf vendor dan staf klinik ini butuh persetujuan Pemilik Platform dan Owner.">
+      <Section id="identitas" title="Identitas ganda" lead="Akun yang sekaligus staf vendor dan staf klinik ini butuh persetujuan Pemilik Platform dan Owner. Owner dapat mencabutnya kapan saja; akun itu langsung berhenti menjadi staf klinik ini.">
         {p.dual.length === 0 ? (
           <p role="status" className={`${card} text-[var(--label-2)]`}>Tidak ada identitas ganda.</p>
         ) : (
@@ -215,16 +215,18 @@ async function Body({ searchParams }: { searchParams: Promise<Record<string, str
               <li key={d.requestId} className={card}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-semibold [overflow-wrap:anywhere]">{d.vendorName ?? "Akun vendor"}</span>
-                  <StatusBadge tone={d.effective ? "success" : d.state === "rejected" || d.state === "cancelled" ? "neutral" : "warning"}>
-                    {d.effective ? "Berlaku" : d.state === "rejected" ? "Ditolak" : d.state === "cancelled" ? "Dibatalkan" : d.clinicApprovedAt ? "Menunggu Pemilik Platform" : "Menunggu Owner"}
+                  <StatusBadge tone={d.effective ? "success" : d.revokedAt || d.state === "rejected" || d.state === "cancelled" ? "neutral" : "warning"}>
+                    {d.effective ? "Berlaku" : d.revokedAt ? "Dicabut" : d.state === "rejected" ? "Ditolak" : d.state === "cancelled" ? "Dibatalkan" : d.clinicApprovedAt ? "Menunggu Pemilik Platform" : "Menunggu Owner"}
                   </StatusBadge>
                 </div>
                 <p className={muted}>
                   Diajukan {fmt.format(d.requestedAt)} · Pemilik Platform: {d.platformDecidedAt ? `memutuskan ${fmt.format(d.platformDecidedAt)}` : "belum memutuskan"} · Owner: {d.clinicApprovedAt ? `menyetujui ${fmt.format(d.clinicApprovedAt)}` : "belum menyetujui"}
+                  {d.revokedAt ? ` · dicabut Owner ${fmt.format(d.revokedAt)}` : ""}
                 </p>
                 {p.isOwner && !d.clinicApprovedAt && (d.state === "pending" || d.state === "approved") && (
                   <DualIdentityDecision requestId={d.requestId} ctx={p.ctx} label={d.vendorName ?? "akun vendor"} />
                 )}
+                {p.isOwner && d.effective && <RevokeDualIdentity requestId={d.requestId} ctx={p.ctx} label={d.vendorName ?? "akun vendor"} />}
               </li>
             ))}
           </ul>

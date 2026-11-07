@@ -56,6 +56,7 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string; ok?: string }
   ["decideScopeAction", (f) => a.decideScopeAction({}, f), { session: U(41), decision: "approve" }],
   ["endSessionAction", (f) => a.endSessionAction({}, f), { session: U(41) }],
   ["decideDualIdentityAction", (f) => a.decideDualIdentityAction({}, f), { request: U(42), decision: "reject" }],
+  ["revokeDualIdentityAction", (f) => a.revokeDualIdentityAction({}, f), { request: U(42) }],
 ];
 const OWNER_A = ctx(U(1), "owner");
 const SWITCHES: [string, ActingContext][] = [["clinic", ctx(U(2), "owner")], ["role", ctx(U(1), "admin_pusat")], ["branch", ctx(U(1), "owner", U(11))]];
@@ -141,5 +142,26 @@ describe("the result notice is shown only when the data agrees (review round 1)"
     expect(verifiedResult(`sesi-diakhiri:${U(41)}`, [sess({ state: "ended", end_reason: "owner" })], [])).toBe("Sesi diakhiri. Vendor tidak bisa membaca data lagi lewat sesi ini.");
     expect(verifiedResult(`akses-disetujui:${U(41)}`, [sess({ state: "active", activated_at: "2026-11-07T00:00:00Z" })], [])).toBe("Akses disetujui. Sesi aktif mulai sekarang.");
     expect(verifiedResult(`identitas-ditolak:${U(42)}`, [], [{ requestId: U(42), state: "rejected", clinicApprovedAt: null } as never])).toBe("Identitas ganda ditolak.");
+  });
+});
+
+describe("Cabut identitas ganda (HYG-013)", () => {
+  it("refusals map to fixed copy without a result; success sets the result cookie and reloads", async () => {
+    activate(OWNER_A);
+    io.db = () => ({ s: "refused:self" });
+    expect(await a.revokeDualIdentityAction({}, form({ request: U(42) }, OWNER_A))).toEqual({ error: "Anda tidak dapat mencabut identitas ganda Anda sendiri; minta Owner lain." });
+    io.db = () => ({ s: "refused:not_effective" });
+    expect(await a.revokeDualIdentityAction({}, form({ request: U(42) }, OWNER_A))).toEqual({ error: "Identitas ganda ini sudah tidak berlaku. Muat ulang halaman." });
+    io.db = () => ({ s: "refused:not_owner" });
+    expect(await a.revokeDualIdentityAction({}, form({ request: U(42) }, OWNER_A))).toEqual({ error: "Hanya Owner yang dapat memutuskan akses vendor." });
+    expect(io.cookie).toBeNull();
+    io.db = () => ({ s: "revoked" });
+    await expect(a.revokeDualIdentityAction({}, form({ request: U(42) }, OWNER_A))).rejects.toThrow("redirect /saya/akses-vendor");
+    expect(io.cookie).toEqual([RESULT_COOKIE, `identitas-dicabut:${U(42)}`]);
+  });
+  it("the revoke notice shows only when the identity is revoked", () => {
+    const d = (o: Record<string, unknown>) => ({ requestId: U(42), state: "approved", clinicApprovedAt: new Date(), revokedAt: null, ...o }) as never;
+    expect(verifiedResult(`identitas-dicabut:${U(42)}`, [], [d({})])).toBeNull();
+    expect(verifiedResult(`identitas-dicabut:${U(42)}`, [], [d({ revokedAt: new Date() })])).toBe("Identitas ganda dicabut. Akun itu tidak lagi menjadi staf klinik ini.");
   });
 });

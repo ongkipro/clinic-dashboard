@@ -1,6 +1,6 @@
 # Tasks — Clinic Dashboard
 
-Updated: 2026-11-05
+Updated: 2026-11-07
 
 Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR-9, PR-14, PR-15, PR-18, PR-71, PR-83). Root execution queue of `~/Projects/clinic-dashboard` (DEL-1). Every task traces to exactly one primary `PR-*` in `02-PRD.md`; other IDs are constraints. Task state lives in `STATUS.md` and `.delivery/`, not here.
 
@@ -32,7 +32,7 @@ Kit v0.7, re-validated at G1 on 2026-11-02 (P-27; Q-12 may still change PR-7, PR
 
 ### Hygiene queue (owner-authorised, runs before the remaining M0 tasks)
 
-Owner instructions 2026-11-04/05 (foundation review: "jika ada bugs dan kekurangan kamu sempurnakan"; DEC-040, DEC-041). These are not `T-*` tasks and trace to no PR: each fixes verified defects in finished M0 work. Each has a plan in `docs/tasks/<ID>.md` and goes through the delivery ledger, independent review (GPT and claude for R3) and a local commit, like a task. Order is binding: one at a time, top to bottom, then T-027, T-028, T-032.
+Owner instructions 2026-11-04/05 (foundation review: "jika ada bugs dan kekurangan kamu sempurnakan"; DEC-040, DEC-041). These are not `T-*` tasks and trace to no PR: each fixes verified defects in finished M0 work. Each has a plan in `docs/tasks/<ID>.md` and goes through the delivery ledger, independent review (GPT and claude for R3) and a local commit, like a task. Order is binding: one at a time, top to bottom, then T-027, T-028, HYG-013 (added 2026-11-07, DEC-044), T-032.
 
 | Order | ID | Risk | Scope | Plan | State |
 |---|---|---|---|---|---|
@@ -43,6 +43,7 @@ Owner instructions 2026-11-04/05 (foundation review: "jika ada bugs dan kekurang
 | 5 | HYG-010 | R2 | Isolation gate that can fail for cross-tenant writes; outbox negative; `/staf/[id]` not-found; browser runners exit non-zero; stale STATUS/ARCHITECTURE lines; DECISIONS supersedes marks. Allowed: `tests/isolation/**`, `tests/ui/**`, docs | `docs/tasks/HYG-010.md` | Done: `2549b53`; pushed, CI 42369917032 green |
 | 6 | HYG-011 | R2 | Measured limits for timing-bound tests (the 5 s test timeout under load was raised to 30 s inside HYG-006, 2026-11-06; what remains: tests whose timing is the point); `hosts.spec.ts` keeps server output and takes a free port. Allowed: `tests/**`, docs | `docs/tasks/HYG-011.md` | Done: `5ec5b63`; pushed, CI 42369917032 green |
 | 7 | — | — | Wave gate (CI order locally, image migration, restore drill), push, CI green | `STATUS.md` | Done: wave gate PASS on `5ec5b63`; pushed; CI 42369917032 green |
+| 8 | HYG-013 | R3 | Dual-identity revoke (DEC-030 (1), DEC-044; owner 2026-11-07, before T-032): `vendor_dual_identity_clinic_revoke` (Owner only, under `staff_access`; the request kept with the revocation recorded; ends that account's clinic membership in this tenant at once; the vendor account untouched) and "Cabut" in Saya › Akses Vendor. Migration `drizzle/0052_*`; allowed: `drizzle/0052_*`, `drizzle/meta/_journal.json`, `src/modules/vendor/schema.ts`, `src/modules/vendor/staff/staff.ts`, `src/app/(app)/saya/akses-vendor/**`, `tests/vendor/dual-revoke.test.ts`, `tests/db/dual-revoke-drift.*`, `tests/rls/rls.test.ts`, `tests/rls/authority-clock.test.ts`, `tests/isolation/cases/akses-vendor.cases.ts`, `tests/ui/akses-vendor.spec.ts`, docs. Done when: Owner revokes an effective dual identity, the membership ends and its sessions are revoked, a new membership is refused, the vendor account stays active; non-Owner, the subject, another tenant and a second revoke are refused; drift 0051→0052 bounded; mutations caught; browser "Cabut" at 390/820/1180/1440 and 200 %; independent review | `docs/tasks/HYG-013.md` | Done locally; ledger PASS; review APPROVE (round 2) |
 
 ### Milestone M0
 

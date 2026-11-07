@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 import { ContextFields } from "../../../../components/context-fields";
 import { Button } from "../../../../components/ui/button";
 import type { RenderedContext } from "../../../../modules/org/context/context";
-import { type AksesState, decideDualIdentityAction, decideScopeAction, endSessionAction } from "./actions";
+import { type AksesState, decideDualIdentityAction, decideScopeAction, endSessionAction, revokeDualIdentityAction } from "./actions";
 
 function Message({ state }: { state: AksesState }) {
   if (state.error) return <p role="alert" className="m-0 text-[var(--danger)]">{state.error}</p>;
@@ -61,6 +61,30 @@ export function DualIdentityDecision({ requestId, ctx, label }: { requestId: str
         <Button type="submit" name="decision" value="approve" variant="secondary" aria-disabled={pending}>Setujui</Button>
         <Button type="submit" name="decision" value="reject" variant="plain" aria-disabled={pending}>Tolak</Button>
       </div>
+      <Message state={state} />
+    </form>
+  );
+}
+
+// Cabut (HYG-013): a destructive decision, so it names its consequence and asks once more.
+export function RevokeDualIdentity({ requestId, ctx, label }: { requestId: string; ctx: RenderedContext; label: string }) {
+  const [state, action, pending] = useActionState<AksesState, FormData>(revokeDualIdentityAction, {});
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <form action={action} className="grid gap-2" aria-label={`Cabut identitas ganda ${label}`}>
+      <input type="hidden" name="request" value={requestId} />
+      <ContextFields ctx={ctx} />
+      {confirm ? (
+        <>
+          <p className="m-0">Cabut identitas ganda {label}? Akun itu langsung berhenti menjadi staf klinik ini dan keluar dari semua perangkat. Akun vendornya tidak berubah.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="plain" onClick={() => setConfirm(false)}>Batal</Button>
+            <Button type="submit" variant="destructive" aria-disabled={pending}>Cabut</Button>
+          </div>
+        </>
+      ) : (
+        <Button type="button" variant="destructive" onClick={() => setConfirm(true)}>Cabut</Button>
+      )}
       <Message state={state} />
     </form>
   );

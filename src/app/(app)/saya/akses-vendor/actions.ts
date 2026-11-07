@@ -11,7 +11,7 @@ import { withTenantContext } from "../../../../db/rls/context";
 import { CommandError } from "../../../../lib/command";
 import { STALE_CONTEXT, staleContext } from "../../../../modules/org/context/context";
 import { appPool, requestContext } from "../../../../modules/org/context/store";
-import { vendorDualIdentityClinicDecide } from "../../../../modules/vendor/staff/staff";
+import { vendorDualIdentityClinicDecide, vendorDualIdentityClinicRevoke } from "../../../../modules/vendor/staff/staff";
 import { decideScope } from "../../../../modules/vendor/support/scope";
 import { endSessionAsOwner } from "../../../../modules/vendor/support/support";
 import { RESULT_COOKIE } from "./result-cookie";
@@ -30,6 +30,9 @@ const COPY: Record<string, string> = {
   operator_inactive: "Petugas vendor itu sudah tidak aktif; sesi tidak dapat disetujui.",
   approver_is_requester: "Akun Anda sendiri yang mengajukan sesi ini; Anda hanya dapat menolaknya.",
   not_found: "Sesi tidak ditemukan. Muat ulang halaman.",
+  // Cabut identitas ganda (HYG-013).
+  ERR_FORBIDDEN_SELF: "Anda tidak dapat mencabut identitas ganda Anda sendiri; minta Owner lain.",
+  revoke_not_effective: "Identitas ganda ini sudah tidak berlaku. Muat ulang halaman.",
 };
 
 // The success notice (review round 1): a short-lived (60 s) httpOnly cookie set only after the database
@@ -95,4 +98,18 @@ export async function decideDualIdentityAction(_p: AksesState, f: FormData): Pro
   });
   if (r) return r;
   return done(decision === "approve" ? "identitas-disetujui" : "identitas-ditolak", id);
+}
+
+// Cabut (HYG-013, DEC-044): the Owner revokes an effective dual identity; the database ends that
+// account's clinic membership here at the same moment.
+export async function revokeDualIdentityAction(_p: AksesState, f: FormData): Promise<AksesState> {
+  const id = String(f.get("request") ?? "");
+  if (!UUID.test(id)) return { error: COPY.ERR_INVALID_INPUT };
+  const r = await run(f, async (db) => {
+    const d = await vendorDualIdentityClinicRevoke(db, id);
+    if (typeof d === "string") return null;
+    return { error: d.refused === "ERR_VERSION_CONFLICT" ? COPY.revoke_not_effective : COPY[d.refused] ?? COPY.ERR_FORBIDDEN };
+  });
+  if (r) return r;
+  return done("identitas-dicabut", id);
 }

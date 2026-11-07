@@ -3,13 +3,13 @@
 // actions decide a session's scope, end a session and decide a dual identity. Each case seeds a
 // support session in B (pending approval, with a secret purpose) and a read of it, then runs as A's
 // owner: none of B's sessions or reads come back, B's session log is not found, and every decision on
-// B's session is refused (attempts, HYG-010).
+// B's session is refused (attempts, HYG-010). HYG-013 adds the revoke of B's effective dual identity.
 import { withTenantContext } from "../../../src/db/rls/context";
 import { CommandError } from "../../../src/lib/command";
 import { assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { decideScope, sessionLog, sessionsForOwner } from "../../../src/modules/vendor/support/scope";
 import { endSessionAsOwner } from "../../../src/modules/vendor/support/support";
-import { vendorDualIdentities, vendorDualIdentityClinicDecide } from "../../../src/modules/vendor/staff/staff";
+import { vendorDualIdentities, vendorDualIdentityClinicDecide, vendorDualIdentityClinicRevoke } from "../../../src/modules/vendor/staff/staff";
 import { defineCases, expectLive, type IsolationEnv } from "../case";
 
 const owners = new Map<string, string>();
@@ -74,6 +74,30 @@ async function victimDual(env: IsolationEnv): Promise<string> {
   return id;
 }
 
+// HYG-013: a fresh effective dual identity in B for every run (approved by a platform owner and B's
+// Owner, the subject a member of B), so B's own run can revoke it and A's attempt meets a live one.
+let platformOwner: string | null = null;
+async function victimEffectiveDual(env: IsolationEnv): Promise<{ id: string; subject: string }> {
+  const t = env.victim.tenantId;
+  const op = await vendorOperator(env);
+  if (!platformOwner) {
+    const acc = (await env.owner.query(`insert into auth_user (name, email, two_factor_enabled) values ('PP', 'pp.av@vendor-sintetis.test', true) returning id`)).rows[0].id as string;
+    platformOwner = (await env.owner.query(`insert into vendor_staff (account_id, display_name, state) values ($1, 'Pemilik Platform AV', 'active') returning id`, [acc])).rows[0].id as string;
+  }
+  const ownerAcc = await ownerOf(env, t);
+  const ownerStaff = (await env.owner.query(`select s.id from staff s join memberships m on m.tenant_id = s.tenant_id and m.id = s.membership_id where m.tenant_id = $1 and m.account_id = $2`, [t, ownerAcc])).rows[0].id as string;
+  const subject = (await env.owner.query(`insert into auth_user (name, email) values ('Ganda Aktif', $1) returning id`, [`aktif.${crypto.randomUUID().slice(0, 8)}@vendor-sintetis.test`])).rows[0].id as string;
+  const id = (await env.owner.query(
+    `insert into vendor_requests (kind, tenant_id, payload, reason, requested_by, requested_as, state, decided_by, decided_at,
+                                  clinic_approved_by, clinic_approved_account, clinic_approved_at)
+     values ('dual_identity', $1, jsonb_build_object('account_id', $2::text), 'Identitas ganda aktif untuk uji', $3, 'support', 'approved', $4, now(), $5, $6, now())
+     returning id`, [t, subject, op, platformOwner, ownerStaff, ownerAcc])).rows[0].id as string;
+  await createMembership(env.owner, { tenantId: t, accountId: subject, displayName: "Staf Ganda Rahasia" });
+  env.victimSecret(id);
+  env.victimSecret(subject);
+  return { id, subject };
+}
+
 const refused = (p: Promise<unknown>) => p.then(() => "done", (e) => (e instanceof CommandError ? e.code : (e as { code?: string }).code === "P0002" ? "ERR_NOT_FOUND" : Promise.reject(e)));
 
 export default defineCases(
@@ -127,7 +151,20 @@ export default defineCases(
         const after = (await env.owner.query(`select state, clinic_approved_at from vendor_requests where id = $1`, [dualId])).rows[0];
         if (after.state !== "pending" || after.clinic_approved_at !== null) throw new Error("B's dual identity changed under A");
       }
-      return { attempts: { decide, end, dual }, body: { decide, end, dual, id: decide === "done" ? v.id : null } };
+      // Cabut (HYG-013): B's Owner revokes B's effective dual identity; A's attempt is refused and B's
+      // identity and the subject's membership in B are unchanged.
+      const eff = await victimEffectiveDual(env);
+      await expectLive(env, "B's effective dual identity", `exists (select 1 from vendor_requests where id = $1 and state = 'approved' and clinic_approved_at is not null and clinic_revoked_at is null)`, [eff.id]);
+      const revoke = await asOwner(env, env.actor.tenantId, (db) => vendorDualIdentityClinicRevoke(db, eff.id)).then(
+        (r) => (typeof r === "string" ? "done" : r.refused),
+        (e) => (e instanceof CommandError ? e.code : Promise.reject(e)),
+      );
+      if (env.actor.tenantId !== env.victim.tenantId) {
+        const q = (await env.owner.query(`select clinic_revoked_at from vendor_requests where id = $1`, [eff.id])).rows[0];
+        const m = (await env.owner.query(`select effective_to from memberships where tenant_id = $1 and account_id = $2`, [env.victim.tenantId, eff.subject])).rows[0];
+        if (q.clinic_revoked_at !== null || m.effective_to !== null) throw new Error("B's dual identity or membership changed under A");
+      }
+      return { attempts: { decide, end, dual, revoke }, body: { decide, end, dual, revoke, id: decide === "done" ? v.id : null } };
     },
   },
 );

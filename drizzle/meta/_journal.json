@@ -365,6 +365,13 @@
       "when": 1794052913838,
       "tag": "0051_onboarding_checklist",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1794067555590,
+      "tag": "0052_dual_identity_revoke",
+      "breakpoints": true
     }
   ]
 }
