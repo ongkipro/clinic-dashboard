@@ -13,6 +13,7 @@ import { assignBranch, assignRole, createMembership, resolveContext } from "../.
 import { applyLifecycleRequest, assertTenantCapability, CAPABILITIES, type Capability, tenantLifecycleStatus } from "../../src/modules/vendor/lifecycle/lifecycle";
 import { bootstrapVendor, createVendorStaff, decideVendorRequest, requestVendorAction, type VendorCaller, VendorStaffError } from "../../src/modules/vendor/staff/staff";
 import { createHarness, type Harness } from "../rls/harness";
+import { clearGoLiveBlockers, completeVendorProfile } from "./go-live-ready";
 
 let h: Harness;
 let app: pg.Pool;
@@ -178,7 +179,10 @@ describe("TEN-12 edges and maker-checker", () => {
     expect(await state(c.tenantId)).toBe("onboarding");
     expect(await allowed(c, "configuration")).toBe("ok");
     expect(await allowed(c, "new_booking")).toBe("ERR_TENANT_SUSPENDED");
-    // onboarding → live: platform owner only; the TOTP step-up (10 minutes) applies.
+    // onboarding → live: platform owner only; the TOTP step-up (10 minutes) applies. The PR-59
+    // go-live blockers are cleared first (the gate itself: tests/vendor/checklist.test.ts).
+    await completeVendorProfile(h.admin);
+    await clearGoLiveBlockers(h.admin, app, c.tenantId, c.ownerAcc, { acc: c.fhAcc, role: "facility_head", branchId: c.branchId });
     expect(await step(ONBTok, "live")).toMatchObject({ ok: false, reason: "role_not_held" });
     await h.admin.query(`update auth_session set second_factor_at = now() - interval '30 minutes' where token = $1`, [POTok]);
     expect(await step(POTok, "live")).toMatchObject({ ok: false, reason: "totp_not_verified" });

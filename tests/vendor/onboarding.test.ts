@@ -16,6 +16,7 @@ import { confirmDraft, declineDraft, draftInvitation, grantStatus, onboardingAcc
 import { bootstrapVendor, createVendorStaff, type VendorCaller } from "../../src/modules/vendor/staff/staff";
 import { advanceTenant } from "../../src/modules/vendor/tenants/tenants";
 import { createHarness, type Harness } from "../rls/harness";
+import { clearGoLiveBlockers, completeVendorProfile } from "./go-live-ready";
 import { PASSWORD } from "../auth/helpers";
 
 let h: Harness;
@@ -123,7 +124,9 @@ describe("grant lifecycle (Done-when: expires at go-live or day 30)", () => {
     expect(g).toEqual({ d: { days: 30 }, ended_at: null });
     expect(await onboardingAccess(consoleDb, as(onbTok), c.tenantId, "catalog")).toMatchObject({ ok: true });
     expect(await lastAction()).toMatchObject({ action: "onboarding_read", outcome: "success", reason_code: "kind_catalog", tenant_id: c.tenantId });
-    // Go-live (platform owner) ends the grant.
+    // Go-live (platform owner) ends the grant; the PR-59 blockers are cleared first (T-027).
+    await completeVendorProfile(h.admin);
+    await clearGoLiveBlockers(h.admin, app, c.tenantId, c.ownerAcc);
     expect(await advanceTenant(consoleDb, as(poTok), c.tenantId, "live", "Klinik siap melayani pasien")).toMatchObject({ ok: true });
     expect((await h.admin.query(`select end_reason from onboarding_grants where tenant_id = $1`, [c.tenantId])).rows[0].end_reason).toBe("go_live");
     expect(await onboardingAccess(consoleDb, as(onbTok), c.tenantId, "catalog")).toMatchObject({ ok: false, reason: "grant_not_active" });
@@ -283,6 +286,8 @@ describe("the grant is judged at the moment of use (review round 1)", () => {
 
   it("go-live while a vendor check holds staff_access: no deadlock (review round 5)", { timeout: 30_000 }, async () => {
     const c = await clinic();
+    await completeVendorProfile(h.admin);
+    await clearGoLiveBlockers(h.admin, app, c.tenantId, c.ownerAcc);
     const vendorTx = await consoleDb.connect();
     try {
       // The vendor transaction is inside a check: it holds staff_access but has not yet

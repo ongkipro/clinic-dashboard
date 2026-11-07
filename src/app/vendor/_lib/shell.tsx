@@ -2,7 +2,7 @@
 // pages a role cannot use are absent (NAV-1). The rest of the 19 §3 tree arrives with
 // its tasks (T-023 tenant detail, T-024 onboarding, T-118 health, T-129 full tree).
 // Tenant-controlled strings are rendered as React text only (escaped), never as markup.
-import { Building2, ShieldCheck, Users } from "lucide-react";
+import { Building2, ClipboardCheck, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import type { ConsoleUser, VendorRole } from "./server";
 import { VendorSignOut } from "./sign-out";
@@ -18,6 +18,7 @@ export const VENDOR_ROLE_LABEL: Record<VendorRole, string> = {
 
 const PAGES: { href: string; label: string; icon: typeof Building2; roles: "all" | VendorRole[] }[] = [
   { href: "/vendor/tenant", label: "Tenant", icon: Building2, roles: "all" as const },
+  { href: "/vendor/onboarding", label: "Onboarding", icon: ClipboardCheck, roles: "all" as const },
   { href: "/vendor/tim", label: "Tim Vendor", icon: Users, roles: ["platform_owner"] as VendorRole[] },
   { href: "/vendor/keamanan", label: "Keamanan Akun", icon: ShieldCheck, roles: "all" as const },
 ];

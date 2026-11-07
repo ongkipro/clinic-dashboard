@@ -130,6 +130,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A server started by a test must keep its output and stop waiting when it exits; otherwise a start failure is a silent timeout (CI 42174727148 attempt 1).
   - Acceptance runs must hold the host rule for real: a gate that passed "inside heavy-run" let suite 3 run at load 18 beside another suite and fail on a disk stall; held for real, the same code passed three times. A long-running orphan (a dead Docker build) can keep the rule from ever holding; find it rather than relax the rule.
 
+- **T-027** (go-live gate, migration 0051):
+  - A trigger that decides by reading another row's state must take the same locks, in the same order, as the writer of that state; otherwise a concurrent insert can miss the state change for good (review P1: a branch added while the tenant entered onboarding never got its checklist item).
+  - Concurrency tests must wait for the intended backend to be blocked by the intended holder (`pg_blocking_pids`), not for any lock wait on the server.
+  - "Absent" in an API body is a closed set (missing, null, ""); anything else must validate, or `false`/`0` silently mean "clear".
+  - A drift proof by line positions (not anchors) is unambiguous when the same line (`END IF;`) occurs several times.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

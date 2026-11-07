@@ -1,0 +1,36 @@
+{
+  "tenant_lifecycle_transition(uuid,text,text,uuid,text,text)": [
+    {
+      "at": 11,
+      "old": "",
+      "new": "  v_blockers text[];"
+    },
+    {
+      "at": 42,
+      "old": "",
+      "new": "    -- T-027 (PR-59): go-live needs every blocking checklist item, the vendor profile and the\n    -- clinical go-live evidence; the refusal names the first blocker. Judged after the tenant row\n    -- lock above, so a concurrent checklist change is either seen or waits.\n    IF v_from = 'onboarding' AND p_to = 'live' THEN\n      v_blockers := public.tenant_go_live_blockers(p_tenant);\n      IF cardinality(v_blockers) > 0 THEN\n        RAISE EXCEPTION 'ERR_FORBIDDEN: go_live_blocked:%', v_blockers[1] USING ERRCODE = '42501';\n      END IF;\n    END IF;"
+    }
+  ],
+  "vendor_console_tenant_advance(text,text,uuid,text,text)": [
+    {
+      "at": 10,
+      "old": "",
+      "new": "  v_blocker text;"
+    },
+    {
+      "at": 33,
+      "old": "",
+      "new": "        WHEN SQLERRM LIKE '%go_live_blocked:%' THEN 'go_live_blocked'"
+    },
+    {
+      "at": 37,
+      "old": "",
+      "new": "      v_blocker := CASE WHEN v_reason = 'go_live_blocked' THEN substring(SQLERRM from 'go_live_blocked:([a-z_]+:[a-z_:]+(@[A-Za-z0-9-]+)?)') END;"
+    },
+    {
+      "at": 42,
+      "old": "        'reason', v_reason);",
+      "new": "        'reason', v_reason, 'blocker', v_blocker);"
+    }
+  ]
+}

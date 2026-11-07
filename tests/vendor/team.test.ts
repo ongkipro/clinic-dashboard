@@ -305,6 +305,8 @@ describe("history and privileges", () => {
     expect(fns).toEqual([
       // HYG-008b: the console logs an authority re-check refusal in its own transaction.
       "vendor_authority_refused(text, text, text, text, uuid, uuid, text)",
+      "vendor_console_checklist(text, text, uuid)",
+      "vendor_console_checklist_set(text, text, uuid, uuid, text, text, text, uuid)",
       "vendor_console_ip_allowed(text)",
       "vendor_console_me(text, text)",
       "vendor_console_onboarding_access(text, text, uuid, text)",

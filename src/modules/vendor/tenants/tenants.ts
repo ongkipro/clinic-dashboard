@@ -9,16 +9,17 @@ import { hashToken } from "../../org/staff/staff";
 import { type RefusalSubject, withAuthorityRecheck } from "../authority";
 
 export type ConsoleCall = { token: string; ip: string };
-export type Result<T> = { ok: true; data: T } | { ok: false; code: string; reason?: string };
+// `blocker` (T-027): a refused go-live names its first blocker (PR-59).
+export type Result<T> = { ok: true; data: T } | { ok: false; code: string; reason?: string; blocker?: string };
 
-async function call<T>(db: pg.Pool | pg.ClientBase, sql: string, args: unknown[], subject: RefusalSubject = { object: null }): Promise<Result<T>> {
+export async function call<T>(db: pg.Pool | pg.ClientBase, sql: string, args: unknown[], subject: RefusalSubject = { object: null }): Promise<Result<T>> {
   // HYG-008b: the entry point re-reads its caller's authority after its last wait; a refusal
   // there rolls the statement back and is logged in its own transaction, attributed to `subject`
   // (withAuthorityRecheck). Calls that are not console entry points never raise it.
   const fn = /select (vendor_console_[a-z_]+)\(/.exec(sql)?.[1];
   const once = async () => {
-    const r = (await db.query<{ r: { ok: boolean; code?: string; reason?: string } & T }>(sql, args)).rows[0].r;
-    return r.ok ? ({ ok: true, data: r } as const) : ({ ok: false, code: r.code ?? "ERR_FORBIDDEN", reason: r.reason } as const);
+    const r = (await db.query<{ r: { ok: boolean; code?: string; reason?: string; blocker?: string } & T }>(sql, args)).rows[0].r;
+    return r.ok ? ({ ok: true, data: r } as const) : ({ ok: false, code: r.code ?? "ERR_FORBIDDEN", reason: r.reason, ...(r.blocker ? { blocker: r.blocker } : {}) } as const);
   };
   if (!fn) return once();
   return withAuthorityRecheck(db, { token: String(args[0]), ip: String(args[1]) }, fn, subject, once);

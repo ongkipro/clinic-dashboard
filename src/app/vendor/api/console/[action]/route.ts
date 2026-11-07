@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { ipHeader, vendorAuth, vendorOrigin, vendorPool } from "../../../_lib/server";
 import { AccountExistsError, PasswordPolicyError } from "../../../../../auth/server";
 import { acceptMemberWithNewAccount, cancelMemberInvite, inviteMember, setMemberState } from "../../../../../modules/vendor/team/team";
+import { setChecklistItem } from "../../../../../modules/vendor/checklist/checklist";
 import {
   advanceTenant, approveOwnerInvite, cancelOwnerInvite, type ConsoleCall, createTenant, requestOwnerInvite,
 } from "../../../../../modules/vendor/tenants/tenants";
@@ -70,6 +71,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
       r = await advanceTenant(db, c, uuid(body.tenantId), str(body.to, 16), str(body.reason, 500));
       break;
     }
+    case "checklist-set": {
+      // Konsol Vendor › Onboarding (UX-41, PR-59): one item's status, note and owner. A malformed
+      // branch or owner id is refused here; the database validates the item, status and roles.
+      // Absent means missing, null or ""; any other value must be a UUID (review round 1: false or 0
+      // must not read as "tenant level" or "no owner").
+      const absent = (v: unknown) => v === undefined || v === null || v === "";
+      const branch = absent(body.branchId) ? null : uuid(body.branchId);
+      const owner = absent(body.ownerId) ? null : uuid(body.ownerId);
+      if ((!absent(body.branchId) && !branch) || (!absent(body.ownerId) && !owner)) return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
+      r = await setChecklistItem(db, c, uuid(body.tenantId), { branchId: branch, item: str(body.item, 32), status: str(body.status, 16), note: str(body.note, 500), ownerId: owner });
+      break;
+    }
     case "session-end": {
       // Profil & Keamanan › Sesi Aktif on the vendor host: one of this account's other
       // vendor sessions (endOwnSession refuses the current one and anyone else's).
@@ -93,6 +106,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
     default:
       return json({ ok: false, code: "ERR_NOT_FOUND" }, 404);
   }
-  if (!r.ok) return json({ ok: false, code: r.code, reason: r.reason }, r.code === "ERR_INVALID_INPUT" ? 400 : r.code === "ERR_NOT_FOUND" ? 404 : r.code === "ERR_FORBIDDEN" ? 403 : 409);
+  if (!r.ok) return json({ ok: false, code: r.code, reason: r.reason, ...(r.blocker ? { blocker: r.blocker } : {}) }, r.code === "ERR_INVALID_INPUT" ? 400 : r.code === "ERR_NOT_FOUND" ? 404 : r.code === "ERR_FORBIDDEN" ? 403 : 409);
   return json({ ok: true, ...(r.data as object), r: undefined });
 }

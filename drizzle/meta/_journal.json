@@ -358,6 +358,13 @@
       "when": 1793977306510,
       "tag": "0050_setting_branch_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1794052913838,
+      "tag": "0051_onboarding_checklist",
+      "breakpoints": true
     }
   ]
 }

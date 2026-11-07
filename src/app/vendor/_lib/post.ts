@@ -1,4 +1,5 @@
 "use client";
+import { blockerLabel } from "../../../modules/vendor/checklist/labels";
 // Console write from the browser: JSON POST to /vendor/api/console/<action> (src/proxy.ts
 // allows nothing else). Maps refusals to UI-5 copy; raw codes are never shown.
 export type PostResult = { ok: true; data: Record<string, unknown> } | { ok: false; message: string };
@@ -12,6 +13,7 @@ const COPY: Record<string, string> = {
   owner_exists: "Klinik ini sudah punya Owner.",
   not_pending: "Undangan ini sudah tidak menunggu persetujuan.",
   not_a_step: "Status tenant sudah berubah. Muat ulang halaman.",
+  not_onboarding: "Tenant ini sudah tidak dalam onboarding; ceklis tidak bisa diubah lagi.",
   already_vendor_staff: "Email ini sudah terdaftar di Tim Vendor.",
   invitation_open: "Email ini masih punya undangan yang berlaku. Batalkan dulu bila ingin mengundang ulang.",
   self_change: "Anda tidak bisa mengubah akses Anda sendiri.",
@@ -37,5 +39,7 @@ export async function post(action: string, body: unknown): Promise<PostResult> {
   }
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (res.ok && data.ok) return { ok: true, data };
+  // PR-59: a refused go-live names its first blocker.
+  if (data.reason === "go_live_blocked" && typeof data.blocker === "string") return { ok: false, message: `Belum bisa live: ${blockerLabel(data.blocker)}.` };
   return { ok: false, message: COPY[String(data.reason)] ?? COPY[String(data.code)] ?? "Permintaan tidak dapat diproses. Coba Lagi." };
 }

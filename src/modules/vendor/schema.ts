@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, date, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, date, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { authUser } from "../../auth/schema";
+import { branches } from "../org/schema";
 
 // Platform registry of every tenant (DATA-10, TEN-9, TEN-12). Policy kind: platform.
 // Vendor tables reference it by `tenant_id`; it never joins tenant rows directly (TEN-16).
@@ -543,4 +544,36 @@ export const supportSessionReads = pgTable(
     firstReadAt: timestamp("first_read_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique("support_session_reads_key").on(t.sessionId, t.tableName, t.rowId)],
+);
+
+// Onboarding checklist (T-027, PR-59, UX-41, DATA-48): one row per item per tenant (branch null)
+// or per branch. Platform table (TEN-16); written only by the checklist functions (migration 0051);
+// no application role reads it directly. Rows are never deleted.
+export const CHECKLIST_TENANT_ITEMS = ["entity_tax", "catalog", "staff_credentials", "money_settings", "payment_port", "waba", "satusehat"] as const;
+export const CHECKLIST_BRANCH_ITEMS = ["branch_setup"] as const;
+// Used only when the clinic uses the integration (PR-59 "when used"): may be marked not applicable.
+export const CHECKLIST_OPTIONAL_ITEMS = ["payment_port", "waba", "satusehat"] as const;
+export const onboardingChecklistItems = pgTable(
+  "onboarding_checklist_items",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenantsRegistry.id, { onDelete: "restrict" }),
+    branchId: uuid("branch_id"),
+    item: text("item").notNull(),
+    status: text("status", { enum: ["open", "done", "not_applicable"] }).notNull().default("open"),
+    note: text("note"),
+    ownerStaff: uuid("owner_staff").references(() => vendorStaff.id, { onDelete: "restrict" }),
+    updatedBy: uuid("updated_by").references(() => vendorStaff.id, { onDelete: "restrict" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    unique("onboarding_checklist_items_tenant_branch_item_key").on(t.tenantId, t.branchId, t.item).nullsNotDistinct(),
+    check("onboarding_checklist_items_item_check", sql`(${t.branchId} is null and ${t.item} in ('entity_tax','catalog','staff_credentials','money_settings','payment_port','waba','satusehat')) or (${t.branchId} is not null and ${t.item} = 'branch_setup')`),
+    check("onboarding_checklist_items_status_check", sql`${t.status} in ('open','done','not_applicable')`),
+    check("onboarding_checklist_items_na_check", sql`${t.status} <> 'not_applicable' or (${t.item} in ('payment_port','waba','satusehat') and length(btrim(coalesce(${t.note}, ''))) between 3 and 500)`),
+    check("onboarding_checklist_items_note_check", sql`${t.note} is null or length(${t.note}) <= 500`),
+  ],
 );
