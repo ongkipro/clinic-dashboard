@@ -125,6 +125,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A positive control must require every attempt to succeed as the owning tenant; "at least one" let an attempt the owner could not make either (a duty to a cashier) pass as a refusal (review P1).
   - A hole demonstration must undo every new guard on the path it exercises; one that stops at a new check proves nothing (rerun it).
 
+- **HYG-011** (timing and hosts):
+  - Measure before raising limits: with the 30 s global from HYG-006, no test came within 40 % of its limit across three full suites at load 11.6–14.2, so nothing changed.
+  - A server started by a test must keep its output and stop waiting when it exits; otherwise a start failure is a silent timeout (CI 42174727148 attempt 1).
+  - Acceptance runs must hold the host rule for real: a gate that passed "inside heavy-run" let suite 3 run at load 18 beside another suite and fail on a disk stall; held for real, the same code passed three times. A long-running orphan (a dead Docker build) can keep the rule from ever holding; find it rather than relax the rule.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

@@ -10,7 +10,20 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const ROOT = join(import.meta.dirname, "../..");
-const PORT = 3000 + Math.floor(Math.random() * 2000) + 1000;
+// HYG-011: a port the OS reports free (a random pick in 4000-5999 could collide with another
+// project's server on this shared host), taken once before the server starts.
+let PORT = 0;
+async function freePort(): Promise<number> {
+  const { createServer } = await import("node:net");
+  return new Promise((resolve, reject) => {
+    const s = createServer();
+    s.once("error", reject);
+    s.listen(0, "127.0.0.1", () => {
+      const { port } = s.address() as { port: number };
+      s.close(() => resolve(port));
+    });
+  });
+}
 const HOSTS = { app: "app.test", booking: "booking.test", vendor: "vendor.test" };
 let server: ChildProcess;
 
@@ -67,6 +80,7 @@ beforeAll(async () => {
   // verbatimSymlinks keeps pnpm's relative links pointing inside the copy.
   cpSync(join(ROOT, ".next/standalone"), SERVE, { recursive: true, verbatimSymlinks: true });
   cpSync(join(ROOT, ".next/static"), join(SERVE, ".next/static"), { recursive: true, verbatimSymlinks: true });
+  PORT = await freePort();
   server = spawn(process.execPath, [join(SERVE, "server.js")], {
     cwd: SERVE,
     env: {
@@ -79,9 +93,17 @@ beforeAll(async () => {
       BOOKING_HOST: HOSTS.booking,
       VENDOR_HOST: HOSTS.vendor,
     },
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  // HYG-011: keep the server's output (last 8 KB) so a failed start says why (CI 42174727148
+  // attempt 1 failed here with no output), and stop waiting as soon as the server exits.
+  let output = "";
+  const keep = (b: Buffer) => void (output = (output + b.toString()).slice(-8192));
+  server.stdout!.on("data", keep);
+  server.stderr!.on("data", keep);
+  const started = Date.now();
   for (let i = 0; i < 300; i++) {
+    if (server.exitCode !== null || server.signalCode !== null) break;
     try {
       await get(HOSTS.app, "/");
       return;
@@ -89,7 +111,8 @@ beforeAll(async () => {
       await new Promise((r) => setTimeout(r, 100));
     }
   }
-  throw new Error("next start did not come up");
+  const state = server.exitCode !== null || server.signalCode !== null ? `exited (code ${server.exitCode}, signal ${server.signalCode})` : "still running, not answering";
+  throw new Error(`next start did not come up on 127.0.0.1:${PORT} after ${Date.now() - started} ms: ${state}\n--- server output ---\n${output}`);
 }, 180_000);
 
 afterAll(async () => {
