@@ -86,3 +86,7 @@ T-032 changes no code, test, migration or workflow; the check refuses a tree tha
 ## Review
 
 Independent R4 review: round 1 (run 1) REQUEST_CHANGES, see above and HYG-014; round 2 on this evidence: see `.delivery/` and STATUS.
+
+## Process lapse (run 2, kept on record)
+
+After round 2's APPROVE, a one-line README fix (61 → 62 files) made every check stale. Only docs, scenario-map and ci were re-recorded; `finish` then refused PASS (`test-all-m0` stale), but the commit and push in the same command chain still ran, so `ea9610f` reached `main` before the ledger closed. Run 2 was closed BLOCKED (`9177d4d`); the closure run `RUN-20261107T185906Z-7d05d73e` re-ran every required check against the final surface. Lessons (for BUILD-LOG with the next task that may edit it): a doc fix after the final checks makes every check stale, the suites included; never chain `finish`, commit and push: run `finish` alone and read its result first.
