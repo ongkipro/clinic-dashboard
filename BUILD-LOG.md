@@ -156,7 +156,7 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - **T-032** (M0 exit review):
   - A one-line doc fix after the final checks makes every required check stale, the suites included; re-run all of them, not only the cheap ones.
   - Never chain `finish`, commit and push in one command: `finish` refused PASS and the commit and push still ran (`ea9610f` reached `main` before the ledger closed). Run `finish` alone, read its result, then commit.
-  - Ledger steps that read each other's events (`review-boundary`, then `finish`) must run one after the other, never as parallel tool calls.
+  - Ledger steps that read each other's events (`review-boundary`, then `finish`), and `finish` then commit, must run one after the other, never as parallel tool calls (repeated once in the STATUS docs run that followed; that run closed BLOCKED, `634e840`/`8ac8093`, local only).
   - An exit review must test each scenario's Given/When/Then, not its title: it found PR-59's go-live did not re-check the processor agreement (HYG-014).
 
 ### Gotchas worth keeping (added 2026-11-05)
