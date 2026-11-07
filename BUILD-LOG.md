@@ -136,6 +136,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - "Absent" in an API body is a closed set (missing, null, ""); anything else must validate, or `false`/`0` silently mean "clear".
   - A drift proof by line positions (not anchors) is unambiguous when the same line (`END IF;`) occurs several times.
 
+- **T-028** (Akses Vendor page):
+  - A success notice must be backed by state, not by the URL: a fixed code in a query string is still a claim anyone can link to. Show it only when the subject's current state agrees.
+  - Look up a request-supplied key in a `Map` (or with `Object.hasOwn`), never in a plain object: `__proto__` and `constructor` resolve.
+  - A combined terminal state (`rejected`) cannot say who rejected; do not attribute it to one party.
+  - A `"use server"` file may export only async functions; typecheck does not catch it, the build does.
+  - A cross-tenant negative for a list must seed the victim row and require the victim to see it; an empty list proves nothing.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).
