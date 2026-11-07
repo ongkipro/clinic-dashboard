@@ -153,6 +153,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Write the regression before the fix and run it against the unchanged code; keep that red run as evidence.
   - A mutation that survives can expose a missing case, not only a weak test: replacing `evidence_item_open` by the item state survived until an expired-but-approved case existed.
 
+- **T-032** (M0 exit review):
+  - A one-line doc fix after the final checks makes every required check stale, the suites included; re-run all of them, not only the cheap ones.
+  - Never chain `finish`, commit and push in one command: `finish` refused PASS and the commit and push still ran (`ea9610f` reached `main` before the ledger closed). Run `finish` alone, read its result, then commit.
+  - Ledger steps that read each other's events (`review-boundary`, then `finish`) must run one after the other, never as parallel tool calls.
+  - An exit review must test each scenario's Given/When/Then, not its title: it found PR-59's go-live did not re-check the processor agreement (HYG-014).
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).
