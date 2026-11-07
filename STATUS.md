@@ -23,7 +23,7 @@ Use `BLOCKED` only as an interruption state. Record the blocker and exact state 
 
 ## Current state
 
-M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent review after each task, local commit per task. Push is allowed after a wave gate passes (owner 2026-11-02; DEC-040 K1); the last push was wave 7a (`1334a80`, CI green), so the T-025/T-026/HYG commits since then are local only.
+M0 exit review in progress (T-032 run 2; evidence `docs/evidence/m0/README.md`). Owner instruction 2026-11-02: run tasks in order, independent review after each task, local commit per task. Push: allowed for a task whose ledger finished PASS and whose review approved, CI watched after each push (resolved 2026-11-06, see "Open for the owner"); everything through HYG-014 (`b20f991`) is pushed with CI green.
 
 | Task | Result | Commit |
 |---|---|---|
@@ -63,7 +63,8 @@ M0 in progress. Owner instruction 2026-11-02: run tasks in order, independent re
 | T-027 Onboarding checklist per tenant and branch; go-live gate and date (PR-59, UX-41, migration 0051) | PASS; ledger run `RUN-20261107T115824Z-e29fc91e` (checklist 17 + route 2, drift, vendor, isolation, 19 mutations, browser 9 flows / 24 layouts, full suite); review GPT-6.1 Sol round 1 REQUEST_CHANGES (branch-seeding race; route id validation) fixed, round 2 APPROVE | `1938320`, pushed; CI 42373847152 green |
 | T-028 Owner view Saya › Akses Vendor (PR-60, UX-48; no migration) | PASS locally; ledger run `RUN-20261107T125246Z-bf13b40d` (actions 8, isolation 41, browser 10 flows / 17 layouts, full suite); review GPT-6.1 Sol round 1 REQUEST_CHANGES (dual-identity cross-tenant proof; URL-claimed notice; labels; pending log; runner exit) fixed, round 2 APPROVE (two P2 notes fixed). Revoke built by HYG-013 | `29b6a55`, pushed; CI 42376948180 green |
 | HYG-013 Dual-identity revoke (DEC-030 (1), DEC-044; migration 0052) | PASS locally; ledger run `RUN-20261107T154757Z-2c1b4590` (revoke 6, drift, RLS, authority-clock, isolation, actions 13, 20 mutations (first final run FAIL 16:13:47Z on a stale mutation anchor, no product defect; rerun), browser 13 flows / 18 layouts, full suite); review GPT-6.1 Sol round 1 REQUEST_CHANGES (a pending clinic-approved request resurrected by the platform; membership/account lock deadlock) fixed, round 2 APPROVE | `07e4181`, pushed; CI 42390961918 green |
-| HYG-014 Go-live re-checks the processor agreement (PR-59, DEC-045; migration 0053) | PASS locally; ledger run `RUN-20261107T183052Z-2099d55a` (regression red without 0053, green with it; drift; vendor; RLS; isolation; 5 mutations; full suite); review GPT-6.1 Sol APPROVE | local, not yet committed |
+| HYG-014 Go-live re-checks the processor agreement (PR-59, DEC-045; migration 0053) | PASS locally; ledger run `RUN-20261107T183052Z-2099d55a` (regression red without 0053, green with it; drift; vendor; RLS; isolation; 5 mutations; full suite); review GPT-6.1 Sol APPROVE | `b20f991`, pushed; CI 42402769725 green |
+| T-032 M0 exit review (PR-1, R4) | Run 1 BLOCKED by its R4 review (PR-59 go-live gap → HYG-014). Run 2 on `b20f991`: `test:rls` 178, `test:isolation` 41, `test -- m0` 936 passed / 14 skipped / 0 failed; 17 M0 scenarios mapped to 23 exact test cases, all passed; CI receipt for `b20f991` (run 42402769725: `ci` workflow, test step green, restore drill passed); ledger run `RUN-20261107T184822Z-0d7785ff`; R4 review (GPT-6.1 Sol) round 1 REQUEST_CHANGES (PR-59 go-live gap → HYG-014; CI receipt; PR-1 audit part; checker), round 2 APPROVE (README file count corrected) | local, not yet committed |
 | HYG-004 Test hook timeout under a busy full suite (`vitest.config.mts` hookTimeout 120 s; harness close reports slow steps) | PASS locally (CI after push); review APPROVE (codex r1, GPT r2) | `67d256b` |
 | HYG-006 Test harness: database creates never run beside other database creates or drops (advisory lock: CREATE exclusive, DROP shared) | PASS; CI run 42164189650 green; full suite ×3 all green; review APPROVE (GPT and claude r2; GPT-6.1 Sol r3–r5) | `3acf40e` |
 | HYG-005 PostgreSQL crash-restart from orphaned child processes (init/tini; local, CI, production image) | PASS locally (CI after push); R3 review APPROVE (GPT and claude, plan 3 rounds, implementation 5 rounds) | `baae0c8` |
@@ -233,8 +234,8 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 - **T-028 done:** `29b6a55`, pushed `1938320..29b6a55`; CI run 42376948180 green. Owner view Saya › Akses Vendor; see `docs/tasks/T-028.md` "Results".
 - **HYG-013 done:** `07e4181`, pushed `29b6a55..07e4181`; CI run 42390961918 green on attempt 1. Dual-identity revoke (owner decision 2026-11-07, DEC-044); see `docs/tasks/HYG-013.md` "Results".
 - **T-032 run 1 BLOCKED** (`80db5ef`, ledger `RUN-20261107T163334Z-08c7f8ed` kept): the R4 review found PR-59's go-live did not re-check the processor agreement; owner chose option 1 (DEC-045) → HYG-014. Evidence WIP kept in `/data/tmp/clinic-dashboard/t032/wip/`.
-- **HYG-014 (in closure):** go-live re-checks the processor agreement; see `docs/tasks/HYG-014.md` "Results".
-- **Queue:** HYG-014 → T-032 (M0 exit, repeated), then M1 from T-033 per PLAN/TASKS. Each: own ledger run, GPT-6.1 Sol review, STATUS/BUILD-LOG/ARCHITECTURE updates.
+- **HYG-014 done:** `b20f991`, pushed `07e4181..b20f991`; CI run 42402769725 green on attempt 1. Go-live re-checks the processor agreement; see `docs/tasks/HYG-014.md` "Results".
+- **Queue:** T-032 run 2 (M0 exit, in progress) → M1 from T-033 per PLAN/TASKS, then M1 from T-033 per PLAN/TASKS. Each: own ledger run, GPT-6.1 Sol review, STATUS/BUILD-LOG/ARCHITECTURE updates.
 
 ### Open for the owner
 
