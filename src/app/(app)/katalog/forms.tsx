@@ -127,7 +127,7 @@ export function VersionForm({ ctx, itemId, initial, clinicalActive, canSeeClinic
 export function WithdrawPending({ ctx, itemId, approvalId }: { ctx: RenderedContext; itemId: string; approvalId: string }) {
   const [state, action, pending] = useActionState<KatalogState, FormData>(withdrawAction, {});
   return (
-    <form action={action} className="grid gap-2" aria-label="Tarik ajuan perubahan klinis">
+    <form action={action} className="grid gap-2" aria-label="Tarik ajuan perubahan">
       <ContextFields ctx={ctx} />
       <input type="hidden" name="item" value={itemId} />
       <input type="hidden" name="approval" value={approvalId} />

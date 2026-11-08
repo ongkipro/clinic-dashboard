@@ -154,11 +154,15 @@ describe("review round 1 (T-033 implementation review)", () => {
   it("P1: a price-only edit keeps the material formula; an explicit empty formula clears it", async () => {
     const formula = [{ material: "Serum pembawa", qty: 2, unit: "ml" }];
     const v = await as(MGR, (db) => publish(db, { kind: "service", code: "FORM-01" }, { name: "Infus Vitamin", tax_category: "exempt_medical", tax_basis: "Jasa pelayanan kesehatan medis", normal_price: 400_000, material_formula: formula }, "Layanan baru"));
-    // The edit form sends no material_formula key (its editor arrives with T-034): the formula is kept.
+    // T-034 (DEC-047 (2)): a recipe passes the pharmacist's materials review first.
+    expect(v).toMatchObject({ state: "pending_review", approvalId: null });
+    await as(PH, (db) => decideApproval(db, v.materialsApprovalId!, true));
+    // An edit that sends no material_formula key keeps the formula.
     const noFormula: CatalogFields = { name: "Infus Vitamin", tax_category: "exempt_medical", tax_basis: "Jasa pelayanan kesehatan medis", normal_price: 450_000 };
     expect((await as(MGR, (db) => publish(db, { itemId: v.itemId }, noFormula, "Harga naik"))).state).toBe("active");
     expect((await active(MGR, v.itemId))).toMatchObject({ version: 2, normalPrice: 450_000, materialFormula: formula });
-    await as(MGR, (db) => publish(db, { itemId: v.itemId }, { ...noFormula, material_formula: [] }, "Resep dihapus"));
+    const cleared = await as(MGR, (db) => publish(db, { itemId: v.itemId }, { ...noFormula, material_formula: [] }, "Resep dihapus"));
+    await as(PH, (db) => decideApproval(db, cleared.materialsApprovalId!, true)); // clearing the recipe is a recipe change
     expect((await active(MGR, v.itemId))!.materialFormula).toEqual([]);
   });
 
@@ -173,6 +177,9 @@ describe("review round 1 (T-033 implementation review)", () => {
     await as(MGR, (db) => cancelApproval(db, r2.approvalId!));
     const r3 = await as(MGR, (db) => publish(db, { itemId: r.itemId }, { ...base, contraindications: "Kulit luka terbuka; keloid; isotretinoin" }, "Ajukan lagi"));
     await as(FH1, (db) => decideApproval(db, r3.approvalId!, true));
+    // T-034: the carried recipe is new against the (empty) active baseline, so the pharmacist reviews it too.
+    expect((await active(MGR, r.itemId))).toBeUndefined();
+    await as(PH, (db) => decideApproval(db, r3.materialsApprovalId!, true));
     expect((await versionsAs(MGR, r.itemId)).map((v) => [v.version, v.state, v.materialFormula])).toEqual([[3, "active", formula], [2, "cancelled", formula], [1, "rejected", formula]]);
   });
 
@@ -183,7 +190,7 @@ describe("review round 1 (T-033 implementation review)", () => {
     const p2 = await as(MGR, (db) => publish(db, { kind: "service", code: "TGT-02" }, { ...FACIAL, name: "Facial Target Dua" }, "Layanan baru"));
     const t1 = await as(FH2, (db) => reviewTarget(db, p1.approvalId!));
     const t2 = await as(FH2, (db) => reviewTarget(db, p2.approvalId!));
-    expect(t1).toMatchObject({ itemId: a1.itemId, code: "TGT-01", name: "Facial Target Satu", version: 2, proposed: { contraindications: "Kulit luka terbuka; rosacea aktif" }, active: { contraindications: "Kulit luka terbuka" } });
+    expect(t1).toMatchObject({ reviewType: "catalog_clinical_review", itemId: a1.itemId, kind: "service", code: "TGT-01", name: "Facial Target Satu", version: 2, proposed: { contraindications: "Kulit luka terbuka; rosacea aktif" }, active: { contraindications: "Kulit luka terbuka" }, formula: null });
     expect(t2).toMatchObject({ itemId: p2.itemId, code: "TGT-02", version: 1, active: null });
     // Not for commercial roles, nor for another tenant, nor for another approval type.
     expect(await as(FO, (db) => reviewTarget(db, p1.approvalId!))).toBeNull();

@@ -4,7 +4,7 @@
 // Pusat and Manager publish.
 import "server-only";
 import { withTenantContext } from "../../../db/rls/context";
-import { catalogItem, commercialCatalog, type CommercialRow, itemVersions, unpublishedItems, type UnpublishedRow, type VersionRow } from "../../../modules/catalog/catalog";
+import { catalogItem, commercialCatalog, type CommercialRow, itemVersions, openReview, unpublishedItems, type UnpublishedRow, type VersionRow } from "../../../modules/catalog/catalog";
 import { type RenderedContext, renderedContext } from "../../../modules/org/context/context";
 import { appPool, requestContext } from "../../../modules/org/context/store";
 
@@ -18,7 +18,7 @@ export type DetailData =
   | { kind: "redirect"; to: string }
   | { kind: "forbidden" }
   | { kind: "not-found" }
-  | ({ kind: "ok"; item: { id: string; kind: string; code: string }; commercial: CommercialRow | null; versions: VersionRow[] } & Base);
+  | ({ kind: "ok"; item: { id: string; kind: string; code: string }; commercial: CommercialRow | null; versions: VersionRow[]; openReview: string | null } & Base);
 
 async function context() {
   const rc = await requestContext();
@@ -57,6 +57,8 @@ export async function loadItem(id: string): Promise<DetailData> {
     if (!item) return { kind: "not-found" as const };
     const commercial = (await commercialCatalog(db)).find((r) => r.itemId === id) ?? null;
     const versions = x.base.seesClinical ? await itemVersions(db, id) : [];
-    return { kind: "ok" as const, item, commercial, versions, ...x.base };
+    // T-034: the open review of a pending version (clinical or materials), for Tarik Ajuan.
+    const pending = versions.find((v) => v.state === "pending_review");
+    return { kind: "ok" as const, item, commercial, versions, openReview: pending ? await openReview(db, pending) : null, ...x.base };
   });
 }

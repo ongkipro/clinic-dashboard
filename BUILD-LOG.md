@@ -169,6 +169,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A new tenant table needs its vendor support class and operator policy (TEN-19); run `tests/vendor` while building, not only at the full suite.
   - A reviewer quota (429) can stay exhausted for hours while other sessions share it: retrying does not help; use the owner's fallback reviewer (Argon) and record it.
 
+- **T-034** (Master Layanan, migration 0055):
+  - Row-level security cannot hide columns: a role allowed to read a row reads its clinical text too. Give a narrower role (the pharmacist) its view through a SECURITY DEFINER projection, and test the definer itself, not only the module's mapping (a mutation survived until the raw function was asserted).
+  - Two approvals on one subject: move the subject first, then cancel the sibling, so the trigger's second firing finds nothing pending and exits; the sibling's cancellation needs a decider, an audit row and its event like any other.
+  - A form that only offers allowed choices must also judge "what changed" on what it will post, not on its raw state (a narrower category silently dropped rows while the button still said Minta Review).
+  - A `<select>` inside its `<label>` takes the options' text into its accessible name; label it with `for`.
+  - `memberships_effective_check` needs `effective_to > effective_from`: end a membership in tests with `now()`, not a time before it.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

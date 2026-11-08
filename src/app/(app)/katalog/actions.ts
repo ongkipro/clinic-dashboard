@@ -1,6 +1,6 @@
 "use server";
 // Katalog actions (UX-25, PR-41): publish a new version (Simpan / Minta Review) and withdraw a
-// pending clinical change (the requester; through the approvals engine, which moves the version).
+// pending change (clinical or materials review, T-034) (the requester; through the approvals engine, which moves the version).
 // Each refuses a form rendered in another context first (HYG-009 B2-1); the database decides roles,
 // the clinical review gate and the item lock (DEC-046).
 import { revalidatePath } from "next/cache";
@@ -22,7 +22,9 @@ const COPY: Record<string, string> = {
   ERR_FORBIDDEN: "Peran Anda tidak dapat mengubah katalog.",
   ERR_NOT_FOUND: "Item tidak ditemukan. Muat ulang halaman.",
   ERR_VERSION_CONFLICT: "Kode sudah dipakai atau data sudah berubah. Muat ulang halaman.",
-  catalog_review_pending: "Perubahan klinis item ini masih menunggu review. Tunggu keputusannya atau tarik ajuannya dulu.",
+  catalog_review_pending: "Perubahan item ini masih menunggu review. Tunggu keputusannya atau tarik ajuannya dulu.",
+  delegation_floor: "Staf & Delegasi item ini tidak lagi sesuai batas hukum. Ubah di Master Layanan.",
+  category_required: "Pilih kategori layanan di Master Layanan.",
   ERR_INVALID_INPUT: "Periksa kembali isian: ada nilai yang tidak valid.",
 };
 

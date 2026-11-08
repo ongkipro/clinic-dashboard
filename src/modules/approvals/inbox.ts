@@ -21,6 +21,9 @@ export const APPROVAL_TYPES: Record<string, { label: string; approverRoles: read
   setting_change_fh: { label: "Perubahan pengaturan klinis", approverRoles: ["facility_head", "owner"] },
   // T-033 (DEC-046): a clinical catalog change; any facility head of the tenant, the owner only as fallback.
   catalog_clinical_review: { label: "Review klinis katalog", approverRoles: ["facility_head", "owner"] },
+  // T-034 (DEC-047 (2)): a BHP recipe change; any pharmacist of the tenant, the facility head or the
+  // owner only while no pharmacist other than the requester could.
+  catalog_materials_review: { label: "Review bahan (BHP) katalog", approverRoles: ["pharmacist", "facility_head", "owner"] },
 };
 // Types the owner decides only while no facility head other than the requester could (DEC-031 D2,
 // DEC-046 (1)).
@@ -35,7 +38,7 @@ export const rupiah = (n: number) => `Rp${new Intl.NumberFormat("id-ID").format(
 
 // 19 §2.14: who opens Persetujuan. A requester outside these roles reads its own
 // requests through RLS but has no inbox screen.
-export const INBOX_READERS: readonly Role[] = ["owner", "manager", "facility_head", "records_officer"];
+export const INBOX_READERS: readonly Role[] = ["owner", "manager", "facility_head", "records_officer", "pharmacist"];
 
 export type InboxRow = {
   id: string;
@@ -104,6 +107,7 @@ export async function listInbox(db: pg.ClientBase, role: Role, filter: { type?: 
   const { rows } = await db.query(
     `${SELECT} where a.state = 'pending' and a.type = any($1::text[])
         and ($3::text <> 'owner' or a.type <> all($4::text[]) or approval_owner_decides_fh(a.id))
+        and ($3::text not in ('owner','facility_head') or a.type <> 'catalog_materials_review' or not approval_ph_available(a.id))
       order by a.requested_at, a.id limit $2`,
     [types, limit + 1, role, OWNER_FALLBACK_TYPES],
   );
@@ -123,6 +127,8 @@ export async function inboxDetail(db: pg.ClientBase, actor: { staffId: string; r
     : !(APPROVAL_TYPES[r.type]?.approverRoles ?? []).includes(actor.role) ? "not-approver"
     // The owner is only the fallback for clinical drafts (DEC-031 D2).
     : actor.role === "owner" && OWNER_FALLBACK_TYPES.includes(r.type) && !(await db.query(`select approval_owner_decides_fh($1) as ok`, [id])).rows[0].ok ? "not-approver"
+    // DEC-047 (2): a pharmacist decides the materials review while one other than the requester could.
+    : (actor.role === "owner" || actor.role === "facility_head") && r.type === "catalog_materials_review" && (await db.query(`select approval_ph_available($1) as ok`, [id])).rows[0].ok ? "not-approver"
     : null;
   return {
     ...row(r),

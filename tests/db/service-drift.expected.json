@@ -1,0 +1,176 @@
+{
+  "approval_decide(uuid,boolean,text)": [
+    {
+      "at": 20,
+      "old": "",
+      "new": "                       OR a.role = 'pharmacist' AND ap.type = 'catalog_materials_review'"
+    },
+    {
+      "at": 34,
+      "old": "",
+      "new": "  END IF;\n  -- DEC-047 (2): a pharmacist decides the materials review; the facility head or the owner only\n  -- while no pharmacist other than the requester could.\n  IF ap.type = 'catalog_materials_review' AND a.role IN ('facility_head','owner') AND public.approval_ph_available(p_approval) THEN\n    RAISE EXCEPTION 'ERR_FORBIDDEN: a pharmacist decides this review' USING ERRCODE = '42501';"
+    }
+  ],
+  "approval_is_tenant_setting_draft(uuid,uuid)": [
+    {
+      "at": 12,
+      "old": "                WHERE ap.tenant_id = p_tenant AND ap.id = p_approval AND ap.type = 'catalog_clinical_review'))",
+      "new": "                WHERE ap.tenant_id = p_tenant AND ap.id = p_approval AND ap.type IN ('catalog_clinical_review','catalog_materials_review')))"
+    }
+  ],
+  "catalog_publish(uuid,text,text,jsonb,text)": [
+    {
+      "at": 9,
+      "old": "",
+      "new": "  v_kind text;"
+    },
+    {
+      "at": 10,
+      "old": "",
+      "new": "  src public.catalog_versions;"
+    },
+    {
+      "at": 11,
+      "old": "",
+      "new": "  v_category text;\n  v_prep integer;\n  v_treat integer;\n  v_buffer integer;\n  v_online boolean;\n  v_aftercare text;\n  v_resources jsonb;\n  v_elig jsonb;\n  v_cur_elig jsonb;\n  v_floor integer;\n  e jsonb;"
+    },
+    {
+      "at": 13,
+      "old": "",
+      "new": "  v_materials boolean;"
+    },
+    {
+      "at": 15,
+      "old": "",
+      "new": "  v_mapproval uuid;"
+    },
+    {
+      "at": 31,
+      "old": "      RETURNING id INTO v_item;",
+      "new": "      RETURNING id, kind INTO v_item, v_kind;"
+    },
+    {
+      "at": 37,
+      "old": "    PERFORM 1 FROM public.catalog_items WHERE tenant_id = a.tenant_id AND id = v_item FOR UPDATE;",
+      "new": "    SELECT kind INTO v_kind FROM public.catalog_items WHERE tenant_id = a.tenant_id AND id = v_item FOR UPDATE;"
+    },
+    {
+      "at": 46,
+      "old": "",
+      "new": "  -- The carry-forward source: the active version, else the latest (a first version rejected or\n  -- withdrawn, corrected from the latest one). Never the gate baseline (that is cur only).\n  SELECT * INTO src FROM public.catalog_versions WHERE tenant_id = a.tenant_id AND item_id = v_item\n   ORDER BY (state = 'active') DESC, version DESC LIMIT 1;"
+    },
+    {
+      "at": 47,
+      "old": "  -- Review rounds 1-2 (P1): an omitted material formula keeps the active version's, or, with no active\n  -- version (a first version rejected or withdrawn, corrected from the latest one), the latest version's;\n  -- an explicit [] clears it. This is not the clinical baseline (that stays the active version only).\n  v_formula := CASE WHEN f ? 'material_formula' THEN f -> 'material_formula'\n                    ELSE coalesce(cur.material_formula,\n                                  (SELECT x.material_formula FROM public.catalog_versions x WHERE x.tenant_id = a.tenant_id AND x.item_id = v_item\n                                    ORDER BY x.version DESC LIMIT 1),\n                                  '[]'::jsonb) END;",
+      "new": "  BEGIN\n    -- An omitted recipe keeps the source's; an explicit [] clears it.\n    v_formula := CASE WHEN f ? 'material_formula' THEN f -> 'material_formula' ELSE coalesce(src.material_formula, '[]'::jsonb) END;\n    IF jsonb_typeof(v_formula) <> 'array' THEN\n      RAISE EXCEPTION 'ERR_INVALID_INPUT: material formula must be a list' USING ERRCODE = '22023';\n    END IF;\n    IF jsonb_array_length(v_formula) > 50 OR EXISTS (\n         SELECT 1 FROM jsonb_array_elements(v_formula) x\n          WHERE jsonb_typeof(x) <> 'object' OR jsonb_typeof(x -> 'material') IS DISTINCT FROM 'string'\n             OR jsonb_typeof(x -> 'qty') IS DISTINCT FROM 'number' OR jsonb_typeof(x -> 'unit') IS DISTINCT FROM 'string') THEN\n      RAISE EXCEPTION 'ERR_INVALID_INPUT: material formula rows need material, qty and unit' USING ERRCODE = '22023';\n    END IF;\n    IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_formula) x\n                WHERE length(btrim(x ->> 'material')) NOT BETWEEN 1 AND 120 OR (x ->> 'qty')::numeric <= 0\n                   OR (x ->> 'qty')::numeric > 100000 OR length(btrim(x ->> 'unit')) NOT BETWEEN 1 AND 16) THEN\n      RAISE EXCEPTION 'ERR_INVALID_INPUT: material formula rows need material, qty > 0 and unit' USING ERRCODE = '22023';\n    END IF;\n    IF v_kind <> 'service' THEN\n      IF f ?| ARRAY['category','prep_min','treatment_min','buffer_min','online_bookable','aftercare_text','resources','eligibility'] THEN\n        RAISE EXCEPTION 'ERR_INVALID_INPUT: service fields are for services only' USING ERRCODE = '22023';\n      END IF;\n      v_online := false;\n      v_resources := '[]'::jsonb;\n      v_elig := '[]'::jsonb;\n    ELSE\n      v_category := CASE WHEN f ? 'category' THEN NULLIF(f ->> 'category', '') ELSE src.category END;\n      IF v_category IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.delegation_floor d WHERE d.category = v_category) THEN\n        RAISE EXCEPTION 'ERR_INVALID_INPUT: category not allowed' USING ERRCODE = '22023';\n      END IF;\n      v_prep := coalesce((f ->> 'prep_min')::integer, src.prep_min, 10);\n      v_treat := coalesce((f ->> 'treatment_min')::integer, src.treatment_min, 30);\n      v_buffer := coalesce((f ->> 'buffer_min')::integer, src.buffer_min, 10);\n      v_online := coalesce((f ->> 'online_bookable')::boolean, src.online_bookable, false);\n      v_aftercare := CASE WHEN f ? 'aftercare_text' THEN public.catalog_norm(f ->> 'aftercare_text') ELSE src.aftercare_text END;\n      IF f ? 'resources' THEN\n        IF jsonb_typeof(f -> 'resources') <> 'array' OR jsonb_array_length(f -> 'resources') > 20 THEN\n          RAISE EXCEPTION 'ERR_INVALID_INPUT: resources must be a list of at most 20' USING ERRCODE = '22023';\n        END IF;\n        v_resources := (SELECT coalesce(jsonb_agg(jsonb_build_object('kind', x ->> 'kind', 'code', x ->> 'code',\n                                                                    'required', coalesce((x ->> 'required')::boolean, true))\n                                                  ORDER BY x ->> 'kind', x ->> 'code'), '[]'::jsonb)\n                          FROM jsonb_array_elements(f -> 'resources') x);\n      ELSE\n        v_resources := coalesce((SELECT jsonb_agg(jsonb_build_object('kind', r.kind, 'code', r.code, 'required', r.required) ORDER BY r.kind, r.code)\n                                   FROM public.service_resources r WHERE r.tenant_id = a.tenant_id AND r.version_id = src.id), '[]'::jsonb);\n      END IF;\n      IF f ? 'eligibility' THEN\n        IF jsonb_typeof(f -> 'eligibility') <> 'array' OR jsonb_array_length(f -> 'eligibility') > 50 THEN\n          RAISE EXCEPTION 'ERR_INVALID_INPUT: eligibility must be a list of at most 50' USING ERRCODE = '22023';\n        END IF;\n        v_elig := (SELECT coalesce(jsonb_agg(jsonb_build_object('role', NULLIF(x ->> 'role', ''), 'staff_id', lower(NULLIF(x ->> 'staff_id', '')), 'mode', x ->> 'mode')\n                                             ORDER BY NULLIF(x ->> 'role', ''), lower(NULLIF(x ->> 'staff_id', '')), x ->> 'mode'), '[]'::jsonb)\n                     FROM jsonb_array_elements(f -> 'eligibility') x);\n      ELSE\n        v_elig := coalesce((SELECT jsonb_agg(jsonb_build_object('role', e.role, 'staff_id', e.staff_id::text, 'mode', e.mode)\n                                   ORDER BY e.role, e.staff_id::text, e.mode)\n                         FROM public.service_staff_eligibility e WHERE e.tenant_id = a.tenant_id AND e.version_id = src.id), '[]'::jsonb);\n      END IF;\n    END IF;\n    -- The legal floor (DEC-047 (3)): every row, carried or new, against the version's category.\n    IF jsonb_array_length(v_elig) > 0 AND v_category IS NULL THEN\n      RAISE EXCEPTION 'ERR_INVALID_INPUT: category_required' USING ERRCODE = '22023';\n    END IF;\n    FOR e IN SELECT x FROM jsonb_array_elements(v_elig) x LOOP\n      IF (e ->> 'role' IS NULL) = (e ->> 'staff_id' IS NULL) OR e ->> 'role' NOT IN ('doctor','nurse','therapist')\n         OR e ->> 'mode' IS DISTINCT FROM 'performs' AND e ->> 'mode' IS DISTINCT FROM 'supervised' AND e ->> 'mode' IS DISTINCT FROM 'assists' THEN\n        RAISE EXCEPTION 'ERR_INVALID_INPUT: eligibility rows name a doctor, nurse or therapist role or one staff member, and a mode' USING ERRCODE = '22023';\n      END IF;\n      IF e ->> 'role' IS NOT NULL THEN\n        SELECT public.catalog_mode_rank(d.max_mode) INTO v_floor FROM public.delegation_floor d\n         WHERE d.category = v_category AND d.profession = e ->> 'role';\n      ELSE\n        SELECT max(public.catalog_mode_rank(d.max_mode)) INTO v_floor\n          FROM public.staff s\n          JOIN public.memberships m ON m.tenant_id = s.tenant_id AND m.id = s.membership_id\n          JOIN public.staff_roles r ON r.tenant_id = s.tenant_id AND r.staff_id = s.id\n          JOIN public.delegation_floor d ON d.category = v_category AND d.profession = r.role\n         WHERE s.tenant_id = a.tenant_id AND s.id = (e ->> 'staff_id')::uuid\n           AND m.effective_from <= clock_timestamp() AND (m.effective_to IS NULL OR m.effective_to > clock_timestamp());\n      END IF;\n      IF coalesce(v_floor, 0) < public.catalog_mode_rank(e ->> 'mode') THEN\n        RAISE EXCEPTION 'ERR_INVALID_INPUT: delegation_floor' USING ERRCODE = '22023';\n      END IF;\n    END LOOP;\n  EXCEPTION\n    -- Bad casts only (my own ERR_ raises use 22023 and pass through untouched).\n    WHEN invalid_text_representation OR numeric_value_out_of_range OR invalid_datetime_format THEN\n      RAISE EXCEPTION 'ERR_INVALID_INPUT: %', SQLERRM USING ERRCODE = '22023';\n  END;\n  v_cur_elig := coalesce((SELECT jsonb_agg(jsonb_build_object('role', e.role, 'staff_id', e.staff_id::text, 'mode', e.mode)\n                                   ORDER BY e.role, e.staff_id::text, e.mode)\n                         FROM public.service_staff_eligibility e WHERE e.tenant_id = a.tenant_id AND e.version_id = cur.id), '[]'::jsonb);"
+    },
+    {
+      "at": 56,
+      "old": "                 public.catalog_norm(f ->> 'consent_template'), public.catalog_norm(f ->> 'delegation'))",
+      "new": "                 public.catalog_norm(f ->> 'consent_template'), public.catalog_norm(f ->> 'delegation'), v_aftercare, v_elig)"
+    },
+    {
+      "at": 59,
+      "old": "                 public.catalog_norm(cur.consent_template), public.catalog_norm(cur.delegation));",
+      "new": "                 public.catalog_norm(cur.consent_template), public.catalog_norm(cur.delegation), cur.aftercare_text, v_cur_elig);\n  v_materials := v_formula IS DISTINCT FROM coalesce(cur.material_formula, '[]'::jsonb);\n  -- The approvals name the version that will exist (same transaction); tenant-wide reviews."
+    },
+    {
+      "at": 61,
+      "old": "    -- The approval names the version that will exist (same transaction); tenant-wide review.",
+      "new": ""
+    },
+    {
+      "at": 63,
+      "old": "",
+      "new": "  END IF;\n  IF v_materials THEN\n    v_mapproval := public.approval_request('catalog_materials_review', 'catalog_version', v_id, p_reason, NULL, NULL);\n  END IF;\n  IF v_clinical OR v_materials THEN"
+    },
+    {
+      "at": 73,
+      "old": "        commission_scope, indications, contraindications, consent_template, delegation, reason, created_by, created_as, approval_id)",
+      "new": "        commission_scope, indications, contraindications, consent_template, delegation, category, prep_min, treatment_min, buffer_min,\n        online_bookable, aftercare_text, reason, created_by, created_as, approval_id, materials_approval_id)"
+    },
+    {
+      "at": 82,
+      "old": "        btrim(coalesce(p_reason, '')), a.staff_id, a.role, v_approval);",
+      "new": "        v_category, v_prep, v_treat, v_buffer, v_online, v_aftercare,\n        btrim(coalesce(p_reason, '')), a.staff_id, a.role, v_approval, v_mapproval);\n    INSERT INTO public.service_resources (tenant_id, version_id, kind, code, required)\n    SELECT a.tenant_id, v_id, x ->> 'kind', x ->> 'code', (x ->> 'required')::boolean FROM jsonb_array_elements(v_resources) x;\n    INSERT INTO public.service_staff_eligibility (tenant_id, version_id, role, staff_id, mode)\n    SELECT a.tenant_id, v_id, x ->> 'role', (x ->> 'staff_id')::uuid, x ->> 'mode' FROM jsonb_array_elements(v_elig) x;"
+    },
+    {
+      "at": 84,
+      "old": "    WHEN check_violation OR not_null_violation OR invalid_text_representation OR numeric_value_out_of_range THEN",
+      "new": "    WHEN check_violation OR not_null_violation OR invalid_text_representation OR numeric_value_out_of_range\n      OR unique_violation OR foreign_key_violation THEN"
+    },
+    {
+      "at": 88,
+      "old": "          CASE WHEN v_clinical THEN 'catalog_review_requested' ELSE 'catalog_version_published' END);\n  IF NOT v_clinical THEN",
+      "new": "          CASE WHEN v_state = 'pending_review' THEN 'catalog_review_requested' ELSE 'catalog_version_published' END);\n  IF v_state = 'active' THEN"
+    },
+    {
+      "at": 93,
+      "old": "  RETURN jsonb_build_object('item_id', v_item, 'version_id', v_id, 'version', v_next, 'state', v_state, 'approval_id', v_approval);",
+      "new": "  RETURN jsonb_build_object('item_id', v_item, 'version_id', v_id, 'version', v_next, 'state', v_state,\n                            'approval_id', v_approval, 'materials_approval_id', v_mapproval);"
+    }
+  ],
+  "catalog_review_sync()": [
+    {
+      "at": 8,
+      "old": "",
+      "new": "  v_other uuid;"
+    },
+    {
+      "at": 9,
+      "old": "  IF NEW.type <> 'catalog_clinical_review' OR OLD.state <> 'pending' OR NEW.state = 'pending' THEN",
+      "new": "  IF NEW.type NOT IN ('catalog_clinical_review','catalog_materials_review') OR OLD.state <> 'pending' OR NEW.state = 'pending' THEN"
+    },
+    {
+      "at": 12,
+      "old": "  SELECT * INTO ver FROM public.catalog_versions WHERE tenant_id = NEW.tenant_id AND approval_id = NEW.id AND state = 'pending_review' FOR UPDATE;",
+      "new": "  SELECT * INTO ver FROM public.catalog_versions\n   WHERE tenant_id = NEW.tenant_id AND (approval_id = NEW.id OR materials_approval_id = NEW.id) AND state = 'pending_review' FOR UPDATE;"
+    },
+    {
+      "at": 16,
+      "old": "",
+      "new": "  v_other := CASE WHEN ver.approval_id = NEW.id THEN ver.materials_approval_id ELSE ver.approval_id END;"
+    },
+    {
+      "at": 17,
+      "old": "",
+      "new": "    IF v_other IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.approvals WHERE tenant_id = NEW.tenant_id AND id = v_other AND state = 'approved') THEN\n      RETURN NULL; -- the other review is still open\n    END IF;"
+    },
+    {
+      "at": 31,
+      "old": "",
+      "new": "  IF NEW.state IN ('rejected','cancelled') AND v_other IS NOT NULL THEN\n    UPDATE public.approvals SET state = 'cancelled', decided_by = NEW.decided_by, decided_as = NEW.decided_as, decided_at = clock_timestamp()\n     WHERE tenant_id = NEW.tenant_id AND id = v_other AND state = 'pending';\n    IF FOUND THEN\n      IF public.app_staff_id() IS NOT NULL THEN\n        PERFORM public.audit_append('approval', 'approval', v_other, 'success', 'approval_cancelled');\n      END IF;\n      INSERT INTO public.domain_events (tenant_id, branch_id, type, aggregate_kind, aggregate_id, payload)\n      SELECT ap.tenant_id, ap.branch_id, 'ApprovalDecided', 'approval', ap.id,\n             jsonb_build_object('approval_type', ap.type, 'outcome', 'cancelled', 'subject_kind', ap.subject_kind, 'subject_id', ap.subject_id)\n        FROM public.approvals ap WHERE ap.tenant_id = NEW.tenant_id AND ap.id = v_other;\n    END IF;\n  END IF;"
+    }
+  ],
+  "catalog_commercial()": [
+    {
+      "at": 1,
+      "old": " RETURNS TABLE(item_id uuid, version_id uuid, version integer, kind text, code text, name text, tax_category text, tax_basis text, normal_price bigint, control_count integer, control_validity_days integer, booking_dp_enabled boolean, booking_dp_amount bigint, min_dp_pct integer, installments_allowed boolean, validity_days integer, commission_scope text[], pending_review boolean)",
+      "new": " RETURNS TABLE(item_id uuid, version_id uuid, version integer, kind text, code text, name text, tax_category text, tax_basis text, normal_price bigint, control_count integer, control_validity_days integer, booking_dp_enabled boolean, booking_dp_amount bigint, min_dp_pct integer, installments_allowed boolean, validity_days integer, commission_scope text[], pending_review boolean, category text, prep_min integer, treatment_min integer, buffer_min integer, online_bookable boolean)"
+    },
+    {
+      "at": 8,
+      "old": "         EXISTS (SELECT 1 FROM public.catalog_versions p WHERE p.tenant_id = i.tenant_id AND p.item_id = i.id AND p.state = 'pending_review')",
+      "new": "         EXISTS (SELECT 1 FROM public.catalog_versions p WHERE p.tenant_id = i.tenant_id AND p.item_id = i.id AND p.state = 'pending_review'),\n         v.category, v.prep_min, v.treatment_min, v.buffer_min, v.online_bookable"
+    }
+  ],
+  "catalog_review_target(uuid)": [
+    {
+      "at": 1,
+      "old": " RETURNS TABLE(item_id uuid, code text, name text, version integer, state text, indications text, contraindications text, consent_template text, delegation text, has_active boolean, active_indications text, active_contraindications text, active_consent_template text, active_delegation text)",
+      "new": " RETURNS TABLE(review_type text, item_id uuid, kind text, code text, name text, version integer, state text, indications text, contraindications text, consent_template text, delegation text, aftercare_text text, category text, eligibility jsonb, has_active boolean, active_indications text, active_contraindications text, active_consent_template text, active_delegation text, active_aftercare_text text, active_eligibility jsonb, material_formula jsonb, active_material_formula jsonb)"
+    },
+    {
+      "at": 6,
+      "old": "  SELECT i.id, i.code, v.name, v.version, v.state, v.indications, v.contraindications, v.consent_template, v.delegation,\n         a.id IS NOT NULL, a.indications, a.contraindications, a.consent_template, a.delegation\n    FROM public.approvals ap\n    JOIN public.catalog_versions v ON v.tenant_id = ap.tenant_id AND v.approval_id = ap.id\n    JOIN public.catalog_items i ON i.tenant_id = v.tenant_id AND i.id = v.item_id\n    LEFT JOIN public.catalog_versions a ON a.tenant_id = v.tenant_id AND a.item_id = v.item_id AND a.state = 'active'\n   WHERE ap.tenant_id = public.app_tenant_id() AND ap.id = p_approval AND ap.type = 'catalog_clinical_review'\n     AND public.app_staff_id() IS NOT NULL AND public.app_role_in(ARRAY['owner','admin_pusat','manager','facility_head'])",
+      "new": "  WITH x AS (\n    SELECT ap.type, ap.type = 'catalog_clinical_review' AS cl, v, i, a\n      FROM public.approvals ap\n      JOIN public.catalog_versions v ON v.tenant_id = ap.tenant_id AND (v.approval_id = ap.id OR v.materials_approval_id = ap.id)\n      JOIN public.catalog_items i ON i.tenant_id = v.tenant_id AND i.id = v.item_id\n      LEFT JOIN public.catalog_versions a ON a.tenant_id = v.tenant_id AND a.item_id = v.item_id AND a.state = 'active'\n     WHERE ap.tenant_id = public.app_tenant_id() AND ap.id = p_approval\n       AND ap.type IN ('catalog_clinical_review','catalog_materials_review') AND public.app_staff_id() IS NOT NULL\n       AND (public.app_role_in(ARRAY['owner','admin_pusat','manager','facility_head'])\n            OR ap.type = 'catalog_materials_review' AND public.app_role_in(ARRAY['pharmacist'])))\n  SELECT x.type, (x.i).id, (x.i).kind, (x.i).code, (x.v).name, (x.v).version, (x.v).state,\n         CASE WHEN x.cl THEN (x.v).indications END, CASE WHEN x.cl THEN (x.v).contraindications END,\n         CASE WHEN x.cl THEN (x.v).consent_template END, CASE WHEN x.cl THEN (x.v).delegation END,\n         CASE WHEN x.cl THEN (x.v).aftercare_text END, (x.v).category,\n         CASE WHEN x.cl THEN public.catalog_eligibility_named((x.v).tenant_id, (x.v).id) END,\n         (x.a).id IS NOT NULL,\n         CASE WHEN x.cl THEN (x.a).indications END, CASE WHEN x.cl THEN (x.a).contraindications END,\n         CASE WHEN x.cl THEN (x.a).consent_template END, CASE WHEN x.cl THEN (x.a).delegation END,\n         CASE WHEN x.cl THEN (x.a).aftercare_text END,\n         CASE WHEN x.cl AND (x.a).id IS NOT NULL THEN public.catalog_eligibility_named((x.a).tenant_id, (x.a).id) END,\n         CASE WHEN NOT x.cl THEN (x.v).material_formula END, CASE WHEN NOT x.cl THEN (x.a).material_formula END\n    FROM x"
+    }
+  ],
+  "catalog_versions_guard()": [
+    {
+      "at": 11,
+      "old": "       OR (NEW.state = 'pending_review') <> (NEW.approval_id IS NOT NULL) THEN\n      RAISE EXCEPTION 'a catalog version starts active, or pending review with its approval' USING ERRCODE = '42501';",
+      "new": "       OR (NEW.state = 'pending_review') <> (NEW.approval_id IS NOT NULL OR NEW.materials_approval_id IS NOT NULL) THEN\n      RAISE EXCEPTION 'a catalog version starts active, or pending review with its approvals' USING ERRCODE = '42501';"
+    }
+  ]
+}

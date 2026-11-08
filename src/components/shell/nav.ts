@@ -105,7 +105,7 @@ export const NAV: readonly NavGroup[] = [
     ["tutup-kasir", "Tutup Kasir", "/kasir/tutup", "FO M"],
   ]),
   group("paket", "Paket & Promo", [
-    ["master-layanan", "Master Layanan", "/layanan", "AP O FH PH"],
+    ["master-layanan", "Master Layanan", "/layanan", "AP O M FH PH"],
     ["templat-paket", "Templat Paket", "/layanan/paket", "AP O"],
     ["kode-promo", "Kode Promo & Voucher", "/situs/promo", "MK AP"],
   ]),
@@ -166,7 +166,7 @@ export const NAV: readonly NavGroup[] = [
     ["kamus-kpi", "Kamus KPI", "/laporan/kamus-kpi", "O F M MK CS PH PU AU"],
   ]),
   group("persetujuan", "Persetujuan & Audit", [
-    ["persetujuan", "Persetujuan", "/persetujuan", "O M FH RO"],
+    ["persetujuan", "Persetujuan", "/persetujuan", "O M FH RO PH"],
     ["matriks-persetujuan", "Matriks Persetujuan", "/persetujuan/matriks", "O AP"],
     ["log-audit", "Log Audit", "/audit", "O FH RO AU"],
     ["audit-internal", "Audit Internal", "/audit/internal", "AU O"],

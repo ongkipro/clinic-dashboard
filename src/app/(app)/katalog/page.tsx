@@ -52,7 +52,7 @@ async function Body({ searchParams }: { searchParams: Promise<Record<string, str
             subtitle={`${KIND_LABEL[r.kind]} · ${r.code} · ${TAX_LABEL[r.taxCategory]}`}
             trailing={<span className="font-semibold tabular-nums">{rupiah(r.normalPrice)}</span>}
           >
-            {r.pendingReview && <StatusBadge tone="warning">Menunggu review klinis</StatusBadge>}
+            {r.pendingReview && <StatusBadge tone="warning">Menunggu review</StatusBadge>}
           </Row>
         ))}
       </RowList>

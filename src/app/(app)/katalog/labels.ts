@@ -10,7 +10,7 @@ export const SCOPE_LABEL: Record<string, string> = { guiding_bc: "BC pendamping"
 export const STATE_LABEL: Record<string, string> = {
   active: "Aktif",
   superseded: "Versi lama",
-  pending_review: "Menunggu review klinis",
+  pending_review: "Menunggu review",
   rejected: "Ditolak",
   cancelled: "Ditarik",
 };

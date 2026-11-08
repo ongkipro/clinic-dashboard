@@ -366,12 +366,14 @@ describe("functions (TEN-16)", () => {
     "approval_decide(uuid,boolean,text)",
     "approval_is_tenant_setting_draft(uuid,uuid)",
     "approval_owner_decides_fh(uuid)",
+    "approval_ph_available(uuid)", // T-034: the inbox offers a materials review only where approval_decide accepts it
     "approval_owner_self(text,text,uuid,text,uuid,bigint)",
     "approval_request(text,text,uuid,text,uuid,bigint)",
     "audit_append(text,text,uuid,text,text,text,uuid)",
     "catalog_commercial()",
     "catalog_publish(uuid,text,text,jsonb,text)",
     "catalog_review_target(uuid)",
+    "catalog_service_requirements(uuid)", // T-034: active resources and eligibility for booking roles (DEC-047 (4))
     "catalog_unpublished()",
     "catalog_version_reference(uuid)",
     "audit_verify(uuid)",

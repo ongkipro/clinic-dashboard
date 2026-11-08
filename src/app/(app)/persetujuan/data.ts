@@ -7,6 +7,8 @@ import { reviewTarget, type ReviewTarget } from "../../../modules/catalog/catalo
 import { APPROVAL_TYPES, decidableTypes, INBOX_READERS, inboxDetail, type InboxDetail, type InboxRow, listInbox } from "../../../modules/approvals/inbox";
 import { appPool, requestContext } from "../../../modules/org/context/store";
 
+const CATALOG_REVIEWS = new Set(["catalog_clinical_review", "catalog_materials_review"]);
+
 export type InboxPage =
   | { kind: "redirect"; to: string }
   | { kind: "forbidden" }
@@ -38,8 +40,8 @@ export async function loadDetail(id: string): Promise<DetailPage> {
   if (!INBOX_READERS.includes(role)) return { kind: "forbidden" };
   const r = await withTenantContext(await appPool(), rc.active.context, async (db) => {
     const detail = await inboxDetail(db, { staffId, role }, id);
-    // T-033 review round 1 (P1): a catalog clinical review shows what it decides.
-    const catalog = detail?.type === "catalog_clinical_review" ? await reviewTarget(db, id) : null;
+    // T-033 review round 1 (P1), T-034: a catalog review shows what it decides.
+    const catalog = detail && CATALOG_REVIEWS.has(detail.type) ? await reviewTarget(db, id) : null;
     return { detail, catalog };
   });
   return r.detail ? { kind: "ok", detail: r.detail, ctx: renderedContext(rc.active.context), catalog: r.catalog } : { kind: "not-found" };

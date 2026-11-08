@@ -40,6 +40,12 @@ function Clinical({ v }: { v: VersionRow }) {
   );
 }
 
+// T-034: which review a pending version waits for (unknown to roles that read no versions).
+function reviewLabel(v: VersionRow | undefined): string {
+  if (!v) return "Menunggu review";
+  return v.approvalId && v.materialsApprovalId ? "Menunggu review klinis & BHP" : v.approvalId ? "Menunggu review klinis" : "Menunggu review BHP";
+}
+
 async function Body({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const p = await loadItem(id);
@@ -76,22 +82,24 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
   if (p.seesClinical && activeV) sections.push({ id: "klinis", label: "Data klinis", content: <Clinical v={activeV} /> });
   if (p.seesClinical && pending) {
     const mine = pending.createdBy === p.staffId;
+    // T-034 (DEC-047 (2)): a pending version waits for the clinical review, the materials review, or both.
+    const who = pending.approvalId && pending.materialsApprovalId ? "Penanggung Jawab Klinik dan Apoteker" : pending.approvalId ? "Penanggung Jawab Klinik" : "Apoteker";
     sections.push({
       id: "review",
-      label: "Perubahan menunggu review klinis",
+      label: `Perubahan ${reviewLabel(pending).toLowerCase()}`,
       content: (
         <div className="grid min-w-0 gap-3">
-          <p className="m-0">Versi {pending.version} diajukan {fmt.format(pending.createdAt)}: {pending.reason}. Versi aktif tetap berlaku sampai Penanggung Jawab Klinik menyetujui.</p>
-          <Clinical v={pending} />
-          {p.role === "facility_head" || p.role === "owner" ? (
+          <p className="m-0">Versi {pending.version} diajukan {fmt.format(pending.createdAt)}: {pending.reason}. Versi aktif tetap berlaku sampai {who} menyetujui.</p>
+          {pending.approvalId && <Clinical v={pending} />}
+          {(p.role === "facility_head" || p.role === "owner") && pending.approvalId ? (
             <Link href={`/persetujuan/${pending.approvalId}`} className="inline-flex min-h-[var(--target)] items-center justify-self-start font-semibold text-[var(--tint)]">Buka di Persetujuan</Link>
           ) : null}
-          {mine && pending.approvalId && <WithdrawPending ctx={p.ctx} itemId={p.item.id} approvalId={pending.approvalId} />}
+          {mine && p.openReview && <WithdrawPending ctx={p.ctx} itemId={p.item.id} approvalId={p.openReview} />}
         </div>
       ),
     });
-  } else if (!p.seesClinical && c?.pendingReview) {
-    sections.push({ id: "review", label: "Perubahan", content: <p className="m-0">Ada perubahan yang menunggu review klinis. Harga dan data di atas tetap berlaku.</p> });
+  } else if (c?.pendingReview) {
+    sections.push({ id: "review", label: "Perubahan", content: <p className="m-0">Ada perubahan yang menunggu review klinis atau BHP. Harga dan data di atas tetap berlaku.</p> });
   }
   if (p.seesClinical) {
     sections.push({
@@ -116,7 +124,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
     <DetailPage
       title={title}
       subtitle={`${KIND_LABEL[p.item.kind]} · ${p.item.code}`}
-      status={pending || c?.pendingReview ? { tone: "warning", label: "Menunggu review klinis" } : c ? { tone: "success", label: "Aktif" } : undefined}
+      status={pending || c?.pendingReview ? { tone: "warning", label: reviewLabel(pending) } : c ? { tone: "success", label: "Aktif" } : undefined}
       primaryAction={p.canEdit && !pending && !c?.pendingReview ? { label: "Ubah", href: `/katalog/${p.item.id}/ubah` } : undefined}
       sections={sections}
     />
