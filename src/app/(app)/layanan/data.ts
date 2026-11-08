@@ -9,7 +9,9 @@ import { withTenantContext } from "../../../db/rls/context";
 import { catalogItem, commercialCatalog, type CommercialRow, itemVersions, openReview, serviceRows, type ServiceRows, unpublishedItems, type UnpublishedRow, type VersionRow } from "../../../modules/catalog/catalog";
 import { type RenderedContext, renderedContext } from "../../../modules/org/context/context";
 import { appPool, requestContext } from "../../../modules/org/context/store";
+import { priceBranches, priceRows, summarise } from "../../../modules/catalog/prices/prices";
 import { listStaff } from "../../../modules/org/staff/staff";
+import type { BranchPrices } from "../katalog/harga-cabang/summary";
 
 export const READERS = ["owner", "admin_pusat", "manager", "facility_head", "pharmacist"] as const;
 export const EDITORS = ["owner", "admin_pusat", "manager"] as const;
@@ -23,7 +25,7 @@ export type DetailData =
   | { kind: "redirect"; to: string }
   | { kind: "forbidden" }
   | { kind: "not-found" }
-  | ({ kind: "ok"; item: { id: string; kind: string; code: string }; commercial: CommercialRow | null; versions: Version[]; openReview: string | null; staffNames: Record<string, string> } & Base);
+  | ({ kind: "ok"; item: { id: string; kind: string; code: string }; commercial: CommercialRow | null; versions: Version[]; openReview: string | null; staffNames: Record<string, string>; prices: BranchPrices | null } & Base);
 export type StaffOption = { id: string; name: string; roles: string[] };
 
 async function context() {
@@ -74,6 +76,11 @@ export async function loadService(id: string, opts: { staff?: boolean } = {}): P
     return {
       kind: "ok" as const, item, commercial, versions, staffNames,
       openReview: pending ? await openReview(db, pending) : null,
+      // T-035: branch prices once the service has an active version (plan r1 P2-2).
+      prices: commercial ? await (async () => {
+        const branches = await priceBranches(db);
+        return { branches, summary: summarise(await priceRows(db, id), branches.map((b) => b.id), commercial.normalPrice) };
+      })() : null,
       staff: opts.staff && x.base.canEdit ? await clinicalStaff(db) : undefined,
       ...x.base,
     };

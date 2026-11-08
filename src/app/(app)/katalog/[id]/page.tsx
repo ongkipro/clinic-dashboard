@@ -11,6 +11,7 @@ import { StatusBadge } from "../../../../components/ui/status-badge";
 import type { VersionRow } from "../../../../modules/catalog/catalog";
 import { loadItem } from "../data";
 import { WithdrawPending } from "../forms";
+import { BranchPriceTab } from "../harga-cabang/summary";
 import { KIND_LABEL, rupiah, SCOPE_LABEL, STATE_LABEL, TAX_LABEL } from "../labels";
 
 export const metadata: Metadata = { title: "Item Katalog — Clinic Dashboard" };
@@ -79,6 +80,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
       ),
     },
   ];
+  if (p.prices) sections.push({ id: "harga-cabang", label: "Harga Cabang", content: <BranchPriceTab itemId={p.item.id} prices={p.prices} canEdit={p.role === "owner"} /> });
   if (p.seesClinical && activeV) sections.push({ id: "klinis", label: "Data klinis", content: <Clinical v={activeV} /> });
   if (p.seesClinical && pending) {
     const mine = pending.createdBy === p.staffId;

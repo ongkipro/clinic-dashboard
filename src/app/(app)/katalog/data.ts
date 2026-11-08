@@ -5,7 +5,9 @@
 import "server-only";
 import { withTenantContext } from "../../../db/rls/context";
 import { catalogItem, commercialCatalog, type CommercialRow, itemVersions, openReview, unpublishedItems, type UnpublishedRow, type VersionRow } from "../../../modules/catalog/catalog";
+import { priceBranches, priceRows, summarise } from "../../../modules/catalog/prices/prices";
 import { type RenderedContext, renderedContext } from "../../../modules/org/context/context";
+import type { BranchPrices } from "./harga-cabang/summary";
 import { appPool, requestContext } from "../../../modules/org/context/store";
 
 export const EDITORS = ["owner", "admin_pusat", "manager"] as const;
@@ -18,7 +20,7 @@ export type DetailData =
   | { kind: "redirect"; to: string }
   | { kind: "forbidden" }
   | { kind: "not-found" }
-  | ({ kind: "ok"; item: { id: string; kind: string; code: string }; commercial: CommercialRow | null; versions: VersionRow[]; openReview: string | null } & Base);
+  | ({ kind: "ok"; item: { id: string; kind: string; code: string }; commercial: CommercialRow | null; versions: VersionRow[]; openReview: string | null; prices: BranchPrices | null } & Base);
 
 async function context() {
   const rc = await requestContext();
@@ -59,6 +61,11 @@ export async function loadItem(id: string): Promise<DetailData> {
     const versions = x.base.seesClinical ? await itemVersions(db, id) : [];
     // T-034: the open review of a pending version (clinical or materials), for Tarik Ajuan.
     const pending = versions.find((v) => v.state === "pending_review");
-    return { kind: "ok" as const, item, commercial, versions, openReview: pending ? await openReview(db, pending) : null, ...x.base };
+    // T-035: branch prices for a sellable item with an active version (plan r1 P2-2).
+    const branches = commercial && item.kind !== "material" ? await priceBranches(db) : [];
+    const prices = commercial && item.kind !== "material"
+      ? { branches, summary: summarise(await priceRows(db, id), branches.map((b) => b.id), commercial.normalPrice) }
+      : null;
+    return { kind: "ok" as const, item, commercial, versions, openReview: pending ? await openReview(db, pending) : null, prices, ...x.base };
   });
 }

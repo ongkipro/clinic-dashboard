@@ -9,7 +9,7 @@
 import { sql } from "drizzle-orm";
 import { bigint, boolean, check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { approvals } from "../approvals/schema";
-import { staff, tenants } from "../org/schema";
+import { branches, staff, tenants } from "../org/schema";
 
 export const CATALOG_KINDS = ["service", "product", "package", "material"] as const;
 // BILL-6 tax categories.
@@ -178,5 +178,43 @@ export const delegationFloor = pgTable(
   (t) => [
     unique("delegation_floor_key").on(t.category, t.profession),
     check("delegation_floor_mode_check", sql`${t.maxMode} in ('performs','supervised','assists','none')`),
+  ],
+);
+
+// Branch price overrides (PR-42, B-08, SET-5; T-035). Owner only, effective-dated, keyed by catalog
+// item (not version), so an override holds across new catalog versions until the Owner changes or
+// ends it; invoices snapshot the version and the effective price (DATA-6). price null = back to the
+// normal price from effective_from. Rows never change except active -> cancelled before they take
+// effect; written only by branch_price_set / branch_price_cancel (migration 0056).
+export const branchPrices = pgTable(
+  "branch_prices",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    price: bigint("price", { mode: "number" }), // integer rupiah, or null = normal price
+    effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+    state: text("state", { enum: ["active", "cancelled"] }).notNull().default("active"),
+    reason: text("reason").notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAs: text("created_as").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: uuid("cancelled_by"),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.itemId], foreignColumns: [catalogItems.tenantId, catalogItems.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.cancelledBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("branch_prices_tenant_id_id_key").on(t.tenantId, t.id),
+    uniqueIndex("branch_prices_one_active_per_time").on(t.tenantId, t.branchId, t.itemId, t.effectiveFrom).where(sql`${t.state} = 'active'`),
+    check("branch_prices_price_check", sql`${t.price} is null or ${t.price} between 1 and 1000000000000`),
+    check("branch_prices_state_check", sql`${t.state} in ('active','cancelled')`),
+    check("branch_prices_cancel_check", sql`(${t.state} = 'cancelled') = (${t.cancelledAt} is not null and ${t.cancelledBy} is not null)`),
+    check("branch_prices_owner_check", sql`${t.createdAs} = 'owner'`),
+    check("branch_prices_reason_check", sql`length(btrim(${t.reason})) between 3 and 500`),
   ],
 );

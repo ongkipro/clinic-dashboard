@@ -2,6 +2,7 @@
 // clinical change waiting for review are marked. Every member reads it (commercial projection);
 // Owner, Admin Pusat and Manager add items.
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ListPage, Row, RowList } from "../../../components/templates/templates";
@@ -34,6 +35,8 @@ async function Body({ searchParams }: { searchParams: Promise<Record<string, str
             : { kind: "rows" }
       }
     >
+      {/* T-035: branch prices for every member; the Owner changes them there (PR-42). */}
+      <Link href="/katalog/harga-cabang" className="inline-flex min-h-[var(--target)] items-center justify-self-start font-semibold text-[var(--tint)]">Harga Cabang</Link>
       {unpublished.length > 0 && (
         <RowList label="Belum aktif">
           {unpublished.map((r) => (

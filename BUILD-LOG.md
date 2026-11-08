@@ -176,6 +176,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A `<select>` inside its `<label>` takes the options' text into its accessible name; label it with `for`.
   - `memberships_effective_check` needs `effective_to > effective_from`: end a membership in tests with `now()`, not a time before it.
 
+- **T-035** (branch prices, migration 0056):
+  - A form action that returns an error lets React reset the form: a controlled `<select>` shows its first option again in the DOM while the state still holds the chosen value, so the next submit posts something other than what was chosen. Remount the fields from the values the action returns (a `key` that changes on every completion).
+  - Horizontal-overflow checks miss text squeezed to one letter per line at 200 %: also check that no text cell is narrower than a few characters of its own font, and look at the 390 px / 200 % screenshot.
+  - Two lists compared in a test must be sorted in the same collation: `pg_policies` names sort in "C", ordinary text columns in the database default, and the first table name where they disagree (`branch_prices` vs `branches`) breaks the comparison. PostgreSQL rejects `ORDER BY 1 COLLATE ...` (a literal) and output aliases inside an ORDER BY expression; sort in the test instead.
+  - Never validate input with a query that can fail inside the caller's transaction (`'2026-02-31'::date`): the error aborts the whole transaction. Validate in code first.
+  - A read helper with a default "as of" time must default to the wall clock (`clock_timestamp()`), not the transaction start, or a value written "now" earlier in the same transaction is invisible to it.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

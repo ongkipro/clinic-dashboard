@@ -1,8 +1,8 @@
 // Master Layanan detail (UX-25, PR-88, T-034): the active version in the 19 row's tabs (Umum ·
 // Durasi & Sumber Daya · Staf & Delegasi · Harga Cabang · Pajak · Resep BHP · Persetujuan Tindakan ·
 // Aftercare · Situs · Booking Online), the change waiting for review (which review, Tarik Ajuan for its
-// requester, Persetujuan for reviewers) and the version history. Harga Cabang (T-035) and Situs (the
-// public-site task) say plainly that they are not available yet. A pharmacist never sees unpublished
+// requester, Persetujuan for reviewers) and the version history. Harga Cabang shows the price per
+// branch (T-035); Situs (the public-site task) says plainly that it is not available yet. A pharmacist never sees unpublished
 // clinical content here (DEC-047 (2)): RLS gives it no pending version; its review is in Persetujuan.
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -14,6 +14,7 @@ import { StatusBadge } from "../../../../components/ui/status-badge";
 import { CATEGORY_LABEL, MODE_LABEL, PROFESSION_LABEL, resourceLabel } from "../../../../modules/catalog/service/labels";
 import { rupiah, SCOPE_LABEL, STATE_LABEL, TAX_LABEL } from "../../katalog/labels";
 import { loadService, type Version } from "../data";
+import { BranchPriceTab } from "../../katalog/harga-cabang/summary";
 import { WithdrawReview } from "../forms";
 
 export const metadata: Metadata = { title: "Layanan — Clinic Dashboard" };
@@ -84,7 +85,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
         ["Alat", resText(a, "device")],
       ]} /> },
       { id: "staf", label: "Staf & Delegasi", content: <Facts rows={[["Staf yang boleh", eligText(a, p.staffNames)], ["Catatan delegasi", a.delegation ?? "—"]]} /> },
-      { id: "harga-cabang", label: "Harga Cabang", content: soon("Harga per cabang") },
+      { id: "harga-cabang", label: "Harga Cabang", content: p.prices ? <BranchPriceTab itemId={p.item.id} prices={p.prices} canEdit={p.role === "owner"} /> : soon("Harga per cabang") },
       { id: "pajak", label: "Pajak", content: <Facts rows={[["Kategori", TAX_LABEL[a.taxCategory]], ["Dasar", a.taxBasis]]} /> },
       { id: "bhp", label: "Resep BHP", content: <Facts rows={[["Bahan per tindakan", recipeText(a)]]} /> },
       { id: "persetujuan-tindakan", label: "Persetujuan Tindakan", content: <Facts rows={[["Indikasi", a.indications ?? "—"], ["Kontraindikasi", a.contraindications ?? "—"], ["Templat", a.consentTemplate ?? "—"]]} /> },

@@ -393,6 +393,13 @@
       "when": 1794137860397,
       "tag": "0055_service_master",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1794143832327,
+      "tag": "0056_branch_prices",
+      "breakpoints": true
     }
   ]
 }

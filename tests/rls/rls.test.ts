@@ -370,6 +370,9 @@ describe("functions (TEN-16)", () => {
     "approval_owner_self(text,text,uuid,text,uuid,bigint)",
     "approval_request(text,text,uuid,text,uuid,bigint)",
     "audit_append(text,text,uuid,text,text,text,uuid)",
+    "branch_price_cancel(uuid)", // T-035: Owner-only branch price writers and reader (PR-42)
+    "branch_price_set(uuid,uuid,bigint,timestamp with time zone,text)",
+    "catalog_branch_price(uuid,uuid,timestamp with time zone)",
     "catalog_commercial()",
     "catalog_publish(uuid,text,text,jsonb,text)",
     "catalog_review_target(uuid)",

@@ -689,8 +689,11 @@ describe("coverage (TEN-19)", () => {
     const missing = (await h.admin.query(`select s.table_name from scope_map s where s.policy_kind <> 'platform'
                                             and not exists (select 1 from support_object_kinds k where k.table_name = s.table_name)`)).rows;
     expect(missing).toEqual([]);
-    const policies = (await h.admin.query(`select schemaname || '.' || tablename t from pg_policies where 'clinic_operator' = any (roles) order by 1`)).rows.map((r) => r.t);
-    const readable = (await h.admin.query(`select table_name t from support_object_kinds where support_class <> 'never' order by 1`)).rows.map((r) => r.t);
+    // Sorted the same way in JS (T-035: pg_policies names sort in collation "C", table_name in the
+    // default collation, so "branch_prices" and "branches" came out in different orders).
+    const byCode = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
+    const policies = (await h.admin.query(`select schemaname || '.' || tablename t from pg_policies where 'clinic_operator' = any (roles)`)).rows.map((r) => r.t as string).sort(byCode);
+    const readable = (await h.admin.query(`select table_name t from support_object_kinds where support_class <> 'never'`)).rows.map((r) => r.t as string).sort(byCode);
     expect(policies).toEqual(readable);
   });
 

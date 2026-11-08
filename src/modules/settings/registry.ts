@@ -79,7 +79,7 @@ export const SETTINGS: SettingDef[] = [
     kind: "value", spec: obj([["persiapan", "Persiapan", I(0, 120, "menit")], ["tindakan", "Tindakan", I(5, 480, "menit")], ["jeda", "Jeda", I(0, 120, "menit")]]),
     default: { persiapan: 10, tindakan: 30, jeda: 10 }, source: P25, note: "Durasi per layanan diatur di Master Layanan.",
   },
-  { key: "SET-5", group: "layanan", label: "Harga cabang (override)", scope: "branch", changers: ["owner"], drafts: [], kind: "ref", defaultText: "Harga normal", boundsText: "> 0 (gratis hanya lewat diskon atau pembebasan)", href: "/master-layanan", owner: "Master Layanan › Harga Cabang" },
+  { key: "SET-5", group: "layanan", label: "Harga cabang (override)", scope: "branch", changers: ["owner"], drafts: [], kind: "ref", defaultText: "Harga normal", boundsText: "> 0 (gratis hanya lewat diskon atau pembebasan)", href: "/katalog/harga-cabang", owner: "Katalog › Harga Cabang" },
 
   {
     key: "SET-6", group: "uang", label: "Biaya konsultasi", scope: "tenant", changers: ["owner"], drafts: AP_TO_OWNER,
@@ -241,7 +241,7 @@ export const SETTINGS: SettingDef[] = [
     spec: { t: "list", min: 1, max: 6, unique: true, of: { t: "enum", of: [{ v: "depan", l: "Depan" }, { v: "serong_45", l: "Serong 45°" }, { v: "samping", l: "Samping" }, { v: "atas", l: "Atas" }, { v: "bawah", l: "Bawah (dagu)" }, { v: "dekat", l: "Close-up area" }] } },
     default: ["depan", "serong_45", "samping"], source: { kind: "decision", ref: "CD-18" },
   },
-  { key: "SET-30", group: "klinis", label: "Matriks delegasi", scope: "tenant", changers: ["facility_head", "owner"], drafts: [], note: "Penanggung jawab klinik dan owner, dua orang berbeda.", kind: "ref", defaultText: "Matriks bawaan RG-16 (CD-16)", boundsText: "Hanya lebih sempit dari tabel hukum; tidak pernah melewati cek kredensial", href: "/master-layanan", owner: "Master Layanan › Staf & Delegasi" },
+  { key: "SET-30", group: "klinis", label: "Matriks delegasi", scope: "tenant", changers: ["facility_head", "owner"], drafts: [], note: "Penanggung jawab klinik dan owner, dua orang berbeda.", kind: "ref", defaultText: "Matriks bawaan RG-16 (CD-16)", boundsText: "Hanya lebih sempit dari tabel hukum; tidak pernah melewati cek kredensial", href: "/layanan", owner: "Master Layanan › Staf & Delegasi" },
   {
     key: "SET-31", group: "klinis", label: "Target respons keluhan klinis (triase)", scope: "tenant", changers: ["facility_head"], drafts: [],
     kind: "value", spec: obj([["merah", "Merah", I(5, 60, "menit")], ["kuning", "Kuning", I(30, 240, "menit")], ["hijau", "Hijau", I(4, 24, "jam kerja")]], [["merah", "kuning"]]),

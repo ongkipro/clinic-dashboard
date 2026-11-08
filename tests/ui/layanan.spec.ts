@@ -114,7 +114,7 @@ try {
   const dur = await section(m, "Durasi & Sumber Daya");
   const staf = await section(m, "Staf & Delegasi");
   const soon = await section(m, "Harga Cabang");
-  flow.push(["the detail shows the 19 tabs: durations, room and device, eligible staff; Harga Cabang says not yet available", dur.includes("15 menit") && dur.includes("45 menit") && dur.includes("Ruang tindakan") && dur.includes("Laser non-ablatif") && staf.includes("Dokter: Melakukan") && soon.includes("belum tersedia")]);
+  flow.push(["the detail shows the 19 tabs: durations, room and device, eligible staff; Harga Cabang shows the branch price (T-035)", dur.includes("15 menit") && dur.includes("45 menit") && dur.includes("Ruang tindakan") && dur.includes("Laser non-ablatif") && staf.includes("Dokter: Melakukan") && soon.includes("Cabang Kemang") && soon.includes("Rp1.200.000") && soon.includes("Lihat harga cabang")]);
 
   // Operational change: durations and the device removed; Simpan; a new version active at once.
   await m.goto(`${BASE}/layanan/${seed.laser}/ubah`);
