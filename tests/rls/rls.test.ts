@@ -278,10 +278,11 @@ describe("scope map (TEN-3, TEN-19)", () => {
   });
 
   it("fails on a table missing from scope_map", async () => {
-    const v = await inRolledBack(`create table patients (id uuid primary key)`, async () =>
+    // A table that does not exist yet (T-037 built patients; visits arrive with T-047).
+    const v = await inRolledBack(`create table visits (id uuid primary key)`, async () =>
       scopeMapViolations(await relations(h.admin), await entries(h.admin)),
     );
-    expect(v).toEqual(["public.patients: missing from scope_map"]);
+    expect(v).toEqual(["public.visits: missing from scope_map"]);
   });
 
   it("fails on a view or materialized view missing from scope_map", async () => {
@@ -374,6 +375,11 @@ describe("functions (TEN-16)", () => {
     "branch_price_set(uuid,uuid,bigint,timestamp with time zone,text)",
     "catalog_branch_price(uuid,uuid,timestamp with time zone)",
     "catalog_commercial()",
+    "patient_get(uuid)", // T-037: patient registration and scenario PR-1 (PR-5, DATA-8)
+    "patient_matches(text,text,date,text,text)",
+    "patient_register(jsonb,text,text,text)",
+    "tenant_data_key_ensure(text)",
+    "tenant_data_keys_for()",
     "catalog_publish(uuid,text,text,jsonb,text)",
     "catalog_review_target(uuid)",
     "catalog_service_requirements(uuid)", // T-034: active resources and eligibility for booking roles (DEC-047 (4))

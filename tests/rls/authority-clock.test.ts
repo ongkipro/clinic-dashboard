@@ -145,6 +145,9 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["vendor_dual_identity_clinic_decide", async () => ["select vendor_dual_identity_clinic_decide($1, true)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["vendor_dual_identity_clinic_revoke", async () => ["select vendor_dual_identity_clinic_revoke($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["catalog_publish", async () => ["select catalog_publish(null, 'product', 'TAL-1', '{}'::jsonb, 'alasan uji')", []], ["owner"]],
+    ["patient_register", async () => ["select patient_register('{}'::jsonb, null, null, null)", []], ["fo_cashier"]],
+    ["tenant_data_key_ensure", async () => ["select * from tenant_data_key_ensure('k1.1.AAAA.BBBB.CCCC')", []], ["fo_cashier"]],
+    ["patient_get", async () => ["select patient_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["branch_price_set", async (t) => ["select branch_price_set(gen_random_uuid(), $1, 1000, null, 'alasan uji')", [t.branch]], ["owner"]],
     ["branch_price_cancel", async () => ["select branch_price_cancel($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
   ];

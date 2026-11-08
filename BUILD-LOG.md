@@ -183,6 +183,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Never validate input with a query that can fail inside the caller's transaction (`'2026-02-31'::date`): the error aborts the whole transaction. Validate in code first.
   - A read helper with a default "as of" time must default to the wall clock (`clock_timestamp()`), not the transaction start, or a value written "now" earlier in the same transaction is invisible to it.
 
+- **T-037** (patients, encrypted identity, migration 0057):
+  - A secret value must not survive a refused form: never echo it in the action state; carry the sealed value and a masked display instead, and verify the sealed pair when it comes back (it can be tampered with).
+  - "Create on first use" for a key needs `INSERT … ON CONFLICT DO NOTHING` plus returning the stored row; the caller must use the returned key, never its own candidate. Test it deterministically with two candidates, not only with a race.
+  - A rule enforced twice (a function check and a table check; a tenant filter in a search and in its projection) survives a one-layer mutation: mutate both layers.
+  - A fail-closed environment flag (`DEPLOY_ENV` unset = production) blocks tests silently by design: set the non-production value explicitly in the test, and test the production branch on purpose.
+  - The safety net blocks `rm -r` on scratch paths outside the working directory: give each scratch run its own folder instead of cleaning up.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).
