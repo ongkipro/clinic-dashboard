@@ -351,7 +351,10 @@ describe("read listing grouped by session (TEN-14)", () => {
     await asOwner(a, (db) => decideScope(db, p.id, true));
     const staffRows = await read(supTok, p.id, `select id from staff`);
     await read(supTok, p.id, `select id from branches where code = 'TMP'`);
+    // T-036: branches are never deleted (branches_guard); this test needs the row to disappear.
+    await h.admin.query(`alter table branches disable trigger branches_guard`);
     await h.admin.query(`delete from branches where id = $1`, [tmp]);
+    await h.admin.query(`alter table branches enable trigger branches_guard`);
     const log = await asOwner(a, (db) => sessionLog(db, p.id));
     expect(readsOf(log).filter((r) => r.object_kind === "public.staff").map((r) => [r.id, r.row_found]).sort())
       .toEqual(staffRows.map((r) => [r.id, true]).sort());

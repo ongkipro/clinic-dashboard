@@ -190,6 +190,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A fail-closed environment flag (`DEPLOY_ENV` unset = production) blocks tests silently by design: set the non-production value explicitly in the test, and test the production branch on purpose.
   - The safety net blocks `rm -r` on scratch paths outside the working directory: give each scratch run its own folder instead of cleaning up.
 
+- **T-036** (branch master, migration 0058):
+  - A server component that imports a value (not a component) from a `"use client"` module receives a client reference, not the data: the label read "undefined". Keep shared constants in a plain module.
+  - A mutation "caught" because the mutated SQL no longer parses proves nothing: check every mutation log for a real assertion failure, not a skipped file.
+  - A negative test on another tenant's row must use a row that would answer "yes" for its own tenant (a branch with hours), or removing the tenant filter still returns "no".
+  - Authorize the row's own scope before any other comparison, or the order of errors tells a caller what exists.
+  - A fictional table in a self-test collides when a later task creates the real one (fourth time): name fixtures `fixture_*`.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

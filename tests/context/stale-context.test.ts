@@ -30,6 +30,7 @@ const staff = await import("../../src/modules/org/staff/actions");
 const roles = await import("../../src/modules/org/roles/actions");
 const ctxActions = await import("../../src/modules/org/context/actions");
 const pasienBaru = await import("../../src/app/(app)/pasien/baru/actions"); // T-037
+const cabang = await import("../../src/app/(app)/pengaturan/cabang/actions"); // T-036
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -72,6 +73,15 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["roles answerOwnerGrantAction", (f) => roles.answerOwnerGrantAction({}, f), () => ({ id: U(48), answer: "terima" })],
   ["context switchAction", (f) => ctxActions.switchAction({}, f), () => ({ kind: "branch", value: BRANCH_2 })],
   ["pasien-baru searchAction", (f) => pasienBaru.searchAction({}, f), () => ({ by: "phone", q: "081234567890" })],
+  ["cabang createBranchAction", (f) => cabang.createBranchAction({}, f), () => ({ code: "NEW-1", name: "Cabang Baru", timezone: "Asia/Jakarta" })],
+  ["cabang profileAction", (f) => cabang.profileAction({}, f), () => ({ branch: BRANCH_1, section: "identitas", name: "Cabang Satu", timezone: "Asia/Jakarta" })],
+  ["cabang hoursAction", (f) => cabang.hoursAction({}, f), () => ({ branch: BRANCH_1, h_1_0_open: "09:00", h_1_0_close: "17:00" })],
+  ["cabang addClosureAction", (f) => cabang.addClosureAction({}, f), () => ({ branch: BRANCH_1, date: today, reason: "Uji konteks" })],
+  ["cabang removeClosureAction", (f) => cabang.removeClosureAction({}, f), () => ({ branch: BRANCH_1, id: U(49) })],
+  ["cabang roomAction", (f) => cabang.roomAction({}, f), () => ({ branch: BRANCH_1, name: "Ruang Uji", kind: "treatment" })],
+  ["cabang deviceAction", (f) => cabang.deviceAction({}, f), () => ({ branch: BRANCH_1, label: "Alat Uji", type: "ipl" })],
+  ["cabang activeAction", (f) => cabang.activeAction({}, f), () => ({ branch: BRANCH_1, id: U(50), what: "room", active: "0" })],
+  ["cabang servicesAction", (f) => cabang.servicesAction({}, f), () => ({ branch: BRANCH_1, item: U(51) })],
   ["pasien-baru registerAction", (f) => pasienBaru.registerAction({}, f), () => ({ full_name: "Pasien Uji", birth_date: "1990-01-01", sex: "female", phone: "081234567890",
     identity_type: "nik", identity_number: "3171010101010001", religion: "islam", occupation: "Karyawan", education: "s1", marital_status: "kawin" })],
 ];

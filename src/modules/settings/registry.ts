@@ -71,8 +71,8 @@ export const SETTINGS: SettingDef[] = [
     note: "Logo diunggah di Situs Klinik (UI-8). Aksen diterima bila kontras ≥ 4,5:1 (UI-2).",
   },
   { key: "SET-2", group: "klinik", label: "Jam buka, hari libur, tutup khusus", scope: "branch", changers: ["admin_pusat", "manager"], drafts: [], kind: "ref", defaultText: "Dari onboarding", boundsText: "Rentang jam yang valid", href: "/pengaturan/cabang/jam", owner: "Jam Operasional & Libur" },
-  { key: "SET-3", group: "klinik", label: "Zona waktu cabang", scope: "branch", changers: ["admin_pusat"], drafts: [], kind: "ref", defaultText: "Kota cabang (WIB/WITA/WIT)", boundsText: "Zona Indonesia", href: "/cabang", owner: "Data Cabang" },
-  { key: "SET-46", group: "klinik", label: "Data izin klinik per cabang (nomor izin, NIB, penanggung jawab, ID SATUSEHAT)", scope: "branch", changers: ["owner", "admin_pusat"], drafts: [], kind: "ref", defaultText: "Isian onboarding", boundsText: "Wajib sebelum layanan klinis berjalan", href: "/cabang", owner: "Data Cabang" },
+  { key: "SET-3", group: "klinik", label: "Zona waktu cabang", scope: "branch", changers: ["admin_pusat"], drafts: [], kind: "ref", defaultText: "Kota cabang (WIB/WITA/WIT)", boundsText: "Zona Indonesia", href: "/pengaturan/cabang", owner: "Data Cabang" },
+  { key: "SET-46", group: "klinik", label: "Data izin klinik per cabang (nomor izin, NIB, penanggung jawab, ID SATUSEHAT)", scope: "branch", changers: ["owner", "admin_pusat"], drafts: [], kind: "ref", defaultText: "Isian onboarding", boundsText: "Wajib sebelum layanan klinis berjalan", href: "/pengaturan/cabang", owner: "Data Cabang" },
 
   {
     key: "SET-4", group: "layanan", label: "Durasi default persiapan, tindakan, jeda", scope: "tenant", changers: ["admin_pusat"], drafts: [],

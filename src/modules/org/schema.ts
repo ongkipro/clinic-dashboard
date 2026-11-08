@@ -46,11 +46,27 @@ export const branches = pgTable(
     name: text("name").notNull(),
     timezone: text("timezone").notNull(),
     address: text("address"),
+    // Branch master (PR-2, DATA-11, SET-46; T-036): contacts, location, licence data, publish window.
+    mapUrl: text("map_url"),
+    whatsappNumber: text("whatsapp_number"),
+    licenceNumber: text("licence_number"),
+    nib: text("nib"),
+    facilityCode: text("facility_code"),
+    satusehatOrgId: text("satusehat_org_id"),
+    responsibleStaffId: uuid("responsible_staff_id"),
+    publishFrom: timestamp("publish_from", { withTimezone: true }),
+    publishUntil: timestamp("publish_until", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
     unique("branches_tenant_id_id_key").on(t.tenantId, t.id),
+    // Checked here only where every existing row already satisfies them (M0 fixtures use 1-char codes).
+    check("branches_map_url_check", sql`${t.mapUrl} is null or (${t.mapUrl} ~ '^https://' and length(${t.mapUrl}) <= 500)`),
+    check("branches_whatsapp_check", sql`${t.whatsappNumber} is null or ${t.whatsappNumber} ~ '^\\+[1-9][0-9]{7,14}$'`),
+    check("branches_nib_check", sql`${t.nib} is null or ${t.nib} ~ '^[0-9]{13}$'`),
+    check("branches_licence_check", sql`coalesce(length(${t.licenceNumber}), 0) <= 100 and coalesce(length(${t.facilityCode}), 0) <= 50 and coalesce(length(${t.satusehatOrgId}), 0) <= 100 and coalesce(length(${t.address}), 0) <= 300`),
+    check("branches_publish_check", sql`${t.publishFrom} is null or ${t.publishUntil} is null or ${t.publishUntil} > ${t.publishFrom}`),
     unique("branches_tenant_id_code_key").on(t.tenantId, t.code),
     check(
       "branches_timezone_check",
