@@ -1,6 +1,7 @@
 // Persetujuan detail (UX-26): requester, reason and impact; Setujui / Tolak only here and
 // only for an approver who did not request it ("Anda pengaju — tidak dapat menyetujui").
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ROLE_LABEL } from "../../../../components/shell/nav";
@@ -81,6 +82,30 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
             </dl>
           ),
         },
+        // T-033 review round 1 (P1): a catalog clinical review names the item and shows the proposed
+        // clinical fields next to the active ones.
+        ...(p.catalog
+          ? [{
+              id: "katalog",
+              label: "Perubahan klinis katalog",
+              content: (
+                <div className="grid min-w-0 gap-3">
+                  <dl className="m-0 grid gap-3">
+                    <Fact label="Item" value={`${p.catalog.name} · ${p.catalog.code} · versi ${p.catalog.version}`} />
+                    {([["Indikasi", "indications"], ["Kontraindikasi", "contraindications"], ["Persetujuan tindakan", "consentTemplate"], ["Delegasi", "delegation"]] as const).map(([l, k]) => {
+                      const now = p.catalog!.active ? p.catalog!.active[k] : null;
+                      const next = p.catalog!.proposed[k];
+                      return (
+                        <Fact key={k} label={`${l}${(now ?? "") === (next ?? "") ? "" : " (berubah)"}`}
+                          value={`${next ?? "—"}${p.catalog!.active ? ` — sekarang: ${now ?? "—"}` : ""}`} />
+                      );
+                    })}
+                  </dl>
+                  <Link href={`/katalog/${p.catalog.itemId}`} className="inline-flex min-h-[var(--target)] items-center justify-self-start font-semibold text-[var(--tint)]">Buka item di Katalog</Link>
+                </div>
+              ),
+            }]
+          : []),
         { id: "keputusan", label: "Keputusan", content: decision },
       ]}
     />

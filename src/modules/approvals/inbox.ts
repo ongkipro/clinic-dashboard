@@ -19,7 +19,12 @@ export const APPROVAL_TYPES: Record<string, { label: string; approverRoles: read
   setting_change_owner: { label: "Perubahan pengaturan", approverRoles: ["owner"] },
   // The owner decides clinical drafts only while the tenant has no facility head (DEC-031 D2).
   setting_change_fh: { label: "Perubahan pengaturan klinis", approverRoles: ["facility_head", "owner"] },
+  // T-033 (DEC-046): a clinical catalog change; any facility head of the tenant, the owner only as fallback.
+  catalog_clinical_review: { label: "Review klinis katalog", approverRoles: ["facility_head", "owner"] },
 };
+// Types the owner decides only while no facility head other than the requester could (DEC-031 D2,
+// DEC-046 (1)).
+const OWNER_FALLBACK_TYPES = ["setting_change_fh", "catalog_clinical_review"];
 
 // Approval types whose decision also applies a waiting draft (settings, T-017): the
 // detail decides them through their module so both happen in one transaction.
@@ -98,9 +103,9 @@ export async function listInbox(db: pg.ClientBase, role: Role, filter: { type?: 
   const types = decidableTypes(role).filter((t) => !filter.type || t === filter.type);
   const { rows } = await db.query(
     `${SELECT} where a.state = 'pending' and a.type = any($1::text[])
-        and ($3::text <> 'owner' or a.type <> 'setting_change_fh' or approval_owner_decides_fh(a.id))
+        and ($3::text <> 'owner' or a.type <> all($4::text[]) or approval_owner_decides_fh(a.id))
       order by a.requested_at, a.id limit $2`,
-    [types, limit + 1, role],
+    [types, limit + 1, role, OWNER_FALLBACK_TYPES],
   );
   return { rows: rows.slice(0, limit).map(row), more: rows.length > limit };
 }
@@ -117,7 +122,7 @@ export async function inboxDetail(db: pg.ClientBase, actor: { staffId: string; r
     : r.requested_by === actor.staffId ? "own-request"
     : !(APPROVAL_TYPES[r.type]?.approverRoles ?? []).includes(actor.role) ? "not-approver"
     // The owner is only the fallback for clinical drafts (DEC-031 D2).
-    : actor.role === "owner" && r.type === "setting_change_fh" && !(await db.query(`select approval_owner_decides_fh($1) as ok`, [id])).rows[0].ok ? "not-approver"
+    : actor.role === "owner" && OWNER_FALLBACK_TYPES.includes(r.type) && !(await db.query(`select approval_owner_decides_fh($1) as ok`, [id])).rows[0].ok ? "not-approver"
     : null;
   return {
     ...row(r),

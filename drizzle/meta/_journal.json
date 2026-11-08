@@ -379,6 +379,13 @@
       "when": 1794080000000,
       "tag": "0053_agreement_go_live",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1794080509684,
+      "tag": "0054_catalog",
+      "breakpoints": true
     }
   ]
 }

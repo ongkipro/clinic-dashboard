@@ -174,7 +174,7 @@ describe("Persetujuan inbox rules (UX-26)", () => {
     );
     expect(rupiah(1_250_000)).toBe("Rp1.250.000");
     expect(decidableTypes("manager").sort()).toEqual(["attribution_correction", "disposal", "stock_adjustment"]);
-    expect(decidableTypes("facility_head")).toEqual(["setting_change_fh"]); // SET-48 drafts (T-017)
+    expect(decidableTypes("facility_head")).toEqual(["setting_change_fh", "catalog_clinical_review"]); // SET-48 drafts (T-017), catalog review (T-033)
     expect(decidableTypes("records_officer")).toEqual([]);
   });
 });

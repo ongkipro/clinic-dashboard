@@ -10,3 +10,4 @@ export * from "../../modules/approvals/schema";
 export * from "../../modules/notifications/schema";
 export * from "../../modules/settings/schema";
 export * from "../../modules/compliance/schema";
+export * from "../../modules/catalog/schema";

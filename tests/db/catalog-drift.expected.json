@@ -1,0 +1,21 @@
+{
+  "approval_decide(uuid,boolean,text)": [
+    {
+      "at": 32,
+      "old": "  IF ap.type = 'setting_change_fh' AND a.role = 'owner' AND public.approval_fh_available(a.tenant_id, p_approval, ap.requested_by) THEN",
+      "new": "  IF ap.type IN ('setting_change_fh','catalog_clinical_review') AND a.role = 'owner' AND public.approval_fh_available(a.tenant_id, p_approval, ap.requested_by) THEN"
+    }
+  ],
+  "approval_is_tenant_setting_draft(uuid,uuid)": [
+    {
+      "at": 6,
+      "old": "  SELECT p_tenant = public.app_tenant_id() AND EXISTS (SELECT 1 FROM public.approvals ap",
+      "new": "  SELECT p_tenant = public.app_tenant_id() AND (EXISTS (SELECT 1 FROM public.approvals ap"
+    },
+    {
+      "at": 10,
+      "old": "",
+      "new": "    -- T-033 (DEC-046 (1)): a catalog clinical review is tenant-wide like a tenant clinical draft.\n    OR EXISTS (SELECT 1 FROM public.approvals ap\n                WHERE ap.tenant_id = p_tenant AND ap.id = p_approval AND ap.type = 'catalog_clinical_review'))"
+    }
+  ]
+}

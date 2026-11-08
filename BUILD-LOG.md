@@ -159,6 +159,16 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Ledger steps that read each other's events (`review-boundary`, then `finish`), and `finish` then commit, must run one after the other, never as parallel tool calls (repeated once in the STATUS docs run that followed; that run closed BLOCKED, `634e840`/`8ac8093`, local only).
   - An exit review must test each scenario's Given/When/Then, not its title: it found PR-59's go-live did not re-check the processor agreement (HYG-014).
 
+- **T-033** (catalog versions, migration 0054):
+  - A SECURITY DEFINER function with `search_path = pg_catalog, pg_temp` must schema-qualify every call, `public.uuid_generate_v7()` included.
+  - Domain-event payloads carry ids and short identifiers only (`events_payload_ok`): no numbers.
+  - "Omitted means keep" needs the right fallback for every state: with no active version the edit starts from the latest version, so the kept value must come from there too, while the review baseline stays the active one.
+  - A cross-tenant negative must use a target the victim could act on: a pending version is refused by state alone and hides a missing tenant predicate (a mutation survived).
+  - Browser specs: scope locators to `main` and to the list they mean (a filter chip and a row can share a name); open a detail by its href when a client navigation leaves the previous page mounted.
+  - Pipe a heavy-run job through `set -o pipefail` or its failure reads as success.
+  - A new tenant table needs its vendor support class and operator policy (TEN-19); run `tests/vendor` while building, not only at the full suite.
+  - A reviewer quota (429) can stay exhausted for hours while other sessions share it: retrying does not help; use the owner's fallback reviewer (Argon) and record it.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

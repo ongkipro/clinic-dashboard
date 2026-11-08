@@ -3,6 +3,7 @@ import { type RenderedContext, renderedContext } from "../../../modules/org/cont
 import "server-only";
 import type { Role } from "../../../auth/policy";
 import { withTenantContext } from "../../../db/rls/context";
+import { reviewTarget, type ReviewTarget } from "../../../modules/catalog/catalog";
 import { APPROVAL_TYPES, decidableTypes, INBOX_READERS, inboxDetail, type InboxDetail, type InboxRow, listInbox } from "../../../modules/approvals/inbox";
 import { appPool, requestContext } from "../../../modules/org/context/store";
 
@@ -27,7 +28,7 @@ export type DetailPage =
   | { kind: "redirect"; to: string }
   | { kind: "forbidden" }
   | { kind: "not-found" }
-  | { kind: "ok"; detail: InboxDetail; ctx: RenderedContext };
+  | { kind: "ok"; detail: InboxDetail; ctx: RenderedContext; catalog: ReviewTarget | null };
 
 export async function loadDetail(id: string): Promise<DetailPage> {
   const rc = await requestContext();
@@ -35,6 +36,11 @@ export async function loadDetail(id: string): Promise<DetailPage> {
   if (rc.kind === "blocked") return { kind: "forbidden" };
   const { staffId, actingRole: role } = rc.active.context;
   if (!INBOX_READERS.includes(role)) return { kind: "forbidden" };
-  const detail = await withTenantContext(await appPool(), rc.active.context, (db) => inboxDetail(db, { staffId, role }, id));
-  return detail ? { kind: "ok", detail, ctx: renderedContext(rc.active.context) } : { kind: "not-found" };
+  const r = await withTenantContext(await appPool(), rc.active.context, async (db) => {
+    const detail = await inboxDetail(db, { staffId, role }, id);
+    // T-033 review round 1 (P1): a catalog clinical review shows what it decides.
+    const catalog = detail?.type === "catalog_clinical_review" ? await reviewTarget(db, id) : null;
+    return { detail, catalog };
+  });
+  return r.detail ? { kind: "ok", detail: r.detail, ctx: renderedContext(rc.active.context), catalog: r.catalog } : { kind: "not-found" };
 }
