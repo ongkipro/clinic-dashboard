@@ -31,6 +31,7 @@ const roles = await import("../../src/modules/org/roles/actions");
 const ctxActions = await import("../../src/modules/org/context/actions");
 const pasienBaru = await import("../../src/app/(app)/pasien/baru/actions"); // T-037
 const cabang = await import("../../src/app/(app)/pengaturan/cabang/actions"); // T-036
+const jadwal = await import("../../src/app/(app)/jadwal-staf/actions"); // T-043
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -73,6 +74,9 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["roles answerOwnerGrantAction", (f) => roles.answerOwnerGrantAction({}, f), () => ({ id: U(48), answer: "terima" })],
   ["context switchAction", (f) => ctxActions.switchAction({}, f), () => ({ kind: "branch", value: BRANCH_2 })],
   ["pasien-baru searchAction", (f) => pasienBaru.searchAction({}, f), () => ({ by: "phone", q: "081234567890" })],
+  ["jadwal-staf saveWeekAction", (f) => jadwal.saveWeekAction({}, f), () => ({ branch: BRANCH_1, week: "2030-01-07" })],
+  ["jadwal-staf addLeaveAction", (f) => jadwal.addLeaveAction({}, f), () => ({ branch: BRANCH_1, staff: U(52), kind: "leave", from: today, to: today, reason: "Uji konteks" })],
+  ["jadwal-staf cancelLeaveAction", (f) => jadwal.cancelLeaveAction({}, f), () => ({ id: U(53), reason: "Uji konteks" })],
   ["cabang createBranchAction", (f) => cabang.createBranchAction({}, f), () => ({ code: "NEW-1", name: "Cabang Baru", timezone: "Asia/Jakarta" })],
   ["cabang profileAction", (f) => cabang.profileAction({}, f), () => ({ branch: BRANCH_1, section: "identitas", name: "Cabang Satu", timezone: "Asia/Jakarta" })],
   ["cabang hoursAction", (f) => cabang.hoursAction({}, f), () => ({ branch: BRANCH_1, h_1_0_open: "09:00", h_1_0_close: "17:00" })],

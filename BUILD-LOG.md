@@ -203,6 +203,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A cross-tenant test must give the attacker a valid object of their own (a text in force), or an earlier check answers first and the tenant filter under test is never reached.
   - Keep the failed run's per-mutation logs before a targeted re-run: the script clears its folder.
 
+- **T-043** (staff schedules, migration 0060):
+  - Inputs hidden with CSS still post: two layouts of one form must share one set of inputs (CSS grid with `display: contents`), never render the same names twice.
+  - A "replace the set" writer behind a filtered editor must take the list of what the editor showed, or the save wipes everything the filter hid.
+  - Next 16 keeps the previous page in the DOM, hidden (`<Activity>`, `display: none`): browser specs target `main:visible`.
+  - `/` is a placeholder outside the app shell: browser specs start from a page inside it.
+  - An isolation case's positive control runs the attempts as the victim too: order them so an earlier write does not undo what a later one needs.
+  - Set the browser layout minimum to what the spec measures (pages × 4 widths × 2 sizes + extras), not a copy from another task.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

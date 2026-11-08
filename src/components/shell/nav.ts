@@ -73,7 +73,7 @@ export const NAV: readonly NavGroup[] = [
     ["daftar-reservasi", "Daftar Reservasi", "/jadwal/daftar", "FO CS"],
     ["booking-online", "Booking Online Masuk", "/jadwal/online", "FO CS"],
     ["daftar-tunggu", "Daftar Tunggu", "/jadwal/tunggu", "FO CS"],
-    ["jadwal-praktik", "Jadwal Praktik", "/jadwal-staf", "M AP"],
+    ["jadwal-praktik", "Jadwal Praktik", "/jadwal-staf", "O AP M"],
     ["jam-operasional", "Jam Operasional & Libur", "/pengaturan/cabang/jam", "O AP M"],
     ["ruang-alat", "Ruang, Bed & Alat", "/pengaturan/cabang/ruang", "O AP M"],
   ]),

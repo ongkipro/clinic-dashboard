@@ -390,6 +390,11 @@ describe("functions (TEN-16)", () => {
     "consent_withdraw(uuid,text,text)",
     "marketing_contacts()",
     "patient_consents(uuid)",
+    "leave_add(uuid,uuid,text,date,date,text)", // T-043: staff schedules (PR-48, DEC-053)
+    "leave_cancel(uuid,text)",
+    "roster_set_week(uuid,date,uuid[],jsonb)",
+    "roster_window(uuid,date,date)",
+    "staff_available(uuid,uuid,timestamp with time zone,timestamp with time zone)",
     "patient_get(uuid)", // T-037: patient registration and scenario PR-1 (PR-5, DATA-8)
     "patient_matches(text,text,date,text,text)",
     "patient_register(jsonb,text,text,text)",

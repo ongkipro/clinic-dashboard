@@ -163,6 +163,9 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["consent_text_publish", async () => ["select consent_text_publish('marketing_wa', 'Teks uji', null)", []], ["owner"]],
     ["consent_grant", async () => ["select consent_grant(gen_random_uuid(), 'marketing_wa', gen_random_uuid(), 'in_person')", []], ["fo_cashier"]],
     ["consent_withdraw", async () => ["select consent_withdraw($1, 'in_person', 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["roster_set_week", async (t) => ["select roster_set_week($1, date_trunc('week', current_date + 14)::date, '{}'::uuid[], '[]'::jsonb)", [t.branch]], ["owner"]],
+    ["leave_add", async (t, me) => ["select leave_add($1, $2, 'leave', current_date + 14, current_date + 14, 'alasan uji')", [t.branch, me.staffId]], ["owner"]],
+    ["leave_cancel", async () => ["select leave_cancel($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {
