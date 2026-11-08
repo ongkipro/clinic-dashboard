@@ -384,6 +384,12 @@ describe("functions (TEN-16)", () => {
     "catalog_commercial()",
     "device_set_active(uuid,boolean)",
     "device_upsert(uuid,uuid,text,text)",
+    "consent_active(uuid,text)", // T-038: consent ledger, marketing contacts (PR-4, TEN-18, DEC-052)
+    "consent_grant(uuid,text,uuid,text)",
+    "consent_text_publish(text,text,timestamp with time zone)",
+    "consent_withdraw(uuid,text,text)",
+    "marketing_contacts()",
+    "patient_consents(uuid)",
     "patient_get(uuid)", // T-037: patient registration and scenario PR-1 (PR-5, DATA-8)
     "patient_matches(text,text,date,text,text)",
     "patient_register(jsonb,text,text,text)",

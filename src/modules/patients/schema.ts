@@ -140,3 +140,74 @@ export const guardians = pgTable(
     check("guardians_self_check", sql`${t.guardianPatientId} is null or ${t.guardianPatientId} <> ${t.patientId}`),
   ],
 );
+
+// Consents (PR-4, DATA-14, DATA-66; T-038, DEC-052). Purposes from the PRIV-1 matrix; `procedure` texts
+// may be published but procedure consent itself is captured per plan item and dose by UX-39 (T-054).
+export const CONSENT_PURPOSES = ["care_notice", "procedure", "clinical_photo", "marketing_wa", "publication"] as const;
+export const CONSENT_CHANNELS = ["in_person", "paper", "whatsapp", "phone"] as const;
+
+// Consent texts: insert-only versions per tenant and purpose (a change is a new version).
+export const consentTexts = pgTable(
+  "consent_texts",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    purpose: text("purpose", { enum: CONSENT_PURPOSES }).notNull(),
+    version: integer("version").notNull(),
+    body: text("body").notNull(),
+    effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAs: text("created_as").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("consent_texts_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("consent_texts_tenant_id_id_purpose_key").on(t.tenantId, t.id, t.purpose),
+    unique("consent_texts_version_key").on(t.tenantId, t.purpose, t.version),
+    check("consent_texts_purpose_check", sql`${t.purpose} in ('care_notice','procedure','clinical_photo','marketing_wa','publication')`),
+    check("consent_texts_version_check", sql`${t.version} >= 1`),
+    check("consent_texts_body_check", sql`length(btrim(${t.body})) between 1 and 8000`),
+    check("consent_texts_created_as_check", sql`${t.createdAs} in ('owner','admin_pusat')`),
+    check("consent_texts_effective_check", sql`${t.effectiveFrom} >= ${t.createdAt}`),
+  ],
+);
+
+// The consent ledger: one row per grant; withdrawal fields are set once. A new grant after a
+// withdrawal is a new row, so the rows are the history.
+export const consents = pgTable(
+  "consents",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    purpose: text("purpose", { enum: CONSENT_PURPOSES }).notNull(),
+    consentTextId: uuid("consent_text_id").notNull(),
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    grantedBy: uuid("granted_by").notNull(),
+    grantedAs: text("granted_as").notNull(),
+    grantChannel: text("grant_channel", { enum: CONSENT_CHANNELS }).notNull(),
+    withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+    withdrawnBy: uuid("withdrawn_by"),
+    withdrawnAs: text("withdrawn_as"),
+    withdrawChannel: text("withdraw_channel", { enum: CONSENT_CHANNELS }),
+    withdrawReason: text("withdraw_reason"),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    // Named explicitly: the generated name exceeds PostgreSQL's 63-character identifier limit.
+    foreignKey({ name: "consents_text_purpose_fk", columns: [t.tenantId, t.consentTextId, t.purpose], foreignColumns: [consentTexts.tenantId, consentTexts.id, consentTexts.purpose] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.grantedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.withdrawnBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("consents_tenant_id_id_key").on(t.tenantId, t.id),
+    uniqueIndex("consents_one_active").on(t.tenantId, t.patientId, t.purpose).where(sql`${t.withdrawnAt} is null`),
+    check("consents_purpose_check", sql`${t.purpose} in ('care_notice','clinical_photo','marketing_wa','publication')`),
+    check("consents_channel_check", sql`${t.grantChannel} in ('in_person','paper','whatsapp','phone') and (${t.withdrawChannel} is null or ${t.withdrawChannel} in ('in_person','paper','whatsapp','phone'))`),
+    check("consents_role_check", sql`${t.grantedAs} in ('fo_cashier','central_cs','bc','doctor','records_officer','manager') and (${t.withdrawnAs} is null or ${t.withdrawnAs} in ('fo_cashier','central_cs','bc','doctor','records_officer','manager'))`),
+    check("consents_withdrawal_check", sql`(${t.withdrawnAt} is null and ${t.withdrawnBy} is null and ${t.withdrawnAs} is null and ${t.withdrawChannel} is null and ${t.withdrawReason} is null)
+      or (${t.withdrawnAt} is not null and ${t.withdrawnBy} is not null and ${t.withdrawnAs} is not null and ${t.withdrawChannel} is not null
+          and ${t.withdrawReason} is not null and length(btrim(${t.withdrawReason})) between 3 and 500 and ${t.withdrawnAt} >= ${t.grantedAt})`),
+  ],
+);

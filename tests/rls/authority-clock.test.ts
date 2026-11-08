@@ -160,6 +160,9 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["patient_get", async () => ["select patient_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["branch_price_set", async (t) => ["select branch_price_set(gen_random_uuid(), $1, 1000, null, 'alasan uji')", [t.branch]], ["owner"]],
     ["branch_price_cancel", async () => ["select branch_price_cancel($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["consent_text_publish", async () => ["select consent_text_publish('marketing_wa', 'Teks uji', null)", []], ["owner"]],
+    ["consent_grant", async () => ["select consent_grant(gen_random_uuid(), 'marketing_wa', gen_random_uuid(), 'in_person')", []], ["fo_cashier"]],
+    ["consent_withdraw", async () => ["select consent_withdraw($1, 'in_person', 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {
@@ -182,6 +185,23 @@ describe("2.1 an actor ended after its transaction started is refused by every c
       expect(e.message).toContain(TAL);
     });
   }
+
+  it("a data-protection duty ended after the transaction started no longer lets Admin Pusat publish consent texts (T-038)", async () => {
+    const t = await tenant();
+    const own = await person(t, ["owner"]);
+    const me = await person(t, ["admin_pusat"]);
+    const by0 = await bound(own);
+    await by0.q("select staff_duty_set($1, 'data_protection', true)", [me.staffId]);
+    await by0.q("commit");
+    const tx = await bound(me);
+    const by = await bound(own);
+    await by.q("select staff_duty_set($1, 'data_protection', false)", [me.staffId]);
+    await by.q("commit");
+    const e = await errOf(tx.q("select consent_text_publish('marketing_wa', 'Teks uji', null)"));
+    expect(e).toMatchObject({ code: "42501" });
+    expect(e.message).toContain("may not publish consent texts");
+    await tx.done();
+  });
 
   it("the acting role removed (not the membership) also refuses approval_decide and setting_set", async () => {
     const t = await tenant();

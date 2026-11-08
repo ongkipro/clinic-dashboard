@@ -197,6 +197,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Authorize the row's own scope before any other comparison, or the order of errors tells a caller what exists.
   - A fictional table in a self-test collides when a later task creates the real one (fourth time): name fixtures `fixture_*`.
 
+- **T-038** (consent ledger, migration 0059):
+  - Map database errors to a `CommandError` only outside `runCommand`: inside it, a `CommandError` is a stored refusal; a raw error rolls the claim back. Test the case where the caller catches the error and commits.
+  - A lock that a broader lock already covers survives every mutation: delete it instead of keeping untestable code.
+  - A cross-tenant test must give the attacker a valid object of their own (a text in force), or an earlier check answers first and the tenant filter under test is never reached.
+  - Keep the failed run's per-mutation logs before a targeted re-run: the script clears its folder.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).
