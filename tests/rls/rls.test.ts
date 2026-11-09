@@ -395,6 +395,15 @@ describe("functions (TEN-16)", () => {
     "appointment_no_show(uuid)",
     "appointment_reschedule(uuid,timestamp with time zone,uuid)",
     "appointments_window(uuid,date,date)",
+    "breach_assess(uuid)", // T-039: privacy workspace (PR-92, DEC-059)
+    "breach_close(uuid)",
+    "breach_conclude(uuid,boolean,text)",
+    "breach_notice_add(uuid,jsonb,text,text,bytea,text)",
+    "breach_notice_file(uuid)",
+    "breach_record(timestamp with time zone,text,integer,text)",
+    "privacy_overview()",
+    "processor_set_active(uuid,boolean)",
+    "processor_upsert(uuid,jsonb)",
     "queue_board(uuid)", // T-048: queue numbers, walk-in, paired displays (PR-71, DEC-058)
     "queue_call(uuid,uuid)",
     "queue_display_feed(text)",

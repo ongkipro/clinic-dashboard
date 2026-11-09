@@ -251,6 +251,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Phone search: contacts are stored `+62…`; a typed local `08…` needs the leading 0 mapped to 62.
   - A mutation that removes an inner lock can be equivalent when an outer lock (`tenant_actor_lock`) already serializes the writers: drop it with the reason rather than writing a test that cannot fail.
 
+- **T-039** (privacy, migration 0065):
+  - `timestamptz + interval` is STABLE: a generated column cannot hold a deadline; store it and check `deadline = start + interval` (checks accept STABLE expressions).
+  - A raw `pg.Pool` in a test needs an `error` listener: a backend terminated around the database drop surfaces as an unhandled error and fails the run with every test passing (CI 42615137831).
+  - `runCommand` keeps only a fingerprint of the body: secrets in the body are not stored, but bytes do not belong there either (a Buffer is not a valid body); name a file by its checksum.
+  - Playwright `getByLabel("Penerima")` also matches "Nama penerima": use `exact: true` for short labels.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

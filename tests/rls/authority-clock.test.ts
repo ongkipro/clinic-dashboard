@@ -179,6 +179,14 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["queue_skip", async () => ["select queue_skip($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
     ["queue_display_pair", async (t) => ["select queue_display_pair($1, 'TV uji', repeat('a', 64))", [t.branch]], ["manager"]],
     ["queue_display_revoke", async () => ["select queue_display_revoke($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["processor_upsert", async () => ["select processor_upsert(null, '{}'::jsonb)", []], ["owner"]],
+    ["processor_set_active", async () => ["select processor_set_active($1, false)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["breach_record", async () => ["select breach_record(now(), 'Uji pengguna berakhir', 1, 'Nama')", []], ["owner"]],
+    ["breach_assess", async () => ["select breach_assess($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["breach_conclude", async () => ["select breach_conclude($1, false, 'alasan uji yang cukup')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["breach_close", async () => ["select breach_close($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["breach_notice_add", async () => ["select breach_notice_add($1, '{}'::jsonb, 'a.pdf', 'application/pdf', '\\x25504446'::bytea, repeat('a', 64))", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["breach_notice_file", async () => ["select * from breach_notice_file($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {
@@ -216,6 +224,23 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     const e = await errOf(tx.q("select consent_text_publish('marketing_wa', 'Teks uji', null)"));
     expect(e).toMatchObject({ code: "42501" });
     expect(e.message).toContain("may not publish consent texts");
+    await tx.done();
+  });
+
+  it("a data-protection duty ended after the transaction started no longer lets Admin Pusat record a breach (T-039)", async () => {
+    const t = await tenant();
+    const own = await person(t, ["owner"]);
+    const me = await person(t, ["admin_pusat"]);
+    const by0 = await bound(own);
+    await by0.q("select staff_duty_set($1, 'data_protection', true)", [me.staffId]);
+    await by0.q("commit");
+    const tx = await bound(me);
+    const by = await bound(own);
+    await by.q("select staff_duty_set($1, 'data_protection', false)", [me.staffId]);
+    await by.q("commit");
+    const e = await errOf(tx.q("select breach_record(now(), 'Uji tugas berakhir', 1, 'Nama')"));
+    expect(e).toMatchObject({ code: "42501" });
+    expect(e.message).toContain("only the privacy officers");
     await tx.done();
   });
 

@@ -36,6 +36,7 @@ const kalender = await import("../../src/app/(app)/jadwal/actions"); // T-045
 const profil = await import("../../src/app/(app)/pasien/[id]/actions"); // T-040
 const hariIni = await import("../../src/app/(app)/hari-ini/actions"); // T-047
 const antrean = await import("../../src/app/(app)/antrean/actions"); // T-048
+const privasi = await import("../../src/app/(app)/privasi/actions"); // T-039
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -95,6 +96,15 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["antrean skipAction", (f) => antrean.skipAction({}, f), () => ({ key: U(73), ticket: U(71) })],
   ["antrean pairAction", (f) => antrean.pairAction({}, f), () => ({ key: U(74), label: "TV Lobi" })],
   ["antrean revokeAction", (f) => antrean.revokeAction({}, f), () => ({ key: U(75), display: U(76) })],
+  ["privasi publishTextAction", (f) => privasi.publishTextAction({}, f), () => ({ key: U(77), purpose: "marketing_wa", body: "Teks persetujuan uji konteks" })],
+  ["privasi processorAction", (f) => privasi.processorAction({}, f), () => ({ key: U(78), role: "processor", name: "Vultr", service: "Server", data_categories: "Semua", location: "Jakarta" })],
+  ["privasi processorActiveAction", (f) => privasi.processorActiveAction({}, f), () => ({ key: U(79), id: U(80), active: "false" })],
+  ["privasi recordBreachAction", (f) => privasi.recordBreachAction({}, f), () => ({ key: U(81), aware_at: "2026-11-01T09:00", description: "Uji konteks kebocoran", data_categories: "Nama" })],
+  ["privasi assessAction", (f) => privasi.assessAction({}, f), () => ({ key: U(82), id: U(83) })],
+  ["privasi concludeAction", (f) => privasi.concludeAction({}, f), () => ({ key: U(84), id: U(83), notifiable: "no", reason: "Alasan uji konteks" })],
+  ["privasi closeAction", (f) => privasi.closeAction({}, f), () => ({ key: U(85), id: U(83) })],
+  ["privasi noticeAction", (f) => privasi.noticeAction({}, f), () => ({ key: U(86), id: U(83), recipient_kind: "authority", recipient: "Otoritas", sent_at: "2026-11-01T10:00",
+    channel: "Surat", content_summary: "Ringkasan pemberitahuan uji", file: new File(["%PDF-1.4"], "a.pdf", { type: "application/pdf" }) })],
   ["jadwal-staf saveWeekAction", (f) => jadwal.saveWeekAction({}, f), () => ({ branch: BRANCH_1, week: "2030-01-07" })],
   ["jadwal-staf addLeaveAction", (f) => jadwal.addLeaveAction({}, f), () => ({ branch: BRANCH_1, staff: U(52), kind: "leave", from: today, to: today, reason: "Uji konteks" })],
   ["jadwal-staf cancelLeaveAction", (f) => jadwal.cancelLeaveAction({}, f), () => ({ id: U(53), reason: "Uji konteks" })],

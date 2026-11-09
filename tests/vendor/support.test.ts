@@ -96,9 +96,13 @@ beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
   owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 3 });
+  // A backend terminated while a client sits idle or ends (the database drop at close) is re-emitted on
+  // the pool; without a listener it is an unhandled error (CI 42615137831, HYG-006). openAppPool has one.
+  owner.on("error", () => {});
   consoleDb = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [VENDOR_GROUP_ROLE])), max: 3 }, VENDOR_GROUP_ROLE);
   opDb = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [OPERATOR_GROUP_ROLE])), max: 3 }, OPERATOR_GROUP_ROLE);
   exec = new pg.Pool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_executor"])), max: 1 });
+  exec.on("error", () => {});
   const c = await owner.connect();
   try {
     PO = await account();
