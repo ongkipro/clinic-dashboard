@@ -239,6 +239,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Isolation cases must not echo the input in the result body: the gate reads any victim id as a leak.
   - A select whose options shrink after a submit keeps a stale choice in client state: derive the effective choice from the options.
 
+- **T-047** (visits, migration 0063):
+  - Existing contract tests used `visits` as a throwaway probe table name: a new table with that name breaks them; probe with a name no migration owns yet.
+  - Isolation cases share the fixture tenants: unique names (rooms, service codes) collide across cases; use names of your own and do not change shared branch settings.
+  - A browser check that reads headings right after navigation can read the Suspense fallback (same h1): wait for a section of the loaded page.
+  - A client mirror of a database rule (which blocker comes first) needs a test where two rules apply at once.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

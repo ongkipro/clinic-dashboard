@@ -615,8 +615,8 @@ describe("scope rules (TEN-14)", () => {
       expect(await openSession(consoleDb, as(supTok), { tenantId: a.tenantId, purpose, scope, minutes }), JSON.stringify([scope, minutes])).toMatchObject({ ok: false, code: "ERR_INVALID_INPUT" });
     }
     expect(await lastAction()).toMatchObject({ action: "support_open", outcome: "denied", reason_code: "invalid_input", tenant_id: a.tenantId });
-    // A table that does not exist yet (T-037 built patients; visits arrive with T-047).
-    for (const t of ["public.visits", "public.vendor_staff", "public.support_sessions", "public.auth_user"]) {
+    // A table that does not exist yet (T-037 built patients, T-047 visits; invoices arrive with T-071).
+    for (const t of ["public.invoices", "public.vendor_staff", "public.support_sessions", "public.auth_user"]) {
       expect(await openSession(consoleDb, as(supTok), { tenantId: a.tenantId, purpose: "Memeriksa tabel yang tidak boleh", scope: [t], minutes: 30 }), t).toMatchObject({ ok: false, reason: "not_supportable" });
     }
     const closed = await clinic("closed");

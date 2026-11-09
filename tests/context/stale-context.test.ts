@@ -34,6 +34,7 @@ const cabang = await import("../../src/app/(app)/pengaturan/cabang/actions"); //
 const jadwal = await import("../../src/app/(app)/jadwal-staf/actions"); // T-043
 const kalender = await import("../../src/app/(app)/jadwal/actions"); // T-045
 const profil = await import("../../src/app/(app)/pasien/[id]/actions"); // T-040
+const hariIni = await import("../../src/app/(app)/hari-ini/actions"); // T-047
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -85,6 +86,8 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["jadwal rescheduleAction", (f) => kalender.rescheduleAction({}, f), () => ({ key: U(61), id: U(58), start: new Date(Date.now() + 86_400_000).toISOString() })],
   ["profil grantAction", (f) => profil.grantAction({}, f), () => ({ key: U(62), patient: U(56), purpose: "marketing_wa", channel: "in_person", text: U(63) })],
   ["profil withdrawAction", (f) => profil.withdrawAction({}, f), () => ({ key: U(64), patient: U(56), consent: U(65), channel: "whatsapp", reason: "Uji konteks" })],
+  ["hari-ini checkInAction", (f) => hariIni.checkInAction({}, f), () => ({ key: U(66), id: U(58) })],
+  ["hari-ini closeVisitAction", (f) => hariIni.closeVisitAction({}, f), () => ({ key: U(67), id: U(68) })],
   ["jadwal-staf saveWeekAction", (f) => jadwal.saveWeekAction({}, f), () => ({ branch: BRANCH_1, week: "2030-01-07" })],
   ["jadwal-staf addLeaveAction", (f) => jadwal.addLeaveAction({}, f), () => ({ branch: BRANCH_1, staff: U(52), kind: "leave", from: today, to: today, reason: "Uji konteks" })],
   ["jadwal-staf cancelLeaveAction", (f) => jadwal.cancelLeaveAction({}, f), () => ({ id: U(53), reason: "Uji konteks" })],

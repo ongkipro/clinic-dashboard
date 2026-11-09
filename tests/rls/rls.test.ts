@@ -278,11 +278,11 @@ describe("scope map (TEN-3, TEN-19)", () => {
   });
 
   it("fails on a table missing from scope_map", async () => {
-    // A table that does not exist yet (T-037 built patients; visits arrive with T-047).
-    const v = await inRolledBack(`create table visits (id uuid primary key)`, async () =>
+    // A table that does not exist yet (T-037 built patients, T-047 visits; invoices arrive with T-071).
+    const v = await inRolledBack(`create table invoices (id uuid primary key)`, async () =>
       scopeMapViolations(await relations(h.admin), await entries(h.admin)),
     );
-    expect(v).toEqual(["public.visits: missing from scope_map"]);
+    expect(v).toEqual(["public.invoices: missing from scope_map"]);
   });
 
   it("fails on a view or materialized view missing from scope_map", async () => {
@@ -395,6 +395,9 @@ describe("functions (TEN-16)", () => {
     "appointment_no_show(uuid)",
     "appointment_reschedule(uuid,timestamp with time zone,uuid)",
     "appointments_window(uuid,date,date)",
+    "visit_check_in(uuid)", // T-047: visits and Hari Ini (PR-7, DEC-057)
+    "visit_close(uuid)",
+    "visits_today(uuid)",
     "booking_confirm(uuid)", // T-044: booking engine (PR-6, DEC-054)
     "booking_create(uuid,uuid,uuid,timestamp with time zone,uuid,text,text,text,text,boolean)",
     "booking_slots(uuid,uuid,date,uuid)",

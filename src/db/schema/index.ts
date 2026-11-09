@@ -14,3 +14,4 @@ export * from "../../modules/catalog/schema";
 export * from "../../modules/patients/schema";
 export * from "../../modules/org/branches/schema";
 export * from "../../modules/scheduling/schema";
+export * from "../../modules/visits/schema";

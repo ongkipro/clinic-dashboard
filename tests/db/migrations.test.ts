@@ -157,8 +157,8 @@ describe("05 §3.1 constraint contract", () => {
 
   it("flags a nullable tenant_id and a missing UNIQUE(tenant_id, id)", async () => {
     expect(
-      await violationsWith(`create table visits (id uuid primary key, tenant_id uuid)`),
-    ).toEqual(["public.visits: tenant_id is nullable", "public.visits: missing UNIQUE(tenant_id, id)"]);
+      await violationsWith(`create table invoices (id uuid primary key, tenant_id uuid)`), // a name no migration owns yet (T-071)
+    ).toEqual(["public.invoices: tenant_id is nullable", "public.invoices: missing UNIQUE(tenant_id, id)"]);
   });
 
   it("flags a foreign key that is not ON DELETE RESTRICT", async () => {
