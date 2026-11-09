@@ -32,6 +32,7 @@ const ctxActions = await import("../../src/modules/org/context/actions");
 const pasienBaru = await import("../../src/app/(app)/pasien/baru/actions"); // T-037
 const cabang = await import("../../src/app/(app)/pengaturan/cabang/actions"); // T-036
 const jadwal = await import("../../src/app/(app)/jadwal-staf/actions"); // T-043
+const kalender = await import("../../src/app/(app)/jadwal/actions"); // T-045
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -74,6 +75,13 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["roles answerOwnerGrantAction", (f) => roles.answerOwnerGrantAction({}, f), () => ({ id: U(48), answer: "terima" })],
   ["context switchAction", (f) => ctxActions.switchAction({}, f), () => ({ kind: "branch", value: BRANCH_2 })],
   ["pasien-baru searchAction", (f) => pasienBaru.searchAction({}, f), () => ({ by: "phone", q: "081234567890" })],
+  ["jadwal findPatientAction", (f) => kalender.findPatientAction({}, f), () => ({ q: "Sinta" })],
+  ["jadwal slotsAction", (f) => kalender.slotsAction({}, f), () => ({ branch: BRANCH_1, version: U(54), date: today })],
+  ["jadwal createAction", (f) => kalender.createAction({}, f), () => ({ key: U(55), branch: BRANCH_1, patient: U(56), version: U(54), start: new Date(Date.now() + 86_400_000).toISOString(), channel: "phone" })],
+  ["jadwal confirmAction", (f) => kalender.confirmAction({}, f), () => ({ key: U(57), id: U(58) })],
+  ["jadwal cancelAction", (f) => kalender.cancelAction({}, f), () => ({ key: U(59), id: U(58), reason: "Uji konteks" })],
+  ["jadwal noShowAction", (f) => kalender.noShowAction({}, f), () => ({ key: U(60), id: U(58) })],
+  ["jadwal rescheduleAction", (f) => kalender.rescheduleAction({}, f), () => ({ key: U(61), id: U(58), start: new Date(Date.now() + 86_400_000).toISOString() })],
   ["jadwal-staf saveWeekAction", (f) => jadwal.saveWeekAction({}, f), () => ({ branch: BRANCH_1, week: "2030-01-07" })],
   ["jadwal-staf addLeaveAction", (f) => jadwal.addLeaveAction({}, f), () => ({ branch: BRANCH_1, staff: U(52), kind: "leave", from: today, to: today, reason: "Uji konteks" })],
   ["jadwal-staf cancelLeaveAction", (f) => jadwal.cancelLeaveAction({}, f), () => ({ id: U(53), reason: "Uji konteks" })],

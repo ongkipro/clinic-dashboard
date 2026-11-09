@@ -1,0 +1,61 @@
+{
+  "appointments_guard()": [
+    {
+      "at": 13,
+      "old": "",
+      "new": "    -- T-045: an appointment is created held or booked; the later states come from the writers.\n    IF NEW.state NOT IN ('held','booked') THEN\n      RAISE EXCEPTION 'an appointment is created held or booked' USING ERRCODE = '42501';\n    END IF;"
+    },
+    {
+      "at": 21,
+      "old": "  IF NOT (OLD.state = 'held' AND NEW.state = 'booked' AND NEW.hold_until IS NULL) THEN",
+      "new": "  -- T-045 (PR-83, DEC-055): held \u2192 booked; booked \u2192 confirmed; booked|confirmed \u2192 cancelled, no-show,\n  -- rescheduled or arrived (T-047). A releasing state needs its reservations released first.\n  IF NOT (OLD.state = 'held' AND NEW.state = 'booked' AND NEW.hold_until IS NULL\n          OR OLD.state = 'booked' AND NEW.state = 'confirmed'\n          OR OLD.state IN ('booked','confirmed') AND NEW.state IN ('cancelled','no_show','rescheduled','arrived')) THEN"
+    },
+    {
+      "at": 23,
+      "old": "",
+      "new": "  END IF;\n  IF NEW.state IN ('cancelled','no_show','rescheduled') AND EXISTS (\n       SELECT 1 FROM public.resource_reservations rr\n        WHERE rr.tenant_id = NEW.tenant_id AND rr.branch_id = NEW.branch_id AND rr.appointment_id = NEW.id AND rr.active) THEN\n    RAISE EXCEPTION 'release the reservations before leaving the schedule' USING ERRCODE = '42501';"
+    }
+  ],
+  "booking_busy(uuid,text,uuid,timestamp with time zone,timestamp with time zone)": [
+    {
+      "at": 9,
+      "old": "                    AND (ap.state = 'booked' OR ap.state = 'held' AND ap.hold_until > clock_timestamp())",
+      "new": "                    AND public.appointment_live(ap)"
+    }
+  ],
+  "booking_confirm(uuid)": [
+    {
+      "at": 23,
+      "old": "  IF ap.state = 'booked' THEN",
+      "new": "  IF ap.state <> 'held' THEN -- T-045: any state but a hold"
+    }
+  ],
+  "booking_create(uuid,uuid,uuid,timestamp with time zone,uuid,text,text,text,text,boolean)": [
+    {
+      "at": 58,
+      "old": "              AND (ap.state = 'booked' OR ap.state = 'held' AND ap.hold_until > clock_timestamp())",
+      "new": "              AND public.appointment_live(ap)"
+    }
+  ],
+  "booking_pick(uuid,uuid,uuid,timestamp with time zone,timestamp with time zone,uuid)": [
+    {
+      "at": 59,
+      "old": "                AND (ap.state = 'booked' OR ap.state = 'held' AND ap.hold_until > clock_timestamp())",
+      "new": "                AND public.appointment_live(ap)"
+    }
+  ],
+  "leave_add(uuid,uuid,text,date,date,text)": [
+    {
+      "at": 32,
+      "old": "                AND (ap.state = 'booked' OR ap.state = 'held' AND ap.hold_until > clock_timestamp()) AND ap.ends_at > clock_timestamp()",
+      "new": "                AND public.appointment_live(ap) AND ap.ends_at > clock_timestamp()"
+    }
+  ],
+  "roster_set_week(uuid,date,uuid[],jsonb)": [
+    {
+      "at": 59,
+      "old": "                AND (ap.state = 'booked' OR ap.state = 'held' AND ap.hold_until > clock_timestamp()) AND ap.ends_at > clock_timestamp()",
+      "new": "                AND public.appointment_live(ap) AND ap.ends_at > clock_timestamp()"
+    }
+  ]
+}

@@ -76,7 +76,8 @@ export const staffLeave = pgTable(
 // the room and the device taken, and an exclusion constraint (migration 0061, btree_gist) refuses
 // overlapping active reservations of one resource. Staff are reserved across branches (one person, one
 // place). In T-044 an appointment is held (DP pending, SET-17) or booked; later states are T-045's.
-export const APPOINTMENT_STATES = ["held", "booked"] as const;
+// T-045 (PR-83, DEC-055): the later states. Arrived is set by check-in (T-047).
+export const APPOINTMENT_STATES = ["held", "booked", "confirmed", "arrived", "no_show", "cancelled", "rescheduled"] as const;
 export const BOOKING_CHANNELS = ["walk_in", "phone", "whatsapp", "staff", "online"] as const;
 export const RESERVATION_KINDS = ["staff", "room", "device"] as const;
 
@@ -100,10 +101,16 @@ export const appointments = pgTable(
     createdBy: uuid("created_by").notNull(),
     createdAs: text("created_as").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    stateReason: text("state_reason"),
+    stateChangedAt: timestamp("state_changed_at", { withTimezone: true }),
+    stateChangedBy: uuid("state_changed_by"),
+    rescheduledTo: uuid("rescheduled_to"),
   },
   (t) => [
     foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
     foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "appointments_state_changed_by_fk", columns: [t.tenantId, t.stateChangedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "appointments_rescheduled_to_fk", columns: [t.tenantId, t.branchId, t.rescheduledTo], foreignColumns: [t.tenantId, t.branchId, t.id] }).onDelete("restrict"),
     foreignKey({ name: "appointments_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
     foreignKey({ name: "appointments_version_fk", columns: [t.tenantId, t.catalogVersionId], foreignColumns: [catalogVersions.tenantId, catalogVersions.id] }).onDelete("restrict"),
     foreignKey({ name: "appointments_performer_fk", columns: [t.tenantId, t.performerStaffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
@@ -113,7 +120,11 @@ export const appointments = pgTable(
     index("appointments_branch_start_idx").on(t.tenantId, t.branchId, t.startsAt),
     index("appointments_patient_idx").on(t.tenantId, t.patientId, t.startsAt),
     check("appointments_range_check", sql`${t.startsAt} < ${t.endsAt}`),
-    check("appointments_state_check", sql`${t.state} in ('held','booked') and ((${t.state} = 'held') = (${t.holdUntil} is not null))`),
+    check("appointments_state_check", sql`${t.state} in ('held','booked','confirmed','arrived','no_show','cancelled','rescheduled')
+      and ((${t.state} = 'held') = (${t.holdUntil} is not null))
+      and ((${t.state} = 'cancelled') = (${t.stateReason} is not null and length(btrim(${t.stateReason})) between 3 and 500))
+      and ((${t.state} = 'rescheduled') = (${t.rescheduledTo} is not null and ${t.rescheduledTo} <> ${t.id}))
+      and ((${t.state} in ('confirmed','arrived','no_show','cancelled','rescheduled')) = (${t.stateChangedAt} is not null and ${t.stateChangedBy} is not null))`),
     check("appointments_channel_check", sql`${t.channel} in ('walk_in','phone','whatsapp','staff','online')`),
     check("appointments_source_check", sql`(${t.source} is null or ${t.source} ~ '^[a-z0-9][a-z0-9_-]{0,39}$') and (${t.campaign} is null or ${t.campaign} ~ '^[a-z0-9][a-z0-9_-]{0,39}$')`),
     check("appointments_note_check", sql`${t.note} is null or length(${t.note}) <= 500`),

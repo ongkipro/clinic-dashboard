@@ -219,6 +219,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Tests sharing one branch and week interfere through roster replacement: give a test that edits rosters its own branch.
   - `CREATE EXTENSION btree_gist` adds C functions to `public`: drift tests must ignore extension-owned functions (`pg_depend.deptype = 'e'`).
 
+- **T-045** (appointment states, migration 0062):
+  - Adding a state means revisiting every query that tests the old state set: one helper (`appointment_live`) avoids five drifting copies.
+  - The browser harness must start the server with `DEPLOY_ENV=local`, or every write is refused by the production go-live gate (fail-closed by design) and the page shows an unknown failure.
+  - Map every known refusal class in a server action (`GoLiveBlockedError`), or a deliberate refusal reads as "not sure it saved".
+  - A success message rendered inside a form that unmounts with its row never shows: assert the row's new state instead.
+  - Narrow week columns cannot hold row actions: give the week compact rows and keep the actions on the day view.
+  - Level 2 roles (finance) take no branch: fixtures that assign one hit `staff_branches_level3_check`.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).
