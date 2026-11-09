@@ -104,6 +104,11 @@ describe("host resolver", () => {
       for (const e of readdirSync(dir, { withFileTypes: true })) if (e.isDirectory()) folders.add(e.name);
     }
     folders.delete("layout"); // layout file, not a segment
+    // Top-level app routes outside the groups (the paired queue display, T-048) are staff-host pages too.
+    for (const e of readdirSync(new URL("../../src/app/", import.meta.url), { withFileTypes: true })) {
+      if (e.isDirectory() && !e.name.startsWith("(") && !["api", "vendor"].includes(e.name)) folders.add(e.name);
+    }
+    expect(folders.has("layar-antrean")).toBe(true);
     expect([...folders].filter((f) => !RESERVED_SEGMENTS.has(f))).toEqual([]);
   });
 

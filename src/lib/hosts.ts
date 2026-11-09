@@ -40,7 +40,7 @@ export const RESERVED_SEGMENTS = new Set([
   "pasienku", "pembelian", "pemeriksaan", "pendampingan", "pengaturan", "pengguna-akses",
   "permintaan", "persetujuan", "persetujuan-tindakan", "pesan", "piutang", "privasi",
   "ringkasan", "ruang", "satusehat", "saya", "simulasi", "situs", "staf", "stok",
-  "templat", "vendor", "verifikasi", "terkunci", "aktifkan-2fa", "dev", "undangan",
+  "templat", "vendor", "verifikasi", "terkunci", "aktifkan-2fa", "dev", "undangan", "layar-antrean",
 ]);
 
 export function isPublicSitePath(path: string): boolean {

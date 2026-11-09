@@ -174,6 +174,11 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["appointment_reschedule", async () => ["select appointment_reschedule($1, now() + interval '1 day', null)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
     ["visit_check_in", async () => ["select visit_check_in($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
     ["visit_close", async () => ["select visit_close($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["visit_walk_in", async () => ["select visit_walk_in(gen_random_uuid(), null)", []], ["fo_cashier"]],
+    ["queue_call", async () => ["select queue_call($1, gen_random_uuid())", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["queue_skip", async () => ["select queue_skip($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["queue_display_pair", async (t) => ["select queue_display_pair($1, 'TV uji', repeat('a', 64))", [t.branch]], ["manager"]],
+    ["queue_display_revoke", async () => ["select queue_display_revoke($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

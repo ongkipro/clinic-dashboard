@@ -395,6 +395,14 @@ describe("functions (TEN-16)", () => {
     "appointment_no_show(uuid)",
     "appointment_reschedule(uuid,timestamp with time zone,uuid)",
     "appointments_window(uuid,date,date)",
+    "queue_board(uuid)", // T-048: queue numbers, walk-in, paired displays (PR-71, DEC-058)
+    "queue_call(uuid,uuid)",
+    "queue_display_feed(text)",
+    "queue_display_pair(uuid,text,text)",
+    "queue_display_revoke(uuid)",
+    "queue_patient_search(text)",
+    "queue_skip(uuid)",
+    "visit_walk_in(uuid,uuid)",
     "visit_check_in(uuid)", // T-047: visits and Hari Ini (PR-7, DEC-057)
     "visit_close(uuid)",
     "visits_today(uuid)",

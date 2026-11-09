@@ -245,6 +245,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A browser check that reads headings right after navigation can read the Suspense fallback (same h1): wait for a section of the loaded page.
   - A client mirror of a database rule (which blocker comes first) needs a test where two rules apply at once.
 
+- **T-048** (queue, migration 0064):
+  - A secret made for a one-time display (a pairing token) must never pass through `runCommand`'s body or result: idempotency records are stored; return only the id and attach the secret outside.
+  - Settings read through `setting_value_at` use the session tenant: a function outside a tenant context needs its own read for the row's tenant.
+  - Phone search: contacts are stored `+62…`; a typed local `08…` needs the leading 0 mapped to 62.
+  - A mutation that removes an inner lock can be equivalent when an outer lock (`tenant_actor_lock`) already serializes the writers: drop it with the reason rather than writing a test that cannot fail.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

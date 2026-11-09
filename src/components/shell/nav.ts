@@ -65,7 +65,7 @@ export const NAV: readonly NavGroup[] = [
   group("front-office", "Front Office", [
     ["hari-ini", "Hari Ini", "/hari-ini", "FO M"],
     ["pendaftaran", "Pendaftaran Pasien", "/pasien/baru", "FO CS"],
-    ["antrean", "Antrean", "/antrean", "FO"],
+    ["antrean", "Antrean", "/antrean", "O AP M FO"],
     ["check-in", "Check-in / Check-out", "/hari-ini/check-in", "FO"],
   ]),
   group("jadwal", "Jadwal & Reservasi", [
@@ -317,7 +317,7 @@ export function landingFor(role: Role): NavPage {
 // NAV-3 quick actions by role (the sheets themselves arrive with their pages).
 export type QuickAction = { id: string; label: string; href: string };
 const QUICK: QuickAction[] = [
-  { id: "pasien-datang", label: "Pasien Datang", href: "/hari-ini?aksi=datang" },
+  { id: "pasien-datang", label: "Pasien Datang", href: "/antrean?aksi=datang" },
   { id: "buat-janji", label: "Buat Janji", href: "/jadwal?aksi=baru" },
   { id: "jual-cepat", label: "Jual Cepat", href: "/kasir/jual-cepat" },
   { id: "pasien-baru", label: "Pasien Baru", href: "/pasien/baru" },

@@ -35,6 +35,7 @@ const jadwal = await import("../../src/app/(app)/jadwal-staf/actions"); // T-043
 const kalender = await import("../../src/app/(app)/jadwal/actions"); // T-045
 const profil = await import("../../src/app/(app)/pasien/[id]/actions"); // T-040
 const hariIni = await import("../../src/app/(app)/hari-ini/actions"); // T-047
+const antrean = await import("../../src/app/(app)/antrean/actions"); // T-048
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -88,6 +89,12 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["profil withdrawAction", (f) => profil.withdrawAction({}, f), () => ({ key: U(64), patient: U(56), consent: U(65), channel: "whatsapp", reason: "Uji konteks" })],
   ["hari-ini checkInAction", (f) => hariIni.checkInAction({}, f), () => ({ key: U(66), id: U(58) })],
   ["hari-ini closeVisitAction", (f) => hariIni.closeVisitAction({}, f), () => ({ key: U(67), id: U(68) })],
+  ["antrean findPatientAction", (f) => antrean.findPatientAction({}, f), () => ({ q: "Sinta" })],
+  ["antrean walkInAction", (f) => antrean.walkInAction({}, f), () => ({ key: U(69), patient: U(56) })],
+  ["antrean callAction", (f) => antrean.callAction({}, f), () => ({ key: U(70), ticket: U(71), room: U(72) })],
+  ["antrean skipAction", (f) => antrean.skipAction({}, f), () => ({ key: U(73), ticket: U(71) })],
+  ["antrean pairAction", (f) => antrean.pairAction({}, f), () => ({ key: U(74), label: "TV Lobi" })],
+  ["antrean revokeAction", (f) => antrean.revokeAction({}, f), () => ({ key: U(75), display: U(76) })],
   ["jadwal-staf saveWeekAction", (f) => jadwal.saveWeekAction({}, f), () => ({ branch: BRANCH_1, week: "2030-01-07" })],
   ["jadwal-staf addLeaveAction", (f) => jadwal.addLeaveAction({}, f), () => ({ branch: BRANCH_1, staff: U(52), kind: "leave", from: today, to: today, reason: "Uji konteks" })],
   ["jadwal-staf cancelLeaveAction", (f) => jadwal.cancelLeaveAction({}, f), () => ({ id: U(53), reason: "Uji konteks" })],
