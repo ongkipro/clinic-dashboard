@@ -9,6 +9,7 @@ import { accessLog, endMembership, removeRole, revokeSession, setBranch, setDuty
 import { assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { answerOwnerGrant, assignRole as grantRole, myOwnerGrants } from "../../../src/modules/org/roles/roles";
 import { cancelInvite, invite, listInvitations, listStaff } from "../../../src/modules/org/staff/staff";
+import { decideCredential, endCredential, listCredentials, recordCredential } from "../../../src/modules/org/licences/licences";
 import { defineCases, expectLive, type IsolationEnv } from "../case";
 
 const owners = new Map<string, string>();
@@ -99,6 +100,45 @@ async function asOwner<T>(env: IsolationEnv, fn: Parameters<typeof withTenantCon
   return withTenantContext(env.app, ctx, fn as never) as Promise<T>;
 }
 
+// T-050: a fresh B doctor with a pending STR recorded by B's Admin Pusat for each run. The doctor works at
+// a branch of B's own with no facility head (other cases may add one at the shared branch), so B's Owner
+// verifies as the fallback in the positive control.
+const credentialBranches = new Map<string, string>();
+async function credentialBranch(env: IsolationEnv): Promise<string> {
+  const t = env.victim.tenantId;
+  const known = credentialBranches.get(t);
+  if (known) return known;
+  const id = (await env.owner.query(`insert into branches (tenant_id, code, name, timezone) values ($1, 'KRDISO', 'Cabang Kredensial Isolasi', 'Asia/Jakarta') returning id`, [t])).rows[0].id as string;
+  credentialBranches.set(t, id);
+  return id;
+}
+async function victimCredential(env: IsolationEnv): Promise<{ staffId: string; credentialId: string; number: string }> {
+  const t = env.victim.tenantId;
+  const tag = crypto.randomUUID().slice(0, 8);
+  const mk = async (role: "doctor" | "admin_pusat", name: string) => {
+    const acc = (await env.owner.query(`insert into auth_user (name, email) values ('K', $1) returning id`, [`kred.${role}.${tag}.${t}@klinik-sintetis.test`])).rows[0].id as string;
+    const { staffId } = await createMembership(env.owner, { tenantId: t, accountId: acc, displayName: name });
+    const c = await env.owner.connect();
+    try {
+      const rid = await assignRole(c, { tenantId: t, staffId, role });
+      if (role === "doctor") await c.query(`insert into staff_branches (tenant_id, staff_role_id, staff_id, role, branch_id) values ($1, $2, $3, 'doctor', $4)`, [t, rid, staffId, await credentialBranch(env)]);
+    } finally {
+      c.release();
+    }
+    return { acc, staffId };
+  };
+  const doctor = await mk("doctor", `Dokter Rahasia ${tag}`);
+  const ap = await mk("admin_pusat", `Admin Rahasia ${tag}`);
+  const number = `STR-RAHASIA-${tag}`;
+  const ctx = await resolveContext(env.app, ap.acc, { tenantId: t, actingRole: "admin_pusat" });
+  const { credentialId } = await withTenantContext(env.app, ctx, (db) =>
+    recordCredential(db, crypto.randomUUID(), doctor.staffId, { kind: "str", number, issuer: "Konsil Kesehatan", profession: "dokter", validFrom: "2024-01-01" }));
+  env.victimSecret(number);
+  env.victimSecret(credentialId);
+  return { staffId: doctor.staffId, credentialId, number };
+}
+const credentialMarks = new Map<string, string>();
+
 const refused = (p: Promise<unknown>) => p.then(() => "done", (e) => (e instanceof CommandError ? e.code : Promise.reject(e)));
 
 export default defineCases(
@@ -170,6 +210,26 @@ export default defineCases(
       // The caller's own staff list contains the victim only for B (positive control marker).
       const staff = await asOwner(env, async (db) => (await listStaff(db)).map((s) => s.name));
       return { attempts, body: { attempts, staff } };
+    },
+  },
+  {
+    // T-050 Kredensial actions (record, decide, end) and the credential reads of /staf and /staf/[id]:
+    // A's Owner cannot verify, end, renew or list B's credential; B's Owner (positive control) can.
+    kind: "action",
+    id: "app/(app)/staf/kredensial-actions",
+    marker: (env) => credentialMarks.get(env.victim.tenantId) ?? "",
+    async run(env) {
+      const v = await victimCredential(env);
+      credentialMarks.set(env.victim.tenantId, v.number);
+      await expectLive(env, "B's pending credential", `exists (select 1 from staff_credentials where id = $1 and state = 'pending')`, [v.credentialId]);
+      const attempts = {
+        decide: await refused(asOwner(env, (db) => decideCredential(db, crypto.randomUUID(), v.credentialId, true))),
+        end: await refused(asOwner(env, (db) => endCredential(db, crypto.randomUUID(), v.credentialId, "suspended", "Uji isolasi"))),
+        renew: await refused(asOwner(env, (db) =>
+          recordCredential(db, crypto.randomUUID(), v.staffId, { kind: "str", number: `STR-BARU-${v.number.slice(-8)}`, issuer: "Konsil Kesehatan", profession: "dokter", validFrom: "2025-01-01", replaces: v.credentialId }))),
+      };
+      const listed = await asOwner(env, async (db) => (await listCredentials(db, [v.staffId])).map((c) => c.number));
+      return { attempts, body: { attempts, listed } };
     },
   },
   {

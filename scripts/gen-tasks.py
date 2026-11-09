@@ -199,7 +199,7 @@ t("letters",M,"PR-74","Document templates (UX-54) and signed medical letters",R3
   ["src/modules/documents/**","src/app/(app)/templat/**","tests/documents/**"],["signing"],
   "Scenario PR-74 passes",visual=UI.format(ux="UX-54"))
 t("cred_alerts",M,"PR-73","Credential model (STR lifetime, SIP per branch) and expiry alerts 60/30/7",R2,
-  ["src/modules/org/credentials/**","tests/org/credentials.test.ts"],["m1_exit"],
+  ["src/modules/org/licences/**","tests/org/credentials.test.ts"],["m1_exit"],
   "Scenario PR-73 passes; no alert for lifetime STR")
 t("m2_exit",M,"PR-13","M2 exit: clinical scenarios and CLIN set",R3,
   ["docs/evidence/m2/**","STATUS.md"],["requests","complaints","letters","cred_alerts","photos"],

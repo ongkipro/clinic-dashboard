@@ -16,3 +16,4 @@ export * from "../../modules/org/branches/schema";
 export * from "../../modules/scheduling/schema";
 export * from "../../modules/visits/schema";
 export * from "../../modules/privacy/schema";
+export * from "../../modules/org/licences/schema";

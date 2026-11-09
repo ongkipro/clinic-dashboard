@@ -192,6 +192,9 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["breach_close", async () => ["select breach_close($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["breach_notice_add", async () => ["select breach_notice_add($1, '{}'::jsonb, 'a.pdf', 'application/pdf', '\\x25504446'::bytea, repeat('a', 64))", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["breach_notice_file", async () => ["select * from breach_notice_file($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["credential_record", async () => ["select credential_record(gen_random_uuid(), '{}'::jsonb)", []], ["owner"]],
+    ["credential_decide", async () => ["select credential_decide($1, true, null)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
+    ["credential_end", async () => ["select credential_end($1, 'suspended', 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

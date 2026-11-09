@@ -594,7 +594,7 @@ Owner instructions 2026-11-04/05 (foundation review: "jika ada bugs dan kekurang
 #### T-050: Credential model (STR lifetime, SIP per branch) and expiry alerts 60/30/7
 - **Primary requirement:** PR-73
 - **Risk Level:** R3
-- **Allowed Paths:** `src/modules/org/credentials/**`, `tests/org/credentials.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/app/(app)/staf/**`, `tests/ui/staf-kredensial.spec.ts`, `src/modules/org/schema.ts`
+- **Allowed Paths:** `src/modules/org/licences/**` (DEC-062), `tests/org/credentials.test.ts`, `drizzle/**`, `src/db/schema/index.ts`, `src/app/(app)/staf/**`, `tests/ui/staf-kredensial.spec.ts`, `src/modules/org/schema.ts`
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-049
 - **Visual Contract:** Visual contract per `docs/spec/17` UX-3 credential verification segment; tokens from `DESIGN.md`; states loading/empty/filtered-empty/error/success/blocked (`docs/spec/10` State Copy Patterns); compact 390 and regular 820/1180/1440 layouts per NAV-7.

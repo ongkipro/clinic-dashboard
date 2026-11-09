@@ -477,6 +477,13 @@
       "when": 1794233451999,
       "tag": "0067_patient_merges",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1794239984457,
+      "tag": "0068_staff_credentials",
+      "breakpoints": true
     }
   ]
 }

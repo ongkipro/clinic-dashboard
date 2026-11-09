@@ -397,6 +397,12 @@ describe("functions (TEN-16)", () => {
     "appointments_window(uuid,date,date)",
     "patient_merge(uuid,uuid,text)", // T-042: duplicate merge (PR-85, DEC-061)
     "patient_unmerge(uuid,text)",
+    "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
+    "credential_decide(uuid,boolean,text)",
+    "credential_end(uuid,text,text)",
+    "credential_valid(uuid,uuid,timestamp with time zone)",
+    "credential_decidable(uuid[])",
+    "credential_alert_scan(date)",
     "patient_search(text,jsonb,uuid)", // T-041: Daftar Pasien search and segments (PR-76, DEC-060)
     "segment_delete(uuid)",
     "segment_save(text,jsonb)",
