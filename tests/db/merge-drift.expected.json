@@ -1,0 +1,192 @@
+{
+  "appointment_reschedule(uuid,timestamp with time zone,uuid)": [
+    {
+      "at": 26,
+      "old": "  IF EXISTS (SELECT 1 FROM public.appointments o WHERE o.tenant_id = ap.tenant_id AND o.patient_id = ap.patient_id AND o.id <> ap.id",
+      "new": "  IF EXISTS (SELECT 1 FROM public.appointments o WHERE o.tenant_id = ap.tenant_id AND o.patient_id = ANY (public.patient_cluster(ap.tenant_id, public.patient_canonical(ap.tenant_id, ap.patient_id))) AND o.id <> ap.id"
+    }
+  ],
+  "appointments_window(uuid,date,date)": [
+    {
+      "at": 23,
+      "old": "               'patient_id', ap.patient_id, 'patient_name', pt.full_name, 'patient_mrn', pt.mrn,",
+      "new": "               'patient_id', pt.id, 'patient_name', pt.full_name, 'patient_mrn', pt.mrn,"
+    },
+    {
+      "at": 33,
+      "old": "        JOIN public.patients pt ON pt.tenant_id = ap.tenant_id AND pt.id = ap.patient_id",
+      "new": "        JOIN public.patients pt ON pt.tenant_id = ap.tenant_id AND pt.id = public.patient_canonical(ap.tenant_id, ap.patient_id) -- T-042"
+    }
+  ],
+  "booking_create(uuid,uuid,uuid,timestamp with time zone,uuid,text,text,text,text,boolean)": [
+    {
+      "at": 26,
+      "old": "  IF NOT EXISTS (SELECT 1 FROM public.patients WHERE tenant_id = a.tenant_id AND id = p_patient) THEN",
+      "new": "  IF NOT EXISTS (SELECT 1 FROM public.patients WHERE tenant_id = a.tenant_id AND id = p_patient) OR public.patient_is_merged(a.tenant_id, p_patient) THEN -- T-042"
+    },
+    {
+      "at": 57,
+      "old": "  IF EXISTS (SELECT 1 FROM public.appointments ap WHERE ap.tenant_id = a.tenant_id AND ap.patient_id = p_patient",
+      "new": "  IF EXISTS (SELECT 1 FROM public.appointments ap WHERE ap.tenant_id = a.tenant_id AND ap.patient_id = ANY (public.patient_cluster(a.tenant_id, p_patient))"
+    }
+  ],
+  "consent_active(uuid,text)": [
+    {
+      "at": 22,
+      "old": "                  WHERE tenant_id = v_tenant AND patient_id = p_patient AND purpose = p_purpose AND withdrawn_at IS NULL);",
+      "new": "                  WHERE tenant_id = v_tenant AND patient_id = ANY (public.patient_cluster(v_tenant, public.patient_canonical(v_tenant, p_patient))) AND purpose = p_purpose AND withdrawn_at IS NULL); -- T-042"
+    }
+  ],
+  "consent_grant(uuid,text,uuid,text)": [
+    {
+      "at": 26,
+      "old": "  PERFORM 1 FROM public.patients WHERE tenant_id = a.tenant_id AND id = p_patient;",
+      "new": "  PERFORM 1 FROM public.patients WHERE tenant_id = a.tenant_id AND id = p_patient AND NOT public.patient_is_merged(a.tenant_id, p_patient); -- T-042"
+    },
+    {
+      "at": 39,
+      "old": "  IF EXISTS (SELECT 1 FROM public.consents WHERE tenant_id = a.tenant_id AND patient_id = p_patient AND purpose = p_purpose AND withdrawn_at IS NULL) THEN",
+      "new": "  IF EXISTS (SELECT 1 FROM public.consents WHERE tenant_id = a.tenant_id AND patient_id = ANY (public.patient_cluster(a.tenant_id, p_patient)) AND purpose = p_purpose AND withdrawn_at IS NULL) THEN"
+    }
+  ],
+  "marketing_contacts()": [
+    {
+      "at": 16,
+      "old": "      JOIN public.consents c ON c.tenant_id = p.tenant_id AND c.patient_id = p.id AND c.purpose = 'marketing_wa' AND c.withdrawn_at IS NULL",
+      "new": ""
+    },
+    {
+      "at": 18,
+      "old": "     WHERE p.tenant_id = a.tenant_id",
+      "new": "     WHERE p.tenant_id = a.tenant_id AND NOT public.patient_is_merged(p.tenant_id, p.id) -- T-042: the survivor, with consents of the cluster\n       AND EXISTS (SELECT 1 FROM public.consents c WHERE c.tenant_id = p.tenant_id AND c.patient_id = ANY (public.patient_cluster(p.tenant_id, p.id)) AND c.purpose = 'marketing_wa' AND c.withdrawn_at IS NULL)"
+    }
+  ],
+  "patient_consents(uuid)": [
+    {
+      "at": 25,
+      "old": "     WHERE c.tenant_id = a.tenant_id AND c.patient_id = p_patient), '[]'::jsonb);",
+      "new": "     WHERE c.tenant_id = a.tenant_id AND c.patient_id = ANY (public.patient_cluster(a.tenant_id, public.patient_canonical(a.tenant_id, p_patient)))), '[]'::jsonb); -- T-042"
+    }
+  ],
+  "patient_get(uuid)": [
+    {
+      "at": 9,
+      "old": "",
+      "new": "  v_id uuid;"
+    },
+    {
+      "at": 15,
+      "old": "  SELECT jsonb_build_object('id', p.id, 'mrn', p.mrn, 'full_name', p.full_name, 'birth_date', p.birth_date, 'sex', p.sex,",
+      "new": "  v_id := public.patient_canonical(a.tenant_id, p_id); -- T-042: a merged duplicate opens its survivor\n  SELECT jsonb_build_object('id', p.id, 'merged_into', CASE WHEN v_id <> p_id THEN v_id END, 'mrn', p.mrn, 'full_name', p.full_name, 'birth_date', p.birth_date, 'sex', p.sex,"
+    },
+    {
+      "at": 21,
+      "old": "                                                    FROM public.guardians g WHERE g.tenant_id = p.tenant_id AND g.patient_id = p.id), '[]'::jsonb))\n    INTO r FROM public.patients p WHERE p.tenant_id = a.tenant_id AND p.id = p_id;",
+      "new": "                                                    FROM public.guardians g WHERE g.tenant_id = p.tenant_id AND g.patient_id = ANY (public.patient_cluster(p.tenant_id, p.id))), '[]'::jsonb))\n    INTO r FROM public.patients p WHERE p.tenant_id = a.tenant_id AND p.id = v_id;"
+    }
+  ],
+  "patient_match_rows(uuid,uuid[])": [
+    {
+      "at": 12,
+      "old": "    FROM public.patients p WHERE p.tenant_id = p_tenant AND p.id = ANY (p_ids)",
+      "new": "    FROM public.patients p WHERE p.tenant_id = p_tenant AND p.id = ANY (ARRAY(SELECT public.patient_canonical(p_tenant, x) FROM unnest(p_ids) x)) -- T-042"
+    }
+  ],
+  "patient_search(text,jsonb,uuid)": [
+    {
+      "at": 57,
+      "old": "                                    WHERE v.tenant_id = p.tenant_id AND v.patient_id = p.id AND v.closed_at IS NULL AND public.patient_search_visit_visible(a.tenant_id, a.staff_id, a.role, v.branch_id)",
+      "new": "                                    WHERE v.tenant_id = p.tenant_id AND v.patient_id = ANY (public.patient_cluster(p.tenant_id, p.id)) AND v.closed_at IS NULL AND public.patient_search_visit_visible(a.tenant_id, a.staff_id, a.role, v.branch_id)"
+    },
+    {
+      "at": 60,
+      "old": "                                WHERE v.tenant_id = p.tenant_id AND v.patient_id = p.id AND public.patient_search_visit_visible(a.tenant_id, a.staff_id, a.role, v.branch_id))) AS r",
+      "new": "                                WHERE v.tenant_id = p.tenant_id AND v.patient_id = ANY (public.patient_cluster(p.tenant_id, p.id)) AND public.patient_search_visit_visible(a.tenant_id, a.staff_id, a.role, v.branch_id))) AS r"
+    },
+    {
+      "at": 63,
+      "old": "     WHERE p.tenant_id = a.tenant_id",
+      "new": "     WHERE p.tenant_id = a.tenant_id AND NOT public.patient_is_merged(p.tenant_id, p.id) -- T-042: survivors only, matched over the cluster"
+    },
+    {
+      "at": 65,
+      "old": "            OR upper(q) = p.mrn\n            OR length(raw_digits) >= 6 AND EXISTS (SELECT 1 FROM public.contact_points c WHERE c.tenant_id = p.tenant_id AND c.patient_id = p.id AND c.kind = 'phone'",
+      "new": "            OR EXISTS (SELECT 1 FROM public.patients m WHERE m.tenant_id = p.tenant_id AND m.id = ANY (public.patient_cluster(p.tenant_id, p.id)) AND m.mrn = upper(q))\n            OR length(raw_digits) >= 6 AND EXISTS (SELECT 1 FROM public.contact_points c WHERE c.tenant_id = p.tenant_id AND c.patient_id = ANY (public.patient_cluster(p.tenant_id, p.id)) AND c.kind = 'phone'"
+    },
+    {
+      "at": 69,
+      "old": "       AND (NOT v_visiting OR EXISTS (SELECT 1 FROM public.visits v WHERE v.tenant_id = p.tenant_id AND v.patient_id = p.id AND v.closed_at IS NULL",
+      "new": "       AND (NOT v_visiting OR EXISTS (SELECT 1 FROM public.visits v WHERE v.tenant_id = p.tenant_id AND v.patient_id = ANY (public.patient_cluster(p.tenant_id, p.id)) AND v.closed_at IS NULL"
+    },
+    {
+      "at": 72,
+      "old": "            OR v_last = 'never' AND NOT EXISTS (SELECT 1 FROM public.visits v WHERE v.tenant_id = p.tenant_id AND v.patient_id = p.id AND public.patient_search_visit_visible(a.tenant_id, a.staff_id, a.role, v.branch_id))\n            OR v_last IN ('30d','90d') AND EXISTS (SELECT 1 FROM public.visits v WHERE v.tenant_id = p.tenant_id AND v.patient_id = p.id",
+      "new": "            OR v_last = 'never' AND NOT EXISTS (SELECT 1 FROM public.visits v WHERE v.tenant_id = p.tenant_id AND v.patient_id = ANY (public.patient_cluster(p.tenant_id, p.id)) AND public.patient_search_visit_visible(a.tenant_id, a.staff_id, a.role, v.branch_id))\n            OR v_last IN ('30d','90d') AND EXISTS (SELECT 1 FROM public.visits v WHERE v.tenant_id = p.tenant_id AND v.patient_id = ANY (public.patient_cluster(p.tenant_id, p.id))"
+    }
+  ],
+  "queue_board(uuid)": [
+    {
+      "at": 21,
+      "old": "               'room_id', t.room_id, 'room_name', r.name, 'visit_id', t.visit_id, 'kind', v.kind, 'patient_id', v.patient_id,",
+      "new": "               'room_id', t.room_id, 'room_name', r.name, 'visit_id', t.visit_id, 'kind', v.kind, 'patient_id', p.id,"
+    },
+    {
+      "at": 25,
+      "old": "        JOIN public.patients p ON p.tenant_id = v.tenant_id AND p.id = v.patient_id",
+      "new": "        JOIN public.patients p ON p.tenant_id = v.tenant_id AND p.id = public.patient_canonical(v.tenant_id, v.patient_id) -- T-042"
+    }
+  ],
+  "queue_patient_search(text)": [
+    {
+      "at": 25,
+      "old": "       WHERE p.tenant_id = a.tenant_id",
+      "new": "       WHERE p.tenant_id = a.tenant_id AND NOT public.patient_is_merged(p.tenant_id, p.id) -- T-042: survivors only, matched over the cluster"
+    },
+    {
+      "at": 27,
+      "old": "              OR upper(q) = p.mrn\n              OR length(digits) >= 6 AND EXISTS (SELECT 1 FROM public.contact_points c WHERE c.tenant_id = p.tenant_id AND c.patient_id = p.id",
+      "new": "              OR EXISTS (SELECT 1 FROM public.patients m WHERE m.tenant_id = p.tenant_id AND m.id = ANY (public.patient_cluster(p.tenant_id, p.id)) AND m.mrn = upper(q))\n              OR length(digits) >= 6 AND EXISTS (SELECT 1 FROM public.contact_points c WHERE c.tenant_id = p.tenant_id AND c.patient_id = ANY (public.patient_cluster(p.tenant_id, p.id))"
+    }
+  ],
+  "visit_check_in(uuid)": [
+    {
+      "at": 27,
+      "old": "  IF EXISTS (SELECT 1 FROM public.visits x WHERE x.tenant_id = a.tenant_id AND x.branch_id = ap.branch_id AND x.patient_id = ap.patient_id AND x.closed_at IS NULL) THEN",
+      "new": "  IF EXISTS (SELECT 1 FROM public.visits x WHERE x.tenant_id = a.tenant_id AND x.branch_id = ap.branch_id AND x.patient_id = ANY (public.patient_cluster(a.tenant_id, public.patient_canonical(a.tenant_id, ap.patient_id))) AND x.closed_at IS NULL) THEN -- T-042"
+    }
+  ],
+  "visit_walk_in(uuid,uuid)": [
+    {
+      "at": 12,
+      "old": "  IF NOT EXISTS (SELECT 1 FROM public.patients p WHERE p.tenant_id = a.tenant_id AND p.id = p_patient) THEN",
+      "new": "  IF NOT EXISTS (SELECT 1 FROM public.patients p WHERE p.tenant_id = a.tenant_id AND p.id = p_patient) OR public.patient_is_merged(a.tenant_id, p_patient) THEN -- T-042"
+    },
+    {
+      "at": 15,
+      "old": "  IF EXISTS (SELECT 1 FROM public.visits x WHERE x.tenant_id = a.tenant_id AND x.branch_id = b.id AND x.patient_id = p_patient AND x.closed_at IS NULL) THEN",
+      "new": "  IF EXISTS (SELECT 1 FROM public.visits x WHERE x.tenant_id = a.tenant_id AND x.branch_id = b.id AND x.patient_id = ANY (public.patient_cluster(a.tenant_id, p_patient)) AND x.closed_at IS NULL) THEN"
+    }
+  ],
+  "visits_today(uuid)": [
+    {
+      "at": 22,
+      "old": "               'patient_id', v.patient_id, 'patient_name', pt.full_name, 'patient_mrn', pt.mrn,",
+      "new": "               'patient_id', pt.id, 'patient_name', pt.full_name, 'patient_mrn', pt.mrn,"
+    },
+    {
+      "at": 27,
+      "old": "        JOIN public.patients pt ON pt.tenant_id = v.tenant_id AND pt.id = v.patient_id",
+      "new": "        JOIN public.patients pt ON pt.tenant_id = v.tenant_id AND pt.id = public.patient_canonical(v.tenant_id, v.patient_id) -- T-042"
+    },
+    {
+      "at": 34,
+      "old": "               'patient_id', ap.patient_id, 'patient_name', pt.full_name, 'patient_mrn', pt.mrn, 'service_name', cv.name)",
+      "new": "               'patient_id', pt.id, 'patient_name', pt.full_name, 'patient_mrn', pt.mrn, 'service_name', cv.name)"
+    },
+    {
+      "at": 37,
+      "old": "        JOIN public.patients pt ON pt.tenant_id = ap.tenant_id AND pt.id = ap.patient_id",
+      "new": "        JOIN public.patients pt ON pt.tenant_id = ap.tenant_id AND pt.id = public.patient_canonical(ap.tenant_id, ap.patient_id) -- T-042"
+    }
+  ]
+}

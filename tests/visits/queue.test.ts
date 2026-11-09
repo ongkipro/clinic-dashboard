@@ -337,24 +337,26 @@ describe("guards, grants, tenancy and drift", () => {
     expect(JSON.stringify(bBoard)).not.toContain("Pasien Rahasia A");
   });
 
-  it("drift: visit_check_in and visit_close are their 0063 definitions plus one line each", async () => {
-    const def = async (name: string) => (await h.admin.query(`select pg_get_functiondef(p.oid) as d from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = $1`, [name])).rows[0].d as string;
-    const mig = readFileSync(join(import.meta.dirname, "../../drizzle/0063_visits.sql"), "utf8");
-    const body = (name: string) => {
-      const m = new RegExp(`CREATE FUNCTION public\\.${name}\\([\\s\\S]*?AS \\$\\$\\n([\\s\\S]*?)\\n\\$\\$;`).exec(mig);
+  it("drift: in 0064, visit_check_in and visit_close are their 0063 definitions plus one line each", async () => {
+    // Migration text to migration text: later migrations may patch these functions again (T-042 did), so
+    // the live definition is not 0064's.
+    const text = (f: string) => readFileSync(join(import.meta.dirname, `../../drizzle/${f}`), "utf8");
+    const body = (mig: string, name: string) => {
+      const m = new RegExp(`CREATE (?:OR REPLACE )?FUNCTION public\\.${name}\\([\\s\\S]*?AS \\$\\$\\n([\\s\\S]*?)\\n\\$\\$;`).exec(mig);
       return m![1].split("\n");
     };
-    const now = (d: string) => d.slice(d.indexOf("AS $function$") + "AS $function$".length + 1, d.lastIndexOf("$function$")).trimEnd().split("\n");
+    const before = (name: string) => body(text("0063_visits.sql"), name);
+    const after = (name: string) => body(text("0064_queue.sql"), name);
     // Removing the one added line from the new body must give the 0063 body exactly (order kept).
     const added = (before: string[], after: string[]) => {
       const extra = after.filter((l) => !before.includes(l));
       return { removed: before.filter((l) => !after.includes(l)), extra, same: after.filter((l) => !extra.includes(l)).join("\n") === before.join("\n") };
     };
-    const ci = added(body("visit_check_in"), now(await def("visit_check_in")));
+    const ci = added(before("visit_check_in"), after("visit_check_in"));
     expect(ci.removed).toEqual([]);
     expect(ci.extra).toEqual(["  PERFORM public.queue_issue(v); -- T-048: every check-in gets the next number of the day"]);
     expect(ci.same).toBe(true);
-    const cl = added(body("visit_close"), now(await def("visit_close")));
+    const cl = added(before("visit_close"), after("visit_close"));
     expect(cl.removed).toEqual([]);
     expect(cl.extra).toEqual(["  UPDATE public.queue_tickets SET state = 'done' WHERE tenant_id = v.tenant_id AND visit_id = v.id AND state <> 'done'; -- T-048"]);
     expect(cl.same).toBe(true);

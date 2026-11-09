@@ -263,6 +263,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A table no app role reads must not be granted to `clinic_operator` either (vendor-authority 2.8: the operator never sees more than the app); give it support class `never`.
   - A browser spec inside the repository is typechecked by `next build`: run typecheck after writing it.
 
+- **T-042** (patient merge, migration 0067):
+  - Merge by redirect, not by moving rows: guarded tables refuse a patient rewrite, partial unique indexes collide, and an unmerge cannot know which rows moved.
+  - A drift test that reads a function's live definition breaks when a later migration patches it again: compare migration text to migration text.
+  - An overlap check that may span several ids needs a test where the conflicting row is on the other id (the survivor's check passed with its own consent).
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

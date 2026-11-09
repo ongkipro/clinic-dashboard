@@ -395,6 +395,8 @@ describe("functions (TEN-16)", () => {
     "appointment_no_show(uuid)",
     "appointment_reschedule(uuid,timestamp with time zone,uuid)",
     "appointments_window(uuid,date,date)",
+    "patient_merge(uuid,uuid,text)", // T-042: duplicate merge (PR-85, DEC-061)
+    "patient_unmerge(uuid,text)",
     "patient_search(text,jsonb,uuid)", // T-041: Daftar Pasien search and segments (PR-76, DEC-060)
     "segment_delete(uuid)",
     "segment_save(text,jsonb)",

@@ -254,3 +254,38 @@ export const patientSegments = pgTable(
     check("patient_segments_filters_check", sql`jsonb_typeof(${t.filters}) = 'object' and ${t.filters} - 'branch_id' - 'last_visit' - 'visiting_now' = '{}'::jsonb and ${t.filters} <> '{}'::jsonb`),
   ],
 );
+
+// Duplicate patient merges (PR-85; T-042, DEC-061): a redirect record, never a move of rows. While active,
+// readers resolve the duplicate (merged_id) to the survivor; undoing it stamps the row and leaves every
+// linked row exactly where it was. Insert-only except the undo stamp; never deleted.
+export const patientMerges = pgTable(
+  "patient_merges",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    survivorId: uuid("survivor_id").notNull(),
+    mergedId: uuid("merged_id").notNull(),
+    reason: text("reason").notNull(),
+    mergedBy: uuid("merged_by").notNull(),
+    mergedAs: text("merged_as").notNull(),
+    mergedAt: timestamp("merged_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+    undoneBy: uuid("undone_by"),
+    undoneAs: text("undone_as"),
+    undoReason: text("undo_reason"),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "patient_merges_survivor_fk", columns: [t.tenantId, t.survivorId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "patient_merges_merged_fk", columns: [t.tenantId, t.mergedId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "patient_merges_merged_by_fk", columns: [t.tenantId, t.mergedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "patient_merges_undone_by_fk", columns: [t.tenantId, t.undoneBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("patient_merges_tenant_id_id_key").on(t.tenantId, t.id),
+    uniqueIndex("patient_merges_one_active").on(t.tenantId, t.mergedId).where(sql`${t.undoneAt} is null`),
+    index("patient_merges_survivor_idx").on(t.tenantId, t.survivorId).where(sql`${t.undoneAt} is null`),
+    check("patient_merges_pair_check", sql`${t.survivorId} <> ${t.mergedId}`),
+    check("patient_merges_reason_check", sql`length(btrim(${t.reason})) between 10 and 500 and ${t.mergedAs} = 'records_officer'`),
+    check("patient_merges_undo_check", sql`(${t.undoneAt} is null and ${t.undoneBy} is null and ${t.undoneAs} is null and ${t.undoReason} is null)
+      or (${t.undoneAt} is not null and ${t.undoneBy} is not null and ${t.undoneAs} = 'records_officer' and length(btrim(coalesce(${t.undoReason}, ''))) between 10 and 500 and ${t.undoneAt} >= ${t.mergedAt})`),
+  ],
+);

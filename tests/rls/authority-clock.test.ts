@@ -179,6 +179,8 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["queue_skip", async () => ["select queue_skip($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
     ["queue_display_pair", async (t) => ["select queue_display_pair($1, 'TV uji', repeat('a', 64))", [t.branch]], ["manager"]],
     ["queue_display_revoke", async () => ["select queue_display_revoke($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["patient_merge", async () => ["select patient_merge(gen_random_uuid(), gen_random_uuid(), 'alasan uji gabung')", []], ["records_officer"]],
+    ["patient_unmerge", async () => ["select patient_unmerge($1, 'alasan uji batal')", ["00000000-0000-7000-8000-000000000000"]], ["records_officer"]],
     ["patient_search", async () => ["select patient_search('Rina', '{}'::jsonb, null)", []], ["fo_cashier"]],
     ["segment_save", async () => ["select segment_save('Segmen uji', '{\"visiting_now\": true}'::jsonb)", []], ["fo_cashier"]],
     ["segment_delete", async () => ["select segment_delete($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
