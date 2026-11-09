@@ -211,6 +211,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - An isolation case's positive control runs the attempts as the victim too: order them so an earlier write does not undo what a later one needs.
   - Set the browser layout minimum to what the spec measures (pages × 4 widths × 2 sizes + extras), not a copy from another task.
 
+- **T-044** (booking engine, migration 0061):
+  - In PL/pgSQL, a `CASE … WHEN … THEN` inside an `IF` condition ends the `IF` at the first `THEN`: use boolean `OR`/`AND` instead.
+  - An apostrophe in a SQL comment can split Drizzle's statement parser: keep comments free of quotes.
+  - A unique key "one per kind" contradicts "one of each required type": key on the resource, and test a service needing two of a kind.
+  - A function created after 0003 is never PUBLIC-executable (`ALTER DEFAULT PRIVILEGES REVOKE EXECUTE … FROM PUBLIC`): an explicit revoke is consistency, not protection.
+  - Tests sharing one branch and week interfere through roster replacement: give a test that edits rosters its own branch.
+  - `CREATE EXTENSION btree_gist` adds C functions to `public`: drift tests must ignore extension-owned functions (`pg_depend.deptype = 'e'`).
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

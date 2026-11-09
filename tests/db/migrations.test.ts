@@ -142,9 +142,10 @@ describe("05 §3.1 constraint contract", () => {
   }
 
   it("flags a table without tenant_id that is not a platform table", async () => {
-    // A table that does not exist yet (T-037 built patients; appointments arrive with T-044).
-    expect(await violationsWith(`create table appointments (id uuid primary key)`)).toEqual([
-      "public.appointments: unclassified table without tenant_id",
+    // A fixture name no task will create (T-044: "appointments" was the example here until it became real;
+    // the fifth collision of this kind, so fixtures are named fixture_*).
+    expect(await violationsWith(`create table fixture_unclassified (id uuid primary key)`)).toEqual([
+      "public.fixture_unclassified: unclassified table without tenant_id",
     ]);
   });
 

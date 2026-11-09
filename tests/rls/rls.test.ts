@@ -390,6 +390,9 @@ describe("functions (TEN-16)", () => {
     "consent_withdraw(uuid,text,text)",
     "marketing_contacts()",
     "patient_consents(uuid)",
+    "booking_confirm(uuid)", // T-044: booking engine (PR-6, DEC-054)
+    "booking_create(uuid,uuid,uuid,timestamp with time zone,uuid,text,text,text,text,boolean)",
+    "booking_slots(uuid,uuid,date,uuid)",
     "leave_add(uuid,uuid,text,date,date,text)", // T-043: staff schedules (PR-48, DEC-053)
     "leave_cancel(uuid,text)",
     "roster_set_week(uuid,date,uuid[],jsonb)",

@@ -1,0 +1,26 @@
+{
+  "leave_add(uuid,uuid,text,date,date,text)": [
+    {
+      "at": 13,
+      "old": "",
+      "new": "  PERFORM public.booking_expire_holds(a.tenant_id); -- T-044: expired holds never block"
+    },
+    {
+      "at": 28,
+      "old": "",
+      "new": "  -- T-044 (UX-33, DEC-053): no live appointment of this staff member at the branch in the leave days.\n  IF EXISTS (SELECT 1 FROM public.appointments ap\n              WHERE ap.tenant_id = a.tenant_id AND ap.branch_id = p_branch AND ap.performer_staff_id = p_staff\n                AND (ap.state = 'booked' OR ap.state = 'held' AND ap.hold_until > clock_timestamp()) AND ap.ends_at > clock_timestamp()\n                AND (ap.starts_at AT TIME ZONE b.timezone)::date BETWEEN p_from AND p_to) THEN\n    RAISE EXCEPTION 'ERR_VERSION_CONFLICT: appointment_conflict' USING ERRCODE = '55000';\n  END IF;"
+    }
+  ],
+  "roster_set_week(uuid,date,uuid[],jsonb)": [
+    {
+      "at": 15,
+      "old": "",
+      "new": "  PERFORM public.booking_expire_holds(a.tenant_id); -- T-044: expired holds never block"
+    },
+    {
+      "at": 54,
+      "old": "",
+      "new": "  -- T-044 (UX-33, DEC-053): every live appointment of a listed staff member in the edited days must\n  -- still lie inside one work shift of its performer and outside every break.\n  IF EXISTS (SELECT 1 FROM public.appointments ap\n              WHERE ap.tenant_id = a.tenant_id AND ap.branch_id = p_branch AND ap.performer_staff_id = ANY (p_staff)\n                AND (ap.state = 'booked' OR ap.state = 'held' AND ap.hold_until > clock_timestamp()) AND ap.ends_at > clock_timestamp()\n                AND (ap.starts_at AT TIME ZONE b.timezone)::date BETWEEN greatest(p_week, v_today) AND p_week + 6\n                AND (NOT EXISTS (SELECT 1 FROM public.staff_shifts w\n                                  WHERE w.tenant_id = ap.tenant_id AND w.branch_id = ap.branch_id AND w.staff_id = ap.performer_staff_id AND w.kind = 'work'\n                                    AND w.shift_date = (ap.starts_at AT TIME ZONE b.timezone)::date\n                                    AND public.roster_instant(w.shift_date, w.starts, b.timezone) <= ap.starts_at\n                                    AND ap.ends_at <= public.roster_instant(w.shift_date, w.ends, b.timezone))\n                     OR EXISTS (SELECT 1 FROM public.staff_shifts br\n                                 WHERE br.tenant_id = ap.tenant_id AND br.branch_id = ap.branch_id AND br.staff_id = ap.performer_staff_id AND br.kind = 'break'\n                                   AND br.shift_date = (ap.starts_at AT TIME ZONE b.timezone)::date\n                                   AND public.roster_instant(br.shift_date, br.starts, b.timezone) < ap.ends_at\n                                   AND ap.starts_at < public.roster_instant(br.shift_date, br.ends, b.timezone)))) THEN\n    RAISE EXCEPTION 'ERR_VERSION_CONFLICT: appointment_conflict' USING ERRCODE = '55000';\n  END IF;"
+    }
+  ]
+}

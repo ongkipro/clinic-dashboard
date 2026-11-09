@@ -166,6 +166,8 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["roster_set_week", async (t) => ["select roster_set_week($1, date_trunc('week', current_date + 14)::date, '{}'::uuid[], '[]'::jsonb)", [t.branch]], ["owner"]],
     ["leave_add", async (t, me) => ["select leave_add($1, $2, 'leave', current_date + 14, current_date + 14, 'alasan uji')", [t.branch, me.staffId]], ["owner"]],
     ["leave_cancel", async () => ["select leave_cancel($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["booking_create", async (t) => ["select booking_create($1, gen_random_uuid(), gen_random_uuid(), now() + interval '1 day', null, 'phone', null, null, null, false)", [t.branch]], ["fo_cashier"]],
+    ["booking_confirm", async () => ["select booking_confirm($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {
