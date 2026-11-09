@@ -233,6 +233,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A gate that the inner writer also checks survives its mutation while there is work to do: test it where there is nothing to do.
   - heavy-run runs commands from another directory: call scripts with `bash <absolute path>`, never `./script`.
 
+- **T-040** (patient profile, no migration):
+  - A projection that short-circuits before the database reader skips the database's own refusal and audit: call the guarded reader first.
+  - A writer that takes only a child id (`consent_withdraw(consent)`) needs the parent checked by the page that names it.
+  - Isolation cases must not echo the input in the result body: the gate reads any victim id as a leak.
+  - A select whose options shrink after a submit keeps a stale choice in client state: derive the effective choice from the options.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).
