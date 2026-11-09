@@ -37,6 +37,7 @@ const profil = await import("../../src/app/(app)/pasien/[id]/actions"); // T-040
 const hariIni = await import("../../src/app/(app)/hari-ini/actions"); // T-047
 const antrean = await import("../../src/app/(app)/antrean/actions"); // T-048
 const privasi = await import("../../src/app/(app)/privasi/actions"); // T-039
+const daftar = await import("../../src/app/(app)/pasien/_components/actions"); // T-041
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -103,6 +104,9 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["privasi assessAction", (f) => privasi.assessAction({}, f), () => ({ key: U(82), id: U(83) })],
   ["privasi concludeAction", (f) => privasi.concludeAction({}, f), () => ({ key: U(84), id: U(83), notifiable: "no", reason: "Alasan uji konteks" })],
   ["privasi closeAction", (f) => privasi.closeAction({}, f), () => ({ key: U(85), id: U(83) })],
+  ["daftar-pasien searchAction", (f) => daftar.searchAction({}, f), () => ({ q: "Sinta" })],
+  ["daftar-pasien saveSegmentAction", (f) => daftar.saveSegmentAction({}, f), () => ({ key: U(87), name: "Segmen uji", visiting_now: "on" })],
+  ["daftar-pasien deleteSegmentAction", (f) => daftar.deleteSegmentAction({}, f), () => ({ key: U(88), id: U(89) })],
   ["privasi noticeAction", (f) => privasi.noticeAction({}, f), () => ({ key: U(86), id: U(83), recipient_kind: "authority", recipient: "Otoritas", sent_at: "2026-11-01T10:00",
     channel: "Surat", content_summary: "Ringkasan pemberitahuan uji", file: new File(["%PDF-1.4"], "a.pdf", { type: "application/pdf" }) })],
   ["jadwal-staf saveWeekAction", (f) => jadwal.saveWeekAction({}, f), () => ({ branch: BRANCH_1, week: "2030-01-07" })],

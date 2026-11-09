@@ -257,6 +257,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - `runCommand` keeps only a fingerprint of the body: secrets in the body are not stored, but bytes do not belong there either (a Buffer is not a valid body); name a file by its checksum.
   - Playwright `getByLabel("Penerima")` also matches "Nama penerima": use `exact: true` for short labels.
 
+- **T-041** (patient search, migration 0066):
+  - A rate limit that must keep its count and alert cannot raise inside `withTenantContext` (the rollback erases both): return the refusal as a value and throw after the commit.
+  - SQL-language functions cannot take `record` arguments: pass scalars (or use plpgsql).
+  - A table no app role reads must not be granted to `clinic_operator` either (vendor-authority 2.8: the operator never sees more than the app); give it support class `never`.
+  - A browser spec inside the repository is typechecked by `next build`: run typecheck after writing it.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

@@ -4,7 +4,7 @@
 // (identity_bidx, HMAC) for equality lookup; clinic_app cannot select either column. Patients are
 // never deleted (PRIV-3, S-05). Writes go only through patient_register (migration 0058).
 import { sql } from "drizzle-orm";
-import { boolean, check, date, foreignKey, integer, bigint, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, integer, bigint, jsonb, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { branches, staff, tenants } from "../org/schema";
 
 export const IDENTITY_TYPES = ["nik", "passport", "kitas", "newborn_via_guardian"] as const;
@@ -209,5 +209,48 @@ export const consents = pgTable(
     check("consents_withdrawal_check", sql`(${t.withdrawnAt} is null and ${t.withdrawnBy} is null and ${t.withdrawnAs} is null and ${t.withdrawChannel} is null and ${t.withdrawReason} is null)
       or (${t.withdrawnAt} is not null and ${t.withdrawnBy} is not null and ${t.withdrawnAs} is not null and ${t.withdrawChannel} is not null
           and ${t.withdrawReason} is not null and length(btrim(${t.withdrawReason})) between 3 and 500 and ${t.withdrawnAt} >= ${t.grantedAt})`),
+  ],
+);
+
+// Patient search log (PR-76; T-041, DEC-060): one row per search, never the query text; append-only. Used
+// for the per-staff rate limit (30 a minute) and the hourly abuse alert to the facility head (over 200).
+export const patientSearchLog = pgTable(
+  "patient_search_log",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
+    role: text("role").notNull(),
+    branchId: uuid("branch_id"),
+    searchedAt: timestamp("searched_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "patient_search_log_staff_fk", columns: [t.tenantId, t.staffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "patient_search_log_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    unique("patient_search_log_tenant_id_id_key").on(t.tenantId, t.id),
+    index("patient_search_log_staff_idx").on(t.tenantId, t.staffId, t.searchedAt),
+  ],
+);
+
+// Saved segments of Daftar Pasien (T-041): filters only (never a search text), private to their owner.
+export const patientSegments = pgTable(
+  "patient_segments",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
+    name: text("name").notNull(),
+    filters: jsonb("filters").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "patient_segments_staff_fk", columns: [t.tenantId, t.staffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("patient_segments_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("patient_segments_name_key").on(t.tenantId, t.staffId, t.name),
+    check("patient_segments_name_check", sql`length(btrim(${t.name})) between 2 and 60`),
+    check("patient_segments_filters_check", sql`jsonb_typeof(${t.filters}) = 'object' and ${t.filters} - 'branch_id' - 'last_visit' - 'visiting_now' = '{}'::jsonb and ${t.filters} <> '{}'::jsonb`),
   ],
 );
