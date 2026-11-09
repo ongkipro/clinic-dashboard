@@ -1,0 +1,257 @@
+{
+ "_about": "T-049 M1 exit: PLAN.md §1 M1 exit check scenarios mapped to the exact test cases that prove each (JUnit classname = file, name = 'describe > test'). Checked by check-scenarios.py: every scenario title exists in docs/spec/02-PRD.md §8; every mapped test name occurs in its file; with a JUnit report, every mapped test case is present once, passed and not skipped, and the report has no failure. 'items' are M1 requirements without a PRD §8 scenario title, checked the same way. 'proves' states which Given/When/Then parts the cases assert; 'open' names a part not proven in M1 and the task where it completes.",
+ "scenarios": [
+  {
+   "scenario": "PR-1 tenant isolation",
+   "file": "tests/patients/registration.test.ts",
+   "tests": [
+    "T-037 Done-when > scenario PR-1: tenant A requesting B's patient by id gets not-found and an audit event records it; an unknown id is answered the same"
+   ],
+   "proves": "with patient rows (M0 had fixture rows only): another tenant's patient by id is not-found and the denied attempt is audited in the caller's chain",
+   "open": "none in M1 (M0 deferred this half to M1)"
+  },
+  {
+   "scenario": "PR-1 tenant isolation",
+   "file": "tests/isolation/isolation.test.ts",
+   "tests": [
+    "coverage gate > every route, job and export in src has a cross-tenant negative case"
+   ],
+   "proves": "every M1 route and action has a cross-tenant negative case with a positive control",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-2 structured hours",
+   "file": "tests/org/branches.test.ts",
+   "tests": [
+    "branch_is_open (plan r1 P1-2; scenario PR-2 fixture) > 09:00-20:00 with a midday break and a closure date, in WIB, WITA and WIT: instants, intervals and boundaries",
+    "branch_is_open (plan r1 P1-2; scenario PR-2 fixture) > a slot ending at midnight is open with 24:00; an interval across midnight is not; unknown and foreign branches are false, never null"
+   ],
+   "proves": "structured weekly hours with a break and closures decide open/closed per branch timezone",
+   "open": "the public listing of hours: T-123"
+  },
+  {
+   "scenario": "PR-2 structured hours",
+   "file": "tests/scheduling/booking.test.ts",
+   "tests": [
+    "Done-when > the slot half of scenario PR-2: slots only inside branch hours, none on a closure date or in a closure range"
+   ],
+   "proves": "booking offers slots only inside the hours and never on a closure",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-4 consent withdrawal",
+   "file": "tests/patients/consents.test.ts",
+   "tests": [
+    "scenario PR-4, ledger half > marketing consent is withdrawn and recorded; care notice stays active; the history keeps every row",
+    "scenario PR-4, ledger half > text versions are gap-free and immutable; a change is a new version; never backdated"
+   ],
+   "proves": "the ledger half: withdrawal recorded with history; versions immutable",
+   "open": "a queued promo not sent and care reminders continuing: T-094 / T-095"
+  },
+  {
+   "scenario": "PR-4 consent withdrawal",
+   "file": "tests/patients/profile.test.ts",
+   "tests": [
+    "consents on the profile > a recorder grants and withdraws; the profile shows both; the care notice is not withdrawable; finance cannot record"
+   ],
+   "proves": "withdrawal from the patient profile",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-5 shared phone",
+   "file": "tests/patients/registration.test.ts",
+   "tests": [
+    "T-037 Done-when > scenario PR-5: two patients with the same phone; a search by that phone lists both for an explicit choice, minimal projection only"
+   ],
+   "proves": "two patients may share a phone; the search lists both for an explicit choice",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-6 resources and source",
+   "file": "tests/scheduling/booking.test.ts",
+   "tests": [
+    "Done-when > scenario PR-6: a doctor + room service booked from source ig-ad at B2 reserves only doctor and room; source, branch and version stored"
+   ],
+   "proves": "the service's resources reserved together; the source, branch and version stored",
+   "open": "the public booking link: T-126; booking DP: T-077"
+  },
+  {
+   "scenario": "PR-7 outstanding list",
+   "file": "tests/visits/visits.test.ts",
+   "tests": [
+    "scenario PR-7: the board and the close blocker for an unpaid bill > check-in opens one visit; an unpaid bill lists it under Belum dibayar and blocks the close until settled",
+    "scenario PR-7: the board and the close blocker for an unpaid bill > pending dispensing or treatment (in progress or blocked) blocks the close and names the blocker; not needed does not"
+   ],
+   "proves": "a visit with an unpaid bill is on the outstanding list and cannot close until settled (the payment column standing in for the cashier, DEC-057)",
+   "open": "the unpaid addition and the cashier's writer: T-074 with T-071 / T-072 (M4)"
+  },
+  {
+   "scenario": "PR-8 lateness default",
+   "file": "tests/scheduling/lateness.test.ts",
+   "tests": [
+    "scenario PR-8: lateness default off > a new branch, a patient 30 minutes late: the slot is not auto-released; nothing changes",
+    "scenario PR-8: lateness default off > with the rule on (15 min) the late appointment is released: no-show, reservations freed, the slot bookable again, no money moves"
+   ],
+   "proves": "off by default; released only when the branch enabled SET-15",
+   "open": "the scheduled job calling the release: an operations task"
+  },
+  {
+   "scenario": "PR-41 clinical review before publish",
+   "file": "tests/catalog/catalog.test.ts",
+   "tests": [
+    "scenario PR-41 clinical review before publish > a manager edits a treatment's contraindications and publishes: the change waits for clinical-lead review and the previous version stays active"
+   ],
+   "proves": "a clinical change waits for review; the previous version stays active",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-42 branch price",
+   "file": "tests/catalog/prices.test.ts",
+   "tests": [
+    "T-035 Done-when: owner-only, effective-dated override > scenario PR-42 (price half): a facial at Rp500,000 and an override of Rp450,000 at branch B; branch B reads Rp450,000, branch A the normal price"
+   ],
+   "proves": "the price half: the branch override applies at its branch only",
+   "open": "the invoice snapshot: T-071 / T-072; the package session value: T-076"
+  },
+  {
+   "scenario": "PR-48 roster",
+   "file": "tests/scheduling/rosters.test.ts",
+   "tests": [
+    "Done-when: shifts and leave persist per branch; availability excludes a doctor on leave > a week is saved and read back per branch; a doctor on leave on a date is not available that date"
+   ],
+   "proves": "a doctor on leave is not available that date",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-48 roster",
+   "file": "tests/scheduling/booking.test.ts",
+   "tests": [
+    "Done-when > the full scenario PR-48: a doctor on leave on a date has no slot that date"
+   ],
+   "proves": "no slot for the doctor on leave",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-49 record copy",
+   "file": "tests/patients/profile.test.ts",
+   "tests": [
+    "scenario PR-49, role projections > each of the 16 roles gets exactly its sections; the cashier sees no clinical tab",
+    "scenario PR-49, role projections > the loader, per role on a real database: readers get the patient and the role's sections; the rest nothing"
+   ],
+   "proves": "the role projections of the profile (TASKS T-040 Done-when)",
+   "open": "the record copy (a PDF of signed records, logged): T-053; balance, packages and receivables: T-075 / T-076 / T-078"
+  },
+  {
+   "scenario": "PR-71 walk-in",
+   "file": "tests/visits/queue.test.ts",
+   "tests": [
+    "scenario PR-71: walk-in with the next number of the day > a patient without a booking gets a walk-in visit numbered A-001, the next A-002; booked check-ins are numbered too",
+    "the paired TV display: no patient name, ever > pairing stores only the hash; the feed has numbers and rooms only; SET-40 applies; revoked and unknown get null"
+   ],
+   "proves": "a walk-in opens a visit with the next number; the TV payload has no patient name",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-76 search projection",
+   "file": "tests/patients/search.test.ts",
+   "tests": [
+    "scenario PR-76: search projection > a cashier searching by phone sees name, masked phone, MRN and visit status; no diagnosis or clinical keys",
+    "rate limit, abuse alert and no query text anywhere > the 31st search in a minute is refused yet counted; over 200 in an hour alerts the facility head once; no query text stored or logged"
+   ],
+   "proves": "name and visit status without a diagnosis; the rate limit; no query text stored or logged",
+   "open": "invoice-number search and invoice totals: T-071 / T-072"
+  },
+  {
+   "scenario": "PR-83 no-show without DP",
+   "file": "tests/scheduling/appointments.test.ts",
+   "tests": [
+    "Done-when: scenario PR-83 no-show without DP > FO marks Tidak Datang after the appointment time: state no-show, no money moves, the slot is released, an event is recorded",
+    "cancel, confirm, reschedule > Ubah Jadwal moves the booking atomically: old rescheduled → new booked, the old slot free, a clash changes nothing"
+   ],
+   "proves": "no-show without DP (no money moves) and the reschedule (PLAN M1: no-show, reschedule)",
+   "open": "the CS follow-up task: T-093; reminder replies: T-095"
+  },
+  {
+   "scenario": "PR-84 branch switch",
+   "file": "tests/org/context.test.ts",
+   "tests": [
+    "scenario PR-84 branch switch (record half) > a doctor allowed at B1 and B2 with B1 active switches to B2: the switch and later actions record B2"
+   ],
+   "proves": "the switch and later actions record B2",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-84 branch switch",
+   "file": "tests/visits/queue.test.ts",
+   "tests": [
+    "calling the queue > scenario PR-84: a manager of B1 and B2 switching to B2 sees B2's queue and acts on B2 only"
+   ],
+   "proves": "Antrean shows B2 patients and actions record B2 (with a manager)",
+   "open": "the doctor's Antrean (UX-8): T-052"
+  },
+  {
+   "scenario": "PR-88 service needs a room",
+   "file": "tests/catalog/service.test.ts",
+   "tests": [
+    "T-034 Done-when: Master Layanan saved and versioned with resources and staff eligibility > a service with durations and resources is active at once; eligibility is clinical and waits for the facility head; every version keeps its own rows"
+   ],
+   "proves": "a service declares its resources and durations",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-88 service needs a room",
+   "file": "tests/scheduling/booking.test.ts",
+   "tests": [
+    "Done-when > scenario PR-88: a service needing a laser has slots at B1 and none at B2 (no laser there)"
+   ],
+   "proves": "no slot where the resource is missing",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-92 breach record",
+   "file": "tests/privacy/privacy.test.ts",
+   "tests": [
+    "scenario PR-92: the breach register > a suspected breach recorded: the register shows the awareness time, the 3×24 h deadline and the notice fields; notified path audited",
+    "scenario PR-92: the breach register > the not-notifiable path keeps its reason when closed; transitions out of order are refused"
+   ],
+   "proves": "awareness time, the 72 h deadline and notice evidence; every transition audited",
+   "open": "data-subject requests (PR-50): T-121"
+  }
+ ],
+ "items": [
+  {
+   "item": "M1 exit: book → check-in → board on a real database",
+   "file": "docs/evidence/m1/m1-flow.test.ts",
+   "tests": [
+    "M1 exit: book → check-in → board on a real database > a booked patient is checked in, shown on Hari Ini and Antrean, blocked while unpaid, and closed once settled"
+   ],
+   "proves": "registration (encrypted NIK) → consent → booking from slots() → check-in → Hari Ini and Antrean → TV without a name → unpaid blocks the close → settled closes, slot released, ticket done, through the real writers"
+  },
+  {
+   "item": "PR-85 duplicate patient merge",
+   "file": "tests/patients/merge.test.ts",
+   "tests": [
+    "Done-when: merge then unmerge restores both patients with all linked rows; the audit shows actor and reason > while merged the duplicate resolves to the survivor everywhere; after the unmerge both are exactly as before"
+   ],
+   "proves": "merge then unmerge restores both patients with all linked rows; the audit shows actor and reason (TASKS T-042 Done-when)"
+  },
+  {
+   "item": "CLIN-011 catalog versions immutable once referenced",
+   "file": "tests/catalog/catalog.test.ts",
+   "tests": [
+    "CLIN-011: versions are immutable; referenced once; never deleted > content cannot change before or after reference; referenced_at is set once; no delete or truncate; the app cannot write the tables"
+   ],
+   "proves": "catalog versions are immutable and never deleted"
+  }
+ ],
+ "deferred": [
+  {
+   "scenario": "PR-85 import dry-run",
+   "completes_in": "T-128 (M9 opening-data import)"
+  },
+  {
+   "scenario": "PR-83 no-show",
+   "completes_in": "T-077 (M4 booking DP forfeit) and T-093 (M6 CS follow-up task)"
+  }
+ ]
+}
