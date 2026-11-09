@@ -227,6 +227,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - Narrow week columns cannot hold row actions: give the week compact rows and keep the actions on the day view.
   - Level 2 roles (finance) take no branch: fixtures that assign one hit `staff_branches_level3_check`.
 
+- **T-046** (lateness release, no migration):
+  - An early "off, nothing to do" return must not skip the scope and role checks: run the guarded reader first, then decide.
+  - A "today" window misses work that crosses midnight in branch time: use yesterday and today.
+  - A gate that the inner writer also checks survives its mutation while there is work to do: test it where there is nothing to do.
+  - heavy-run runs commands from another directory: call scripts with `bash <absolute path>`, never `./script`.
+
 ### Gotchas worth keeping (added 2026-11-05)
 
 - `now()` in PostgreSQL is the **transaction start**. A validity check (membership, session, grant) that must hold "now" uses `clock_timestamp()` after taking the lock that serializes the change; otherwise a transaction opened before a revocation keeps acting (HYG-008).

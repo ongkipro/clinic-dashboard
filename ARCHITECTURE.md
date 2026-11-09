@@ -59,6 +59,7 @@ flowchart LR
 | `scheduling/rosters` | staff schedules (PR-48, DATA-16): `staff_shifts` and `staff_leave` per branch; `roster_set_week` (listed staff only), `leave_add`, `leave_cancel`; a statement-level check that one person is never in two places; readers `staff_available` and `roster_window` for booking; page `/jadwal-staf` (DEC-053) | T-043 |
 | `scheduling/booking` | booking engine (PR-6, DATA-16): `appointments` and `resource_reservations` with an exclusion constraint (btree_gist); `booking_slots`, `booking_create` (runCommand), `booking_confirm`, holds released at write time; the UX-33 conflict check in the roster writers (DEC-054) | T-044 |
 | `scheduling/appointments` | appointment states (PR-83): confirm, cancel, no-show, reschedule writers through `runCommand`; `appointment_live`; the calendar reader `appointments_window`; page `/jadwal` with Hari Ini, Minggu, filters and Buat Janji (DEC-055) | T-045 |
+| `scheduling/lateness` | lateness release (PR-8, SET-15): off by default; when a branch sets it, late booked or confirmed appointments (yesterday and today, branch time) are released as no-show through the T-045 writer; `releaseLate` checks the go-live gate and writer roles first | T-046 |
 | `compliance` | obligations, evidence files and approvals, feature gates | T-019 |
 | `vendor/staff` | vendor staff, roles, IP allowlist, maker-checker requests, `vendor_guard`, `vendor_log` | T-020 |
 | `vendor/profile` | vendor profile + residency gate | T-018 |
