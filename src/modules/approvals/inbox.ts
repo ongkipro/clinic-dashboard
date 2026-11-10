@@ -24,6 +24,8 @@ export const APPROVAL_TYPES: Record<string, { label: string; approverRoles: read
   // T-034 (DEC-047 (2)): a BHP recipe change; any pharmacist of the tenant, the facility head or the
   // owner only while no pharmacist other than the requester could.
   catalog_materials_review: { label: "Review bahan (BHP) katalog", approverRoles: ["pharmacist", "facility_head", "owner"] },
+  // T-053 (PR-13): a correction of a signed record more than 48 h after signing; never the requesting doctor.
+  record_late_correction: { label: "Koreksi rekam medis", approverRoles: ["records_officer", "facility_head"] },
 };
 // Types the owner decides only while no facility head other than the requester could (DEC-031 D2,
 // DEC-046 (1)).

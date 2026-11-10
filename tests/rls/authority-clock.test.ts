@@ -205,6 +205,9 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["plan_item_add", async () => ["select plan_item_add($1, gen_random_uuid(), '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["plan_item_remove", async () => ["select plan_item_remove($1, gen_random_uuid())", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["plan_close", async () => ["select plan_close($1, gen_random_uuid(), 'completed')", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["record_sign", async () => ["select record_sign($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["record_correct", async () => ["select record_correct($1, '{}'::jsonb, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["record_copy_request", async () => ["select record_copy_request(gen_random_uuid(), 'alasan uji')", []], ["fo_cashier"]],
     ["credential_decide", async () => ["select credential_decide($1, true, null)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["credential_end", async () => ["select credential_end($1, 'suspended', 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
   ];

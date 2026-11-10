@@ -306,3 +306,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A mutant that removes a writer check is equivalent when a table CHECK refuses the same input and the writer maps `check_violation` to invalid input; drop it with that reason rather than adding a test that cannot tell them apart.
 - A nurse has no second factor (PR-3 `TOTP_ROLES`); a browser spec that enrols TOTP for every role waits forever on `/aktifkan-2fa`.
 
+## 2026-11-10 — T-053 Signing and records
+
+- Raw Better Auth API calls (`.api`) are allowed only in `src/auth/server.ts` (SEC-21 guard in `tests/vendor/host.test.ts`); a step-up check belongs in the auth factory, not in a module.
+- `visits_guard` refuses every update of a closed visit; a writer that may run after close must filter `closed_at IS NULL` on its visit update.
+- `runCommand` results land in `idempotency_records`: keep them to ids and counts and read content with a separate definer (the copy request).
+- `ARRAY(SELECT ...)` is never NULL; `coalesce` over it never falls back — branch on the state instead.
+- A drift test of re-created functions pins the exact line blocks (`*-drift.expected.json`); compute them once from the two migrated databases with a scratch test, then review each block.
+

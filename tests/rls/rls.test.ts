@@ -415,6 +415,12 @@ describe("functions (TEN-16)", () => {
     "pemeriksaan_visits(uuid)",
     "exam_sheet(uuid)",
     "plan_options(uuid)",
+    "record_sign(uuid)", // T-053: signing, corrections, patient copy, retention (PR-13, PR-49)
+    "record_correct(uuid,jsonb,text)",
+    "record_get(uuid)",
+    "record_copy_request(uuid,text)",
+    "record_copy_data(uuid)",
+    "retention_until(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",
     "credential_end(uuid,text,text)",

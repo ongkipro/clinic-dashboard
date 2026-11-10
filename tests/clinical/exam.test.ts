@@ -389,19 +389,14 @@ describe("authority, lifecycle and the visit step", () => {
     await expect(h.admin.query(`update care_plans set title = 'Lain' where id = $1`, [planId])).rejects.toThrow(/keeps its patient/);
     await expect(h.admin.query(`update plan_items set qty = 5 where id = $1`, [itemId])).rejects.toThrow(/only by removal/);
     await expect(h.admin.query(`delete from plan_items where id = $1`, [itemId])).rejects.toThrow(/never deleted/);
-    // A non-draft examination (as T-053 will sign) freezes the examination and its parts.
-    await h.admin.query(`alter table examinations drop constraint examinations_state_check`);
-    try {
-      await h.admin.query(`update examinations set state = 'signed' where id = $1`, [examId]);
+    // A signed examination (T-053 signs through record_sign; here the database owner stands in) freezes the
+    // examination and its parts.
+    {
+      await h.admin.query(`update examinations set state = 'signed', signed_at = now(), signed_by = author_id, signed_as = 'doctor', content_hash = repeat('a', 64) where id = $1`, [examId]);
       await expect(h.admin.query(`update examinations set assessment = 'x' where id = $1`, [examId])).rejects.toThrow(/signed examination is final/);
       await expect(h.admin.query(`delete from face_map_marks where id = $1`, [markId])).rejects.toThrow(/signed examination is final/);
       await expect(h.admin.query(`update intake_verifications set decision = 'corrected', corrected_value = 'y' where examination_id = $1`, [examId])).rejects.toThrow(/signed examination is final/);
       expect(await code(as(DOC, (db) => saveExam(db, key(), examId, { assessment: "x" })))).toBe("ERR_VERSION_CONFLICT");
-    } finally {
-      await h.admin.query(`alter table examinations disable trigger examinations_guard`);
-      await h.admin.query(`update examinations set state = 'draft' where id = $1`, [examId]);
-      await h.admin.query(`alter table examinations enable always trigger examinations_guard`);
-      await h.admin.query(`alter table examinations add constraint examinations_state_check check (state in ('draft'))`);
     }
     for (const t of TABLES) await expect(h.admin.query(`truncate ${t} cascade`)).rejects.toThrow();
     const trig = (await h.admin.query(`select tgname, tgenabled from pg_trigger where tgrelid = any($1::regclass[]) and not tgisinternal order by 1`, [TABLES])).rows;

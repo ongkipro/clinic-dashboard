@@ -1,0 +1,31 @@
+{
+  "examinations_guard()": [
+    {
+      "at": 25,
+      "old": "",
+      "new": "  IF NEW.state <> 'draft' AND to_jsonb(NEW) - 'state' - 'signed_at' - 'signed_by' - 'signed_as' - 'content_hash' - 'updated_at'\n                             IS DISTINCT FROM to_jsonb(OLD) - 'state' - 'signed_at' - 'signed_by' - 'signed_as' - 'content_hash' - 'updated_at' THEN\n    RAISE EXCEPTION 'signing changes only the state and the signature' USING ERRCODE = '42501';\n  END IF;"
+    }
+  ],
+  "exam_sheet(uuid)": [
+    {
+      "at": 12,
+      "old": "",
+      "new": "  rv public.record_versions;\n  c jsonb;"
+    },
+    {
+      "at": 22,
+      "old": "",
+      "new": "  -- T-053: a signed examination shows its latest version (the row itself never changes after signing).\n  rv := public.record_current(v.tenant_id, e.id);\n  c := CASE WHEN e.state = 'signed' THEN rv.content ELSE to_jsonb(e) END;"
+    },
+    {
+      "at": 43,
+      "old": "              'subjective', e.subjective, 'objective', e.objective, 'assessment', e.assessment, 'plan_note', e.plan_note,\n              'template_key', e.template_key, 'template_values', e.template_values, 'vitals', e.vitals, 'icd10_codes', to_jsonb(e.icd10_codes),\n              'updated_at', e.updated_at,",
+      "new": "              'subjective', c -> 'subjective', 'objective', c -> 'objective',\n              'assessment', c -> 'assessment', 'plan_note', c -> 'plan_note',\n              'template_key', c -> 'template_key', 'template_values', c -> 'template_values',\n              'vitals', c -> 'vitals', 'icd10_codes', c -> 'icd10_codes',\n              'updated_at', e.updated_at, 'signed_at', e.signed_at, 'signed_as', e.signed_as, 'version', rv.version, 'content_hash', rv.content_hash,"
+    },
+    {
+      "at": 52,
+      "old": "        FROM (SELECT pv.id, pv.checked_in_at, br.name AS branch_name, pi.complaint, pe.assessment, pe.icd10_codes, pa.display_name AS author_name",
+      "new": "        FROM (SELECT pv.id, pv.checked_in_at, br.name AS branch_name, pi.complaint,\n                     CASE WHEN pe.state = 'signed' THEN (public.record_current(pe.tenant_id, pe.id)).content ->> 'assessment' ELSE pe.assessment END AS assessment,\n                     CASE WHEN pe.state = 'signed' THEN ARRAY(SELECT jsonb_array_elements_text((public.record_current(pe.tenant_id, pe.id)).content -> 'icd10_codes'))\n                          ELSE pe.icd10_codes END AS icd10_codes,\n                     pa.display_name AS author_name"
+    }
+  ]
+}
