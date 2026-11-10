@@ -17,3 +17,4 @@ export * from "../../modules/scheduling/schema";
 export * from "../../modules/visits/schema";
 export * from "../../modules/privacy/schema";
 export * from "../../modules/org/licences/schema";
+export * from "../../modules/clinical/schema";

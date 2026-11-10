@@ -39,6 +39,7 @@ const antrean = await import("../../src/app/(app)/antrean/actions"); // T-048
 const privasi = await import("../../src/app/(app)/privasi/actions"); // T-039
 const daftar = await import("../../src/app/(app)/pasien/_components/actions"); // T-041
 const kredensial = await import("../../src/app/(app)/staf/kredensial-actions"); // T-050
+const pendampingan = await import("../../src/app/(app)/pendampingan/actions"); // T-051
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -110,6 +111,8 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["daftar-pasien deleteSegmentAction", (f) => daftar.deleteSegmentAction({}, f), () => ({ key: U(88), id: U(89) })],
   ["privasi noticeAction", (f) => privasi.noticeAction({}, f), () => ({ key: U(86), id: U(83), recipient_kind: "authority", recipient: "Otoritas", sent_at: "2026-11-01T10:00",
     channel: "Surat", content_summary: "Ringkasan pemberitahuan uji", file: new File(["%PDF-1.4"], "a.pdf", { type: "application/pdf" }) })],
+  ["pendampingan openAction", (f) => pendampingan.openAction({}, f), () => ({ key: U(95), visit: U(96) })],
+  ["pendampingan saveAction", (f) => pendampingan.saveAction({}, f), () => ({ key: U(97), send_key: U(98), visit: U(96), intake: U(99), intent: "save", complaint: "Uji konteks" })],
   ["staf recordCredentialAction", (f) => kredensial.recordCredentialAction({}, f), () => ({ key: U(91), staff_id: U(46), kind: "str", profession: "dokter", number: "STR-1", issuer: "Konsil Kesehatan", valid_from: "2024-01-01" })],
   ["staf decideCredentialAction", (f) => kredensial.decideCredentialAction({}, f), () => ({ key: U(92), id: U(93), staff_id: U(46), verdict: "verified" })],
   ["staf endCredentialAction", (f) => kredensial.endCredentialAction({}, f), () => ({ key: U(94), id: U(93), staff_id: U(46), state: "suspended", reason: "Uji konteks" })],

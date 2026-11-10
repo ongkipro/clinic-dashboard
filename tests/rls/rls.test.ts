@@ -397,6 +397,12 @@ describe("functions (TEN-16)", () => {
     "appointments_window(uuid,date,date)",
     "patient_merge(uuid,uuid,text)", // T-042: duplicate merge (PR-85, DEC-061)
     "patient_unmerge(uuid,text)",
+    "intake_open(uuid)", // T-051: BC Pendampingan intake (PR-9, CLIN-001–003)
+    "intake_save(uuid,jsonb)",
+    "intake_send(uuid)",
+    "pendampingan_visits(uuid)",
+    "pendampingan_visit(uuid)",
+    "patient_cautions(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",
     "credential_end(uuid,text,text)",

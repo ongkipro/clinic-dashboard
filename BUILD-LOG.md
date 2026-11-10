@@ -291,3 +291,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - The device's command guard (cc-safety-net `secret.basename.credentials`) blocks every shell command that names a path segment `credentials`, and `rm -r` outside the session's directory. The TASKS path `src/modules/org/credentials/**` would have blocked mutations, staging and merge, so the owner chose the folder `src/modules/org/licences` (DEC-062). Lesson: never name a source folder `credentials`, `secrets` or similar on this device; the guard is not bypassed.
 - Next.js: a non-component export of a `"use client"` module reaches a Server Component only as a client reference (labels rendered empty); a `"use server"` module may export only async functions. Shared constants go to a plain module.
 - Forms that keep one idempotency key per mount fail the second attempt (`runCommand` spends a key on success and on refusal alike): bump `n` in every action answer and remount the hidden key with it.
+
+## 2026-11-10 — T-051 BC Pendampingan
+
+- A refusal that must stay audited is a committed value, not a raise: `runCommand` rolls back its savepoint and `withTenantContext` the transaction on a throw, taking the audit row with them (0066, 0069).
+- A `Row` link covers its whole row (`after:inset-0`): an action inside the row is under the overlay and cannot be clicked; keep one link per row and put actions on the detail page.
+- A page `main` grid needs `grid-cols-[minmax(0,1fr)]`, or one wide child stretches the column past 390 px at 200 %.
+- A mutation that leaves invalid SQL fails the migration, not a test: its log has "Tests" with every case skipped — check for "skipped" too, not only for a "Tests" line.
