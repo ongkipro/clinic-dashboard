@@ -42,6 +42,7 @@ const kredensial = await import("../../src/app/(app)/staf/kredensial-actions"); 
 const pendampingan = await import("../../src/app/(app)/pendampingan/actions"); // T-051
 const pemeriksaan = await import("../../src/app/(app)/pemeriksaan/actions"); // T-052
 const persetujuanTindakan = await import("../../src/app/(app)/persetujuan-tindakan/actions"); // T-054
+const keluhan = await import("../../src/app/(app)/keluhan/actions"); // T-057
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -128,6 +129,12 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
     signature: "data:image/png;base64,iVBORw0KGgo=" })],
   ["persetujuan-tindakan withdrawAction", (f) => persetujuanTindakan.withdrawAction({}, f), () => ({ key: U(119), visit: U(117), consent: U(120), reason: "Uji konteks" })],
   ["persetujuan-tindakan reviewAction", (f) => persetujuanTindakan.reviewAction({}, f), () => ({ key: U(121), visit: U(117), exam: U(122), item: U(123), decision: "cleared" })],
+  ["keluhan flagAction", (f) => keluhan.flagAction({}, f), () => ({ key: U(124), target: `${U(125)}:${U(126)}`, kind: "klinis", triage: "kuning", summary: "Uji konteks" })],
+  ["keluhan takeAction", (f) => keluhan.takeAction({}, f), () => ({ key: U(127), task: U(128) })],
+  ["keluhan triageAction", (f) => keluhan.triageAction({}, f), () => ({ key: U(129), task: U(128), triage: "merah" })],
+  ["keluhan noteAction", (f) => keluhan.noteAction({}, f), () => ({ key: U(130), task: U(128), note: "Uji konteks" })],
+  ["keluhan resolveAction", (f) => keluhan.resolveAction({}, f), () => ({ key: U(131), task: U(128), outcome: "edukasi", note: "Uji konteks" })],
+  ["keluhan reopenAction", (f) => keluhan.reopenAction({}, f), () => ({ key: U(132), task: U(128), note: "Uji konteks" })],
   ["staf recordCredentialAction", (f) => kredensial.recordCredentialAction({}, f), () => ({ key: U(91), staff_id: U(46), kind: "str", profession: "dokter", number: "STR-1", issuer: "Konsil Kesehatan", valid_from: "2024-01-01" })],
   ["staf decideCredentialAction", (f) => kredensial.decideCredentialAction({}, f), () => ({ key: U(92), id: U(93), staff_id: U(46), verdict: "verified" })],
   ["staf endCredentialAction", (f) => kredensial.endCredentialAction({}, f), () => ({ key: U(94), id: U(93), staff_id: U(46), state: "suspended", reason: "Uji konteks" })],

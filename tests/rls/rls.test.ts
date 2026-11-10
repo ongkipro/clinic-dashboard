@@ -437,6 +437,16 @@ describe("functions (TEN-16)", () => {
     "consent_visits(uuid)",
     "consent_visit(uuid)",
     "consent_signature(uuid)",
+    "complaint_readable(uuid,uuid,text)", // T-057: Keluhan Klinis and Layanan (PR-43)
+    "complaint_flag(uuid,jsonb)",
+    "complaint_take(uuid)",
+    "complaint_triage(uuid,text)",
+    "complaint_note(uuid,text)",
+    "complaint_resolve(uuid,text,text)",
+    "complaint_reopen(uuid,text)",
+    "complaint_list(uuid,text)",
+    "complaint_get(uuid)",
+    "complaint_flag_options(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",
     "credential_end(uuid,text,text)",

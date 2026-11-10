@@ -621,3 +621,99 @@ export const contraindicationReviews = pgTable(
       and (${t.reason} is null or length(btrim(${t.reason})) between 3 and 500) and (${t.decision} <> 'blocked' or ${t.reason} is not null)`),
   ],
 );
+
+// T-057 (PR-43, CLIN-016, CLIN-024; migration 0074): Keluhan. A complaint task is Klinis (suspected complication
+// or adverse event; triage merah | kuning | hijau; the branch's clinical pool) or Layanan (service: waiting time,
+// billing, staff behaviour; the branch manager). Raised from a visit note, a staff flag or a pharmacist flag (the
+// message source is reserved for the inbox). Due from SET-31 / SET-31.layanan (working hours of the branch).
+// History in `complaint_events`. Flaggers outside the handlers see status only (DEC-066).
+export const COMPLAINT_KINDS = ["klinis", "layanan"] as const;
+export const COMPLAINT_SOURCES = ["visit_note", "staff_flag", "pharmacist", "message"] as const;
+export const COMPLAINT_TRIAGE = ["merah", "kuning", "hijau"] as const;
+export const COMPLAINT_CATEGORIES = ["waktu_tunggu", "tagihan", "sikap_staf", "lainnya"] as const;
+export const COMPLAINT_STATES = ["open", "in_progress", "resolved"] as const;
+export const COMPLAINT_FLAGGERS = ["fo_cashier", "central_cs", "bc", "doctor", "nurse", "pharmacist", "facility_head", "manager"] as const;
+export const COMPLAINT_OUTCOMES = ["kontrol_gratis", "edukasi", "resep_tambahan", "rujuk", "penjelasan", "jadwal_ulang", "eskalasi_tagihan", "pembinaan_staf", "lainnya"] as const;
+export const COMPLAINT_EVENT_KINDS = ["flagged", "taken", "triaged", "note", "resolved", "reopened", "escalated"] as const;
+
+export const complaintTasks = pgTable(
+  "complaint_tasks",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    visitId: uuid("visit_id"),
+    kind: text("kind", { enum: COMPLAINT_KINDS }).notNull(),
+    source: text("source", { enum: COMPLAINT_SOURCES }).notNull(),
+    triage: text("triage", { enum: COMPLAINT_TRIAGE }),
+    category: text("category", { enum: COMPLAINT_CATEGORIES }),
+    summary: text("summary").notNull(),
+    state: text("state", { enum: COMPLAINT_STATES }).notNull().default("open"),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    assignedTo: uuid("assigned_to"),
+    assignedAs: text("assigned_as"),
+    flaggedBy: uuid("flagged_by").notNull(),
+    flaggedAs: text("flagged_as").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: uuid("resolved_by"),
+    resolvedAs: text("resolved_as"),
+    resolutionOutcome: text("resolution_outcome", { enum: COMPLAINT_OUTCOMES }),
+    resolutionNote: text("resolution_note"),
+    escalatedAt: timestamp("escalated_at", { withTimezone: true }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "complaint_tasks_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "complaint_tasks_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "complaint_tasks_visit_fk", columns: [t.tenantId, t.branchId, t.visitId], foreignColumns: [visits.tenantId, visits.branchId, visits.id] }).onDelete("restrict"),
+    foreignKey({ name: "complaint_tasks_flagged_by_fk", columns: [t.tenantId, t.flaggedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "complaint_tasks_assigned_fk", columns: [t.tenantId, t.assignedTo], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "complaint_tasks_resolved_by_fk", columns: [t.tenantId, t.resolvedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("complaint_tasks_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("complaint_tasks_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
+    index("complaint_tasks_branch_idx").on(t.tenantId, t.branchId, t.state, t.dueAt),
+    index("complaint_tasks_patient_idx").on(t.tenantId, t.patientId),
+    check("complaint_tasks_kind_check", sql`${t.kind} in (${inList(COMPLAINT_KINDS)})
+      and ((${t.kind} = 'klinis') = (${t.triage} is not null and ${t.category} is null))
+      and ((${t.kind} = 'layanan') = (${t.category} is not null and ${t.triage} is null))
+      and (${t.triage} is null or ${t.triage} in (${inList(COMPLAINT_TRIAGE)})) and (${t.category} is null or ${t.category} in (${inList(COMPLAINT_CATEGORIES)}))`),
+    check("complaint_tasks_source_check", sql`${t.source} in (${inList(COMPLAINT_SOURCES)}) and (${t.source} <> 'visit_note' or ${t.visitId} is not null)
+      and (${t.source} <> 'pharmacist' or (${t.kind} = 'klinis' and ${t.flaggedAs} = 'pharmacist'))
+      and ${t.flaggedAs} in (${inList(COMPLAINT_FLAGGERS)}) and (${t.flaggedAs} <> 'manager' or ${t.kind} = 'layanan')`),
+    check("complaint_tasks_state_check", sql`${t.state} in (${inList(COMPLAINT_STATES)})
+      and ((${t.state} = 'open') = (${t.assignedTo} is null and ${t.assignedAs} is null)) and num_nonnulls(${t.assignedTo}, ${t.assignedAs}) in (0, 2)
+      and ((${t.state} = 'resolved') = (num_nonnulls(${t.resolvedAt}, ${t.resolvedBy}, ${t.resolvedAs}, ${t.resolutionOutcome}, ${t.resolutionNote}) = 5))
+      and num_nonnulls(${t.resolvedAt}, ${t.resolvedBy}, ${t.resolvedAs}, ${t.resolutionOutcome}, ${t.resolutionNote}) in (0, 5)
+      and (${t.resolutionOutcome} is null or ${t.resolutionOutcome} in (${inList(COMPLAINT_OUTCOMES)}))`),
+    check("complaint_tasks_text_check", sql`length(btrim(${t.summary})) between 3 and 1000
+      and (${t.resolutionNote} is null or length(btrim(${t.resolutionNote})) between 3 and 1000) and ${t.dueAt} > ${t.createdAt}`),
+  ],
+);
+
+export const complaintEvents = pgTable(
+  "complaint_events",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    taskId: uuid("task_id").notNull(),
+    taskKind: text("task_kind", { enum: COMPLAINT_KINDS }).notNull(),
+    kind: text("kind", { enum: COMPLAINT_EVENT_KINDS }).notNull(),
+    actorId: uuid("actor_id"),
+    actorRole: text("actor_role"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "complaint_events_task_fk", columns: [t.tenantId, t.branchId, t.taskId], foreignColumns: [complaintTasks.tenantId, complaintTasks.branchId, complaintTasks.id] }).onDelete("restrict"),
+    foreignKey({ name: "complaint_events_actor_fk", columns: [t.tenantId, t.actorId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("complaint_events_tenant_id_id_key").on(t.tenantId, t.id),
+    index("complaint_events_task_idx").on(t.tenantId, t.taskId, t.createdAt),
+    check("complaint_events_check", sql`${t.kind} in (${inList(COMPLAINT_EVENT_KINDS)}) and ${t.taskKind} in (${inList(COMPLAINT_KINDS)})
+      and ((${t.kind} in ('note','resolved','reopened')) = (${t.note} is not null)) and (${t.note} is null or length(btrim(${t.note})) between 3 and 1000)
+      and ((${t.kind} = 'escalated') = (${t.actorId} is null)) and num_nonnulls(${t.actorId}, ${t.actorRole}) in (0, 2)`),
+  ],
+);

@@ -329,3 +329,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - SQL-language functions are validated at creation: define helpers before the functions that call them.
 - A mutation that survives because a condition can never be true marks dead code: remove the condition (and its mutant) instead of writing a test for it.
 
+## 2026-11-10 — T-057 Keluhan Klinis and Layanan
+
+- A definer reader that takes a branch argument must refuse a branch other than the actor's active one; ignoring it silently answered 200 for another tenant's branch id (caught by the isolation suite).
+- `branch_closures` refuses dates in the past, so working-hour tests use future dates with their weekdays checked.
+- Playwright `getByLabel` matches substrings: the shell search ("Cari halaman, pasien atau aksi") collides with a field labelled "Pasien"; use `exact: true`.
+- A fixed label column (`12rem`) in a `dl` squeezes the values at 820 px with 200 % text; stack label above value.
+- A writer's task lookup must compare with the active branch, not only the session's allowed branches: a multi-branch handler otherwise acts on another branch's row that the readers already hide (implementation review P2-1).
+- In a Level 2 session `app_branch_allowed` is true for every id; a reader that takes a branch id must also check the branch belongs to the tenant (P2-2).
