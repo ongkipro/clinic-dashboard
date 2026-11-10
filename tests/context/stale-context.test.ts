@@ -44,6 +44,7 @@ const pemeriksaan = await import("../../src/app/(app)/pemeriksaan/actions"); // 
 const persetujuanTindakan = await import("../../src/app/(app)/persetujuan-tindakan/actions"); // T-054
 const keluhan = await import("../../src/app/(app)/keluhan/actions"); // T-057
 const templat = await import("../../src/app/(app)/templat/actions"); // T-058
+const permintaan = await import("../../src/app/(app)/permintaan/actions"); // T-056
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -141,6 +142,9 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["templat createLetterAction", (f) => templat.createLetterAction({}, f), () => ({ key: U(136), visit: U(137), template_version: U(138) })],
   ["templat saveLetterAction", (f) => templat.saveLetterAction({}, f), () => ({ key: U(139), letter: U(140), body: "Uji konteks surat" })],
   ["templat correctLetterAction", (f) => templat.correctLetterAction({}, f), () => ({ key: U(141), letter: U(140), body: "Uji konteks surat", reason: "Uji konteks" })],
+  ["permintaan createRequestAction", (f) => permintaan.createRequestAction({}, f), () => ({ key: U(142), visit: U(143), plan: U(144), kind: "addition", version: U(145), stage: "1", qty: "1", reason: "Uji konteks" })],
+  ["permintaan decideRequestAction", (f) => permintaan.decideRequestAction({}, f), () => ({ key: U(146), request: U(147), decision: "approve" })],
+  ["permintaan cancelRequestAction", (f) => permintaan.cancelRequestAction({}, f), () => ({ key: U(148), request: U(147) })],
   ["staf recordCredentialAction", (f) => kredensial.recordCredentialAction({}, f), () => ({ key: U(91), staff_id: U(46), kind: "str", profession: "dokter", number: "STR-1", issuer: "Konsil Kesehatan", valid_from: "2024-01-01" })],
   ["staf decideCredentialAction", (f) => kredensial.decideCredentialAction({}, f), () => ({ key: U(92), id: U(93), staff_id: U(46), verdict: "verified" })],
   ["staf endCredentialAction", (f) => kredensial.endCredentialAction({}, f), () => ({ key: U(94), id: U(93), staff_id: U(46), state: "suspended", reason: "Uji konteks" })],

@@ -275,9 +275,13 @@ export const planItems = pgTable(
     note: text("note"),
     removedAt: timestamp("removed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    // T-056 (PR-45): the approved clinical request that added or removed the item (FKs in migration 0076).
+    requestId: uuid("request_id"),
+    removedByRequestId: uuid("removed_by_request_id"),
   },
   (t) => [
     foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    check("plan_items_request_check", sql`${t.removedByRequestId} is null or ${t.removedAt} is not null`),
     foreignKey({ name: "plan_items_plan_fk", columns: [t.tenantId, t.branchId, t.planId], foreignColumns: [carePlans.tenantId, carePlans.branchId, carePlans.id] }).onDelete("restrict"),
     foreignKey({ name: "plan_items_exam_fk", columns: [t.tenantId, t.examinationId], foreignColumns: [examinations.tenantId, examinations.id] }).onDelete("restrict"),
     foreignKey({ name: "plan_items_version_fk", columns: [t.tenantId, t.catalogVersionId], foreignColumns: [catalogVersions.tenantId, catalogVersions.id] }).onDelete("restrict"),
@@ -715,5 +719,72 @@ export const complaintEvents = pgTable(
     check("complaint_events_check", sql`${t.kind} in (${inList(COMPLAINT_EVENT_KINDS)}) and ${t.taskKind} in (${inList(COMPLAINT_KINDS)})
       and ((${t.kind} in ('note','resolved','reopened')) = (${t.note} is not null)) and (${t.note} is null or length(btrim(${t.note})) between 3 and 1000)
       and ((${t.kind} = 'escalated') = (${t.actorId} is null)) and num_nonnulls(${t.actorId}, ${t.actorRole}) in (0, 2)`),
+  ],
+);
+
+// T-056 (PR-45, UX-27; migration 0076; DEC-068): Permintaan Klinis. A clinician or BC in the room proposes an
+// addition, a plan change (same catalog version, other stage, quantity or dose) or a substitution (another
+// version) to a patient's active plan; a doctor or facility head of the branch decides. Approval applies the change
+// to the plan (removal and insertion, history kept) and opens the patient agreement step again when the consent no
+// longer covers the plan; FO is alerted (ids only). No money here (M4, T-074).
+export const REQUEST_KINDS = ["addition", "plan_change", "substitution"] as const;
+export const REQUEST_STATES = ["pending", "approved", "declined", "cancelled"] as const;
+export const REQUEST_PROPOSERS = ["bc", "doctor", "nurse", "therapist"] as const;
+export const REQUEST_DECIDERS = ["doctor", "facility_head"] as const;
+
+export const clinicalRequests = pgTable(
+  "clinical_requests",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    visitId: uuid("visit_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    examinationId: uuid("examination_id").notNull(),
+    planId: uuid("plan_id").notNull(),
+    kind: text("kind", { enum: REQUEST_KINDS }).notNull(),
+    targetItemId: uuid("target_item_id"),
+    catalogVersionId: uuid("catalog_version_id").notNull(),
+    stage: integer("stage").notNull(),
+    qty: integer("qty").notNull(),
+    doseMicro: bigint("dose_micro", { mode: "number" }),
+    doseUnit: text("dose_unit", { enum: DOSE_UNITS }),
+    reason: text("reason").notNull(),
+    state: text("state", { enum: REQUEST_STATES }).notNull().default("pending"),
+    requestedBy: uuid("requested_by").notNull(),
+    requestedAs: text("requested_as").notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    decidedBy: uuid("decided_by"),
+    decidedAs: text("decided_as"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionReason: text("decision_reason"),
+    addedItemId: uuid("added_item_id"),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_requests_visit_fk", columns: [t.tenantId, t.branchId, t.visitId], foreignColumns: [visits.tenantId, visits.branchId, visits.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_requests_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_requests_exam_fk", columns: [t.tenantId, t.branchId, t.examinationId], foreignColumns: [examinations.tenantId, examinations.branchId, examinations.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_requests_plan_fk", columns: [t.tenantId, t.planId], foreignColumns: [carePlans.tenantId, carePlans.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_requests_target_fk", columns: [t.tenantId, t.targetItemId], foreignColumns: [planItems.tenantId, planItems.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_requests_added_fk", columns: [t.tenantId, t.addedItemId], foreignColumns: [planItems.tenantId, planItems.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_requests_version_fk", columns: [t.tenantId, t.catalogVersionId], foreignColumns: [catalogVersions.tenantId, catalogVersions.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_requests_by_fk", columns: [t.tenantId, t.requestedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_requests_decided_by_fk", columns: [t.tenantId, t.decidedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("clinical_requests_tenant_id_id_key").on(t.tenantId, t.id),
+    index("clinical_requests_branch_idx").on(t.tenantId, t.branchId, t.state, t.requestedAt),
+    index("clinical_requests_visit_idx").on(t.tenantId, t.visitId),
+    uniqueIndex("clinical_requests_one_pending_item").on(t.tenantId, t.targetItemId).where(sql`state = 'pending' and target_item_id is not null`),
+    check("clinical_requests_kind_check", sql`${t.kind} in (${inList(REQUEST_KINDS)}) and ((${t.kind} = 'addition') = (${t.targetItemId} is null))
+      and ${t.stage} between 1 and 20 and ${t.qty} between 1 and 1000
+      and ((${t.doseMicro} is null) = (${t.doseUnit} is null)) and (${t.doseMicro} is null or ${t.doseMicro} between 1 and 1000000000)
+      and (${t.doseUnit} is null or ${t.doseUnit} in (${inList(DOSE_UNITS)})) and length(btrim(${t.reason})) between 3 and 500
+      and ${t.requestedAs} in (${inList(REQUEST_PROPOSERS)})`),
+    check("clinical_requests_state_check", sql`${t.state} in (${inList(REQUEST_STATES)})
+      and ((${t.state} = 'pending') = (${t.decidedAt} is null)) and num_nonnulls(${t.decidedBy}, ${t.decidedAs}) in (0, 2)
+      and ((${t.state} in ('approved','declined')) = (${t.decidedBy} is not null))
+      and (${t.decidedAs} is null or ${t.decidedAs} in (${inList(REQUEST_DECIDERS)})) and (${t.decidedBy} is null or ${t.decidedBy} <> ${t.requestedBy})
+      and ((${t.state} = 'approved') = (${t.addedItemId} is not null))
+      and ((${t.state} = 'declined') = (${t.decisionReason} is not null)) and (${t.decisionReason} is null or length(btrim(${t.decisionReason})) between 3 and 500)`),
   ],
 );

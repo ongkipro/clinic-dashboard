@@ -233,6 +233,11 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["letter_sign", async () => ["select letter_sign($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["letter_correct", async () => ["select letter_correct($1, 'isi surat uji', 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["letter_get", async () => ["select letter_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["records_officer"]],
+    ["clinical_request_create", async () => ["select clinical_request_create($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["nurse"]],
+    ["clinical_request_decide", async () => ["select clinical_request_decide($1, true, null)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["clinical_request_cancel", async () => ["select clinical_request_cancel($1)", ["00000000-0000-7000-8000-000000000000"]], ["bc"]],
+    ["clinical_request_list", async () => ["select clinical_request_list(null)", []], ["therapist"]],
+    ["clinical_request_get", async () => ["select clinical_request_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["credential_decide", async () => ["select credential_decide($1, true, null)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["credential_end", async () => ["select credential_end($1, 'suspended', 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
   ];

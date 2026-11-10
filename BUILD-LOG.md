@@ -345,3 +345,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A seed that turns on a TOTP role's factor to sign server-side must turn it off again, or the browser sign-in asks for a code instead of enrolling the authenticator.
 - Playwright `getByRole("link", { name })` matches substrings ("Struk" in "Templat Struk ..."): scope the query to the segment group and compare the exact list.
 - A long status badge ("Ditandatangani · v2") overflows a list row at 390 px with 200 % text; keep badge words short and move detail into the subtitle.
+
+## 2026-11-11 — T-056 Permintaan Klinis
+
+- A section that disappears when the record's state changes unmounts its forms and loses their result; keep it mounted for the roles that acted (the T-054 lesson again, on the decision of a request).
+- After a link to a page with the same heading, wait for the new URL and a text of that page, not the heading: the next page streams in after the click and the old heading is still on screen.
+- A runner's minimum flow count copied from another task must match the spec it runs; set it to the spec's own count so a skipped flow still fails.
+- Plan items reference their plan by `(tenant, branch, plan)`: an item added for a visit at another branch carries the plan's branch, not the visit's.

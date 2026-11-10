@@ -459,6 +459,13 @@ describe("functions (TEN-16)", () => {
     "letter_list(uuid,uuid)",
     "letter_get(uuid)",
     "letter_options(uuid)",
+    "request_readable(uuid,uuid)", // T-056: Permintaan Klinis (PR-45)
+    "clinical_request_create(uuid,jsonb)",
+    "clinical_request_decide(uuid,boolean,text)",
+    "clinical_request_cancel(uuid)",
+    "clinical_request_list(text)",
+    "clinical_request_get(uuid)",
+    "clinical_request_options(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",
     "credential_end(uuid,text,text)",
