@@ -403,6 +403,18 @@ describe("functions (TEN-16)", () => {
     "pendampingan_visits(uuid)",
     "pendampingan_visit(uuid)",
     "patient_cautions(uuid)",
+    "exam_open(uuid)", // T-052: Lembar Pemeriksaan (PR-10, CLIN-004, CLIN-012)
+    "exam_save(uuid,jsonb)",
+    "intake_verify(uuid,uuid,text,text)",
+    "mark_set(uuid,jsonb)",
+    "mark_remove(uuid,uuid)",
+    "plan_create(uuid,text,text)",
+    "plan_item_add(uuid,uuid,jsonb)",
+    "plan_item_remove(uuid,uuid)",
+    "plan_close(uuid,uuid,text)",
+    "pemeriksaan_visits(uuid)",
+    "exam_sheet(uuid)",
+    "plan_options(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",
     "credential_end(uuid,text,text)",

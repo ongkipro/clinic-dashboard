@@ -298,3 +298,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A `Row` link covers its whole row (`after:inset-0`): an action inside the row is under the overlay and cannot be clicked; keep one link per row and put actions on the detail page.
 - A page `main` grid needs `grid-cols-[minmax(0,1fr)]`, or one wide child stretches the column past 390 px at 200 %.
 - A mutation that leaves invalid SQL fails the migration, not a test: its log has "Tests" with every case skipped — check for "skipped" too, not only for a "Tests" line.
+
+## 2026-11-10 — T-052 Lembar Pemeriksaan
+
+- Domain event payloads accept only ids, lower-case codes, booleans, objects and arrays (`events_payload_ok`): a number such as a version is refused by the CHECK; keep counts out of events.
+- A policy that needs another table's branch through a definer helper widens the allow-list; store the scope column on the row instead (plans and items carry the creating examination's branch).
+- A mutant that removes a writer check is equivalent when a table CHECK refuses the same input and the writer maps `check_violation` to invalid input; drop it with that reason rather than adding a test that cannot tell them apart.
+- A nurse has no second factor (PR-3 `TOTP_ROLES`); a browser spec that enrols TOTP for every role waits forever on `/aktifkan-2fa`.
+
