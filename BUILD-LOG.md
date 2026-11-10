@@ -321,3 +321,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - `media_tokens` stores only the sha256 of the token; an idempotent replay cannot show the token again, so the replay is a conflict and the caller asks for a new link.
 - Column grants (`GRANT SELECT (cols)`) keep content addresses and removal reasons out of direct reads while the row stays readable.
 
+## 2026-11-10 — T-054 Procedure consent and start gates
+
+- A form whose page swaps it for a summary after success unmounts and loses its `useActionState` result; keep the form mounted and let it render the result and the summary (capture and withdraw on UX-39).
+- Playwright `mouse` coordinates are viewport coordinates: scroll a canvas into view before drawing on it, and wait for hydration (the pad reports the stroke) before submitting.
+- In PL/pgSQL a variable named like a table alias (`x record` and `FROM t x`) makes `x.col` resolve to the variable; name record variables apart from aliases.
+- SQL-language functions are validated at creation: define helpers before the functions that call them.
+- A mutation that survives because a condition can never be true marks dead code: remove the condition (and its mutant) instead of writing a test for it.
+

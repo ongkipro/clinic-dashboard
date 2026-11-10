@@ -213,6 +213,10 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["media_remove", async () => ["select media_remove($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["media_token_issue", async () => ["select media_token_issue($1, 'view', repeat('a', 64), 300)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["media_token_redeem", async () => ["select media_token_redeem(repeat('a', 64))", []], ["doctor"]],
+    ["procedure_consent_text", async () => ["select procedure_consent_text($1, gen_random_uuid())", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["procedure_consent_capture", async () => ["select procedure_consent_capture($1, gen_random_uuid(), '{}'::jsonb, '\\x00'::bytea)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["procedure_consent_withdraw", async () => ["select procedure_consent_withdraw($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["nurse"]],
+    ["contraindication_review", async () => ["select contraindication_review($1, gen_random_uuid(), 'cleared', null)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["credential_decide", async () => ["select credential_decide($1, true, null)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["credential_end", async () => ["select credential_end($1, 'suspended', 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
   ];

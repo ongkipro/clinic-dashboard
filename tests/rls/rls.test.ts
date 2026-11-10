@@ -429,6 +429,14 @@ describe("functions (TEN-16)", () => {
     "media_token_redeem(text)",
     "media_list(uuid,uuid)",
     "media_compare(uuid,uuid)",
+    "procedure_consent_text(uuid,uuid)", // T-054: procedure consent and the treatment start gate (PR-11)
+    "procedure_consent_capture(uuid,uuid,jsonb,bytea)",
+    "procedure_consent_withdraw(uuid,text)",
+    "contraindication_review(uuid,uuid,text,text)",
+    "treatment_start_check(uuid,uuid[],uuid,uuid)",
+    "consent_visits(uuid)",
+    "consent_visit(uuid)",
+    "consent_signature(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",
     "credential_end(uuid,text,text)",

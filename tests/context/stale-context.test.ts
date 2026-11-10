@@ -41,6 +41,7 @@ const daftar = await import("../../src/app/(app)/pasien/_components/actions"); /
 const kredensial = await import("../../src/app/(app)/staf/kredensial-actions"); // T-050
 const pendampingan = await import("../../src/app/(app)/pendampingan/actions"); // T-051
 const pemeriksaan = await import("../../src/app/(app)/pemeriksaan/actions"); // T-052
+const persetujuanTindakan = await import("../../src/app/(app)/persetujuan-tindakan/actions"); // T-054
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -123,6 +124,10 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["pemeriksaan itemAction", (f) => pemeriksaan.itemAction({}, f), () => ({ key: U(110), visit: U(101), exam: U(103), plan: U(111), version: U(112), stage: "1", qty: "1" })],
   ["pemeriksaan removeItemAction", (f) => pemeriksaan.removeItemAction({}, f), () => ({ key: U(113), visit: U(101), exam: U(103), item: U(114) })],
   ["pemeriksaan closePlanAction", (f) => pemeriksaan.closePlanAction({}, f), () => ({ key: U(115), visit: U(101), exam: U(103), plan: U(111), state: "completed" })],
+  ["persetujuan-tindakan captureAction", (f) => persetujuanTindakan.captureAction({}, f), () => ({ key: U(116), visit: U(117), plan: U(118), hash: "a".repeat(64), signer: "patient",
+    signature: "data:image/png;base64,iVBORw0KGgo=" })],
+  ["persetujuan-tindakan withdrawAction", (f) => persetujuanTindakan.withdrawAction({}, f), () => ({ key: U(119), visit: U(117), consent: U(120), reason: "Uji konteks" })],
+  ["persetujuan-tindakan reviewAction", (f) => persetujuanTindakan.reviewAction({}, f), () => ({ key: U(121), visit: U(117), exam: U(122), item: U(123), decision: "cleared" })],
   ["staf recordCredentialAction", (f) => kredensial.recordCredentialAction({}, f), () => ({ key: U(91), staff_id: U(46), kind: "str", profession: "dokter", number: "STR-1", issuer: "Konsil Kesehatan", valid_from: "2024-01-01" })],
   ["staf decideCredentialAction", (f) => kredensial.decideCredentialAction({}, f), () => ({ key: U(92), id: U(93), staff_id: U(46), verdict: "verified" })],
   ["staf endCredentialAction", (f) => kredensial.endCredentialAction({}, f), () => ({ key: U(94), id: U(93), staff_id: U(46), state: "suspended", reason: "Uji konteks" })],
