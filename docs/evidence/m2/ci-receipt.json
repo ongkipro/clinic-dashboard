@@ -1,0 +1,225 @@
+{
+ "run": {
+  "conclusion": "success",
+  "event": "push",
+  "headBranch": "main",
+  "headSha": "0816baaadfd149af9ba4d6b5682391c55430233b",
+  "jobs": [
+   {
+    "completedAt": "2026-11-10T20:09:32Z",
+    "conclusion": "success",
+    "databaseId": 130093507426,
+    "name": "verify",
+    "startedAt": "2026-11-10T20:03:49Z",
+    "status": "completed",
+    "steps": [
+     {
+      "completedAt": "2026-11-10T20:03:50Z",
+      "conclusion": "success",
+      "name": "Set up job",
+      "number": 1,
+      "startedAt": "2026-11-10T20:03:49Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:03:59Z",
+      "conclusion": "success",
+      "name": "Initialize containers",
+      "number": 2,
+      "startedAt": "2026-11-10T20:03:50Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:04:01Z",
+      "conclusion": "success",
+      "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "number": 3,
+      "startedAt": "2026-11-10T20:03:59Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:04:04Z",
+      "conclusion": "success",
+      "name": "Run pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413",
+      "number": 4,
+      "startedAt": "2026-11-10T20:04:01Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:04:12Z",
+      "conclusion": "success",
+      "name": "Run actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "number": 5,
+      "startedAt": "2026-11-10T20:04:04Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:04:16Z",
+      "conclusion": "success",
+      "name": "Run pnpm install --frozen-lockfile",
+      "number": 6,
+      "startedAt": "2026-11-10T20:04:12Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:04:33Z",
+      "conclusion": "success",
+      "name": "Run pnpm typecheck",
+      "number": 7,
+      "startedAt": "2026-11-10T20:04:16Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:04:52Z",
+      "conclusion": "success",
+      "name": "Run pnpm lint",
+      "number": 8,
+      "startedAt": "2026-11-10T20:04:33Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:04:54Z",
+      "conclusion": "success",
+      "name": "Run pnpm db:migrate",
+      "number": 9,
+      "startedAt": "2026-11-10T20:04:52Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:08:15Z",
+      "conclusion": "success",
+      "name": "Run pnpm test",
+      "number": 10,
+      "startedAt": "2026-11-10T20:04:54Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:08:24Z",
+      "conclusion": "success",
+      "name": "Run pnpm build",
+      "number": 11,
+      "startedAt": "2026-11-10T20:08:15Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:08:25Z",
+      "conclusion": "success",
+      "name": "Run pnpm audit --prod",
+      "number": 12,
+      "startedAt": "2026-11-10T20:08:24Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:08:25Z",
+      "conclusion": "success",
+      "name": "Run pnpm docs:check",
+      "number": 13,
+      "startedAt": "2026-11-10T20:08:25Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:08:25Z",
+      "conclusion": "success",
+      "name": "Run pnpm docs:promotion",
+      "number": 14,
+      "startedAt": "2026-11-10T20:08:25Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:09:28Z",
+      "conclusion": "success",
+      "name": "Image migration check (migrations run from the release image)",
+      "number": 15,
+      "startedAt": "2026-11-10T20:08:25Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:09:28Z",
+      "conclusion": "success",
+      "name": "Build image and record digest",
+      "number": 16,
+      "startedAt": "2026-11-10T20:09:28Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:09:29Z",
+      "conclusion": "success",
+      "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+      "number": 17,
+      "startedAt": "2026-11-10T20:09:28Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:09:29Z",
+      "conclusion": "success",
+      "name": "Post Run actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "number": 31,
+      "startedAt": "2026-11-10T20:09:29Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:09:30Z",
+      "conclusion": "success",
+      "name": "Post Run pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413",
+      "number": 32,
+      "startedAt": "2026-11-10T20:09:29Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:09:30Z",
+      "conclusion": "success",
+      "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "number": 33,
+      "startedAt": "2026-11-10T20:09:30Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:09:30Z",
+      "conclusion": "success",
+      "name": "Stop containers",
+      "number": 34,
+      "startedAt": "2026-11-10T20:09:30Z",
+      "status": "completed"
+     },
+     {
+      "completedAt": "2026-11-10T20:09:30Z",
+      "conclusion": "success",
+      "name": "Complete job",
+      "number": 35,
+      "startedAt": "2026-11-10T20:09:30Z",
+      "status": "completed"
+     }
+    ],
+    "url": "https://github.com/ongkipro/clinic-dashboard/actions/runs/42891496954/job/130093507426"
+   }
+  ],
+  "workflowDatabaseId": 404977709,
+  "workflowName": "ci"
+ },
+ "drill": [
+  "verify\tRun pnpm test\t2026-11-10T20:08:15.3252882Z      \u2713 restores a seeded database to a scratch instance with matching row counts 25511ms"
+ ],
+ "summary": [
+  "verify\tRun pnpm test\t2026-11-10T20:08:15.3347693Z       Tests  1520 passed | 28 skipped (1548)"
+ ],
+ "files": {
+  "tests/org/credentials.test.ts": 1,
+  "tests/clinical/intake.test.ts": 1,
+  "tests/clinical/exam.test.ts": 1,
+  "tests/clinical/records.test.ts": 1,
+  "tests/clinical/consent.test.ts": 1,
+  "tests/clinical/media.test.ts": 1,
+  "tests/clinical/requests.test.ts": 1,
+  "tests/clinical/complaints.test.ts": 1,
+  "tests/documents/documents.test.ts": 1,
+  "tests/db/cautions-drift.test.ts": 1,
+  "tests/db/records-drift.test.ts": 1,
+  "tests/db/plans-drift.test.ts": 1,
+  "tests/rls/rls.test.ts": 1,
+  "tests/rls/authority-clock.test.ts": 1,
+  "tests/isolation/isolation.test.ts": 1,
+  "tests/context/stale-context.test.ts": 1,
+  "tests/approvals/inbox.test.ts": 1
+ },
+ "problems": []
+}

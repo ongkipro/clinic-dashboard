@@ -1,0 +1,323 @@
+{
+ "_about": "T-059 M2 exit: the PLAN.md §1 M2 exit scenarios and the Done-when CLIN ids mapped to the exact test cases that prove each (JUnit classname = file, name = 'describe > test'). Checked by check-scenarios.py against a JUnit report of `pnpm test -- m2`: the required scenario titles and CLIN ids present; every title a PRD §8 scenario and every CLIN id a PRD CLIN row; every mapped name in its file; every mapped case present once and passed; no failure anywhere. 'proves' states what the cases assert; 'open' what is not proven in M2 and the task that completes it.",
+ "scenarios": [
+  {
+   "scenario": "PR-9 no scores from BC",
+   "file": "tests/clinical/intake.test.ts",
+   "tests": [
+    "scenario PR-9: no scores from BC > a submission with a score, grade or Fitzpatrick field is rejected, audited, and writes nothing",
+    "scenario PR-9: no scores from BC > a replayed refusal does not audit twice"
+   ],
+   "proves": "a BC submission with a score, grade or Fitzpatrick field is rejected, audited once, and writes nothing (T-051)",
+   "open": "UX-7 steps 3–4 (Diskusi Pilihan, Konfirmasi) in M3/M4; per-visit BC assignment with the room (T-064)"
+  },
+  {
+   "scenario": "PR-9 BC cannot diagnose",
+   "file": "tests/clinical/intake.test.ts",
+   "tests": [
+    "CLIN-003: a BC cannot diagnose or sign > diagnosis and signing fields are refused as audited values; a BC has no write on the tables"
+   ],
+   "proves": "a BC's diagnosis and signing fields are refused as audited values and the BC has no table write; the intake stays BC-captured and unverified (T-051)",
+   "open": "per-visit BC assignment (T-064); UX-7 photo panel wiring to clinical_media"
+  },
+  {
+   "scenario": "PR-9 BC cannot diagnose",
+   "file": "tests/clinical/exam.test.ts",
+   "tests": [
+    "authority, lifecycle and the visit step > a non-doctor is refused before any lookup; one examination per visit; only the author edits"
+   ],
+   "proves": "the examination writers refuse a BC (and every non-doctor) before any lookup (T-052)",
+   "open": "as above"
+  },
+  {
+   "scenario": "PR-9 BC cannot diagnose",
+   "file": "tests/clinical/records.test.ts",
+   "tests": [
+    "signing (PR-13, PR-3) > only the author, acting as Dokter, with a second factor and a step-up; after the visit closed too"
+   ],
+   "proves": "only the examining doctor acting as Dokter signs; a BC never signs (T-053)",
+   "open": "as above"
+  },
+  {
+   "scenario": "PR-10 history on one screen",
+   "file": "tests/clinical/exam.test.ts",
+   "tests": [
+    "scenario PR-10: a repeat patient's sheet in one read > two earlier visits, the intake to verify, active plans and the photos placeholder state on one sheet",
+    "the plan projection: BC, FO, nurse and therapist see items and prices only > plan_options carries no condition, dose, note or anything of the examination; others are refused"
+   ],
+   "proves": "one exam_sheet read holds two earlier visits, the intake to verify, active plans and the photos state (T-052; the photos field was a placeholder then); the BC/FO projection carries items and prices only",
+   "open": "wiring the UX-8 Foto & Bandingkan panel to clinical_media (UI follow-up of T-052/T-055); closed ICD-10 code system (T-102); prescriptions (T-063); Kirim ke Kasir (T-072)"
+  },
+  {
+   "scenario": "PR-10 history on one screen",
+   "file": "tests/clinical/media.test.ts",
+   "tests": [
+    "CLIN-015: non-comparable photos warn, no score > the merge cluster: photos of a merged duplicate list and compare with the survivor's"
+   ],
+   "proves": "the patient's photos across visits list and compare, also across a merged duplicate (T-055)",
+   "open": "as above"
+  },
+  {
+   "scenario": "PR-11 consent mismatch",
+   "file": "tests/clinical/consent.test.ts",
+   "tests": [
+    "scenario PR-11: consent mismatch > consent for 20 units; the plan raised to 25 → treatment cannot start until new consent is recorded"
+   ],
+   "proves": "consent for 20 units; the plan raised to 25 → the start gate blocks until a new consent is recorded (T-054)",
+   "open": "the treatment-start writer in the room calling assertCanStart (T-064, PR-14)"
+  },
+  {
+   "scenario": "PR-11 consent mismatch",
+   "file": "tests/clinical/requests.test.ts",
+   "tests": [
+    "scenario PR-45: clinician approves addition > a nurse proposes an additional treatment in the room; the doctor approves; the agreement step opens and FO is alerted"
+   ],
+   "proves": "a plan raised after signing through an approved request makes the consent outdated and the gate blocks until re-consent (T-056)",
+   "open": "as above"
+  },
+  {
+   "scenario": "PR-13 correction window",
+   "file": "tests/clinical/records.test.ts",
+   "tests": [
+    "signing (PR-13, PR-3) > the author signs a draft: version 1 is the signed snapshot; the row and its parts are final; idempotent",
+    "signing (PR-13, PR-3) > only the author, acting as Dokter, with a second factor and a step-up; after the visit closed too",
+    "corrections (PR-13, CLIN-023) > within 48 h the author writes version 2 at once holding only the net delta; a no-op is refused",
+    "corrections (PR-13, CLIN-023) > scenario PR-13: 50 h after signing a correction needs RO or FH approval; the prior version stays readable",
+    "corrections (PR-13, CLIN-023) > the 48 h boundary: 47:59 direct, 48:01 approval",
+    "retention, guards, readers, events, cross-tenant > retention: 25 years from the last visit's local date, across the merge cluster"
+   ],
+   "proves": "sign (version 1, the row final, second factor and step-up), version (a correction within 48 h is version 2 with the net delta), the correction window (50 h → records officer or facility head approval, the prior version readable; 47:59 direct, 48:01 approval), retention 25 years (T-053)",
+   "open": "the TOTP step-up producer and the signing prompt on /pemeriksaan (deferred from T-053 by SEC-21); disposal after retention (PRIV-3)"
+  },
+  {
+   "scenario": "PR-32 private photo",
+   "file": "tests/clinical/media.test.ts",
+   "tests": [
+    "scenario PR-32: private, short-lived links > a token opens the bytes within its lifetime; a link older than its lifetime is refused; ≤ 10 minutes",
+    "scenario PR-32: private, short-lived links > a token is the issuer's only: another staff or another acting role cannot open it; malformed links are not found"
+   ],
+   "proves": "bytes only through a short-lived token (≤ 10 min) of its issuer; an expired or foreign link is refused (T-055)",
+   "open": "upload/viewer UI and the serving route (no-store); the S3 MediaStore when provisioned (ARCH-9; DB store per DEC-027); photo publication with consent per purpose (T-123, PR-40)"
+  },
+  {
+   "scenario": "PR-43 complaint escalation",
+   "file": "tests/clinical/complaints.test.ts",
+   "tests": [
+    "scenario PR-43: a reaction reported at the visit > a Klinis task with the SET-31 triage time; a free control recorded; the FO sees the status only",
+    "roles, flaggers and projections > layanan for the manager and the facility head; manager flags layanan only; central CS names a branch; therapist never"
+   ],
+   "proves": "M2 builds the visit-note and staff flag (PLAN M2 'PR-43 visit-note flag'): a Klinis task with the SET-31 due time for the clinical pool; flaggers FO, central CS (named branch), BC see the status only; a free control recorded as the outcome; the message source is refused (message_source_not_ready) (T-057)",
+   "open": "the PRD scenario's WhatsApp message flag by CS (T-090, M6 inbox); the free-control billing waiver (M4 cashier)"
+  },
+  {
+   "scenario": "PR-45 clinician approves addition",
+   "file": "tests/clinical/requests.test.ts",
+   "tests": [
+    "scenario PR-45: clinician approves addition > a nurse proposes an additional treatment in the room; the doctor approves; the agreement step opens and FO is alerted",
+    "plan change, substitution, decline, cancel > a plan change and a substitution replace the item (history kept); a lower dose keeps the consent; decline needs a reason"
+   ],
+   "proves": "a nurse's addition approved by the doctor: the plan gets the item, the consent is outdated, the visit's consent step reopens, the start gate blocks, FO is alerted; plan change, substitution and decline (T-056)",
+   "open": "the 'Usul Tindakan Tambahan' entry from the room (UX-9, T-064) and the exam sheet; payment of the addition and release before payment (T-074, PR-15)"
+  },
+  {
+   "scenario": "PR-49 record copy",
+   "file": "tests/clinical/records.test.ts",
+   "tests": [
+    "PR-49: the patient record copy > FO requests a copy: logged (content-free), a PDF of the signed records across the merge cluster; drafts left out"
+   ],
+   "proves": "FO requests a copy: logged content-free, a PDF of the signed records across the merge cluster, drafts left out (T-053)",
+   "open": "delivery to the patient; signed letters in the copy; the profile money tabs (T-075, T-076, T-078)"
+  },
+  {
+   "scenario": "PR-3 acting role for multi-role staff",
+   "file": "tests/clinical/records.test.ts",
+   "tests": [
+    "signing (PR-13, PR-3) > scenario PR-3: an owner who also holds Dokter switches to Dokter and signs; signature and audit say Dokter"
+   ],
+   "proves": "an owner who also holds Dokter switches to Dokter and signs; the signature and audit say Dokter (T-053)",
+   "open": "none"
+  },
+  {
+   "scenario": "PR-73 credential alert",
+   "file": "tests/org/credentials.test.ts",
+   "tests": [
+    "scenario PR-73: credential expiry alerts > a doctor's SIP expiring in 30 days: the daily job alerts the doctor and the facility head, once",
+    "scenario PR-73: credential expiry alerts > thresholds: 60 at 60 days; a late first run sends only the most urgent; nothing past expiry or beyond 60 days",
+    "scenario PR-73: credential expiry alerts > no alert for a lifetime STR; an STR with an expiry alerts the facility head of each clinical branch of its holder",
+    "validity: expired or invalid credentials remain blocked > credential_valid needs a verified STR and a verified permit for the branch, both in force, same profession"
+   ],
+   "proves": "a SIP expiring in 30 days: the daily job alerts the doctor and the facility head once; thresholds 60/30/7; lifetime STR; an invalid credential stays blocked (T-050)",
+   "open": "rendering the alerts in Ringkasan Klinis › Perlu Ditangani (UX-60, T-115) and Saya › Notifikasi; the daily scheduler calling runCredentialAlerts"
+  },
+  {
+   "scenario": "PR-74 signed letter",
+   "file": "tests/documents/documents.test.ts",
+   "tests": [
+    "scenario PR-74: signed letter > a doctor creates a surat keterangan from a template; signed, it is part of the record, never edited, only corrected by a new version",
+    "scenario PR-74: signed letter > a late correction waits for the record-correction approval; the record correction trigger ignores it",
+    "templates: versions, placeholders, roles > Simpan Versi publishes n+1, the used version stays; retire stops new letters; placeholders closed and required"
+   ],
+   "proves": "a surat keterangan from a template, signed with the step-up proof, stored with the record, never edited, corrected only by a new version (within 48 h by the author, later through the record-correction approval); templates versioned and frozen once used (T-058)",
+   "open": "the TOTP step-up producer and the signing prompt on /templat/surat; 'Buat Surat' links from UX-8 / UX-29; receipt (T-072) and legal-page (T-123) consumers of the template store; letters in the patient copy"
+  },
+  {
+   "scenario": "PR-84 branch switch",
+   "file": "tests/clinical/exam.test.ts",
+   "tests": [
+    "readers on the wall clock (plan P1-4) > doctor, facility head and records officer read at their branch; the queue; the role removed loses the read"
+   ],
+   "proves": "completes M1's deferral 'the doctor's Antrean (UX-8): T-052': the doctor's queue and sheet follow the active branch; a removed branch role loses the read (T-052)",
+   "open": "none"
+  }
+ ],
+ "items": [
+  {
+   "item": "CLIN-001 Repeat visit: prior intake as history, only changes are new facts",
+   "file": "tests/clinical/intake.test.ts",
+   "tests": [
+    "CLIN-001: repeat visit — prior intake as history, only changes are new facts > unchanged answers add no fact; changed ones do, linked to the prior; history spans a merged duplicate"
+   ],
+   "proves": "unchanged answers add no fact, changed ones do (linked to the prior), history across a merged duplicate (T-051)"
+  },
+  {
+   "item": "CLIN-002 Unverified allergy flag reaches doctor, nurse, pharmacist as caution",
+   "file": "tests/clinical/intake.test.ts",
+   "tests": [
+    "CLIN-002: an unverified allergy flag reaches doctor, nurse and pharmacist as a caution > the caution (kind, value, provenance) for the clinical roles only; it survives an unchanged repeat visit"
+   ],
+   "proves": "the caution reaches the clinical roles only, kind, value, provenance; survives an unchanged repeat visit (T-051)"
+  },
+  {
+   "item": "CLIN-003 BC cannot diagnose or sign",
+   "file": "tests/clinical/intake.test.ts",
+   "tests": [
+    "CLIN-003: a BC cannot diagnose or sign > diagnosis and signing fields are refused as audited values; a BC has no write on the tables"
+   ],
+   "proves": "as PR-9 BC cannot diagnose (T-051)"
+  },
+  {
+   "item": "CLIN-004 Doctor confirms BC facts; BC authorship kept",
+   "file": "tests/clinical/exam.test.ts",
+   "tests": [
+    "CLIN-004: the doctor verifies BC facts; the BC fact keeps its author > confirm and correct are separate rows with time and version; the fact row never changes",
+    "CLIN-004: the doctor verifies BC facts; the BC fact keeps its author > a reviewed prior fact (from another branch, before a merge) is verifiable; an unsent intake is not"
+   ],
+   "proves": "confirm and correct are separate rows; the BC fact row never changes (T-052)"
+  },
+  {
+   "item": "CLIN-005 Missing credential blocks start",
+   "file": "tests/clinical/consent.test.ts",
+   "tests": [
+    "CLIN-005: a missing credential blocks start; eligibility and supervision > no credential, an expired one; named eligibility over role; floor; assists; supervised needs a credentialed doctor"
+   ],
+   "proves": "no or an expired credential blocks start; eligibility and supervision (T-054)"
+  },
+  {
+   "item": "CLIN-012 Two parallel care plans stay separate",
+   "file": "tests/clinical/exam.test.ts",
+   "tests": [
+    "CLIN-012: several active plans in parallel, each with its own items; live prices, never stored > two plans for two conditions; items per plan and stage; removal and closing; the branch price applies live"
+   ],
+   "proves": "two active plans for two conditions, items per plan and stage, live prices (T-052)"
+  },
+  {
+   "item": "CLIN-014 New assessment adds a timepoint; old record unchanged",
+   "file": "tests/clinical/records.test.ts",
+   "tests": [
+    "CLIN-014: a new assessment is a new timepoint; the old record is unchanged > a later visit's examination is its own record; the earlier signed record and its versions stay"
+   ],
+   "proves": "a later visit's examination is its own record; the earlier signed record stays (T-053)"
+  },
+  {
+   "item": "CLIN-015 Non-comparable photos warn, no score",
+   "file": "tests/clinical/media.test.ts",
+   "tests": [
+    "CLIN-015: non-comparable photos warn, no score > same angle, aspect and a day apart are comparable; otherwise reasons; never a score or percentage"
+   ],
+   "proves": "comparable only with the same angle and aspect a day apart, otherwise reasons; never a score (T-055)"
+  },
+  {
+   "item": "CLIN-016 Worse symptoms create a clinical task",
+   "file": "tests/clinical/complaints.test.ts",
+   "tests": [
+    "CLIN-016 and CLIN-024: worse symptoms; a pharmacist's adverse-effect flag > worse symptoms → a clinical task due by SET-31 (kuning by default); the pharmacist source is the pharmacist's"
+   ],
+   "proves": "worse symptoms → a Klinis task due by SET-31 (T-057)"
+  },
+  {
+   "item": "CLIN-021 Non-clinical roles cannot read diagnosis or photos",
+   "file": "tests/clinical/media.test.ts",
+   "tests": [
+    "CLIN-021: non-clinical roles read no photos > clinical readers list and open; BC photos only; pharmacist and non-clinical roles are forbidden; tables unreadable"
+   ],
+   "proves": "photos: clinical readers only; non-clinical roles forbidden; tables unreadable (T-055)"
+  },
+  {
+   "item": "CLIN-021 Non-clinical roles cannot read diagnosis or photos",
+   "file": "tests/clinical/exam.test.ts",
+   "tests": [
+    "the plan projection: BC, FO, nurse and therapist see items and prices only > plan_options carries no condition, dose, note or anything of the examination; others are refused",
+    "readers on the wall clock (plan P1-4) > doctor, facility head and records officer read at their branch; the queue; the role removed loses the read"
+   ],
+   "proves": "diagnosis: the examination is read by doctor, facility head, records officer only; the BC/FO projection carries no condition or dose (T-052)"
+  },
+  {
+   "item": "CLIN-022 Added item or higher dose needs re-consent",
+   "file": "tests/clinical/consent.test.ts",
+   "tests": [
+    "CLIN-022: an added item or a higher dose needs re-consent > added item, higher qty, other version, dose where none was consented, unit; equal or lower stays valid"
+   ],
+   "proves": "an added item, higher quantity or dose, other version or unit needs re-consent; equal or lower stays valid (T-054)"
+  },
+  {
+   "item": "CLIN-023 Amendment: new version and net delta only",
+   "file": "tests/clinical/records.test.ts",
+   "tests": [
+    "corrections (PR-13, CLIN-023) > within 48 h the author writes version 2 at once holding only the net delta; a no-op is refused"
+   ],
+   "proves": "a correction is version n+1 holding the net delta only; a no-op is refused (T-053)"
+  },
+  {
+   "item": "CLIN-024 Pharmacist adverse-effect flag escalates clinically",
+   "file": "tests/clinical/complaints.test.ts",
+   "tests": [
+    "CLIN-016 and CLIN-024: worse symptoms; a pharmacist's adverse-effect flag > worse symptoms → a clinical task due by SET-31 (kuning by default); the pharmacist source is the pharmacist's"
+   ],
+   "proves": "the pharmacist source is a pharmacist's Klinis flag (T-057)"
+  },
+  {
+   "item": "CLIN-026 Lost assignment removes access",
+   "file": "tests/clinical/media.test.ts",
+   "tests": [
+    "CLIN-026: lost assignment removes access > removing the branch role empties the list and refuses an issued token at once; another branch never reads"
+   ],
+   "proves": "removing the branch role empties the photo list and refuses an issued token at once (T-055); M2 enforces the branch-role assignment on the wall clock, per-visit assignment arrives with the room (T-064)"
+  },
+  {
+   "item": "CLIN-026 Lost assignment removes access",
+   "file": "tests/clinical/exam.test.ts",
+   "tests": [
+    "readers on the wall clock (plan P1-4) > doctor, facility head and records officer read at their branch; the queue; the role removed loses the read"
+   ],
+   "proves": "the examination reader loses the read when the branch role is removed (T-052)"
+  },
+  {
+   "item": "M2 flow: one patient through every M2 module",
+   "file": "docs/evidence/m2/m2-flow.test.ts",
+   "tests": [
+    "M2 exit flow > one patient through every M2 module on a real database, through the real writers"
+   ],
+   "proves": "credential, intake and caution, sheet with verification, mark and two plans, projection, contraindication clearing, a photo behind a token, signing, consent and the gate, an approved addition reopening consent and alerting FO, re-consent, a visit-note complaint, a signed letter and its correction, a record correction and the patient copy; events, audit and notifications content-free (T-059)"
+  }
+ ],
+ "deferred": [
+  {
+   "scenario": "PR-43 complaint escalation",
+   "completes_in": "T-090 (M6 WhatsApp inbox message flag); the free-control billing waiver in the M4 cashier"
+  },
+  {
+   "scenario": "PR-45 clinician approves addition",
+   "completes_in": "T-074 (M4 payment of additions, release before payment); the room entry in T-064 (M3)"
+  }
+ ]
+}
