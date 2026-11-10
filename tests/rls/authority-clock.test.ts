@@ -208,6 +208,11 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["record_sign", async () => ["select record_sign($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["record_correct", async () => ["select record_correct($1, '{}'::jsonb, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["record_copy_request", async () => ["select record_copy_request(gen_random_uuid(), 'alasan uji')", []], ["fo_cashier"]],
+    ["media_blob_put", async () => ["select media_blob_put(repeat('0', 64), 'application/pdf', '\\x255044462d'::bytea)", []], ["doctor"]],
+    ["media_add", async () => ["select media_add($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["media_remove", async () => ["select media_remove($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["media_token_issue", async () => ["select media_token_issue($1, 'view', repeat('a', 64), 300)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["media_token_redeem", async () => ["select media_token_redeem(repeat('a', 64))", []], ["doctor"]],
     ["credential_decide", async () => ["select credential_decide($1, true, null)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["credential_end", async () => ["select credential_end($1, 'suspended', 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
   ];

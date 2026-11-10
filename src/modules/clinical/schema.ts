@@ -8,7 +8,7 @@
 // and text, never a grade, score or skin type (PR-9). Provenance of every fact is BC-captured, unverified:
 // never a diagnosis (CLIN-003).
 import { sql } from "drizzle-orm";
-import { bigint, check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, check, customType, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { approvals } from "../approvals/schema";
 import { catalogVersions } from "../catalog/schema";
 import { branches, staff, tenants } from "../org/schema";
@@ -384,5 +384,118 @@ export const recordCopyRequests = pgTable(
     index("record_copy_requests_patient_idx").on(t.tenantId, t.patientId, t.requestedAt),
     check("record_copy_requests_check", sql`${t.recordCount} >= 0 and ${t.requestedAs} in ('fo_cashier','records_officer','facility_head')
       and length(btrim(${t.reason})) between 3 and 300`),
+  ],
+);
+
+// T-055 (PR-32, CLIN-015, CLIN-021, CLIN-026; migration 0072): private clinical media. Metadata in
+// `clinical_media` (photos with a SET-29 angle and dimensions from the bytes; documents); the bytes are
+// content-addressed by sha256 in `clinical_media_blobs` (object key tenants/<tenant>/clinical-media/<sha256>,
+// TEN-4) behind the MediaStore interface, so the S3 adapter replaces it by configuration (ARCH-9) without a
+// schema change. Access only through short-lived tokens (`media_tokens`: the sha256 of a random token, ≤ 10
+// minutes, bound to the staff and acting role). Never deleted: a mistaken upload is hidden with a reason.
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
+export const MEDIA_KINDS = ["photo", "document"] as const;
+export const MEDIA_TYPES = ["image/jpeg", "image/png", "application/pdf"] as const;
+export const PHOTO_ANGLES = ["depan", "serong_45", "samping", "atas", "bawah", "dekat"] as const;
+export const TOKEN_PURPOSES = ["view", "download"] as const;
+export const MEDIA_MAX_BYTES = 5_242_880;
+
+export const clinicalMedia = pgTable(
+  "clinical_media",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    visitId: uuid("visit_id").notNull(),
+    examinationId: uuid("examination_id"),
+    kind: text("kind", { enum: MEDIA_KINDS }).notNull(),
+    angle: text("angle", { enum: PHOTO_ANGLES }),
+    contentType: text("content_type", { enum: MEDIA_TYPES }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    sha256: text("sha256").notNull(),
+    objectKey: text("object_key").notNull(),
+    fileName: text("file_name").notNull(),
+    takenAt: timestamp("taken_at", { withTimezone: true }).notNull(),
+    uploadedBy: uuid("uploaded_by").notNull(),
+    uploadedAs: text("uploaded_as").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedBy: uuid("removed_by"),
+    removedAs: text("removed_as"),
+    removedReason: text("removed_reason"),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_media_visit_fk", columns: [t.tenantId, t.branchId, t.visitId], foreignColumns: [visits.tenantId, visits.branchId, visits.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_media_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_media_exam_fk", columns: [t.tenantId, t.branchId, t.examinationId], foreignColumns: [examinations.tenantId, examinations.branchId, examinations.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_media_by_fk", columns: [t.tenantId, t.uploadedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "clinical_media_removed_by_fk", columns: [t.tenantId, t.removedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("clinical_media_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("clinical_media_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
+    index("clinical_media_patient_idx").on(t.tenantId, t.patientId, t.takenAt),
+    index("clinical_media_visit_idx").on(t.tenantId, t.visitId),
+    check("clinical_media_kind_check", sql`${t.kind} in (${inList(MEDIA_KINDS)}) and ${t.contentType} in (${inList(MEDIA_TYPES)})
+      and (${t.kind} <> 'photo' or ${t.contentType} in ('image/jpeg','image/png'))
+      and ((${t.kind} = 'photo') = (${t.angle} is not null and ${t.width} is not null and ${t.height} is not null))
+      and (${t.angle} is null or ${t.angle} in (${inList(PHOTO_ANGLES)}))
+      and ((${t.width} is null and ${t.height} is null) or (${t.width} between 1 and 20000 and ${t.height} between 1 and 20000))`),
+    check("clinical_media_file_check", sql`${t.sizeBytes} between 1 and ${sql.raw(String(MEDIA_MAX_BYTES))} and ${t.sha256} ~ '^[0-9a-f]{64}$'
+      and ${t.objectKey} = 'tenants/' || ${t.tenantId}::text || '/clinical-media/' || ${t.sha256}
+      and length(btrim(${t.fileName})) between 1 and 200 and ${t.fileName} !~ '[/\\\\]'`),
+    check("clinical_media_uploader_check", sql`${t.uploadedAs} in ('bc','doctor','nurse') and (${t.uploadedAs} <> 'bc' or ${t.kind} = 'photo')`),
+    check("clinical_media_removed_check", sql`num_nonnulls(${t.removedAt}, ${t.removedBy}, ${t.removedAs}, ${t.removedReason}) in (0, 4)
+      and (${t.removedReason} is null or length(btrim(${t.removedReason})) between 3 and 500)`),
+  ],
+);
+
+export const clinicalMediaBlobs = pgTable(
+  "clinical_media_blobs",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    sha256: text("sha256").notNull(),
+    contentType: text("content_type", { enum: MEDIA_TYPES }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    content: bytea("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    unique("clinical_media_blobs_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("clinical_media_blobs_sha_key").on(t.tenantId, t.sha256),
+    check("clinical_media_blobs_check", sql`${t.contentType} in (${inList(MEDIA_TYPES)}) and ${t.sha256} = encode(sha256(${t.content}), 'hex')
+      and ${t.sizeBytes} = octet_length(${t.content}) and ${t.sizeBytes} between 1 and ${sql.raw(String(MEDIA_MAX_BYTES))}`),
+  ],
+);
+
+export const mediaTokens = pgTable(
+  "media_tokens",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    mediaId: uuid("media_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
+    actingRole: text("acting_role").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    purpose: text("purpose", { enum: TOKEN_PURPOSES }).notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedCount: integer("used_count").notNull().default(0),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "media_tokens_media_fk", columns: [t.tenantId, t.branchId, t.mediaId], foreignColumns: [clinicalMedia.tenantId, clinicalMedia.branchId, clinicalMedia.id] }).onDelete("restrict"),
+    foreignKey({ name: "media_tokens_staff_fk", columns: [t.tenantId, t.staffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("media_tokens_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("media_tokens_hash_key").on(t.tokenHash),
+    check("media_tokens_check", sql`${t.purpose} in (${inList(TOKEN_PURPOSES)}) and ${t.tokenHash} ~ '^[0-9a-f]{64}$'
+      and ${t.expiresAt} > ${t.issuedAt} and ${t.expiresAt} <= ${t.issuedAt} + interval '10 minutes'
+      and ${t.usedCount} >= 0 and ((${t.usedCount} = 0) = (${t.lastUsedAt} is null))`),
   ],
 );

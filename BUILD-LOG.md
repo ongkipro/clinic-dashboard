@@ -314,3 +314,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - `ARRAY(SELECT ...)` is never NULL; `coalesce` over it never falls back — branch on the state instead.
 - A drift test of re-created functions pins the exact line blocks (`*-drift.expected.json`); compute them once from the two migrated databases with a scratch test, then review each block.
 
+## 2026-11-10 — T-055 Private clinical media
+
+- Removing a branch role makes `tenant_actor_lock` refuse the bound context itself; tests of lost access must expect that refusal (fail closed), and test "access revoked" with a reader who keeps another branch.
+- A `text[] || 'literal'` in PL/pgSQL is read as an array literal; cast the element (`'x'::text`).
+- `media_tokens` stores only the sha256 of the token; an idempotent replay cannot show the token again, so the replay is a conflict and the caller asks for a new link.
+- Column grants (`GRANT SELECT (cols)`) keep content addresses and removal reasons out of direct reads while the row stays readable.
+

@@ -421,6 +421,14 @@ describe("functions (TEN-16)", () => {
     "record_copy_request(uuid,text)",
     "record_copy_data(uuid)",
     "retention_until(uuid)",
+    "media_blob_put(text,text,bytea)", // T-055: private clinical media and tokens (PR-32)
+    "media_blob_get(text)",
+    "media_add(uuid,jsonb)",
+    "media_remove(uuid,text)",
+    "media_token_issue(uuid,text,text,integer)",
+    "media_token_redeem(text)",
+    "media_list(uuid,uuid)",
+    "media_compare(uuid,uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",
     "credential_end(uuid,text,text)",
