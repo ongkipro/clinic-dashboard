@@ -337,3 +337,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A fixed label column (`12rem`) in a `dl` squeezes the values at 820 px with 200 % text; stack label above value.
 - A writer's task lookup must compare with the active branch, not only the session's allowed branches: a multi-branch handler otherwise acts on another branch's row that the readers already hide (implementation review P2-1).
 - In a Level 2 session `app_branch_allowed` is true for every id; a reader that takes a branch id must also check the branch belongs to the tenant (P2-2).
+
+## 2026-11-11 — T-058 Document templates and signed letters
+
+- A definer that reads its input before `tenant_actor_lock()` answers an ended actor with an input error instead of the access refusal; take the lock first (authority-clock suite, DEC-043).
+- An isolation positive control replays every attempt as tenant B in order: a case that retires B's template must run the letter writes that need it first, and use a fresh template per run.
+- A seed that turns on a TOTP role's factor to sign server-side must turn it off again, or the browser sign-in asks for a code instead of enrolling the authenticator.
+- Playwright `getByRole("link", { name })` matches substrings ("Struk" in "Templat Struk ..."): scope the query to the segment group and compare the exact list.
+- A long status badge ("Ditandatangani · v2") overflows a list row at 390 px with 200 % text; keep badge words short and move detail into the subtitle.

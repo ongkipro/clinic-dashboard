@@ -43,6 +43,7 @@ const pendampingan = await import("../../src/app/(app)/pendampingan/actions"); /
 const pemeriksaan = await import("../../src/app/(app)/pemeriksaan/actions"); // T-052
 const persetujuanTindakan = await import("../../src/app/(app)/persetujuan-tindakan/actions"); // T-054
 const keluhan = await import("../../src/app/(app)/keluhan/actions"); // T-057
+const templat = await import("../../src/app/(app)/templat/actions"); // T-058
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -135,6 +136,11 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["keluhan noteAction", (f) => keluhan.noteAction({}, f), () => ({ key: U(130), task: U(128), note: "Uji konteks" })],
   ["keluhan resolveAction", (f) => keluhan.resolveAction({}, f), () => ({ key: U(131), task: U(128), outcome: "edukasi", note: "Uji konteks" })],
   ["keluhan reopenAction", (f) => keluhan.reopenAction({}, f), () => ({ key: U(132), task: U(128), note: "Uji konteks" })],
+  ["templat saveTemplateAction", (f) => templat.saveTemplateAction({}, f), () => ({ key: U(133), kind: "letter", letter_type: "resume", name: "Uji Konteks", body: "Uji konteks templat", paper: "a4" })],
+  ["templat retireTemplateAction", (f) => templat.retireTemplateAction({}, f), () => ({ key: U(134), template: U(135) })],
+  ["templat createLetterAction", (f) => templat.createLetterAction({}, f), () => ({ key: U(136), visit: U(137), template_version: U(138) })],
+  ["templat saveLetterAction", (f) => templat.saveLetterAction({}, f), () => ({ key: U(139), letter: U(140), body: "Uji konteks surat" })],
+  ["templat correctLetterAction", (f) => templat.correctLetterAction({}, f), () => ({ key: U(141), letter: U(140), body: "Uji konteks surat", reason: "Uji konteks" })],
   ["staf recordCredentialAction", (f) => kredensial.recordCredentialAction({}, f), () => ({ key: U(91), staff_id: U(46), kind: "str", profession: "dokter", number: "STR-1", issuer: "Konsil Kesehatan", valid_from: "2024-01-01" })],
   ["staf decideCredentialAction", (f) => kredensial.decideCredentialAction({}, f), () => ({ key: U(92), id: U(93), staff_id: U(46), verdict: "verified" })],
   ["staf endCredentialAction", (f) => kredensial.endCredentialAction({}, f), () => ({ key: U(94), id: U(93), staff_id: U(46), state: "suspended", reason: "Uji konteks" })],

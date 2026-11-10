@@ -447,6 +447,18 @@ describe("functions (TEN-16)", () => {
     "complaint_list(uuid,text)",
     "complaint_get(uuid)",
     "complaint_flag_options(uuid)",
+    "template_readable(uuid,text)", // T-058: document templates and signed medical letters (PR-74)
+    "template_save(uuid,jsonb)",
+    "template_retire(uuid)",
+    "template_list(text)",
+    "template_get(uuid)",
+    "letter_create(uuid,uuid)",
+    "letter_save(uuid,text)",
+    "letter_sign(uuid)",
+    "letter_correct(uuid,text,text)",
+    "letter_list(uuid,uuid)",
+    "letter_get(uuid)",
+    "letter_options(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",
     "credential_end(uuid,text,text)",

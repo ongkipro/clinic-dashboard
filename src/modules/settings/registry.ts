@@ -258,8 +258,8 @@ export const SETTINGS: SettingDef[] = [
     default: { masa: 30, masa_akut: 7, jeda: 75, sebagian: 4 }, source: { kind: "decision", ref: "19 §5 SET-48" }, note: "Apoteker mengusulkan, penanggung jawab klinik menyetujui.",
   },
 
-  { key: "SET-32", group: "dokumen", label: "Templat struk, persetujuan, surat, halaman legal; ukuran kertas struk", scope: "tenant", changers: ["admin_pusat", "facility_head"], drafts: [], kind: "ref", defaultText: "Templat vendor (UX-54); 80 mm", boundsText: "Berversi; kolom legal dan klinis wajib tidak bisa dihapus; 58/80 mm/A4", href: "/templat-dokumen", owner: "Templat Dokumen" },
-  { key: "SET-33", group: "dokumen", label: "Format nomor RM, invoice, PO", scope: "tenant", changers: ["admin_pusat"], drafts: [], kind: "ref", defaultText: "Prefiks cabang + tahun + urut", boundsText: "Prefiks dan pemisah saja; urutan tanpa celah dan tidak dipakai ulang", href: "/templat-dokumen", owner: "Templat Dokumen" },
+  { key: "SET-32", group: "dokumen", label: "Templat struk, persetujuan, surat, halaman legal; ukuran kertas struk", scope: "tenant", changers: ["admin_pusat", "facility_head"], drafts: [], kind: "ref", defaultText: "Templat vendor (UX-54); 80 mm", boundsText: "Berversi; kolom legal dan klinis wajib tidak bisa dihapus; 58/80 mm/A4", href: "/templat/dokumen", owner: "Templat Dokumen" },
+  { key: "SET-33", group: "dokumen", label: "Format nomor RM, invoice, PO", scope: "tenant", changers: ["admin_pusat"], drafts: [], kind: "ref", defaultText: "Prefiks cabang + tahun + urut", boundsText: "Prefiks dan pemisah saja; urutan tanpa celah dan tidak dipakai ulang", href: "/templat/dokumen", owner: "Templat Dokumen" },
 
   { key: "SET-34", group: "akses", label: "Peran per staf, cabang", scope: "tenant", changers: ["owner", "admin_pusat"], drafts: [], kind: "ref", defaultText: "Undangan", boundsText: "Matriks 07; peran Level 2 perlu persetujuan owner; tidak ada yang mengubah perannya sendiri", href: "/staf", owner: "Staf & Undangan" },
   {
