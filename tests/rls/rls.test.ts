@@ -507,6 +507,10 @@ describe("functions (TEN-16)", () => {
     "material_request_get(uuid)",
     "material_requests_for_visit(uuid)",
     "material_issue_queue()",
+    // T-063 (PR-46): costed receipt and inventory value readers.
+    "stock_receive_costed(uuid,jsonb)",
+    "stock_cost_list(uuid)",
+    "stock_movement_value_list(uuid,uuid,integer)",
     "clinical_request_options(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",

@@ -277,6 +277,10 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["material_request_get", async () => ["select material_request_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["material_requests_for_visit", async () => ["select material_requests_for_visit($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["material_issue_queue", async () => ["select material_issue_queue()", []], ["pharmacist"]],
+    // T-063 (PR-46): the costed receipt and the value readers take the actor lock first.
+    ["stock_receive_costed", async () => ["select stock_receive_costed(null, '{}'::jsonb)", []], ["pharmacist"]],
+    ["stock_cost_list", async () => ["select stock_cost_list(null)", []], ["manager"]],
+    ["stock_movement_value_list", async () => ["select stock_movement_value_list($1, null, 10)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

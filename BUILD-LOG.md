@@ -383,3 +383,9 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Two-tier FEFO returns the open vial row and the sealed row of the same batch; aggregate picks per batch before writing movements whose source key is unique per (source, batch, depot, leg).
 - Free quantity per (line, batch) as issued − consumed − returned − wasted − pending, with pending returns reserving, keeps concurrent consume/return/waste from spending the same units; serialise on the request row.
 
+## 2026-11-12 — T-063 Moving average cost
+
+- A field of an unassigned PL/pgSQL `record` must not appear in an expression even inside a `CASE` branch that is not taken: the first call on a connection fails ("record "v_x" is not assigned yet"), later calls on the same connection may pass because the plan is cached. Tests on a shared pool hide it; use `IF … THEN v := rec.f` and test on a fresh connection. Found in T-062's `material_consume` by T-063's tests and fixed in 0080.
+- A ledger kept beside an existing ledger (values beside quantities) stays in step when it is written by an AFTER INSERT trigger on the same rows and its guard accepts a change only to the afters of the newest row; storing the afters on each value row makes a replayed or partial update detectable.
+- Adding an FK that references a table changes how `TRUNCATE` on that table fails (0A000 "cannot truncate a table referenced in a foreign key constraint" before any truncate trigger fires): tests asserting the trigger's 42501 must use `cascade` or accept both.
+

@@ -337,7 +337,9 @@ describe("the batch ↔ movement invariant and the guards (plan P1-2)", () => {
       await h.admin.query("rollback");
     }
     expect(await code(h.admin.query(`delete from stock_batches where id = $1`, [b.id]))).toBe("raw:42501");
-    expect(await code(h.admin.query(`truncate stock_movements`))).toBe("raw:42501");
+    // refused: by the truncate trigger, or (since T-063's stock_movement_values references movements) by the FK first
+    expect(await code(h.admin.query(`truncate stock_movements`))).toMatch(/^raw:(42501|0A000)$/);
+    expect(await code(h.admin.query(`truncate stock_movements cascade`))).toBe("raw:42501");
     expect(await code(h.admin.query(`insert into stock_batches (tenant_id, branch_id, item_id, batch_no, expiry, quantity) values ($1, $2, $3, 'X-1', $4, 5)`, [b.tenant_id, b.branch_id, b.item_id, day(90)]))).toBe("raw:42501");
     expect(await code(h.admin.query(`select stock_move($1, $2, 'adjust', -100000, null, 'test', gen_random_uuid(), $3, 'pharmacist')`, [b.tenant_id, b.id, PH.staffId]))).toBe("raw:P0422");
     // every batch equals the sum of its movements, and the newest balance_after

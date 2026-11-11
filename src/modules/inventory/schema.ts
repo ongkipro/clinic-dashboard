@@ -681,3 +681,94 @@ export const materialWasteLines = pgTable(
     check("material_waste_lines_check", sql`${qty(t.quantity, "0.0001")} and ${t.quantity} > 0`),
   ],
 );
+
+// ── T-063 moving average cost per item per branch (PR-46, A-13, BILL-26, BILL-35; migration 0080) ──────────────────
+// Written only by the AFTER INSERT trigger stock_movements_value: one value row per movement (signed value, signed
+// uncosted units, and the afters of its (branch, item)), then the cost row moves to those afters. Money in integer
+// rupiah (bigint); the average is a rate over the costed units (value / (quantity − uncosted)). Costed units leave
+// first; uncosted units (receipts without a cost, the 0080 backfill) carry value 0.
+const MONEY = "1000000000000000000";
+export const stockCosts = pgTable(
+  "stock_costs",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    quantity: numeric("quantity").notNull().default("0"),
+    value: bigint("value", { mode: "number" }).notNull().default(0),
+    uncostedQuantity: numeric("uncosted_quantity").notNull().default("0"),
+    lastUnitCost: numeric("last_unit_cost"),
+    lastSeq: bigint("last_seq", { mode: "number" }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "stock_costs_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "stock_costs_item_fk", columns: [t.tenantId, t.itemId], foreignColumns: [stockItems.tenantId, stockItems.id] }).onDelete("restrict"),
+    unique("stock_costs_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("stock_costs_item_key").on(t.tenantId, t.branchId, t.itemId),
+    check("stock_costs_check", sql`${qty(t.quantity, "0", "1000000000000")} and ${qty(t.uncostedQuantity, "0", "1000000000000")} and ${t.uncostedQuantity} <= ${t.quantity}
+      and ${t.value} between 0 and ${sql.raw(MONEY)} and (${t.quantity} > ${t.uncostedQuantity} or ${t.value} = 0)
+      and (${t.lastUnitCost} is null or ${t.lastUnitCost} between 0 and 1000000000 and scale(${t.lastUnitCost}) <= 4)`),
+  ],
+);
+
+export const stockMovementValues = pgTable(
+  "stock_movement_values",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    movementId: uuid("movement_id").notNull(),
+    seq: bigint("seq", { mode: "number" }).notNull(),
+    quantity: numeric("quantity").notNull(),
+    value: bigint("value", { mode: "number" }).notNull(),
+    uncostedQty: numeric("uncosted_qty").notNull(),
+    unitCost: numeric("unit_cost"),
+    quantityAfter: numeric("quantity_after").notNull(),
+    valueAfter: bigint("value_after", { mode: "number" }).notNull(),
+    uncostedAfter: numeric("uncosted_after").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "stock_movement_values_movement_fk", columns: [t.tenantId, t.movementId], foreignColumns: [stockMovements.tenantId, stockMovements.id] }).onDelete("restrict"),
+    foreignKey({ name: "stock_movement_values_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "stock_movement_values_item_fk", columns: [t.tenantId, t.itemId], foreignColumns: [stockItems.tenantId, stockItems.id] }).onDelete("restrict"),
+    unique("stock_movement_values_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("stock_movement_values_movement_key").on(t.tenantId, t.movementId),
+    index("stock_movement_values_item_idx").on(t.tenantId, t.branchId, t.itemId, t.seq),
+    check("stock_movement_values_check", sql`${qty(t.quantity, "-1000000000")} and ${t.quantity} <> 0
+      and ${qty(t.uncostedQty, "-1000000000")} and abs(${t.uncostedQty}) <= abs(${t.quantity}) and sign(${t.uncostedQty}) in (0, sign(${t.quantity}))
+      and ${t.value} between -${sql.raw(MONEY)} and ${sql.raw(MONEY)} and sign(${t.value}) in (0, sign(${t.quantity}))
+      and (${t.unitCost} is null or ${t.unitCost} between 0 and 1000000000 and scale(${t.unitCost}) <= 4)
+      and ${qty(t.quantityAfter, "0", "1000000000000")} and ${qty(t.uncostedAfter, "0", "1000000000000")} and ${t.uncostedAfter} <= ${t.quantityAfter}
+      and ${t.valueAfter} between 0 and ${sql.raw(MONEY)} and (${t.quantityAfter} > ${t.uncostedAfter} or ${t.valueAfter} = 0)`),
+  ],
+);
+
+export const stockReceiptCosts = pgTable(
+  "stock_receipt_costs",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    sourceKind: text("source_kind").notNull(),
+    sourceId: uuid("source_id").notNull(),
+    unitCost: bigint("unit_cost", { mode: "number" }).notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAs: text("created_as").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "stock_receipt_costs_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "stock_receipt_costs_item_fk", columns: [t.tenantId, t.itemId], foreignColumns: [stockItems.tenantId, stockItems.id] }).onDelete("restrict"),
+    foreignKey({ name: "stock_receipt_costs_by_fk", columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("stock_receipt_costs_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("stock_receipt_costs_source_key").on(t.tenantId, t.sourceKind, t.sourceId, t.itemId),
+    check("stock_receipt_costs_check", sql`${t.unitCost} between 0 and 1000000000 and ${t.sourceKind} ~ '^[a-z][a-z_]{1,40}$'
+      and ${t.createdAs} in ('pharmacist','purchasing')`),
+  ],
+);

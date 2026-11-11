@@ -1,0 +1,8 @@
+{
+  "before": {
+    "material_consume(text,uuid,jsonb)": "c7b320ebc753a4402fe0eba13dcf617d99a676b28f3034f85095b3d75c1a5488"
+  },
+  "after": {
+    "material_consume(text,uuid,jsonb)": "7f6c27257502e338e5c1eb9b82e45843969593fc6f866949f63bcca881de9fe0"
+  }
+}
