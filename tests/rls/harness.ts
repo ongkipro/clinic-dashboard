@@ -66,6 +66,15 @@ const SLOW_MS = 5_000;
 //   shared requests from passing a queued exclusive one, so drops cannot starve a create.
 export const DDL_LOCK_KEY = BigInt("7202611030");
 
+// T-060: harness migrations run one at a time cluster-wide. drizzle applies every migration in one
+// transaction, which holds a lock per object it creates (2717 after 0077, measured with pg_locks; 2545
+// after 0076). The shared lock table holds max_locks_per_transaction × max_connections (64 × 100 by
+// default, also in CI), so three overlapping harness migrations overflowed it ("53200 out of shared
+// memory"). Taken on the admin connection after the database's lifetime lock and released right after
+// the migration; never while holding DDL_LOCK_KEY (no new lock-order edge). Distinct from DDL_LOCK_KEY
+// and MIGRATION_LOCK_KEY (that one is per database, so it never serialized different test databases).
+export const MIGRATE_LOCK_KEY = BigInt("7202611040");
+
 type Query = (sql: string, values?: unknown[]) => Promise<unknown>;
 
 // Test-only knobs (tests/rls/harness-lock.test.ts): a private key so no other file queues on
@@ -247,6 +256,7 @@ export async function sweepStaleDatabases(
 export type HarnessOptions = Omit<DdlLockOptions, "onLockWait"> & {
   migrate?: (url: string) => Promise<void>;
   stalePattern?: string;
+  migrateLockKey?: bigint;
 };
 
 export async function createHarness(opts: HarnessOptions = {}): Promise<Harness> {
@@ -277,7 +287,13 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
     await sweepStaleDatabases(server, { ...ddl, pattern: opts.stalePattern });
     await createTestDatabase(server, dbName, { ...ddl, onLockWait: (ms) => (createLockWait = ms) });
     created = true;
-    await (opts.migrate ?? runMigrations)(urlFor());
+    const mk = (opts.migrateLockKey ?? MIGRATE_LOCK_KEY).toString();
+    await server.query("select pg_advisory_lock($1)", [mk]);
+    try {
+      await (opts.migrate ?? runMigrations)(urlFor());
+    } finally {
+      await server.query("select pg_advisory_unlock($1)", [mk]).catch(() => {}); // an ended connection released it
+    }
     await admin.connect();
   } catch (error) {
     // Best effort: an ended connection (an unlock failure) cannot drop; a later sweep does,

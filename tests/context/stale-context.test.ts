@@ -45,6 +45,7 @@ const persetujuanTindakan = await import("../../src/app/(app)/persetujuan-tindak
 const keluhan = await import("../../src/app/(app)/keluhan/actions"); // T-057
 const templat = await import("../../src/app/(app)/templat/actions"); // T-058
 const permintaan = await import("../../src/app/(app)/permintaan/actions"); // T-056
+const stok = await import("../../src/app/(app)/stok/actions"); // T-060
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -145,6 +146,15 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["permintaan createRequestAction", (f) => permintaan.createRequestAction({}, f), () => ({ key: U(142), visit: U(143), plan: U(144), kind: "addition", version: U(145), stage: "1", qty: "1", reason: "Uji konteks" })],
   ["permintaan decideRequestAction", (f) => permintaan.decideRequestAction({}, f), () => ({ key: U(146), request: U(147), decision: "approve" })],
   ["permintaan cancelRequestAction", (f) => permintaan.cancelRequestAction({}, f), () => ({ key: U(148), request: U(147) })],
+  ["stok saveItemAction", (f) => stok.saveItemAction({}, f), () => ({ key: U(149), catalog_item: U(150), unit: "ml", storage: "ruang" })],
+  ["stok receiveAction", (f) => stok.receiveAction({}, f), () => ({ key: U(151), item: U(152), batch_no: "B-1", expiry: "2030-01-01", quantity: "1", reason: "penerimaan" })],
+  ["stok holdAction", (f) => stok.holdAction({}, f), () => ({ key: U(153), batch: U(154), state: "quarantined", reason: "Uji konteks" })],
+  ["stok openVialAction", (f) => stok.openVialAction({}, f), () => ({ key: U(155), batch: U(154) })],
+  ["stok levelAction", (f) => stok.levelAction({}, f), () => ({ key: U(156), item: U(152), min: "1", target: "2" })],
+  ["stok startCountAction", (f) => stok.startCountAction({}, f), () => ({ key: U(157) })],
+  ["stok recordCountAction", (f) => stok.recordCountAction({}, f), () => ({ key: U(158), count: U(159), line: U(160), counted: "1" })],
+  ["stok submitCountAction", (f) => stok.submitCountAction({}, f), () => ({ key: U(161), count: U(159), reason: "Uji konteks" })],
+  ["stok cancelCountAction", (f) => stok.cancelCountAction({}, f), () => ({ key: U(162), count: U(159) })],
   ["staf recordCredentialAction", (f) => kredensial.recordCredentialAction({}, f), () => ({ key: U(91), staff_id: U(46), kind: "str", profession: "dokter", number: "STR-1", issuer: "Konsil Kesehatan", valid_from: "2024-01-01" })],
   ["staf decideCredentialAction", (f) => kredensial.decideCredentialAction({}, f), () => ({ key: U(92), id: U(93), staff_id: U(46), verdict: "verified" })],
   ["staf endCredentialAction", (f) => kredensial.endCredentialAction({}, f), () => ({ key: U(94), id: U(93), staff_id: U(46), state: "suspended", reason: "Uji konteks" })],

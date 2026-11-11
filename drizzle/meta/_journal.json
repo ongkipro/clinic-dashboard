@@ -540,6 +540,13 @@
       "when": 1794337765873,
       "tag": "0076_clinical_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1794375553050,
+      "tag": "0077_stock",
+      "breakpoints": true
     }
   ]
 }

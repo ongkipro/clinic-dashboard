@@ -359,3 +359,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Tests build every pool and client with `testPool`/`testClient` from `tests/rls/harness.ts`, never `new pg.Pool`/`new pg.Client`; `tests/rls/pg-listener.test.ts` fails the build otherwise. The listeners do not hide failures: pg rejects every active and queued query of a dead connection before it emits.
 - A behaviour test that waits for a connection's `end` must also wake on a process-level error: without a listener pg throws before `end`, and the wait would hang to the test timeout instead of failing on its assertion.
 
+## 2026-11-11 — T-060 Stok
+
+- A quantity that may only change with its ledger row: let the ledger row's insert trigger set the quantity and have the quantity guard accept only the newest row's balance. Paired row triggers hold the invariant with no window, where a deferred two-way check needs a transaction-wide matching scheme.
+- `numeric` accepts NaN and Infinity, and both pass `>= 0`: bound every numeric column with `between` and `scale(...) <= 4`; validate decimal strings in the TS layer too (`1e3` is a valid numeric literal).
+- A plpgsql function that takes a `record` argument cannot be called with a `DECLARE a record := …` variable in every position; pass the fields as plain parameters.
+- Unqualified `uuid_generate_v7()` inside a definer with `search_path = pg_catalog, pg_temp` does not resolve; write `public.uuid_generate_v7()`.
+- `getByRole("link", { name })` on Persetujuan matches the type filter chip first; scope to the list (`getByRole("list", { name: "Permintaan menunggu" })`).
+

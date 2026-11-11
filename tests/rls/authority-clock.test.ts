@@ -239,6 +239,20 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["clinical_request_get", async () => ["select clinical_request_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["credential_decide", async () => ["select credential_decide($1, true, null)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["credential_end", async () => ["select credential_end($1, 'suspended', 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
+    // T-060 (PR-17): stock writers and readers take the actor lock first.
+    ["stock_item_save", async () => ["select stock_item_save(null, '{}'::jsonb)", []], ["pharmacist"]],
+    ["stock_receive", async () => ["select stock_receive(null, '{}'::jsonb)", []], ["pharmacist"]],
+    ["stock_batch_hold", async () => ["select stock_batch_hold($1, 'quarantined', 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["stock_vial_open", async () => ["select stock_vial_open($1)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["stock_level_set", async () => ["select stock_level_set(null, $1, 1, 2)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["stock_count_start", async () => ["select stock_count_start(false, null)", []], ["manager"]],
+    ["stock_count_record", async () => ["select stock_count_record($1, $1, 1)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["stock_count_submit", async () => ["select stock_count_submit($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["stock_count_cancel", async () => ["select stock_count_cancel($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["stock_context", async () => ["select stock_context()", []], ["pharmacist"]],
+    ["stock_item_list", async () => ["select stock_item_list(null)", []], ["manager"]],
+    ["stock_card", async () => ["select stock_card($1, null, 10)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["stock_count_get", async () => ["select stock_count_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

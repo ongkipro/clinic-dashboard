@@ -12,6 +12,7 @@ import {
   createTestDatabase,
   DDL_LOCK_KEY,
   dropTestDatabase,
+  MIGRATE_LOCK_KEY,
   STALE_PATTERN,
   sweepStaleDatabases,
   withDatabaseDdlLock,
@@ -553,6 +554,31 @@ describe("HYG-006 database DDL lock", () => {
     } finally {
       console.error = orig;
     }
+  });
+
+  it("15. (T-060) harness migrations run one at a time; the key is released after a failed migration", { timeout: 120_000 }, async () => {
+    const key = freshKey();
+    const mkey = freshKey();
+    const b = barrier();
+    let firstName = "";
+    const first = createHarness({
+      ddlLockKey: key, migrateLockKey: mkey, stalePattern: "^hyg006_never$",
+      migrate: async (url) => { firstName = new URL(url).pathname.slice(1); await b.hook(); throw new Error("migration failed (test)"); },
+    }).catch((e: unknown) => e);
+    await b.atBarrier;
+    let second: Awaited<ReturnType<typeof createHarness>> | undefined;
+    const p2 = createHarness({ ddlLockKey: key, migrateLockKey: mkey, stalePattern: "^hyg006_never$" }).then((x) => (second = x));
+    await until("second harness waits for the migrate key", () => locks(mkey), (r) => r.some((x) => x.app.startsWith("harness:rls_") && x.app !== `harness:${firstName}` && !x.granted));
+    expect(second).toBeUndefined();
+    // The waiter holds no DDL key while it waits.
+    expect((await locks(key)).filter((r) => r.granted)).toEqual([]);
+    b.open();
+    expect(String((await first as Error).message)).toBe("migration failed (test)");
+    await p2;
+    expect((await locks(mkey)).filter((r) => r.granted)).toEqual([]);
+    await second!.close();
+    expect(MIGRATE_LOCK_KEY).not.toBe(DDL_LOCK_KEY);
+    expect(MIGRATE_LOCK_KEY.toString()).not.toBe(String(MIGRATION_LOCK_KEY));
   });
 
   it("the stale pattern the harness sweeps is unchanged", () => {
