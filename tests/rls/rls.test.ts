@@ -495,6 +495,18 @@ describe("functions (TEN-16)", () => {
     "depot_get(uuid)",
     "transfer_list(uuid,text)",
     "transfer_get(uuid)",
+    // T-062 (PR-16, CLIN-008): material lifecycle definers.
+    "stock_item_class_set(uuid,text)",
+    "material_request_create(text,jsonb)",
+    "material_request_cancel(uuid)",
+    "material_issue(text,uuid,jsonb)",
+    "material_consume(text,uuid,jsonb)",
+    "material_return_propose(text,uuid,jsonb)",
+    "material_return_decide(uuid,text,uuid)",
+    "material_waste(text,uuid,jsonb)",
+    "material_request_get(uuid)",
+    "material_requests_for_visit(uuid)",
+    "material_issue_queue()",
     "clinical_request_options(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",

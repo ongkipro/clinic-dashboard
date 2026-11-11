@@ -265,6 +265,18 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["depot_get", async () => ["select depot_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["transfer_list", async () => ["select transfer_list(null, null)", []], ["pharmacist"]],
     ["transfer_get", async () => ["select transfer_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-062 (PR-16, CLIN-008): material writers and readers take the actor lock first.
+    ["stock_item_class_set", async () => ["select stock_item_class_set($1, 'bulk')", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["material_request_create", async () => ["select material_request_create('k-0000000003', '{}'::jsonb)", []], ["nurse"]],
+    ["material_request_cancel", async () => ["select material_request_cancel($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["material_issue", async () => ["select material_issue('k-0000000004', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["material_consume", async () => ["select material_consume('k-0000000005', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["nurse"]],
+    ["material_return_propose", async () => ["select material_return_propose('k-0000000006', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["therapist"]],
+    ["material_return_decide", async () => ["select material_return_decide($1, 'waste', null)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["material_waste", async () => ["select material_waste('k-0000000007', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["nurse"]],
+    ["material_request_get", async () => ["select material_request_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["material_requests_for_visit", async () => ["select material_requests_for_visit($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["material_issue_queue", async () => ["select material_issue_queue()", []], ["pharmacist"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

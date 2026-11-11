@@ -10,8 +10,10 @@ import { sql } from "drizzle-orm";
 import { bigint, boolean, check, date, foreignKey, index, integer, numeric, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { approvals } from "../approvals/schema";
 import { catalogItems } from "../catalog/schema";
+import { planItems } from "../clinical/schema";
 import { rooms } from "../org/branches/schema";
 import { branches, staff, tenants } from "../org/schema";
+import { visits } from "../visits/schema";
 
 export const STOCK_STORAGE_KINDS = ["ruang", "sejuk", "dingin"] as const;
 export const BATCH_STATES = ["active", "quarantined", "recalled"] as const;
@@ -26,6 +28,11 @@ export const DEPOT_KINDS = ["gudang", "ruang", "apotek"] as const;
 export const TRANSFER_KINDS = ["intra", "inter"] as const;
 export const TRANSFER_STATES = ["posted", "sent", "received", "cancelled"] as const;
 export const LEGS = ["out", "in"] as const;
+// T-062 (PR-16, CLIN-008; migration 0079).
+export const MATERIAL_CLASSES = ["bulk", "standard", "precise"] as const;
+export const MATERIAL_REQUEST_STATES = ["open", "issued", "reconciled", "cancelled"] as const;
+export const RETURN_CONDITIONS = ["unopened", "opened", "damaged"] as const;
+export const RETURN_STATES = ["pending", "usable", "waste"] as const;
 const inList = (xs: readonly string[]) => sql.raw(xs.map((x) => `'${x}'`).join(","));
 // Bounded numeric: rejects NaN/Infinity (they pass `>= 0` in PostgreSQL), at most 4 decimals.
 const qty = (c: unknown, min: string, max = "1000000000") => sql`${c} between ${sql.raw(min)} and ${sql.raw(max)} and scale(${c}) <= 4`;
@@ -42,6 +49,9 @@ export const stockItems = pgTable(
     storage: text("storage", { enum: STOCK_STORAGE_KINDS }).notNull().default("ruang"),
     registrationNo: text("registration_no"),
     highValue: boolean("high_value").notNull().default(false),
+    // T-062: how a treatment uses the item (PR-16 "per item class"): bulk (issued by pack, room counts), standard
+    // (per-treatment standard quantity), precise (actual quantity and batch).
+    materialClass: text("material_class", { enum: MATERIAL_CLASSES }).notNull().default("standard"),
     active: boolean("active").notNull().default(true),
     createdBy: uuid("created_by").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
@@ -61,6 +71,7 @@ export const stockItems = pgTable(
       and (${t.openedUseHours} is null or ${t.openedUseHours} between 1 and 8760)`),
     check("stock_items_storage_check", sql`${t.storage} in (${inList(STOCK_STORAGE_KINDS)})`),
     check("stock_items_registration_check", sql`${t.registrationNo} is null or ${t.registrationNo} ~ '^[A-Za-z0-9./ -]{3,40}$'`),
+    check("stock_items_material_class_check", sql`${t.materialClass} in (${inList(MATERIAL_CLASSES)})`),
   ],
 );
 
@@ -259,10 +270,14 @@ export const stockMovements = pgTable(
     check("stock_movements_check", sql`${t.kind} in (${inList(MOVEMENT_KINDS)}) and ${qty(t.quantity, "-1000000000")} and ${t.quantity} <> 0
       and ${qty(t.balanceAfter, "0")} and ${t.sourceKind} ~ '^[a-z][a-z_]{1,40}$'
       and (${t.reason} is null or length(btrim(${t.reason})) between 3 and 500)
-      and (${t.kind} <> 'receive' or ${t.quantity} > 0) and ${qty(t.depotBalanceAfter, "0")}
-      and (${t.kind} = 'transfer_out' and ${t.leg} is not distinct from 'out' and ${t.quantity} < 0
+      and ${qty(t.depotBalanceAfter, "0")}
+      and (${t.kind} = 'receive' and ${t.leg} is null and ${t.quantity} > 0
+           or ${t.kind} = 'adjust' and ${t.leg} is null
+           or ${t.kind} in ('consume','waste','supplier_return','dispense') and ${t.leg} is null and ${t.quantity} < 0
+           or ${t.kind} = 'transfer_out' and ${t.leg} is not distinct from 'out' and ${t.quantity} < 0
            or ${t.kind} = 'transfer_in' and ${t.leg} is not distinct from 'in' and ${t.quantity} > 0
-           or ${t.kind} not in ('transfer_out','transfer_in') and ${t.leg} is null)`),
+           or ${t.kind} in ('issue','return') and (${t.leg} is not distinct from 'out' and ${t.quantity} < 0
+                                                  or ${t.leg} is not distinct from 'in' and ${t.quantity} > 0))`),
   ],
 );
 
@@ -383,5 +398,286 @@ export const depotTransferLines = pgTable(
     unique("depot_transfer_lines_tenant_id_id_key").on(t.tenantId, t.id),
     unique("depot_transfer_lines_batch_key").on(t.tenantId, t.transferId, t.sourceBatchId),
     check("depot_transfer_lines_check", sql`${qty(t.quantity, "0.0001")} and ${t.quantity} > 0`),
+  ],
+);
+
+// ── T-062 material lifecycle (PR-16, CLIN-008, DATA-25; migration 0079) ────────────────────────────────────────
+// A request names stock items for an open visit and a room depot and moves no stock. One issue per request moves the
+// picked batches from a source depot into the room depot (two linked `issue` legs per batch; the batch quantity is
+// unchanged). One consumption per request uses them: standard and precise lines write `consume` from the room depot;
+// a bulk line records an estimate and no movement (room counts own bulk items). Returns (pending until the
+// pharmacist decides usable or waste) and wastes close the rest. Child rows name (tenant, branch, request, item, line)
+// and a batch of that item at that branch, so the database ties each one to its request line. All rows are written
+// by the 0079 definers; children are insert-only.
+const ROOM_ROLES = sql.raw("'doctor','nurse','therapist'");
+const KEY = (c: unknown) => sql`${c} ~ '^[A-Za-z0-9_.:-]{8,128}$'`;
+
+export const materialRequests = pgTable(
+  "material_requests",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    visitId: uuid("visit_id").notNull(),
+    planItemId: uuid("plan_item_id"),
+    roomDepotId: uuid("room_depot_id").notNull(),
+    state: text("state", { enum: MATERIAL_REQUEST_STATES }).notNull().default("open"),
+    commandKey: text("command_key").notNull(),
+    requestedBy: uuid("requested_by").notNull(),
+    requestedAs: text("requested_as").notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_requests_visit_fk", columns: [t.tenantId, t.branchId, t.visitId], foreignColumns: [visits.tenantId, visits.branchId, visits.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_requests_plan_item_fk", columns: [t.tenantId, t.planItemId], foreignColumns: [planItems.tenantId, planItems.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_requests_room_fk", columns: [t.tenantId, t.branchId, t.roomDepotId], foreignColumns: [depots.tenantId, depots.branchId, depots.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_requests_by_fk", columns: [t.tenantId, t.requestedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("material_requests_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("material_requests_branch_key").on(t.tenantId, t.branchId, t.id),
+    unique("material_requests_visit_key").on(t.tenantId, t.visitId, t.id),
+    unique("material_requests_command_key").on(t.tenantId, t.commandKey),
+    index("material_requests_queue_idx").on(t.tenantId, t.branchId, t.state, t.requestedAt),
+    check("material_requests_check", sql`${t.state} in (${inList(MATERIAL_REQUEST_STATES)}) and ${KEY(t.commandKey)}
+      and ${t.requestedAs} in (${ROOM_ROLES},'pharmacist') and ((${t.state} in ('reconciled','cancelled')) = (${t.closedAt} is not null))`),
+  ],
+);
+
+export const materialRequestLines = pgTable(
+  "material_request_lines",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    // The item's class when requested: the whole lifecycle of the line follows it.
+    materialClass: text("material_class", { enum: MATERIAL_CLASSES }).notNull(),
+    requestedQty: numeric("requested_qty").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_request_lines_request_fk", columns: [t.tenantId, t.branchId, t.requestId], foreignColumns: [materialRequests.tenantId, materialRequests.branchId, materialRequests.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_request_lines_item_fk", columns: [t.tenantId, t.itemId], foreignColumns: [stockItems.tenantId, stockItems.id] }).onDelete("restrict"),
+    unique("material_request_lines_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("material_request_lines_item_key").on(t.tenantId, t.requestId, t.itemId),
+    unique("material_request_lines_scope_key").on(t.tenantId, t.branchId, t.requestId, t.itemId, t.id),
+    check("material_request_lines_check", sql`${t.materialClass} in (${inList(MATERIAL_CLASSES)}) and ${qty(t.requestedQty, "0.0001")} and ${t.requestedQty} > 0`),
+  ],
+);
+
+export const materialIssues = pgTable(
+  "material_issues",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    fromDepotId: uuid("from_depot_id").notNull(),
+    commandKey: text("command_key").notNull(),
+    issuedBy: uuid("issued_by").notNull(),
+    issuedAs: text("issued_as").notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_issues_request_fk", columns: [t.tenantId, t.branchId, t.requestId], foreignColumns: [materialRequests.tenantId, materialRequests.branchId, materialRequests.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_issues_depot_fk", columns: [t.tenantId, t.branchId, t.fromDepotId], foreignColumns: [depots.tenantId, depots.branchId, depots.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_issues_by_fk", columns: [t.tenantId, t.issuedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("material_issues_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("material_issues_request_key").on(t.tenantId, t.requestId),
+    unique("material_issues_scope_key").on(t.tenantId, t.requestId, t.id),
+    unique("material_issues_command_key").on(t.tenantId, t.commandKey),
+    check("material_issues_check", sql`${KEY(t.commandKey)} and ${t.issuedAs} = 'pharmacist'`),
+  ],
+);
+
+export const materialIssueLines = pgTable(
+  "material_issue_lines",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    requestLineId: uuid("request_line_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    batchId: uuid("batch_id").notNull(),
+    quantity: numeric("quantity").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_issue_lines_issue_fk", columns: [t.tenantId, t.requestId, t.issueId], foreignColumns: [materialIssues.tenantId, materialIssues.requestId, materialIssues.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_issue_lines_line_fk", columns: [t.tenantId, t.branchId, t.requestId, t.itemId, t.requestLineId],
+      foreignColumns: [materialRequestLines.tenantId, materialRequestLines.branchId, materialRequestLines.requestId, materialRequestLines.itemId, materialRequestLines.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_issue_lines_batch_fk", columns: [t.tenantId, t.branchId, t.itemId, t.batchId], foreignColumns: [stockBatches.tenantId, stockBatches.branchId, stockBatches.itemId, stockBatches.id] }).onDelete("restrict"),
+    unique("material_issue_lines_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("material_issue_lines_batch_key").on(t.tenantId, t.issueId, t.batchId),
+    check("material_issue_lines_check", sql`${qty(t.quantity, "0.0001")} and ${t.quantity} > 0`),
+  ],
+);
+
+export const materialConsumptions = pgTable(
+  "material_consumptions",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    commandKey: text("command_key").notNull(),
+    consumedBy: uuid("consumed_by").notNull(),
+    consumedAs: text("consumed_as").notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_consumptions_request_fk", columns: [t.tenantId, t.branchId, t.requestId], foreignColumns: [materialRequests.tenantId, materialRequests.branchId, materialRequests.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_consumptions_by_fk", columns: [t.tenantId, t.consumedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("material_consumptions_tenant_id_id_key").on(t.tenantId, t.id),
+    // CLIN-008 / DATA-25: one consumption per request (T-064's execution binds 1:1 to its request).
+    unique("material_consumptions_request_key").on(t.tenantId, t.requestId),
+    unique("material_consumptions_scope_key").on(t.tenantId, t.requestId, t.id),
+    unique("material_consumptions_command_key").on(t.tenantId, t.commandKey),
+    check("material_consumptions_check", sql`${KEY(t.commandKey)} and ${t.consumedAs} in (${ROOM_ROLES})`),
+  ],
+);
+
+export const materialConsumptionLines = pgTable(
+  "material_consumption_lines",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    consumptionId: uuid("consumption_id").notNull(),
+    requestLineId: uuid("request_line_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    // null for a bulk estimate and for a line used 0 (nothing moved).
+    batchId: uuid("batch_id"),
+    quantity: numeric("quantity").notNull(),
+    classUsed: text("class_used", { enum: MATERIAL_CLASSES }).notNull(),
+    estimated: boolean("estimated").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_consumption_lines_header_fk", columns: [t.tenantId, t.requestId, t.consumptionId], foreignColumns: [materialConsumptions.tenantId, materialConsumptions.requestId, materialConsumptions.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_consumption_lines_line_fk", columns: [t.tenantId, t.branchId, t.requestId, t.itemId, t.requestLineId],
+      foreignColumns: [materialRequestLines.tenantId, materialRequestLines.branchId, materialRequestLines.requestId, materialRequestLines.itemId, materialRequestLines.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_consumption_lines_batch_fk", columns: [t.tenantId, t.branchId, t.itemId, t.batchId], foreignColumns: [stockBatches.tenantId, stockBatches.branchId, stockBatches.itemId, stockBatches.id] }).onDelete("restrict"),
+    unique("material_consumption_lines_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("material_consumption_lines_batch_key").on(t.tenantId, t.consumptionId, t.requestLineId, t.batchId).nullsNotDistinct(),
+    check("material_consumption_lines_check", sql`${t.classUsed} in (${inList(MATERIAL_CLASSES)}) and ${qty(t.quantity, "0")}
+      and ${t.estimated} = (${t.classUsed} = 'bulk') and ((${t.batchId} is null) = (${t.estimated} or ${t.quantity} = 0))`),
+  ],
+);
+
+export const materialReturns = pgTable(
+  "material_returns",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    condition: text("condition", { enum: RETURN_CONDITIONS }).notNull(),
+    state: text("state", { enum: RETURN_STATES }).notNull().default("pending"),
+    toDepotId: uuid("to_depot_id"),
+    commandKey: text("command_key").notNull(),
+    proposedBy: uuid("proposed_by").notNull(),
+    proposedAs: text("proposed_as").notNull(),
+    proposedAt: timestamp("proposed_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    decidedBy: uuid("decided_by"),
+    decidedAs: text("decided_as"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_returns_request_fk", columns: [t.tenantId, t.branchId, t.requestId], foreignColumns: [materialRequests.tenantId, materialRequests.branchId, materialRequests.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_returns_depot_fk", columns: [t.tenantId, t.branchId, t.toDepotId], foreignColumns: [depots.tenantId, depots.branchId, depots.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_returns_by_fk", columns: [t.tenantId, t.proposedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_returns_decided_by_fk", columns: [t.tenantId, t.decidedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("material_returns_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("material_returns_scope_key").on(t.tenantId, t.requestId, t.id),
+    unique("material_returns_command_key").on(t.tenantId, t.commandKey),
+    index("material_returns_queue_idx").on(t.tenantId, t.branchId, t.state),
+    check("material_returns_check", sql`${t.condition} in (${inList(RETURN_CONDITIONS)}) and ${t.state} in (${inList(RETURN_STATES)}) and ${KEY(t.commandKey)}
+      and ${t.proposedAs} in (${ROOM_ROLES}) and ((${t.state} = 'usable') = (${t.toDepotId} is not null))
+      and (${t.state} <> 'usable' or ${t.condition} <> 'damaged')
+      and ((${t.state} = 'pending') = (${t.decidedAt} is null)) and num_nonnulls(${t.decidedBy}, ${t.decidedAs}, ${t.decidedAt}) in (0, 3)
+      and (${t.decidedAs} is null or ${t.decidedAs} = 'pharmacist')`),
+  ],
+);
+
+export const materialReturnLines = pgTable(
+  "material_return_lines",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    returnId: uuid("return_id").notNull(),
+    requestLineId: uuid("request_line_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    batchId: uuid("batch_id").notNull(),
+    quantity: numeric("quantity").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_return_lines_header_fk", columns: [t.tenantId, t.requestId, t.returnId], foreignColumns: [materialReturns.tenantId, materialReturns.requestId, materialReturns.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_return_lines_line_fk", columns: [t.tenantId, t.branchId, t.requestId, t.itemId, t.requestLineId],
+      foreignColumns: [materialRequestLines.tenantId, materialRequestLines.branchId, materialRequestLines.requestId, materialRequestLines.itemId, materialRequestLines.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_return_lines_batch_fk", columns: [t.tenantId, t.branchId, t.itemId, t.batchId], foreignColumns: [stockBatches.tenantId, stockBatches.branchId, stockBatches.itemId, stockBatches.id] }).onDelete("restrict"),
+    unique("material_return_lines_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("material_return_lines_batch_key").on(t.tenantId, t.returnId, t.batchId),
+    check("material_return_lines_check", sql`${qty(t.quantity, "0.0001")} and ${t.quantity} > 0`),
+  ],
+);
+
+export const materialWastes = pgTable(
+  "material_wastes",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    reason: text("reason").notNull(),
+    commandKey: text("command_key").notNull(),
+    wastedBy: uuid("wasted_by").notNull(),
+    wastedAs: text("wasted_as").notNull(),
+    wastedAt: timestamp("wasted_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_wastes_request_fk", columns: [t.tenantId, t.branchId, t.requestId], foreignColumns: [materialRequests.tenantId, materialRequests.branchId, materialRequests.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_wastes_by_fk", columns: [t.tenantId, t.wastedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("material_wastes_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("material_wastes_scope_key").on(t.tenantId, t.requestId, t.id),
+    unique("material_wastes_command_key").on(t.tenantId, t.commandKey),
+    check("material_wastes_check", sql`${KEY(t.commandKey)} and ${t.wastedAs} in (${ROOM_ROLES}) and length(btrim(${t.reason})) between 3 and 500`),
+  ],
+);
+
+export const materialWasteLines = pgTable(
+  "material_waste_lines",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    wasteId: uuid("waste_id").notNull(),
+    requestLineId: uuid("request_line_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    batchId: uuid("batch_id").notNull(),
+    quantity: numeric("quantity").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_waste_lines_header_fk", columns: [t.tenantId, t.requestId, t.wasteId], foreignColumns: [materialWastes.tenantId, materialWastes.requestId, materialWastes.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_waste_lines_line_fk", columns: [t.tenantId, t.branchId, t.requestId, t.itemId, t.requestLineId],
+      foreignColumns: [materialRequestLines.tenantId, materialRequestLines.branchId, materialRequestLines.requestId, materialRequestLines.itemId, materialRequestLines.id] }).onDelete("restrict"),
+    foreignKey({ name: "material_waste_lines_batch_fk", columns: [t.tenantId, t.branchId, t.itemId, t.batchId], foreignColumns: [stockBatches.tenantId, stockBatches.branchId, stockBatches.itemId, stockBatches.id] }).onDelete("restrict"),
+    unique("material_waste_lines_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("material_waste_lines_batch_key").on(t.tenantId, t.wasteId, t.batchId),
+    check("material_waste_lines_check", sql`${qty(t.quantity, "0.0001")} and ${t.quantity} > 0`),
   ],
 );

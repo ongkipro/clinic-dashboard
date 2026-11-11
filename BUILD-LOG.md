@@ -375,3 +375,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - An AFTER INSERT seed trigger on a parent table (branches → default gudang) breaks every fixture that deletes the parent with its guard disabled: the child row must go first.
 - In plpgsql, `CASE WHEN rec.id IS NOT NULL AND f(rec) … THEN rec.col` on a composite-typed variable did not parse as expected; use `IF FOUND` and a scalar.
 - A random fixture key drawn from a small space (6 digits) into a table that keeps growing across test cases and runs fails by the birthday bound long before it looks likely (3 000 rows: several collisions). Draw from a space orders of magnitude larger than the lifetime row count, or use a sequence. And keep the full output of every gated check: the ledger keeps only the tail, and this failure had to be reconstructed from the database server log.
+
+## 2026-11-11 — T-062 Material lifecycle
+
+- In PL/pgSQL a `record` variable named like a SQL alias inside an embedded query (`l` for a loop record and `public.material_request_lines l` in a subquery) makes the query refer to the not-yet-assigned record ("record "l" is not assigned yet"). Name loop records with a prefix (`v_l`) and never reuse them as aliases.
+- A ledger helper that clamps a derived quantity only when it would exceed the new balance (T-061 `stock_move_depot` and open vials) is silently wrong when the derived quantity sits beside other stock in the same balance: every writer that takes from that sub-quantity must run it down explicitly.
+- Two-tier FEFO returns the open vial row and the sealed row of the same batch; aggregate picks per batch before writing movements whose source key is unique per (source, batch, depot, leg).
+- Free quantity per (line, batch) as issued − consumed − returned − wasted − pending, with pending returns reserving, keeps concurrent consume/return/waste from spending the same units; serialise on the request row.
+
