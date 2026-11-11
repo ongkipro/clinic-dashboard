@@ -12,7 +12,7 @@ import {
   bootstrapVendor, createVendorStaff, decideVendorRequest, requestVendorAction, type VendorCaller,
   vendorDualIdentities, vendorDualIdentityClinicDecide, vendorDualIdentityClinicRevoke,
 } from "../../src/modules/vendor/staff/staff";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -78,8 +78,8 @@ const audit = async (t: string, object: string) =>
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 3 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 3 });
-  opPool = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 3 });
+  opPool = testPool({ connectionString: h.ownerUrl(), max: 1 });
   op = await opPool.connect();
   PO = await account();
   await bootstrapVendor(op, PO, "Pemilik Platform", "203.0.113.0/24", "Kantor vendor");

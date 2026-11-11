@@ -9,7 +9,7 @@ import type { Role } from "../../src/auth/policy";
 import { APP_GROUP_ROLE } from "../../src/db/rls/context";
 import { openAppPool } from "../../src/db/rls/pool";
 import { assignBranch, assignRole, createMembership } from "../../src/modules/org/identity";
-import { createHarness, type Harness } from "./harness";
+import { createHarness, type Harness, testClient, testPool } from "./harness";
 
 let h: Harness;
 let appUrl: string;
@@ -41,8 +41,7 @@ async function person(t: T, roles: Role[], branch?: string): Promise<P> {
 // it until the test commits or rolls back. Its backend pid is known for pg_locks observations.
 type Tx = { c: pg.Client; pid: number; q: (sql: string, v?: unknown[]) => Promise<pg.QueryResult>; done: () => Promise<void> };
 async function bound(p: P, role: Role = p.role): Promise<Tx> {
-  const c = new pg.Client({ connectionString: appUrl, application_name: `hyg008a:${p.staffId.slice(0, 8)}` });
-  c.on("error", () => {});
+  const c = testClient({ connectionString: appUrl, application_name: `hyg008a:${p.staffId.slice(0, 8)}` });
   await c.connect();
   opened.push(c);
   const pid = (await c.query("select pg_backend_pid() as pid")).rows[0].pid as number;
@@ -91,7 +90,7 @@ const TAL = "tenant_actor_lock: bound context is not an active membership";
 beforeAll(async () => {
   h = await createHarness();
   appUrl = h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE]));
-  ownerPool = new pg.Pool({ connectionString: h.ownerUrl(), max: 3 });
+  ownerPool = testPool({ connectionString: h.ownerUrl(), max: 3 });
   // A pool login, only to prove the role is a plain clinic_app login (openAppPool checks it).
   await (await openAppPool({ connectionString: appUrl, max: 1 })).end();
 });
@@ -530,8 +529,7 @@ describe("2.13 R1-M3: staff_invite_accept waits on staff_access and sees the inv
     await iv.q("commit");
     const acc = (await h.admin.query(`insert into auth_user (name, email) values ('Calon', $1) returning id`, [email])).rows[0].id as string;
     const holder = await endMembership(ender, inviter, { commit: false }); // holds staff_access
-    const ac = new pg.Client({ connectionString: appUrl, application_name: "hyg008a:accept" });
-    ac.on("error", () => {});
+    const ac = testClient({ connectionString: appUrl, application_name: "hyg008a:accept" });
     await ac.connect();
     opened.push(ac);
     const pid = (await ac.query("select pg_backend_pid() as pid")).rows[0].pid as number;
@@ -564,8 +562,7 @@ describe("2.16 R1-L1: an owner invitation that expires while its accept waits on
     const appr = (await h.admin.query(`insert into vendor_staff (account_id, display_name) values ($1, 'Pemilik Platform') returning id`, [vs2])).rows[0].id as string;
     const hash = createHash("sha256").update(`owner-${n}-${t.tenantId}`).digest("hex");
     // The accepter starts first: its now() (T_start) is pinned before the invitation exists.
-    const ac = new pg.Client({ connectionString: appUrl, application_name: "hyg008a:owner-accept" });
-    ac.on("error", () => {});
+    const ac = testClient({ connectionString: appUrl, application_name: "hyg008a:owner-accept" });
     await ac.connect();
     opened.push(ac);
     const pid = (await ac.query("select pg_backend_pid() as pid")).rows[0].pid as number;
@@ -593,8 +590,7 @@ describe("2.16 R1-L1: an owner invitation that expires while its accept waits on
 describe("2.13b staff_invite_accept with an unknown token (review r1)", () => {
   it("is refused at once with the generic not-found and takes no staff_access", async () => {
     const acc = (await h.admin.query(`insert into auth_user (name, email) values ('X', $1) returning id`, [`tak${++n}@klinik-sintetis.test`])).rows[0].id as string;
-    const c = new pg.Client({ connectionString: appUrl });
-    c.on("error", () => {});
+    const c = testClient({ connectionString: appUrl });
     await c.connect();
     opened.push(c);
     await c.query("begin");

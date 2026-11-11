@@ -13,7 +13,7 @@ import { resolveContext } from "../../src/modules/org/identity";
 import { acceptOwnerWithNewAccount, invite, lookupOwnerInvite } from "../../src/modules/org/staff/staff";
 import { bootstrapVendor, createVendorStaff, type VendorCaller } from "../../src/modules/vendor/staff/staff";
 import { advanceTenant, approveOwnerInvite, cancelOwnerInvite, createTenant, type NewTenant, requestOwnerInvite, tenantDetail } from "../../src/modules/vendor/tenants/tenants";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 import { PASSWORD } from "../auth/helpers";
 
 let h: Harness;
@@ -49,7 +49,7 @@ beforeAll(async () => {
   consoleDb = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [VENDOR_GROUP_ROLE])), max: 3 }, VENDOR_GROUP_ROLE);
   authPool = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [AUTH_GROUP_ROLE])), max: 3 }, AUTH_GROUP_ROLE);
   auth = createAuth({ pool: authPool, baseURL: "http://app.test", secret: randomBytes(32).toString("base64"), roles: async () => [], rateLimit: false, sleep: async () => {} });
-  const op = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+  const op = testPool({ connectionString: h.ownerUrl(), max: 1 });
   const c = await op.connect();
   try {
     PO = await account();
@@ -161,7 +161,7 @@ describe("first-owner invitation (DEC-033)", () => {
     const t2 = await fresh();
     const vEmail = (await h.admin.query(`select email from tenant_owner_invitations where id = $1`, [t2.invitation_id])).rows[0].email;
     const vAcc = (await h.admin.query(`insert into auth_user (name, email, two_factor_enabled) values ('V', $1, true) returning id`, [vEmail])).rows[0].id;
-    const op = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+    const op = testPool({ connectionString: h.ownerUrl(), max: 1 });
     const c = await op.connect();
     try {
       await createVendorStaff(c, caller(PO), vAcc, "Staf Vendor", ["support"]);
@@ -194,7 +194,7 @@ describe("first-owner invitation (DEC-033)", () => {
     const second = await fresh();
     // An Owner joins by another path (first link of another invitation is not possible: use the owner pool).
     const acc = (await h.admin.query(`insert into auth_user (name, email) values ('P', $1) returning id`, [`lain${++n}@klinik-sintetis.test`])).rows[0].id;
-    const op = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+    const op = testPool({ connectionString: h.ownerUrl(), max: 1 });
     try {
       const m = (await op.query(`insert into memberships (tenant_id, account_id) values ($1, $2) returning id`, [t.tenant_id, acc])).rows[0].id;
       const st = (await op.query(`insert into staff (tenant_id, membership_id, display_name) values ($1, $2, 'Owner Lain') returning id`, [t.tenant_id, m])).rows[0].id;

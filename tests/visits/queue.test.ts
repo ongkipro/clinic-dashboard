@@ -20,7 +20,7 @@ import { assignBranch, assignRole, createMembership, resolveContext } from "../.
 import { changeSetting } from "../../src/modules/settings/settings";
 import { callTicket, displayFeed, pairDisplay, queueBoard, revokeDisplay, searchPatients, skipTicket, walkIn } from "../../src/modules/visits/queue/queue";
 import { checkIn, closeVisit } from "../../src/modules/visits/visits";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -70,7 +70,7 @@ let room2: string;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 8 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   OWN = await person(A, "owner"); FH = await person(A, "facility_head", A.b1); MGR = await person(A, "manager", A.b1); MGR12 = await person(A, "manager", A.b1, A.b2);

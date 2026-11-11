@@ -15,7 +15,7 @@ import { setHours, setServices, upsertRoom } from "../../src/modules/org/branche
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { cancelAppointment } from "../../src/modules/scheduling/appointments/appointments";
 import { BLOCKER_COPY, checkIn, closeBlocker, closeVisit, today, trackStates, unpaid } from "../../src/modules/visits/visits";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -64,7 +64,7 @@ let consult: { itemId: string; versionId: string };
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 8 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   OWN = await person(A, "owner"); FH = await person(A, "facility_head", A.b1); MGR = await person(A, "manager", A.b1);

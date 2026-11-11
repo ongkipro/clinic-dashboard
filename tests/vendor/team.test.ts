@@ -15,7 +15,7 @@ import { bootstrapVendor, createVendorStaff, updateVendorStaff, type VendorCalle
 import {
   acceptMemberWithNewAccount, cancelMemberInvite, inviteMember, listTeam, lookupMemberInvite, setMemberState,
 } from "../../src/modules/vendor/team/team";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 import { PASSWORD } from "../auth/helpers";
 
 let h: Harness;
@@ -57,7 +57,7 @@ beforeAll(async () => {
   authPool = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [AUTH_GROUP_ROLE])), max: 3 }, AUTH_GROUP_ROLE);
   appPoolRole = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 1 });
   auth = createAuth({ pool: authPool, baseURL: "https://vendor.test", surface: "vendor", allowAddress: async () => true, secret: randomBytes(32).toString("base64"), roles: async () => [], rateLimit: false, sleep: async () => {} });
-  op = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+  op = testPool({ connectionString: h.ownerUrl(), max: 1 });
   const c = await op.connect();
   try {
     PO = await account();

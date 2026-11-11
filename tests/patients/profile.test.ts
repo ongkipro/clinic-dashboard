@@ -11,7 +11,7 @@ import { CommandError } from "../../src/lib/command";
 import { grantConsent, publishConsentText, withdrawConsent } from "../../src/modules/patients/consents/consents";
 import { CLINICAL_SECTIONS, loadProfile, profileSections, withdrawFromProfile } from "../../src/modules/patients/profile";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2); the production gate is T-037's, reused here
 
@@ -79,7 +79,7 @@ let waText: string;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   for (const r of ROLES) P_[r] = await person(A, r);

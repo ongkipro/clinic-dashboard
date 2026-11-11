@@ -11,7 +11,7 @@ import { CommandError } from "../../src/lib/command";
 import { decideApproval, ownerSelfApprove, requestApproval } from "../../src/modules/approvals/approvals";
 import { APPROVAL_TYPES, decidableTypes, INBOX_LIMIT, inboxDetail, listInbox, rupiah } from "../../src/modules/approvals/inbox";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -51,7 +51,7 @@ let B: T;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
 });

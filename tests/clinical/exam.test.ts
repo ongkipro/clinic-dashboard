@@ -17,7 +17,7 @@ import {
 import { openIntake, patientCautions, saveIntake, sendIntake } from "../../src/modules/clinical/intake/intake";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { mergePatients } from "../../src/modules/patients/merge/merge";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -87,8 +87,7 @@ let toner: { itemId: string; versionId: string };
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
-  owner.on("error", () => {});
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   OWN = await person(A, "owner");

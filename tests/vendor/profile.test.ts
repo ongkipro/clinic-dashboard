@@ -17,7 +17,7 @@ import {
   vendorIdentity,
   VendorProfileError,
 } from "../../src/modules/vendor/profile/profile";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -50,7 +50,7 @@ async function account(name: string) {
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 2 });
-  opPool = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+  opPool = testPool({ connectionString: h.ownerUrl(), max: 1 });
   op = await opPool.connect();
   owner = { accountId: await account("owner"), vendorRole: "platform_owner" };
   support = { accountId: await account("support"), vendorRole: "support" };

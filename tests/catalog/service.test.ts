@@ -16,7 +16,7 @@ import { CatalogError, type CatalogFields, commercialCatalog, itemVersions, publ
 import { ELIGIBLE_PROFESSIONS, SERVICE_CATEGORIES } from "../../src/modules/catalog/schema";
 import { CATEGORIES, FLOOR, PROFESSIONS } from "../../src/modules/catalog/service/floor";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -64,7 +64,7 @@ let OWN: P; let MGR: P; let FH1: P; let FH2: P; let PH: P; let FO: P; let CS: P;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   OWN = await person(A, "owner");

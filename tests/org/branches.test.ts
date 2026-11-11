@@ -16,7 +16,7 @@ import {
   setDeviceActive, setHours, setRoomActive, setServices, updateProfile, upsertDevice, upsertRoom, weeklyHours,
 } from "../../src/modules/org/branches/branches";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -59,7 +59,7 @@ let OWN: P; let AP: P; let MGR: P; let MGR2: P; let FH: P; let FO: P; let FIN: P
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   OWN = await person(A, "owner");

@@ -15,7 +15,7 @@ import { assignRole, createMembership, resolveContext } from "../../src/modules/
 import { applyLifecycleRequest } from "../../src/modules/vendor/lifecycle/lifecycle";
 import { bootstrapVendor, createVendorStaff, decideVendorRequest, requestVendorAction, type VendorCaller } from "../../src/modules/vendor/staff/staff";
 import { advanceTenant } from "../../src/modules/vendor/tenants/tenants";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -75,11 +75,11 @@ const lastLog = async () => (await h.admin.query(`select action, outcome, reason
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
-  exec = new pg.Pool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_executor"])), max: 2 });
-  opPool = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
+  exec = testPool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_executor"])), max: 2 });
+  opPool = testPool({ connectionString: h.ownerUrl(), max: 1 });
   op = await opPool.connect();
-  consoleDb = new pg.Pool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_vendor"])), max: 3 });
+  consoleDb = testPool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_vendor"])), max: 3 });
   // Vendor profile complete (PR-55): Indonesian storage, no placeholders, so only the maker-checker
   // part of vendor_go_live_blockers() depends on the vendor staff below.
   await h.admin.query(

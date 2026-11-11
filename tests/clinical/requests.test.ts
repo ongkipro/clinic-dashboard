@@ -17,7 +17,7 @@ import { signRecord, type StepUp } from "../../src/modules/clinical/records/reco
 import { cancelRequest, createRequest, decideRequest, getRequest, listRequests, requestOptions } from "../../src/modules/clinical/requests/requests";
 import { list as listNotifications } from "../../src/modules/notifications/notifications";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -102,8 +102,7 @@ let toxin: string; let filler: string; let peel: string;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
-  owner.on("error", () => {});
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   OWN = await person(A, "owner"); FH = await person(A, "facility_head", A.b1);

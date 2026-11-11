@@ -17,7 +17,7 @@ import { bootstrapVendor, createVendorStaff, type VendorCaller } from "../../src
 import {
   endSession, endSessionAsOwner, expireSessions, extendSession, listSessions, openSession, SupportBindError, withSupportSession,
 } from "../../src/modules/vendor/support/support";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 const ROOT = join(import.meta.dirname, "../..");
 let h: Harness;
@@ -95,14 +95,10 @@ let poTok: string; let supTok: string; let sup2Tok: string; let finTok: string;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 3 });
-  // A backend terminated while a client sits idle or ends (the database drop at close) is re-emitted on
-  // the pool; without a listener it is an unhandled error (CI 42615137831, HYG-006). openAppPool has one.
-  owner.on("error", () => {});
+  owner = testPool({ connectionString: h.ownerUrl(), max: 3 });
   consoleDb = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [VENDOR_GROUP_ROLE])), max: 3 }, VENDOR_GROUP_ROLE);
   opDb = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [OPERATOR_GROUP_ROLE])), max: 3 }, OPERATOR_GROUP_ROLE);
-  exec = new pg.Pool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_executor"])), max: 1 });
-  exec.on("error", () => {});
+  exec = testPool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_executor"])), max: 1 });
   const c = await owner.connect();
   try {
     PO = await account();

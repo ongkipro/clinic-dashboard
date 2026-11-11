@@ -16,7 +16,7 @@ import {
   findMatches, getPatient, identityIndexForSearch, normaliseIdentity, normalisePhone, registerPatient, type RegistrationFields, sealIdentity, verifySealed,
 } from "../../src/modules/patients/patients";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 // Synthetic data on a local database (MIG-2); the production gate is tested explicitly below.
 process.env.DEPLOY_ENV = "local";
@@ -73,7 +73,7 @@ let FO: P; let CS: P; let OWN: P; let MGR: P; let DOC: P; let FIN: P; let MK: P;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   setKekRingForTests(RING);
   A = await tenant();
   B = await tenant();

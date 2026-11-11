@@ -8,7 +8,7 @@ import { openAppPool } from "../../src/db/rls/pool";
 import { claim, consume, type DomainEvent, emit, type EventPayload } from "../../src/modules/events/events";
 import { assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { runOutboxBatch } from "../../src/workers/outbox";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -39,7 +39,7 @@ let B: T;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 8 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   // Consumers register through their task's migration; tests register their own.

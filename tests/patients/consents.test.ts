@@ -14,7 +14,7 @@ import {
   consentActive, currentText, grantConsent, marketingContacts, patientConsents, publishConsentText, withdrawConsent,
 } from "../../src/modules/patients/consents/consents";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2); the production gate is T-037's, reused here
 
@@ -68,7 +68,7 @@ const text: Record<string, string> = {};
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   OWN = await person(A, "owner"); AP = await person(A, "admin_pusat"); APD = await person(A, "admin_pusat");

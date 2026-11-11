@@ -15,6 +15,7 @@ import {
   STALE_PATTERN,
   sweepStaleDatabases,
   withDatabaseDdlLock,
+  testClient,
 } from "./harness";
 
 const adminUrl = process.env.TEST_DATABASE_URL ?? LOCAL_DATABASE_URL;
@@ -28,8 +29,7 @@ const freshKey = () => {
 
 const opened: pg.Client[] = [];
 async function client(name: string): Promise<pg.Client> {
-  const c = new pg.Client({ connectionString: adminUrl, application_name: name });
-  c.on("error", () => {});
+  const c = testClient({ connectionString: adminUrl, application_name: name });
   await c.connect();
   opened.push(c);
   return c;

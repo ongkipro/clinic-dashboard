@@ -12,6 +12,28 @@ if (!process.env.CI && !["127.0.0.1", "localhost", "::1", "[::1]"].includes(host
   throw new Error(`refusing to create test databases on non-loopback host ${host}`);
 }
 
+// HYG-015: every test pool and client is built here, never with `new pg.Pool`/`new pg.Client`
+// (tests/rls/pg-listener.test.ts enforces it). A backend terminated while a connection sits idle,
+// or while a test holds a checked-out client (DROP DATABASE … WITH (FORCE) at close, a deliberate
+// pg_terminate_backend), is emitted as an `error` event; with no listener Node throws it and vitest
+// fails the run as an unhandled error although every test passed (CI 42615137831, 42753612376).
+// The listeners only stop that process-level throw: pg rejects every active and queued query of
+// the connection before it emits, and a later query on a dead client rejects, so no test can pass
+// on a swallowed error. A pool also listens on each client it creates ("connect", once per
+// client): pg-pool removes its own idle listener while a client is checked out.
+const ignore = () => {};
+export function testPool(config: pg.PoolConfig): pg.Pool {
+  const pool = new pg.Pool(config);
+  pool.on("error", ignore);
+  pool.on("connect", (client) => client.on("error", ignore));
+  return pool;
+}
+export function testClient(config: pg.ClientConfig): pg.Client {
+  const client = new pg.Client(config);
+  client.on("error", ignore);
+  return client;
+}
+
 export type Harness = {
   dbName: string;
   admin: pg.Client; // superuser on the throwaway database (migration owner)
@@ -67,7 +89,7 @@ export type DdlLockOptions = {
 // short timeouts. `observerName` and `observer` are test-only: a test finds this call's
 // observer by name, or injects one that never connects to prove it cannot block.
 const defaultObserver = (name: string) =>
-  new pg.Client({ connectionString: adminUrl, application_name: name, connectionTimeoutMillis: 2_000, statement_timeout: 2_000 });
+  testClient({ connectionString: adminUrl, application_name: name, connectionTimeoutMillis: 2_000, statement_timeout: 2_000 });
 function startHolderReport(key: bigint, mode: string, slowMs: number, observerName: string, make: (name: string) => pg.Client) {
   const observer = make(observerName);
   observer.on("error", () => {});
@@ -230,9 +252,7 @@ export type HarnessOptions = Omit<DdlLockOptions, "onLockWait"> & {
 export async function createHarness(opts: HarnessOptions = {}): Promise<Harness> {
   const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
   const dbName = `rls_${suffix}`;
-  const server = new pg.Client({ connectionString: adminUrl, application_name: `harness:${dbName}` });
-  // A backend terminated while the client is idle must not surface as an unhandled error.
-  server.on("error", () => {});
+  const server = testClient({ connectionString: adminUrl, application_name: `harness:${dbName}` });
   const ddl: DdlLockOptions = {
     ddlLockKey: opts.ddlLockKey, afterAcquire: opts.afterAcquire, run: opts.run, slowMs: opts.slowMs,
     observerName: opts.observerName, observer: opts.observer,
@@ -249,8 +269,7 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
     }
     return u.toString();
   };
-  const admin = new pg.Client({ connectionString: urlFor() });
-  admin.on("error", () => {});
+  const admin = testClient({ connectionString: urlFor() });
   let created = false;
   try {
     // Each run holds a session advisory lock keyed on its database name for its whole lifetime.
@@ -305,12 +324,12 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
       return urlFor();
     },
     poolAs(role) {
-      const pool = new pg.Pool({ connectionString: urlFor(role, password), max: 4 });
+      const pool = testPool({ connectionString: urlFor(role, password), max: 4 });
       pools.push(pool);
       return pool;
     },
     async connectAs(role) {
-      const c = new pg.Client({ connectionString: urlFor(role, password) });
+      const c = testClient({ connectionString: urlFor(role, password) });
       await c.connect();
       clients.push(c);
       return c;

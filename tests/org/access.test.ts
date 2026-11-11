@@ -12,7 +12,7 @@ import { assignBranch, assignRole, createMembership, resolveContext } from "../.
 import { AccountExistsError, createAuth } from "../../src/auth/server";
 import { acceptInvite, acceptWithNewAccount, cancelInvite, invite, listInvitations, listStaff, lookupInvite, manageableSessions } from "../../src/modules/org/staff/staff";
 import { BASE_URL, Client, PASSWORD } from "../auth/helpers";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 // Invitations are open only outside production (DEC-024 gate); these tests run as local.
 process.env.DEPLOY_ENV = "local";
@@ -63,7 +63,7 @@ let B: T;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant("PT Klinik A");
   B = await tenant("PT Klinik B");
 });

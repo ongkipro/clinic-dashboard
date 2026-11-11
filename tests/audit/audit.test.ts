@@ -21,7 +21,7 @@ import {
   resolveContext,
 } from "../../src/modules/org/identity";
 import type { Role } from "../../src/auth/policy";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -67,7 +67,7 @@ async function person(t: Tenant, roles: { role: Role; branches?: string[] }[]) {
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
 });
 
 afterAll(async () => {
@@ -395,7 +395,7 @@ describe("write-once copy and anchors (SEC-5)", () => {
   beforeAll(async () => {
     h2 = await createHarness();
     app2 = await openAppPool({ connectionString: h2.urlAs(await h2.createLoginRole("", [APP_GROUP_ROLE])), max: 2 });
-    owner2 = new pg.Pool({ connectionString: h2.ownerUrl(), max: 2 });
+    owner2 = testPool({ connectionString: h2.ownerUrl(), max: 2 });
   });
   afterAll(async () => {
     await owner2?.end();

@@ -21,7 +21,7 @@ import {
   roleSource,
 } from "../../src/modules/org/identity";
 import { BASE_URL, Client, PASSWORD } from "../auth/helpers";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -59,7 +59,7 @@ async function addBranch(tenantId: string, i: number): Promise<string> {
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 4 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 4 });
 });
 
 afterAll(async () => {

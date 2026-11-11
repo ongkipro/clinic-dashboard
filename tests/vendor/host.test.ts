@@ -11,7 +11,7 @@ import { AUTH_GROUP_ROLE, VENDOR_GROUP_ROLE } from "../../src/db/rls/context";
 import { openAppPool } from "../../src/db/rls/pool";
 import { type Auth, createAuth, VENDOR_AUTH_BASE_PATH } from "../../src/auth/server";
 import { bootstrapVendor, createVendorStaff } from "../../src/modules/vendor/staff/staff";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 import { PASSWORD, secretFromUri, totp } from "../auth/helpers";
 
 const APP = "http://app.test";
@@ -94,7 +94,7 @@ beforeAll(async () => {
   h = await createHarness();
   authPool = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [AUTH_GROUP_ROLE])), max: 4 }, AUTH_GROUP_ROLE);
   vendorDb = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [VENDOR_GROUP_ROLE])), max: 2 }, VENDOR_GROUP_ROLE);
-  ownerPool = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  ownerPool = testPool({ connectionString: h.ownerUrl(), max: 2 });
   const common = { pool: authPool, secret: SECRET, rateLimit: false, sleep: async () => {} };
   app = createAuth({ ...common, baseURL: APP, roles: async () => [] });
   vendor = createAuth({ ...common, baseURL: VENDOR, surface: "vendor", roles: async () => [], allowAddress: async () => true });

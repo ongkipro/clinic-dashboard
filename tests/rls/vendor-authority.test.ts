@@ -12,7 +12,7 @@ import { inviteMember, listTeam, setMemberState } from "../../src/modules/vendor
 import { openSession, SupportBindError, withSupportSession } from "../../src/modules/vendor/support/support";
 import { CommandError } from "../../src/lib/command";
 import { bootstrapVendor, createVendorStaff, updateVendorStaff, type VendorCaller } from "../../src/modules/vendor/staff/staff";
-import { createHarness, type Harness } from "./harness";
+import { createHarness, type Harness, testClient, testPool } from "./harness";
 
 let h: Harness;
 let ownerPool: pg.Pool;
@@ -40,8 +40,7 @@ async function clinic(): Promise<string> {
 }
 // A fresh connection (any role URL) with its pid; closed at the end of the file.
 async function conn(url: string, name: string): Promise<{ c: pg.Client; pid: number }> {
-  const c = new pg.Client({ connectionString: url, application_name: name });
-  c.on("error", () => {});
+  const c = testClient({ connectionString: url, application_name: name });
   await c.connect();
   opened.push(c);
   return { c, pid: (await c.query("select pg_backend_pid() as pid")).rows[0].pid as number };
@@ -64,7 +63,7 @@ let PO: string; let PO2: string; let SUP: string; let ONB: string;
 
 beforeAll(async () => {
   h = await createHarness();
-  ownerPool = new pg.Pool({ connectionString: h.ownerUrl(), max: 3 });
+  ownerPool = testPool({ connectionString: h.ownerUrl(), max: 3 });
   vendorUrl = h.urlAs(await h.createLoginRole("", [VENDOR_GROUP_ROLE]));
   consoleDb = await openAppPool({ connectionString: vendorUrl, max: 3 }, VENDOR_GROUP_ROLE);
   opDb = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [OPERATOR_GROUP_ROLE])), max: 3 }, OPERATOR_GROUP_ROLE);
@@ -110,7 +109,7 @@ describe("2.17 a console write that waited is refused when its authority ended d
       const holder = await conn(h.ownerUrl(), "hyg008b:holder");
       await holder.c.query("begin");
       await holder.c.query("select 1 from tenants_registry where id = $1 for update", [tenantId]);
-      const pool = new pg.Pool({ connectionString: vendorUrl, max: 1 });
+      const pool = testPool({ connectionString: vendorUrl, max: 1 });
       const p = approveOwnerInvite(pool, { token: tok, ip: IP }, invitationId).catch((e: unknown) => e);
       const pid = await until("approver waiting", () => h.admin.query(
         `select pid from pg_stat_activity where query like '%vendor_console_owner_invite_approve%' and wait_event_type = 'Lock' and pid <> pg_backend_pid()`).then((r) => r.rows[0]?.pid as number | undefined), (x) => x !== undefined);
@@ -138,7 +137,7 @@ describe("2.17 a console write that waited is refused when its authority ended d
     const holder = await conn(h.ownerUrl(), "hyg008b:holder");
     await holder.c.query("begin");
     await holder.c.query("select 1 from tenants_registry where id = $1 for update", [tenantId]);
-    const pool = new pg.Pool({ connectionString: vendorUrl, max: 1 });
+    const pool = testPool({ connectionString: vendorUrl, max: 1 });
     const p = approveOwnerInvite(pool, { token: tok, ip: IP }, invitationId);
     await until("approver waiting", () => h.admin.query(
       `select pid from pg_stat_activity where query like '%vendor_console_owner_invite_approve%' and wait_event_type = 'Lock' and pid <> pg_backend_pid()`).then((r) => r.rows[0]?.pid as number | undefined), (x) => x !== undefined);
@@ -155,7 +154,7 @@ describe("2.17 support_open waits on staff_access; a sign-out during the wait re
     const holder = await conn(h.ownerUrl(), "hyg008b:staff-access");
     await holder.c.query("begin");
     await holder.c.query("select pg_advisory_xact_lock(hashtextextended('staff_access:' || $1::text, 0))", [tenantId]);
-    const pool = new pg.Pool({ connectionString: vendorUrl, max: 1 });
+    const pool = testPool({ connectionString: vendorUrl, max: 1 });
     const p = openSession(pool, { token: tok, ip: IP }, { tenantId, purpose: "Memeriksa pengaturan cabang atas permintaan klinik", scope: ["public.branches"], minutes: 30 });
     await until("open waiting", () => h.admin.query(
       `select pid from pg_stat_activity where query like '%vendor_console_support_open%' and wait_event_type = 'Lock' and pid <> pg_backend_pid()`).then((r) => r.rows[0]?.pid as number | undefined), (x) => x !== undefined);
@@ -232,7 +231,7 @@ async function waitedRefusal(o: {
   const holder = await conn(h.ownerUrl(), `hyg008b:hold:${o.fn}`);
   await holder.c.query("begin");
   await o.hold(holder.c);
-  const pool = new pg.Pool({ connectionString: vendorUrl, max: 1 });
+  const pool = testPool({ connectionString: vendorUrl, max: 1 });
   try {
     const p = o.call(pool).catch((e: unknown) => e);
     await until(`${o.fn} waiting`, () => h.admin.query(
@@ -362,7 +361,7 @@ describe("handler exit: support_ticket's ticket_exists (a unique-key wait inside
     await first.c.query("begin");
     const r1 = (await first.c.query(`select vendor_console_support_ticket($1, $2, $3, $4, $5) as r`, [tok, IP, s.data.id, tx.pid, tx.txid])).rows[0].r;
     expect(r1).toMatchObject({ ok: true });
-    const tok2Pool = new pg.Pool({ connectionString: vendorUrl, max: 1 });
+    const tok2Pool = testPool({ connectionString: vendorUrl, max: 1 });
     try {
       // The raw entry point (the wrapper's behaviour on this error is the first ticket test).
       const p = tok2Pool.query(`select vendor_console_support_ticket($1, $2, $3, $4, $5) as r`, [tok, IP, s.data.id, tx.pid, tx.txid]).then((r) => r.rows[0].r, (e: unknown) => e);

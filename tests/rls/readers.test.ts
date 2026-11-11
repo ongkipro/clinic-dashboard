@@ -12,7 +12,7 @@ import { ADMIN_PUSAT_DIRECT_ROLES, CAPABILITY_TABLES, EVERY_MEMBER_TABLES, parse
 import { answerOwnerGrant, assignRole, decideRoleRequest, myOwnerGrants, withdrawOwnerGrant } from "../../src/modules/org/roles/roles";
 import { invite } from "../../src/modules/org/staff/staff";
 import { LEVEL3_ROLES } from "../../src/modules/org/schema";
-import { createHarness, type Harness } from "./harness";
+import { createHarness, type Harness, testPool } from "./harness";
 
 const ROOT = join(import.meta.dirname, "../..");
 const matrix = parseMatrix(readFileSync(join(ROOT, "docs/spec/07-IAM-RBAC-ABAC.md"), "utf8"));
@@ -43,7 +43,7 @@ const ctxOf = (p: { acc: string }, role: Role, tenant = tenantId) => resolveCont
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   tenantId = (await h.admin.query(`insert into tenants_registry default values returning id`)).rows[0].id;
   await h.admin.query(`insert into tenants (id, legal_name, sak_framework) values ($1, 'PT Sintetis', 'emkm')`, [tenantId]);
   branchId = (await h.admin.query(`insert into branches (tenant_id, code, name, timezone) values ($1, 'CAB01', 'Cabang', 'Asia/Jakarta') returning id`, [tenantId])).rows[0].id;

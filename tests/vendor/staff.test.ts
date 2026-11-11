@@ -10,7 +10,7 @@ import {
   bootstrapVendor, cancelVendorRequest, consumeVendorRequest, createVendorStaff, executeVendorRequest, recordConsumeRefusal, decideVendorRequest, requestVendorAction, setVendorIpAllowlist, updateVendorStaff,
   type VendorCaller, vendorDualIdentities, vendorDualIdentityClinicDecide, VendorStaffError,
 } from "../../src/modules/vendor/staff/staff";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testClient, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -44,8 +44,8 @@ let T: string;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 3 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
-  opPool = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
+  opPool = testPool({ connectionString: h.ownerUrl(), max: 1 });
   op = await opPool.connect();
   PO = await account();
   await bootstrapVendor(op, PO, "Pemilik Platform", "203.0.113.0/24", "Kantor vendor");
@@ -279,7 +279,7 @@ describe("requests over time and concurrency", () => {
     try {
       await tx.query("begin");
       await tx.query(`insert into memberships (tenant_id, account_id) values ($1, $2)`, [t8, acc]); // the trigger takes the account lock
-      const extra = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+      const extra = testPool({ connectionString: h.ownerUrl(), max: 1 });
       const op2 = await extra.connect();
       const pending = code(createVendorStaff(op2, caller(PO), acc, "Menunggu", ["support"]));
       await new Promise((r) => setTimeout(r, 300));
@@ -297,7 +297,7 @@ describe("requests over time and concurrency", () => {
     for (let i = 0; i < 3; i++) {
       const t7 = await tenant();
       const acc = await account();
-      const extra = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+      const extra = testPool({ connectionString: h.ownerUrl(), max: 1 });
       const op2 = await extra.connect();
       const r = await Promise.allSettled([
         createVendorStaff(op2, caller(PO), acc, "Balapan", ["support"]),
@@ -351,7 +351,7 @@ describe("round 2: one person per half, execution once, logs", () => {
   it("an approved request is executed once, inside the effect's transaction, within 30 days, for its tenant; refusals are recorded", async () => {
     const t12 = await tenant();
     const SVC = "billing.worker";
-    const exec = new pg.Pool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_executor"])), max: 3 });
+    const exec = testPool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_executor"])), max: 3 });
     const login = (await exec.query(`select session_user as u`)).rows[0].u.replace(/[0-9]/g, (d: string) => "abcdefghij"[Number(d)]);
     let effects = 0;
     const run = (id: string, kind: "invoice_waiver" | "exit" | "server_fee_change" | "suspension", tenantId = t12, effect?: () => Promise<void>) =>
@@ -437,7 +437,7 @@ describe("round 2: one person per half, execution once, logs", () => {
 
   it("the console role touches no vendor table and cannot call the actor-taking commands (T-021 session binding)", async () => {
     const consoleRole = await h.createLoginRole("", ["clinic_vendor"]);
-    const c = new pg.Client({ connectionString: h.urlAs(consoleRole) });
+    const c = testClient({ connectionString: h.urlAs(consoleRole) });
     await c.connect();
     try {
       for (const t of ["vendor_staff", "vendor_staff_roles", "vendor_ip_allowlist", "vendor_requests", "vendor_actions", "audit_events"]) {
@@ -530,7 +530,7 @@ describe("round 2: one person per half, execution once, logs", () => {
     const y = await account();
     const xId = await createVendorStaff(op, caller(PO), x, "Pemilik X", ["platform_owner"]);
     const yId = await createVendorStaff(op, caller(PO), y, "Pemilik Y", ["platform_owner"]);
-    const pools = [new pg.Pool({ connectionString: h.ownerUrl(), max: 1 }), new pg.Pool({ connectionString: h.ownerUrl(), max: 1 })];
+    const pools = [testPool({ connectionString: h.ownerUrl(), max: 1 }), testPool({ connectionString: h.ownerUrl(), max: 1 })];
     const [c1, c2] = await Promise.all(pools.map((p) => p.connect()));
     const r = await Promise.allSettled([
       updateVendorStaff(c1, caller(x), yId, ["platform_owner", "support"], "active"),

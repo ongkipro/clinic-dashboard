@@ -15,7 +15,7 @@ import { acceptWithNewAccount, lookupInvite } from "../../src/modules/org/staff/
 import { confirmDraft, declineDraft, draftInvitation, grantStatus, onboardingAccess, renewGrant } from "../../src/modules/vendor/onboarding/onboarding";
 import { bootstrapVendor, createVendorStaff, type VendorCaller } from "../../src/modules/vendor/staff/staff";
 import { advanceTenant } from "../../src/modules/vendor/tenants/tenants";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testClient, testPool } from "../rls/harness";
 import { clearGoLiveBlockers, completeVendorProfile } from "./go-live-ready";
 import { PASSWORD } from "../auth/helpers";
 
@@ -90,7 +90,7 @@ let poTok: string; let onbTok: string; let finTok: string;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   consoleDb = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [VENDOR_GROUP_ROLE])), max: 3 }, VENDOR_GROUP_ROLE);
   authPool = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [AUTH_GROUP_ROLE])), max: 3 }, AUTH_GROUP_ROLE);
   auth = createAuth({ pool: authPool, baseURL: "http://app.test", secret: randomBytes(32).toString("base64"), roles: async () => [], rateLimit: false, sleep: async () => {} });
@@ -186,7 +186,7 @@ describe("the grant is judged at the moment of use (review round 1)", () => {
     await h.admin.query(`alter table onboarding_grants disable trigger onboarding_grants_guard`);
     await h.admin.query(`update onboarding_grants set expires_at = clock_timestamp() + interval '2 seconds' where tenant_id = $1`, [c.tenantId]);
     await h.admin.query(`alter table onboarding_grants enable trigger onboarding_grants_guard`);
-    const hold = new pg.Client({ connectionString: h.ownerUrl() });
+    const hold = testClient({ connectionString: h.ownerUrl() });
     await hold.connect();
     try {
       await hold.query("begin");
@@ -248,7 +248,7 @@ describe("the grant is judged at the moment of use (review round 1)", () => {
     await h.admin.query(`alter table onboarding_grants disable trigger onboarding_grants_guard`);
     await h.admin.query(`update onboarding_grants set expires_at = clock_timestamp() + interval '2 seconds' where tenant_id = $1`, [c.tenantId]);
     await h.admin.query(`alter table onboarding_grants enable trigger onboarding_grants_guard`);
-    const hold = new pg.Client({ connectionString: h.ownerUrl() });
+    const hold = testClient({ connectionString: h.ownerUrl() });
     await hold.connect();
     try {
       await hold.query("begin");
@@ -340,7 +340,7 @@ describe("the grant is judged at the moment of use (review round 1)", () => {
     await h.admin.query(`alter table onboarding_grants disable trigger onboarding_grants_guard`);
     await h.admin.query(`update onboarding_grants set expires_at = clock_timestamp() + interval '2 seconds' where tenant_id = $1`, [c.tenantId]);
     await h.admin.query(`alter table onboarding_grants enable trigger onboarding_grants_guard`);
-    const holder = new pg.Client({ connectionString: h.ownerUrl() });
+    const holder = testClient({ connectionString: h.ownerUrl() });
     await holder.connect();
     try {
       await holder.query("begin");
@@ -358,7 +358,7 @@ describe("the grant is judged at the moment of use (review round 1)", () => {
   it("a caller without a valid session writes nothing into the tenant's audit chain or the vendor log (no flooding)", { timeout: 30_000 }, async () => {
     const c = await clinic();
     // ... and takes no clinic lock: a staff_access holder does not block it.
-    const holder = new pg.Client({ connectionString: h.ownerUrl() });
+    const holder = testClient({ connectionString: h.ownerUrl() });
     await holder.connect();
     try {
       await holder.query("begin");

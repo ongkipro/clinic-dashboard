@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setTimeout as sleep } from "node:timers/promises";
 import { LOCAL_DATABASE_URL, MIGRATION_LOCK_KEY, MigrationDriftError, runMigrations } from "../../src/db/migrate";
 import { contractViolations } from "./contract";
-import { createTestDatabase, dropTestDatabase } from "../rls/harness";
+import { createTestDatabase, dropTestDatabase, testClient } from "../rls/harness";
 
 // Tests create a throwaway database on TEST_DATABASE_URL's server. Only loopback hosts
 // are accepted outside CI so a developer shell pointed at a shared server is refused.
@@ -27,11 +27,11 @@ let admin: pg.Client;
 let db: pg.Client;
 
 beforeAll(async () => {
-  admin = new pg.Client({ connectionString: adminUrl });
+  admin = testClient({ connectionString: adminUrl });
   await admin.connect();
   await createTestDatabase(admin, dbName);
   await runMigrations(testUrl);
-  db = new pg.Client({ connectionString: testUrl });
+  db = testClient({ connectionString: testUrl });
   await db.connect();
 });
 
@@ -74,7 +74,7 @@ describe("fresh database migration", () => {
     await createTestDatabase(admin, name);
     const u = new URL(testUrl);
     u.pathname = `/${name}`;
-    const holder = new pg.Client({ connectionString: u.toString() });
+    const holder = testClient({ connectionString: u.toString() });
     await holder.connect();
     try {
       await holder.query("select pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);

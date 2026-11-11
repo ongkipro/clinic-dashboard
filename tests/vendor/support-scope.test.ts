@@ -17,7 +17,7 @@ import { bootstrapVendor, createVendorStaff, type VendorCaller } from "../../src
 import { decideScope, sessionLog, sessionsForOwner, type SessionEvent, type SessionLog } from "../../src/modules/vendor/support/scope";
 import { endSessionAsOwner, extendSession, openSession, SupportBindError, withSupportSession } from "../../src/modules/vendor/support/support";
 import { advanceTenant } from "../../src/modules/vendor/tenants/tenants";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -80,7 +80,7 @@ let supTok: string; let sup2Tok: string; let onbTok: string;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 3 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 3 });
   consoleDb = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [VENDOR_GROUP_ROLE])), max: 3 }, VENDOR_GROUP_ROLE);
   opDb = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [OPERATOR_GROUP_ROLE])), max: 3 }, OPERATOR_GROUP_ROLE);
   await h.admin.query(`

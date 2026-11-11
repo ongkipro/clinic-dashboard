@@ -352,3 +352,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - After a link to a page with the same heading, wait for the new URL and a text of that page, not the heading: the next page streams in after the click and the old heading is still on screen.
 - A runner's minimum flow count copied from another task must match the spec it runs; set it to the spec's own count so a skipped flow still fails.
 - Plan items reference their plan by `(tenant, branch, plan)`: an item added for a visit at another branch carries the plan's branch, not the visit's.
+
+## 2026-11-11 — HYG-015 Test database connections and error listeners
+
+- A `pg.Pool` re-emits an idle client's backend error on the pool, and a `pg.Client` emits it on itself; with no `error` listener Node throws it and vitest fails the run as an unhandled error although every test passed (`57P01` at `DROP DATABASE … WITH (FORCE)` or a deliberate `pg_terminate_backend`). pg-pool removes its own idle listener while a client is checked out, so a client held for a whole file has none at all.
+- Tests build every pool and client with `testPool`/`testClient` from `tests/rls/harness.ts`, never `new pg.Pool`/`new pg.Client`; `tests/rls/pg-listener.test.ts` fails the build otherwise. The listeners do not hide failures: pg rejects every active and queued query of a dead connection before it emits.
+- A behaviour test that waits for a connection's `end` must also wake on a process-level error: without a listener pg throws before `end`, and the wait would hang to the test timeout instead of failing on its assertion.
+

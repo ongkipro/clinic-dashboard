@@ -112,15 +112,14 @@ async function unitTests() {
   });
 
   describe("shell context on a real database", async () => {
-    const pg = (await import("pg")).default;
     const { APP_GROUP_ROLE } = await import("../../src/db/rls/context");
     const { openAppPool } = await import("../../src/db/rls/pool");
     const { assignBranch, assignRole, createMembership } = await import("../../src/modules/org/identity");
     const { shellFor } = await import("../../src/components/shell/context");
-    const { createHarness } = await import("../rls/harness");
+    const { createHarness, testPool } = await import("../rls/harness");
     let h: Awaited<ReturnType<typeof createHarness>>;
-    let app: InstanceType<typeof pg.Pool>;
-    let owner: InstanceType<typeof pg.Pool>;
+    let app: ReturnType<typeof testPool>;
+    let owner: ReturnType<typeof testPool>;
     let tenant: string;
     const br: string[] = [];
     let n = 0;
@@ -130,7 +129,7 @@ async function unitTests() {
     beforeAll(async () => {
       h = await createHarness();
       app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-      owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+      owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
       tenant = (await h.admin.query(`insert into tenants_registry default values returning id`)).rows[0].id;
       await h.admin.query(`insert into tenants (id, legal_name, sak_framework) values ($1, 'PT Klinik Sintetis', 'emkm')`, [tenant]);
       for (const [code, name] of [["A", "Cabang Kemang"], ["B", "Cabang Senopati"]]) {
@@ -169,7 +168,7 @@ async function unitTests() {
     });
 
     it("an infrastructure error is not reported as a missing role", async () => {
-      const broken = new pg.Pool({ connectionString: h.urlAs("no_such_login_xyz"), max: 1 });
+      const broken = testPool({ connectionString: h.urlAs("no_such_login_xyz"), max: 1 });
       await expect(shellFor(broken, await account())).rejects.toThrow();
       await broken.end();
     });

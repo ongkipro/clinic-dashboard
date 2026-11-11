@@ -12,7 +12,7 @@ import { list as listNotifications } from "../../src/modules/notifications/notif
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { applyLifecycleRequest, assertTenantCapability, CAPABILITIES, type Capability, tenantLifecycleStatus } from "../../src/modules/vendor/lifecycle/lifecycle";
 import { bootstrapVendor, createVendorStaff, decideVendorRequest, requestVendorAction, type VendorCaller, VendorStaffError } from "../../src/modules/vendor/staff/staff";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 import { clearGoLiveBlockers, completeVendorProfile } from "./go-live-ready";
 
 let h: Harness;
@@ -81,9 +81,9 @@ async function approved(kind: "suspension" | "exit" | "reactivation" | "closure"
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
-  exec = new pg.Pool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_executor"])), max: 3 });
-  opPool = new pg.Pool({ connectionString: h.ownerUrl(), max: 1 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
+  exec = testPool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_executor"])), max: 3 });
+  opPool = testPool({ connectionString: h.ownerUrl(), max: 1 });
   op = await opPool.connect();
   PO = await account();
   await bootstrapVendor(op, PO, "Pemilik Platform", "203.0.113.0/24", "Kantor vendor");
@@ -94,7 +94,7 @@ beforeAll(async () => {
   await createVendorStaff(op, caller(PO), FIN, "Keuangan Vendor", ["vendor_finance"]);
   ONBId = await createVendorStaff(op, caller(PO), ONB, "Onboarding Vendor", ["onboarding"]);
   POId = (await h.admin.query(`select id from vendor_staff where account_id = $1`, [PO])).rows[0].id;
-  consoleDb = new pg.Pool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_vendor"])), max: 2 });
+  consoleDb = testPool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_vendor"])), max: 2 });
   ONBTok = await session(ONB);
   POTok = await session(PO);
   FINTok = await session(FIN);

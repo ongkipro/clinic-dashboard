@@ -15,7 +15,7 @@ import { book } from "../../src/modules/scheduling/booking/booking";
 import { changeSetting } from "../../src/modules/settings/settings";
 import { lateness, lateReleasable, releaseLate } from "../../src/modules/scheduling/lateness";
 import { setWeek } from "../../src/modules/scheduling/rosters/rosters";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -80,7 +80,7 @@ async function service(code: string, f: Record<string, unknown>) {
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 8 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   OWN = await person(A, "owner"); FH = await person(A, "facility_head", A.b1);
   MGR = await person(A, "manager", A.b1); MGR2 = await person(A, "manager", A.b2); FO = await person(A, "fo_cashier", A.b1); FO2 = await person(A, "fo_cashier", A.b2);

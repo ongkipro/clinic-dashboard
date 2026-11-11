@@ -12,7 +12,7 @@ import { CommandError } from "../../src/lib/command";
 import { addClosure, setHours } from "../../src/modules/org/branches/branches";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { addLeave, branchLeave, cancelLeave, isStaffAvailable, rosterWindow, setWeek, weekShifts, type ShiftRow } from "../../src/modules/scheduling/rosters/rosters";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -66,7 +66,7 @@ let W: string;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   OWN = await person(A, "owner"); AP = await person(A, "admin_pusat");

@@ -15,7 +15,7 @@ import { book, confirm, slots } from "../../src/modules/scheduling/booking/booki
 import { changeSetting } from "../../src/modules/settings/settings";
 import { calendar, cancelAppointment, confirmAttendance, markNoShow, reschedule } from "../../src/modules/scheduling/appointments/appointments";
 import { addLeave, setWeek } from "../../src/modules/scheduling/rosters/rosters";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -87,7 +87,7 @@ async function service(code: string, f: Record<string, unknown>) {
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 8 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
   OWN = await person(A, "owner"); FH = await person(A, "facility_head", A.b1);

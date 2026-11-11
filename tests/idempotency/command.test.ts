@@ -7,7 +7,7 @@ import { APP_GROUP_ROLE, withTenantContext } from "../../src/db/rls/context";
 import { openAppPool } from "../../src/db/rls/pool";
 import { canonicalJson, CommandError, fingerprint, runCommand } from "../../src/lib/command";
 import { assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -52,7 +52,7 @@ let a1: Actor;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   tA = await tenant();
   tB = await tenant();
   a1 = await actor(tA);

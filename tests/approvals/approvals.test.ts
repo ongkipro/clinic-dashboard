@@ -8,7 +8,7 @@ import { openAppPool } from "../../src/db/rls/pool";
 import { CommandError } from "../../src/lib/command";
 import { cancelApproval, decideApproval, listApprovals, ownerSelfApprove, requestApproval } from "../../src/modules/approvals/approvals";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -46,7 +46,7 @@ let T2: T;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 4 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   T1 = await tenant();
   T2 = await tenant();
 });

@@ -18,7 +18,7 @@ import {
 import { assignBranch, assignRole, createMembership } from "../../src/modules/org/identity";
 import { shellFor } from "../../src/components/shell/context";
 import { sayaFor } from "../../src/components/shell/nav";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -57,7 +57,7 @@ let B: Clinic;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await clinic("PT Klinik Aurelia Sintetis");
   B = await clinic("PT Klinik Bening Sintetis");
 });

@@ -16,7 +16,7 @@ import { assignBranch, assignRole, createMembership, resolveContext } from "../.
 import { GROUPS, SETTING_BY_KEY, SETTINGS } from "../../src/modules/settings/registry";
 import { cancelDraft, changeSetting, decideDraft, groupRows, SettingBoundsError, settingValue } from "../../src/modules/settings/settings";
 import { accentWorstRatio, boundsText, fromForm, parseWhole, type Spec, validate, type Value } from "../../src/modules/settings/spec";
-import { createHarness, type Harness } from "../rls/harness";
+import { createHarness, type Harness, testPool } from "../rls/harness";
 
 let h: Harness;
 let app: pg.Pool;
@@ -57,7 +57,7 @@ let B: T;
 beforeAll(async () => {
   h = await createHarness();
   app = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [APP_GROUP_ROLE])), max: 6 });
-  owner = new pg.Pool({ connectionString: h.ownerUrl(), max: 2 });
+  owner = testPool({ connectionString: h.ownerUrl(), max: 2 });
   A = await tenant();
   B = await tenant();
 });
