@@ -1,0 +1,32 @@
+{
+  "after": {
+    "opened_vials_guard()": "1955025e6d669bc97fcb3424a84d6a3f8716e02c6b1d240954da23fdede03030",
+    "stock_count_apply(stock_counts,uuid,text)": "c464addb5b43ea48fb5586d1b7e4898c3ad9974d115fc76becd8a859d05e6c54",
+    "stock_count_check_unmoved(stock_counts)": "9cf0aa1ea32b3c56763722064e8d9aebae7eb1db99ced0eacbec5b75a612ba1e",
+    "stock_count_lines_guard()": "2fb88c90bb3c491a3d8b7f2b9f208a7257d6733b61ee74ddacd994626dd3ad9f",
+    "stock_count_start(boolean,uuid[])": "cbf5d6d13fadf05c2e517d86fe18ae0fcd4434fc95bdedcbb27e889bc871ca68",
+    "stock_fefo(uuid,uuid,uuid,numeric,timestamp with time zone)": "0862e80754e6fcbcb5da2d31f51491ea709aabdabba941040135cec35f883764",
+    "stock_fit_qty(stock_batches,timestamp with time zone)": "70e8f05bd9759947212e1926ec8d50cba10e8a67762e74bcbe718025b9d839e1",
+    "stock_item_get(uuid,uuid)": "2275aa7041fc34029948cd76627dd282b9caf96f9653696c291b83bd91bc5e4e",
+    "stock_move(uuid,uuid,text,numeric,text,text,uuid,uuid,text)": "2e3804285f603621cd3de011143e784b555d6aa63530177f29bfed9955bfc2e6",
+    "stock_movements_apply()": "b4af7360b388eeb518524fdcf8bd30f83b0acb7f7d4d1b4c44b478dde60efc0c",
+    "stock_movements_guard()": "ce64cebd48d25edff958789e096e6dafd43f642d187b1ce659b161f48320cd04",
+    "stock_receive_into(uuid,uuid,text,uuid,jsonb,text,uuid)": "6e8b85da964504ccc4d5abe8633476a306da61efdb91a1841c535d6cd59495a6",
+    "stock_vial_open(uuid)": "8203b82103281fded90037866242dea3788a04ec555b9f683540f77fc5a53b83"
+  },
+  "before": {
+    "opened_vials_guard()": "6e1ef49f6fc5ce5cbfddde09da9670841e27032fc241ad8e00fa42d7f28ff377",
+    "stock_count_apply(stock_counts,uuid,text)": "57b02ccd62cce9e7aa93a5f19778d0b9396da673a7483c54bf343e8afd631b8c",
+    "stock_count_check_unmoved(stock_counts)": "fa8bdcc1fa56bef736fe01db83e2731f07ca0bb0f1ab36f1988c422d204d1237",
+    "stock_count_lines_guard()": "ae3045564226fb1cc22a90c43ae7c4b7b163160b3feeb8ec68b3a789c33d96f0",
+    "stock_count_start(boolean,uuid[])": "9724c9a0e87826ac7070ae6dd5dfc6738e90dd7f70ebf735032b6daedd2889f2",
+    "stock_fefo(uuid,uuid,uuid,numeric,timestamp with time zone)": "8cc7280748e59e7c7a67ade0f3684e2e0cbc872e0bdab1fc0e917a76aa423dd6",
+    "stock_fit_qty(stock_batches,timestamp with time zone)": "a964d9f8265a6dae42229341d0a27d3f6ea70ab8610aa044e5a0f2bf47b8336d",
+    "stock_item_get(uuid,uuid)": "4fd7b1f5d4025473562e48f23d25544806b855123f2ee40e5f54b1e3918bc2ef",
+    "stock_move(uuid,uuid,text,numeric,text,text,uuid,uuid,text)": "b2d91044d60d8f1cf3d600d0322cfdfe7a8b30248278473fc031375d3f5c4077",
+    "stock_movements_apply()": "9d06dd4ebde9417544cb74c902c8eb71ccfe207f5b70109cab73ea6380c04190",
+    "stock_movements_guard()": "8ef4e5a6ded08669f6af14cf2f065ae4d7a77655da348a16109db30c949693f1",
+    "stock_receive_into(uuid,uuid,text,uuid,jsonb,text,uuid)": "76e08d1c0e748b8d6450e9b9d4a92d011bbdc3470b792c719fa0e56e3ebdbb12",
+    "stock_vial_open(uuid)": "d98664329b7e5732cd659d0f555c35c91c928ede9fcde7f00edc877a403d3461"
+  }
+}

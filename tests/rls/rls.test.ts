@@ -483,6 +483,18 @@ describe("functions (TEN-16)", () => {
     "stock_count_record(uuid,uuid,numeric)",
     "stock_count_submit(uuid,text)",
     "stock_count_cancel(uuid)",
+    // T-061 (PR-89): depot and transfer definers.
+    "depot_save(uuid,jsonb)",
+    "depot_transfer(text,jsonb)",
+    "branch_transfer_send(text,jsonb)",
+    "branch_transfer_receive(uuid,uuid)",
+    "branch_transfer_cancel(uuid)",
+    "stock_vial_open_in(uuid,uuid)",
+    "stock_count_start_in(boolean,uuid[],uuid)",
+    "depot_list(uuid)",
+    "depot_get(uuid)",
+    "transfer_list(uuid,text)",
+    "transfer_get(uuid)",
     "clinical_request_options(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",

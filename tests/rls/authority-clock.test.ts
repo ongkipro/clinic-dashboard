@@ -253,6 +253,18 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["stock_item_list", async () => ["select stock_item_list(null)", []], ["manager"]],
     ["stock_card", async () => ["select stock_card($1, null, 10)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
     ["stock_count_get", async () => ["select stock_count_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-061 (PR-89): depot and transfer writers and readers take the actor lock first.
+    ["depot_save", async () => ["select depot_save(null, '{}'::jsonb)", []], ["pharmacist"]],
+    ["depot_transfer", async () => ["select depot_transfer('k-0000000001', '{}'::jsonb)", []], ["pharmacist"]],
+    ["branch_transfer_send", async () => ["select branch_transfer_send('k-0000000002', '{}'::jsonb)", []], ["pharmacist"]],
+    ["branch_transfer_receive", async () => ["select branch_transfer_receive($1, null)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["branch_transfer_cancel", async () => ["select branch_transfer_cancel($1)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["stock_vial_open_in", async () => ["select stock_vial_open_in($1, $1)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["stock_count_start_in", async () => ["select stock_count_start_in(false, null, $1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["depot_list", async () => ["select depot_list(null)", []], ["pharmacist"]],
+    ["depot_get", async () => ["select depot_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["transfer_list", async () => ["select transfer_list(null, null)", []], ["pharmacist"]],
+    ["transfer_get", async () => ["select transfer_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

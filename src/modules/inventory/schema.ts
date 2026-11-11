@@ -10,6 +10,7 @@ import { sql } from "drizzle-orm";
 import { bigint, boolean, check, date, foreignKey, index, integer, numeric, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { approvals } from "../approvals/schema";
 import { catalogItems } from "../catalog/schema";
+import { rooms } from "../org/branches/schema";
 import { branches, staff, tenants } from "../org/schema";
 
 export const STOCK_STORAGE_KINDS = ["ruang", "sejuk", "dingin"] as const;
@@ -20,6 +21,11 @@ export const MOVEMENT_KINDS = ["receive", "adjust", "issue", "consume", "return"
 export const RECEIVE_REASONS = ["stok_awal", "penerimaan"] as const;
 export const COUNT_STATES = ["draft", "pending_approval", "applied", "rejected", "cancelled"] as const;
 export const STOCK_WRITER_ROLES = ["pharmacist", "purchasing", "admin_pusat"] as const;
+// T-061 (PR-89, DATA-63; migration 0078).
+export const DEPOT_KINDS = ["gudang", "ruang", "apotek"] as const;
+export const TRANSFER_KINDS = ["intra", "inter"] as const;
+export const TRANSFER_STATES = ["posted", "sent", "received", "cancelled"] as const;
+export const LEGS = ["out", "in"] as const;
 const inList = (xs: readonly string[]) => sql.raw(xs.map((x) => `'${x}'`).join(","));
 // Bounded numeric: rejects NaN/Infinity (they pass `>= 0` in PostgreSQL), at most 4 decimals.
 const qty = (c: unknown, min: string, max = "1000000000") => sql`${c} between ${sql.raw(min)} and ${sql.raw(max)} and scale(${c}) <= 4`;
@@ -92,6 +98,36 @@ export const stockBatches = pgTable(
   ],
 );
 
+// Depots of a branch (PR-89, DATA-63; T-061). One active default gudang per branch (seeded when the branch is
+// created); a ruang depot may name a treatment room of the same branch. Never deleted; created_by null when seeded.
+export const depots = pgTable(
+  "depots",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    name: text("name").notNull(),
+    kind: text("kind", { enum: DEPOT_KINDS }).notNull(),
+    roomId: uuid("room_id"),
+    isDefault: boolean("is_default").notNull().default(false),
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "depots_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "depots_room_fk", columns: [t.tenantId, t.branchId, t.roomId], foreignColumns: [rooms.tenantId, rooms.branchId, rooms.id] }).onDelete("restrict"),
+    foreignKey({ name: "depots_created_by_fk", columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("depots_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("depots_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
+    unique("depots_branch_name_key").on(t.tenantId, t.branchId, t.name),
+    uniqueIndex("depots_one_default").on(t.tenantId, t.branchId).where(sql`is_default`),
+    check("depots_check", sql`${t.kind} in (${inList(DEPOT_KINDS)}) and length(btrim(${t.name})) between 2 and 60
+      and (not ${t.isDefault} or (${t.kind} = 'gudang' and ${t.active})) and (${t.roomId} is null or ${t.kind} = 'ruang')`),
+  ],
+);
+
 export const openedVials = pgTable(
   "opened_vials",
   {
@@ -99,6 +135,7 @@ export const openedVials = pgTable(
     tenantId: uuid("tenant_id").notNull(),
     branchId: uuid("branch_id").notNull(),
     batchId: uuid("batch_id").notNull(),
+    depotId: uuid("depot_id").notNull(),
     openedBy: uuid("opened_by").notNull(),
     openedAs: text("opened_as").notNull(),
     openedAt: timestamp("opened_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
@@ -111,8 +148,9 @@ export const openedVials = pgTable(
     foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
     foreignKey({ name: "opened_vials_batch_fk", columns: [t.tenantId, t.branchId, t.batchId], foreignColumns: [stockBatches.tenantId, stockBatches.branchId, stockBatches.id] }).onDelete("restrict"),
     foreignKey({ name: "opened_vials_by_fk", columns: [t.tenantId, t.openedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "opened_vials_depot_fk", columns: [t.tenantId, t.branchId, t.depotId], foreignColumns: [depots.tenantId, depots.branchId, depots.id] }).onDelete("restrict"),
     unique("opened_vials_tenant_id_id_key").on(t.tenantId, t.id),
-    uniqueIndex("opened_vials_one_open").on(t.tenantId, t.batchId).where(sql`state = 'open'`),
+    uniqueIndex("opened_vials_one_open").on(t.tenantId, t.batchId, t.depotId).where(sql`state = 'open'`),
     check("opened_vials_check", sql`${qty(t.remaining, "0", "100000")} and ${t.useBy} > ${t.openedAt}
       and ${t.state} in (${inList(VIAL_STATES)}) and ((${t.state} = 'open') = (${t.closedAt} is null))
       and ${t.openedAs} in ('pharmacist')`),
@@ -167,6 +205,7 @@ export const stockCountLines = pgTable(
     countId: uuid("count_id").notNull(),
     itemId: uuid("item_id").notNull(),
     batchId: uuid("batch_id").notNull(),
+    depotId: uuid("depot_id").notNull(),
     systemQty: numeric("system_qty").notNull(),
     countedQty: numeric("counted_qty"),
     countedAt: timestamp("counted_at", { withTimezone: true }),
@@ -176,7 +215,8 @@ export const stockCountLines = pgTable(
     foreignKey({ name: "stock_count_lines_count_fk", columns: [t.tenantId, t.branchId, t.countId], foreignColumns: [stockCounts.tenantId, stockCounts.branchId, stockCounts.id] }).onDelete("restrict"),
     foreignKey({ name: "stock_count_lines_batch_fk", columns: [t.tenantId, t.branchId, t.itemId, t.batchId], foreignColumns: [stockBatches.tenantId, stockBatches.branchId, stockBatches.itemId, stockBatches.id] }).onDelete("restrict"),
     unique("stock_count_lines_tenant_id_id_key").on(t.tenantId, t.id),
-    unique("stock_count_lines_batch_key").on(t.tenantId, t.countId, t.batchId),
+    foreignKey({ name: "stock_count_lines_depot_fk", columns: [t.tenantId, t.branchId, t.depotId], foreignColumns: [depots.tenantId, depots.branchId, depots.id] }).onDelete("restrict"),
+    unique("stock_count_lines_batch_key").on(t.tenantId, t.countId, t.batchId, t.depotId),
     check("stock_count_lines_check", sql`${qty(t.systemQty, "0")} and (${t.countedQty} is null or ${qty(t.countedQty, "0")})
       and ((${t.countedQty} is null) = (${t.countedAt} is null))`),
   ],
@@ -192,9 +232,13 @@ export const stockMovements = pgTable(
     branchId: uuid("branch_id").notNull(),
     itemId: uuid("item_id").notNull(),
     batchId: uuid("batch_id").notNull(),
+    // T-061: the depot the movement moves stock in or out of, its holding balance after, and the transfer leg.
+    depotId: uuid("depot_id").notNull(),
     kind: text("kind", { enum: MOVEMENT_KINDS }).notNull(),
     quantity: numeric("quantity").notNull(),
     balanceAfter: numeric("balance_after").notNull(),
+    depotBalanceAfter: numeric("depot_balance_after").notNull(),
+    leg: text("leg", { enum: LEGS }),
     reason: text("reason"),
     sourceKind: text("source_kind").notNull(),
     sourceId: uuid("source_id").notNull(),
@@ -207,13 +251,18 @@ export const stockMovements = pgTable(
     foreignKey({ name: "stock_movements_batch_fk", columns: [t.tenantId, t.branchId, t.itemId, t.batchId], foreignColumns: [stockBatches.tenantId, stockBatches.branchId, stockBatches.itemId, stockBatches.id] }).onDelete("restrict"),
     foreignKey({ name: "stock_movements_by_fk", columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
     unique("stock_movements_tenant_id_id_key").on(t.tenantId, t.id),
-    unique("stock_movements_source_key").on(t.tenantId, t.sourceKind, t.sourceId, t.batchId),
+    foreignKey({ name: "stock_movements_depot_fk", columns: [t.tenantId, t.branchId, t.depotId], foreignColumns: [depots.tenantId, depots.branchId, depots.id] }).onDelete("restrict"),
+    unique("stock_movements_source_key").on(t.tenantId, t.sourceKind, t.sourceId, t.batchId, t.depotId, t.leg).nullsNotDistinct(),
+    index("stock_movements_depot_idx").on(t.tenantId, t.batchId, t.depotId, t.seq),
     index("stock_movements_card_idx").on(t.tenantId, t.branchId, t.itemId, t.createdAt),
     index("stock_movements_batch_idx").on(t.tenantId, t.batchId, t.seq),
     check("stock_movements_check", sql`${t.kind} in (${inList(MOVEMENT_KINDS)}) and ${qty(t.quantity, "-1000000000")} and ${t.quantity} <> 0
       and ${qty(t.balanceAfter, "0")} and ${t.sourceKind} ~ '^[a-z][a-z_]{1,40}$'
       and (${t.reason} is null or length(btrim(${t.reason})) between 3 and 500)
-      and (${t.kind} <> 'receive' or ${t.quantity} > 0)`),
+      and (${t.kind} <> 'receive' or ${t.quantity} > 0) and ${qty(t.depotBalanceAfter, "0")}
+      and (${t.kind} = 'transfer_out' and ${t.leg} is not distinct from 'out' and ${t.quantity} < 0
+           or ${t.kind} = 'transfer_in' and ${t.leg} is not distinct from 'in' and ${t.quantity} > 0
+           or ${t.kind} not in ('transfer_out','transfer_in') and ${t.leg} is null)`),
   ],
 );
 
@@ -239,5 +288,100 @@ export const stockLevels = pgTable(
     unique("stock_levels_branch_item_key").on(t.tenantId, t.branchId, t.itemId),
     check("stock_levels_check", sql`${qty(t.minQty, "0")} and ${qty(t.targetQty, "0")} and ${t.targetQty} >= ${t.minQty}
       and ${t.updatedAs} in ('pharmacist','purchasing')`),
+  ],
+);
+
+// The quantity of a batch held in a depot (DATA-63). Σ holdings of a batch = the batch quantity: every movement moves
+// both by the same amount (its insert trigger sets both; the holding guard accepts only that).
+export const batchHoldings = pgTable(
+  "batch_holdings",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    depotId: uuid("depot_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    batchId: uuid("batch_id").notNull(),
+    quantity: numeric("quantity").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "batch_holdings_depot_fk", columns: [t.tenantId, t.branchId, t.depotId], foreignColumns: [depots.tenantId, depots.branchId, depots.id] }).onDelete("restrict"),
+    foreignKey({ name: "batch_holdings_batch_fk", columns: [t.tenantId, t.branchId, t.itemId, t.batchId], foreignColumns: [stockBatches.tenantId, stockBatches.branchId, stockBatches.itemId, stockBatches.id] }).onDelete("restrict"),
+    unique("batch_holdings_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("batch_holdings_depot_batch_key").on(t.tenantId, t.depotId, t.batchId),
+    index("batch_holdings_batch_idx").on(t.tenantId, t.batchId),
+    check("batch_holdings_quantity_check", qty(t.quantity, "0")),
+  ],
+);
+
+// One transfer record (DATA-63): intra-branch posts at once (two linked legs per line); inter-branch is sent (out
+// legs) then received (in legs on the destination batch of the same item, number and expiry) or cancelled (in legs
+// back on the source). Never deleted.
+export const depotTransfers = pgTable(
+  "depot_transfers",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    kind: text("kind", { enum: TRANSFER_KINDS }).notNull(),
+    fromBranchId: uuid("from_branch_id").notNull(),
+    fromDepotId: uuid("from_depot_id").notNull(),
+    toBranchId: uuid("to_branch_id").notNull(),
+    toDepotId: uuid("to_depot_id"),
+    state: text("state", { enum: TRANSFER_STATES }).notNull(),
+    commandKey: text("command_key").notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAs: text("created_as").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    closedBy: uuid("closed_by"),
+    closedAs: text("closed_as"),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "depot_transfers_from_fk", columns: [t.tenantId, t.fromBranchId, t.fromDepotId], foreignColumns: [depots.tenantId, depots.branchId, depots.id] }).onDelete("restrict"),
+    foreignKey({ name: "depot_transfers_to_branch_fk", columns: [t.tenantId, t.toBranchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "depot_transfers_to_fk", columns: [t.tenantId, t.toBranchId, t.toDepotId], foreignColumns: [depots.tenantId, depots.branchId, depots.id] }).onDelete("restrict"),
+    foreignKey({ name: "depot_transfers_created_by_fk", columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "depot_transfers_closed_by_fk", columns: [t.tenantId, t.closedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("depot_transfers_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("depot_transfers_branches_key").on(t.tenantId, t.id, t.fromBranchId, t.toBranchId),
+    unique("depot_transfers_command_key").on(t.tenantId, t.commandKey),
+    index("depot_transfers_from_idx").on(t.tenantId, t.fromBranchId, t.state, t.createdAt),
+    index("depot_transfers_to_idx").on(t.tenantId, t.toBranchId, t.state, t.createdAt),
+    check("depot_transfers_check", sql`${t.kind} in (${inList(TRANSFER_KINDS)}) and ${t.state} in (${inList(TRANSFER_STATES)})
+      and ${t.commandKey} ~ '^[A-Za-z0-9_.:-]{8,128}$' and ${t.createdAs} in ('pharmacist','purchasing')
+      and (${t.kind} = 'intra' and ${t.fromBranchId} = ${t.toBranchId} and ${t.state} = 'posted' and ${t.toDepotId} is not null and ${t.toDepotId} <> ${t.fromDepotId}
+           or ${t.kind} = 'inter' and ${t.fromBranchId} <> ${t.toBranchId} and ${t.state} in ('sent','received','cancelled')
+              and ((${t.state} = 'received') = (${t.toDepotId} is not null)))
+      and ((${t.state} in ('received','cancelled')) = (${t.closedAt} is not null)) and num_nonnulls(${t.closedBy}, ${t.closedAs}, ${t.closedAt}) in (0, 3)
+      and (${t.closedAs} is null or ${t.closedAs} in ('pharmacist','purchasing'))`),
+  ],
+);
+
+export const depotTransferLines = pgTable(
+  "depot_transfer_lines",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    transferId: uuid("transfer_id").notNull(),
+    fromBranchId: uuid("from_branch_id").notNull(),
+    toBranchId: uuid("to_branch_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    sourceBatchId: uuid("source_batch_id").notNull(),
+    destinationBatchId: uuid("destination_batch_id"),
+    quantity: numeric("quantity").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "depot_transfer_lines_transfer_fk", columns: [t.tenantId, t.transferId, t.fromBranchId, t.toBranchId],
+      foreignColumns: [depotTransfers.tenantId, depotTransfers.id, depotTransfers.fromBranchId, depotTransfers.toBranchId] }).onDelete("restrict"),
+    foreignKey({ name: "depot_transfer_lines_source_fk", columns: [t.tenantId, t.fromBranchId, t.itemId, t.sourceBatchId],
+      foreignColumns: [stockBatches.tenantId, stockBatches.branchId, stockBatches.itemId, stockBatches.id] }).onDelete("restrict"),
+    foreignKey({ name: "depot_transfer_lines_destination_fk", columns: [t.tenantId, t.toBranchId, t.itemId, t.destinationBatchId],
+      foreignColumns: [stockBatches.tenantId, stockBatches.branchId, stockBatches.itemId, stockBatches.id] }).onDelete("restrict"),
+    unique("depot_transfer_lines_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("depot_transfer_lines_batch_key").on(t.tenantId, t.transferId, t.sourceBatchId),
+    check("depot_transfer_lines_check", sql`${qty(t.quantity, "0.0001")} and ${t.quantity} > 0`),
   ],
 );

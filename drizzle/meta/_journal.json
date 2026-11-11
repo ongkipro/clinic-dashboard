@@ -547,6 +547,13 @@
       "when": 1794375553050,
       "tag": "0077_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1794384352242,
+      "tag": "0078_depots",
+      "breakpoints": true
     }
   ]
 }

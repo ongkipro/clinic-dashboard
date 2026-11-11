@@ -69,7 +69,7 @@ async function victim(env: IsolationEnv) {
   const name = `Pasien Rahasia ${t.slice(0, 8)}`;
   const pt = (await env.owner.query(
     `insert into patients (tenant_id, mrn, full_name, birth_date, sex, identity_type, no_identity_reason, religion, occupation, education, marital_status, registered_branch_id, created_by, created_as)
-     values ($1, 'RM-' || lpad((floor(random() * 900000) + 100000)::text, 6, '0'), $2, '1990-01-01', 'female', 'newborn_via_guardian', 'Fixture', 'islam', 'Karyawan', 's1', 'kawin', $3, $4, 'fo_cashier') returning id`,
+     values ($1, 'RM-' || (1000000000000 + floor(random() * 8999999999999))::bigint::text, $2, '1990-01-01', 'female', 'newborn_via_guardian', 'Fixture', 'islam', 'Karyawan', 's1', 'kawin', $3, $4, 'fo_cashier') returning id`,
     [t, name, b, doc.staffId],
   )).rows[0].id as string;
   // The fixture appointment and its reservations are inserted directly (guards satisfied: booked,

@@ -367,3 +367,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Unqualified `uuid_generate_v7()` inside a definer with `search_path = pg_catalog, pg_temp` does not resolve; write `public.uuid_generate_v7()`.
 - `getByRole("link", { name })` on Persetujuan matches the type filter chip first; scope to the list (`getByRole("list", { name: "Permintaan menunggu" })`).
 
+## 2026-11-11 — T-061 Depots and transfers
+
+- Extending a ledger invariant to a second level (batch → per-depot holding): put the depot and its balance on the same movement row, let the insert trigger set both and let each level's guard accept only its newest movement. Σ holdings = batch quantity then holds by construction, and the T-060 tests stayed unchanged.
+- To make an existing function aware of a new dimension without breaking callers or drift tests, keep its signature (`CREATE OR REPLACE`, defaulting to the old meaning) and add the new variant under a different name; an added defaulted parameter would create an ambiguous overload (42725).
+- A unique key over a ledger's source must include every dimension a single source can legitimately repeat (here depot and leg: one transfer writes two movements on one batch); `NULLS NOT DISTINCT` keeps single-leg sources unique.
+- An AFTER INSERT seed trigger on a parent table (branches → default gudang) breaks every fixture that deletes the parent with its guard disabled: the child row must go first.
+- In plpgsql, `CASE WHEN rec.id IS NOT NULL AND f(rec) … THEN rec.col` on a composite-typed variable did not parse as expected; use `IF FOUND` and a scalar.
+- A random fixture key drawn from a small space (6 digits) into a table that keeps growing across test cases and runs fails by the birthday bound long before it looks likely (3 000 rows: several collisions). Draw from a space orders of magnitude larger than the lifetime row count, or use a sequence. And keep the full output of every gated check: the ledger keeps only the tail, and this failure had to be reconstructed from the database server log.
