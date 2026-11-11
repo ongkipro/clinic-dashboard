@@ -396,3 +396,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A long Indonesian word ("ditandatangani") at 200 % text overflows a narrow card by under a pixel: give block copy `overflow-wrap:anywhere` on the container.
 - Seeding a signed examination needs the signing doctor's second factor enrolled (record_sign refuses otherwise); seed it on the account rather than weakening the rule.
 
+## 2026-11-12 — T-065 Siapkan & Serahkan
+
+- A contract gap (a task's Done-when needing rows no task builds) is first checked against the owning spec's module and event contracts (TD-*, TD-50) before it is escalated: here TD-6 already owned prescriptions and dispensing, so the task built the data within its paths and left the other UX contracts' panels open.
+- Two isolation case files seeding the same victim tenant collide on unique names (depot names per branch): give every case's fixtures names unique to the case.
+- A form's default choice is part of correctness: the issue form defaulted to the apotek depot while treatment materials live in the gudang, so the database rightly refused ("stok tidak cukup"); the browser check found it, not the unit tests.
+- A trailing status badge in a list row squeezes the title to one letter per line at 390 px and 200 % text; put the badge under the title.
+- An explicit guard that repeats the state check right after it (`handed` before `<> 'prepared'`) is dead code a mutation proves: delete it rather than keep an equivalent mutant.
+

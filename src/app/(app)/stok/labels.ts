@@ -21,10 +21,11 @@ export const MOVE_LABEL: Record<string, string> = {
 };
 export const REASON_LABEL: Record<string, string> = { stok_awal: "Stok awal", penerimaan: "Penerimaan" };
 export const UNFIT_LABEL: Record<string, string> = {
-  expired: "Kedaluwarsa", recalled: "Ditarik", quarantined: "Karantina", vial_lapsed: "Lewat batas pakai",
+  expired: "Kedaluwarsa", recalled: "Ditarik", quarantined: "Karantina", temperature_excursion: "Suhu menyimpang", vial_lapsed: "Lewat batas pakai",
 };
 export const BATCH_STATE: Record<string, { label: string; tone: StatusTone }> = {
-  active: { label: "Aktif", tone: "success" }, quarantined: { label: "Karantina", tone: "warning" }, recalled: { label: "Ditarik", tone: "danger" },
+  active: { label: "Aktif", tone: "success" }, quarantined: { label: "Karantina", tone: "warning" },
+  temperature_excursion: { label: "Suhu menyimpang", tone: "warning" }, recalled: { label: "Ditarik", tone: "danger" },
 };
 export const COUNT_STATE: Record<string, { label: string; tone: StatusTone }> = {
   draft: { label: "Sedang dihitung", tone: "neutral" }, pending_approval: { label: "Menunggu persetujuan", tone: "warning" },

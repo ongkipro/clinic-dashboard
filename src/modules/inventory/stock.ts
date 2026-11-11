@@ -128,7 +128,7 @@ export type ItemRow = {
 };
 export type BatchRow = {
   id: string; batch_no: string; expiry: string; quantity: number; state: BatchState; hold_reason: string | null; received_at: string;
-  unfit: "expired" | "recalled" | "quarantined" | null; fit_quantity: number;
+  unfit: "expired" | "recalled" | "quarantined" | "temperature_excursion" | null; fit_quantity: number;
   vial: { id: string; remaining: number; opened_at: string; use_by: string; lapsed: boolean } | null;
 };
 export type ItemDetail = Omit<ItemRow, "quantity" | "fit_quantity" | "near_expiry" | "unfit" | "min_qty" | "target_qty" | "low"> & {

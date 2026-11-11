@@ -133,12 +133,15 @@ export function LevelForm({ ctx, item, branch, min, target, unit }: { ctx: Rende
 
 // The forms stay mounted when the batch changes (a vial opened, a hold set, a recall): the result stays on screen
 // (T-054 lesson); only the buttons follow the new state.
+// T-065 (PR-18): every hold and release asks for the reason.
+const HOLD_REASON = { quarantined: "Alasan karantina", temperature_excursion: "Catatan suhu menyimpang", recalled: "Alasan penarikan", active: "Alasan pelepasan" } as const;
+const HOLD_SUBMIT = { quarantined: "Karantina", temperature_excursion: "Tahan Batch", recalled: "Tarik Batch", active: "Lepas Batch" } as const;
 export function BatchActions({ ctx, batch, state, vialItem, canHold, canOpen, vialOpenable, label }: {
   ctx: RenderedContext; batch: string; state: string; vialItem: boolean; canHold: boolean; canOpen: boolean; vialOpenable: boolean; label: string;
 }) {
   const [s, act, pending] = useActionState<StockFormState, FormData>(holdAction, {});
   const [v, actV, pendingV] = useActionState<StockFormState, FormData>(openVialAction, {});
-  const [hold, setHold] = useState<"" | "quarantined" | "recalled">("");
+  const [hold, setHold] = useState<"" | "quarantined" | "temperature_excursion" | "recalled" | "active">("");
   const id = useId();
   if (!canHold && !(canOpen && vialItem)) return null;
   return (
@@ -155,7 +158,7 @@ export function BatchActions({ ctx, batch, state, vialItem, canHold, canOpen, vi
           <ContextFields ctx={ctx} /><Key /><input type="hidden" name="batch" value={batch} />
           {hold && (
             <div className={field}>
-              <label htmlFor={`${id}-r`}>{hold === "recalled" ? "Alasan penarikan" : "Alasan karantina"}</label>
+              <label htmlFor={`${id}-r`}>{HOLD_REASON[hold]}</label>
               <input id={`${id}-r`} name="reason" required minLength={3} maxLength={300} className={input} />
               <input type="hidden" name="state" value={hold} />
             </div>
@@ -163,10 +166,11 @@ export function BatchActions({ ctx, batch, state, vialItem, canHold, canOpen, vi
           <Notice s={s} />
           {state !== "recalled" && <div className="flex min-w-0 flex-wrap gap-2">
             {hold
-              ? <Button type="submit" variant={hold === "recalled" ? "destructive" : "default"} aria-disabled={pending}>{hold === "recalled" ? "Tarik Batch" : "Karantina"}</Button>
+              ? <Button type="submit" variant={hold === "recalled" ? "destructive" : "default"} aria-disabled={pending}>{HOLD_SUBMIT[hold]}</Button>
               : <>
                   {state === "active" && <Button type="button" variant="plain" onClick={() => setHold("quarantined")}>Karantina…</Button>}
-                  {state === "quarantined" && <Button type="submit" name="state" value="active" variant="plain" aria-disabled={pending}>Lepas Karantina</Button>}
+                  {state === "active" && <Button type="button" variant="plain" onClick={() => setHold("temperature_excursion")}>Suhu Menyimpang…</Button>}
+                  {(state === "quarantined" || state === "temperature_excursion") && <Button type="button" variant="plain" onClick={() => setHold("active")}>Lepas…</Button>}
                   <Button type="button" variant="plain" onClick={() => setHold("recalled")}>Tarik…</Button>
                 </>}
           </div>}

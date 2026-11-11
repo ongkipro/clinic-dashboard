@@ -287,6 +287,24 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["treatment_finish", async () => ["select treatment_finish('k-0000000010', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
     ["treatment_room_list", async () => ["select treatment_room_list()", []], ["nurse"]],
     ["treatment_get", async () => ["select treatment_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    // T-065 (PR-18): pharmacy writers and readers take the actor lock first.
+    ["selection_confirm", async () => ["select selection_confirm('k-0000000011', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["bc"]],
+    ["recipe_map_set", async () => ["select recipe_map_set($1, 0, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["special_item_add", async () => ["select special_item_add($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["selection_prepare_materials", async () => ["select selection_prepare_materials('k-0000000012', $1, null)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["prescription_create", async () => ["select prescription_create('k-0000000013', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["prescription_item_add", async () => ["select prescription_item_add('k-0000000014', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["prescription_item_remove", async () => ["select prescription_item_remove($1, $1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["prescription_sign", async () => ["select prescription_sign($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["dispense_prepare", async () => ["select dispense_prepare('k-0000000015', $1, null)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["dispense_hand_over", async () => ["select dispense_hand_over('k-0000000016', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["dispense_cancel", async () => ["select dispense_cancel($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["label_print", async () => ["select label_print($1)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["pharmacy_prep_list", async () => ["select pharmacy_prep_list()", []], ["pharmacist"]],
+    ["pharmacy_handover_list", async () => ["select pharmacy_handover_list()", []], ["pharmacist"]],
+    ["pharmacy_dispensing_get", async () => ["select pharmacy_dispensing_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["records_officer"]],
+    ["prescription_get", async () => ["select prescription_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
+    ["pharmacy_recall_trace", async () => ["select pharmacy_recall_trace($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

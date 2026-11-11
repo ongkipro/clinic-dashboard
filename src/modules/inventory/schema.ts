@@ -16,7 +16,8 @@ import { branches, staff, tenants } from "../org/schema";
 import { visits } from "../visits/schema";
 
 export const STOCK_STORAGE_KINDS = ["ruang", "sejuk", "dingin"] as const;
-export const BATCH_STATES = ["active", "quarantined", "recalled"] as const;
+// T-065 (PR-18): temperature_excursion holds like quarantine (released by the pharmacist with a reason).
+export const BATCH_STATES = ["active", "quarantined", "temperature_excursion", "recalled"] as const;
 export const VIAL_STATES = ["open", "finished", "lapsed"] as const;
 // T-060 writes receive and adjust; the later kinds are declared now so T-061/T-062/T-065/T-066 add no CHECK change.
 export const MOVEMENT_KINDS = ["receive", "adjust", "issue", "consume", "return", "waste", "transfer_out", "transfer_in", "supplier_return", "dispense"] as const;

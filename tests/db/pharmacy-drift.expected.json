@@ -1,0 +1,12 @@
+{
+  "before": {
+    "stock_batch_hold(uuid,text,text)": "24f5893c8caaa836dc3a35c7d4b9e49885355e330863b3ede9bbf3e3f4fb085b",
+    "stock_batches_guard()": "5439db32aac340aebd1619fd709c6b7b630fedd9e462811b14a36a6c4516be41",
+    "stock_unfit_reason(stock_batches,timestamp with time zone)": "582b9a5e71e5e9f3332421c8aff8f402cded61b46dcd91163d199dbd89695183"
+  },
+  "after": {
+    "stock_batch_hold(uuid,text,text)": "dec88254a546161ce303cd12a67d03a0f7efdfbc6abcc5cd48083c019e5b3ded",
+    "stock_batches_guard()": "9de3e7b5b5226d07ebd08c9519f1c230ac12c7c6bd9fdadae723ea334f3e0829",
+    "stock_unfit_reason(stock_batches,timestamp with time zone)": "093f8502b0291874513ea0036f6a5eb4a354f69afd16cea4a784e6fe63953c10"
+  }
+}

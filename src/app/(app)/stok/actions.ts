@@ -116,10 +116,12 @@ export async function holdAction(p: StockFormState, f: FormData): Promise<StockF
   const state = str(f, "state") as BatchState;
   const reason = str(f, "reason");
   if (!UUID.test(batch)) return next(p, { error: COPY.ERR_NOT_FOUND });
-  if (!["quarantined", "recalled", "active"].includes(state)) return next(p, { error: COPY.ERR_INVALID_INPUT });
-  if (state !== "active" && reason.length < 3) return next(p, { error: "Tulis alasan (minimal 3 huruf)." });
-  const ok = state === "active" ? "Batch dilepas dari karantina." : state === "recalled" ? "Batch ditarik." : "Batch dikarantina.";
-  return run(p, f, ok, (db, key) => holdBatch(db, key, batch, state, state === "active" ? null : reason));
+  if (!["quarantined", "temperature_excursion", "recalled", "active"].includes(state)) return next(p, { error: COPY.ERR_INVALID_INPUT });
+  // T-065 (PR-18): every hold and release carries the pharmacist's reason (kept in the batch's hold history).
+  if (reason.length < 3) return next(p, { error: "Tulis alasan (minimal 3 huruf)." });
+  const ok = state === "active" ? "Batch dilepas; dapat dipakai lagi." : state === "recalled" ? "Batch ditarik."
+    : state === "temperature_excursion" ? "Batch ditahan: suhu menyimpang." : "Batch dikarantina.";
+  return run(p, f, ok, (db, key) => holdBatch(db, key, batch, state, reason));
 }
 
 export async function openVialAction(p: StockFormState, f: FormData): Promise<StockFormState> {
