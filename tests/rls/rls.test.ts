@@ -511,6 +511,12 @@ describe("functions (TEN-16)", () => {
     "stock_receive_costed(uuid,jsonb)",
     "stock_cost_list(uuid)",
     "stock_movement_value_list(uuid,uuid,integer)",
+    // T-064 (PR-14): treatment room definers.
+    "treatment_start(text,uuid,jsonb)",
+    "treatment_timer(text,uuid,text,text)",
+    "treatment_finish(text,uuid,jsonb)",
+    "treatment_room_list()",
+    "treatment_get(uuid)",
     "clinical_request_options(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",

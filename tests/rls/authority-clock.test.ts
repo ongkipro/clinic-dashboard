@@ -281,6 +281,12 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["stock_receive_costed", async () => ["select stock_receive_costed(null, '{}'::jsonb)", []], ["pharmacist"]],
     ["stock_cost_list", async () => ["select stock_cost_list(null)", []], ["manager"]],
     ["stock_movement_value_list", async () => ["select stock_movement_value_list($1, null, 10)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-064 (PR-14): treatment room writers and readers take the actor lock first.
+    ["treatment_start", async () => ["select treatment_start('k-0000000008', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["nurse"]],
+    ["treatment_timer", async () => ["select treatment_timer('k-0000000009', $1, 'pause', null)", ["00000000-0000-7000-8000-000000000000"]], ["therapist"]],
+    ["treatment_finish", async () => ["select treatment_finish('k-0000000010', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
+    ["treatment_room_list", async () => ["select treatment_room_list()", []], ["nurse"]],
+    ["treatment_get", async () => ["select treatment_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["doctor"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

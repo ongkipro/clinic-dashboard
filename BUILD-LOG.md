@@ -389,3 +389,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A ledger kept beside an existing ledger (values beside quantities) stays in step when it is written by an AFTER INSERT trigger on the same rows and its guard accepts a change only to the afters of the newest row; storing the afters on each value row makes a replayed or partial update detectable.
 - Adding an FK that references a table changes how `TRUNCATE` on that table fails (0A000 "cannot truncate a table referenced in a foreign key constraint" before any truncate trigger fires): tests asserting the trigger's 42501 must use `cascade` or accept both.
 
+## 2026-11-12 — T-064 Ruang Tindakan
+
+- A form that the page replaces on success (Sebelum mulai → the running view) unmounts its own status message: browser checks must wait for the new view (the timer), not for the form's status.
+- Layout checks that flag "squeezed" text must skip visually hidden text (`sr-only` is 1 px wide by design) and look at line count, not width alone.
+- A long Indonesian word ("ditandatangani") at 200 % text overflows a narrow card by under a pixel: give block copy `overflow-wrap:anywhere` on the container.
+- Seeding a signed examination needs the signing doctor's second factor enrolled (record_sign refuses otherwise); seed it on the account rather than weakening the rule.
+

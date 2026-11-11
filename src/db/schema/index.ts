@@ -20,3 +20,4 @@ export * from "../../modules/org/licences/schema";
 export * from "../../modules/clinical/schema";
 export * from "../../modules/documents/schema";
 export * from "../../modules/inventory/schema";
+export * from "../../modules/treatment/schema";
