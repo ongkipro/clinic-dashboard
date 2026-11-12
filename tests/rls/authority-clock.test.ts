@@ -305,6 +305,14 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["pharmacy_dispensing_get", async () => ["select pharmacy_dispensing_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["records_officer"]],
     ["prescription_get", async () => ["select prescription_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["pharmacy_recall_trace", async () => ["select pharmacy_recall_trace($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-066 (PR-75): supplier writers and readers take the actor lock first.
+    ["supplier_save", async () => ["select supplier_save(null, '{}'::jsonb)", []], ["manager"]], // the lock comes before the role check
+    ["supplier_receive", async () => ["select supplier_receive('k-0000000017', null, '{}'::jsonb)", []], ["pharmacist"]],
+    ["supplier_return_record", async () => ["select supplier_return_record('k-0000000018', null, '{}'::jsonb)", []], ["manager"]],
+    ["supplier_list", async () => ["select supplier_list()", []], ["manager"]],
+    ["supplier_get", async () => ["select supplier_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["supplier_return_list", async () => ["select supplier_return_list(null)", []], ["pharmacist"]],
+    ["supplier_batches", async () => ["select supplier_batches($1, null)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

@@ -535,6 +535,14 @@ describe("functions (TEN-16)", () => {
     "pharmacy_dispensing_get(uuid)",
     "prescription_get(uuid)",
     "pharmacy_recall_trace(uuid)",
+    // T-066 (PR-75): suppliers and supplier returns.
+    "supplier_save(uuid,jsonb)",
+    "supplier_receive(text,uuid,jsonb)",
+    "supplier_return_record(text,uuid,jsonb)",
+    "supplier_list()",
+    "supplier_get(uuid)",
+    "supplier_return_list(uuid)",
+    "supplier_batches(uuid,uuid)",
     "clinical_request_options(uuid)",
     "credential_record(uuid,jsonb)", // T-050: clinical credentials and expiry alerts (PR-73, IAM-4)
     "credential_decide(uuid,boolean,text)",

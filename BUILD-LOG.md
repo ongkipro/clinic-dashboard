@@ -404,3 +404,9 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A trailing status badge in a list row squeezes the title to one letter per line at 390 px and 200 % text; put the badge under the title.
 - An explicit guard that repeats the state check right after it (`handed` before `<> 'prepared'`) is dead code a mutation proves: delete it rather than keep an equivalent mutant.
 
+## 2026-11-12 — T-066 Suppliers and supplier returns
+
+- A writer that needs the value a row trigger computes can read it in the next statement of the same function: AFTER INSERT FOR EACH ROW triggers have run when the INSERT returns. Write the dependent rows after the movement, never with mutual NOT NULL links between insert-only tables.
+- The moving-average valuation leaves costed units first, so an "uncosted return" only happens when costed units have already left the item at the branch; a test that wants one must take them out first.
+- The authority-clock harness assigns every role to a branch; tenant-wide roles (purchasing, auditor, finance) fail its staff_branches check, so lock-order cases use a Level 3 role that reaches the same lock (the lock comes before the role check).
+
