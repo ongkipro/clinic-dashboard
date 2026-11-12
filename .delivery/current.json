@@ -1,14 +1,14 @@
 {
   "activeRun": null,
   "lastRun": {
-    "finishedAt": "2026-11-12T08:08:18Z",
-    "result": "PASS",
-    "runId": "RUN-20261112T070948Z-ecf787d7"
+    "finishedAt": "2026-11-12T08:08:46Z",
+    "result": "BLOCKED",
+    "runId": "RUN-20261112T033939Z-9c4eb8cc"
   },
-  "observedHead": "ee10520d2eee1c2b8b5023e68ac02514e8d11f47",
+  "observedHead": "62b27ed0569fcef601931b88d99df9fe94fedf91",
   "observedState": "INTEGRATING",
   "project": "clinic-dashboard",
   "schemaVersion": 1,
   "statusAuthority": "STATUS.md",
-  "updatedAt": "2026-11-12T08:08:18Z"
+  "updatedAt": "2026-11-12T08:08:46Z"
 }
