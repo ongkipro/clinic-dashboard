@@ -144,6 +144,18 @@ describe("scenario PR-90: supplier payable", () => {
   });
 });
 
+describe("GRNI = quantity × unit cost (supervisor regression 2026-11-12)", () => {
+  it("10 units received at Rp100,000 → GRNI Rp1,000,000 on the line, the invoice and the uninvoiced list (never marked up)", async () => {
+    const r = await received(SUP, "10", 100_000);
+    expect(num((await h.admin.query(`select payables_grni(r) g from supplier_receipts r where id = $1`, [r])).rows[0].g)).toBe(1_000_000);
+    expect((await as(FIN, (db) => payableOverview(db, A.b1))).uninvoiced.find((u) => u.receipt_id === r)).toMatchObject({ grni: 1_000_000 });
+    const { invoiceId } = await invoice([r]);
+    expect((await h.admin.query(`select grni_amount::bigint g, amount::bigint a from supplier_invoice_lines where invoice_id = $1`, [invoiceId])).rows.map((x) => [num(x.g), num(x.a)]))
+      .toEqual([[1_000_000, 1_000_000]]);
+    expect(await inv(invoiceId)).toMatchObject({ total: 1_000_000, outstanding: 1_000_000 });
+  });
+});
+
 describe("purchase orders and goods receipts (open points 1–2; r1 P1-3, P2-6)", () => {
   it("draft → edit (lines upserted, omitted deactivated) → send → partial and full receipts; beyond ordered refused; unit cost from the PO", async () => {
     const { poId } = await as(PUR, (db) => savePurchaseOrder(db, key(), null, { supplierId: SUP, branchId: A.b1, expectedDate: day(7),
@@ -288,6 +300,14 @@ describe("invoices, payments, credit notes, reversals (open points 3–7; r1 P2-
     expect(await inv(invoiceId)).toMatchObject({ credited: 0, outstanding: 30_000, state: "open" });
     expect((await h.admin.query(`select state, available_amount::int a from supplier_credit_notes where id = $1`, [creditNoteId])).rows[0]).toEqual({ state: "reversed", a: 0 });
     expect((await h.admin.query(`select type from domain_events where aggregate_id = $1 order by occurred_at`, [creditNoteId])).rows.map((e) => e.type)).toEqual(["SupplierCreditApplied", "SupplierCreditReversed"]);
+    // Review 2665ab81 P3: a supplier whose only payable row at a branch is a credit note still has a balance row (the
+    // note's invoice was reversed, so no live invoice or payment remains there).
+    const { supplierId: lone } = await as(PUR, (db) => saveSupplier(db, key(), null, { name: `PT Kredit Saja ${n}` }));
+    const r3 = await received(lone, "1", 4_000);
+    const { invoiceId: i3 } = await invoice([r3], `INV-SAJA-${n}`, lone);
+    await as(FIN, (db) => recordCreditNote(db, key(), A.b1, { supplierId: lone, number: "NK-SAJA", amount: 500, issuedOn: day(0), invoiceId: i3 }));
+    await as(PUR, (db) => reversePayable(db, key(), "invoice", i3, "Faktur salah pemasok"));
+    expect((await as(FIN, (db) => payableOverview(db, A.b1))).balances.find((b) => b.supplier_id === lone)).toMatchObject({ available_credits: 500 });
   });
 });
 
@@ -309,6 +329,25 @@ describe("authority, readers, guards", () => {
     expect(await code(as(PHB2, (db) => listReceipts(db, A.b1)))).toBe("ERR_NOT_FOUND");
     const ctx = await as(PH, purchasingContext);
     expect({ money: ctx.money, pay: ctx.can_pay, receive: ctx.can_receive }).toEqual({ money: false, pay: false, receive: true });
+    // Review 2665ab81 P1-1: the money writers take the actor lock first; an unknown or another tenant's id is not found
+    // (never an input error); another branch's PO is not found for its manager (not "another branch").
+    const ghost = crypto.randomUUID();
+    expect(await code(as(FIN, (db) => allocatePayment(db, key(), ghost, null)))).toBe("ERR_NOT_FOUND");
+    expect(await code(as(FIN, (db) => applyCredit(db, key(), ghost, invoiceId)))).toBe("ERR_NOT_FOUND");
+    expect(await code(as(FIN, (db) => writeOffExpectation(db, key(), ghost, "Alasan uji")))).toBe("ERR_NOT_FOUND");
+    for (const kind of ["invoice", "payment", "credit_note"] as const) expect(await code(as(FIN, (db) => reversePayable(db, key(), kind, ghost, "Alasan uji"))), kind).toBe("ERR_NOT_FOUND");
+    expect(await code(as(BFIN, (db) => reversePayable(db, key(), "invoice", invoiceId, "Alasan uji")))).toBe("ERR_NOT_FOUND");
+    const { poId: otherPo } = await as(PUR, (db) => savePurchaseOrder(db, key(), null, { supplierId: SUP, branchId: A.b2, lines: [{ itemId: item, quantity: "1", unitPrice: 1 }] }));
+    expect(await code(as(MGR, (db) => sendPurchaseOrder(db, key(), otherPo)))).toBe("ERR_NOT_FOUND");
+    // Review 2665ab81 P3: a non-positive or over-precise receipt quantity is an input error before any PO line counts.
+    const { poId: pq } = await as(PUR, (db) => savePurchaseOrder(db, key(), null, { supplierId: SUP, branchId: A.b1, lines: [{ itemId: item, quantity: "5", unitPrice: 1 }] }));
+    await as(PUR, (db) => sendPurchaseOrder(db, key(), pq));
+    for (const q of ["0", "-1", "1.00001"]) {
+      const raw = (await as(PH, (db) => db.query(`select goods_receipt_record($1, null, $2::jsonb)`,
+        [`k-q-${crypto.randomUUID()}`, JSON.stringify({ supplier_id: SUP, po_id: pq, lines: [{ item_id: item, batch_no: "Q-1", expiry: day(100), quantity: q }] })]).then(() => "ok", (e) => e.code)));
+      expect(raw, q).toBe("22023");
+    }
+    expect((await h.admin.query(`select received_qty::float r from purchase_order_lines where po_id = $1`, [pq])).rows[0].r).toBe(0);
   });
 
   it("guards: nothing deleted; amounts and counters follow their children; settlements only reversed; replica mode", async () => {

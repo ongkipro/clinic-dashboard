@@ -36,7 +36,7 @@ export const RETURN_REASON: Record<ReturnReason, string> = {
   expired: "Kedaluwarsa", near_expiry: "Hampir kedaluwarsa", damaged: "Rusak", recalled: "Ditarik produsen", wrong_item: "Salah kirim", quality: "Mutu tidak sesuai", other: "Lainnya",
 };
 export const TRANSFER_STATE: Record<string, { label: string; tone: StatusTone }> = {
-  posted: { label: "Selesai", tone: "success" }, sent: { label: "Dalam pengiriman", tone: "warning" }, received: { label: "Diterima", tone: "success" },
+  posted: { label: "Selesai", tone: "success" }, sent: { label: "Dalam perjalanan", tone: "warning" }, received: { label: "Diterima", tone: "success" },
   cancelled: { label: "Dibatalkan", tone: "locked" },
 };
 export const METHOD: Record<string, string> = { cash: "Tunai", bank_transfer: "Transfer bank" };

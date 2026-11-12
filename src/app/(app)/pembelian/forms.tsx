@@ -73,7 +73,7 @@ export function SupplierForm({ ctx, s0 }: { ctx: RenderedContext; s0?: { id: str
         <F id={`${id}-a`} label="Alamat (opsional)"><input id={`${id}-a`} name="address" defaultValue={s0?.address ?? ""} className={input} /></F>
         {s0 && (
           <label className="flex min-h-[52px] items-center gap-3">
-            <input type="checkbox" name="active" value="on" defaultChecked={s0.active} className="size-5" onChange={(e) => { e.currentTarget.value = e.currentTarget.checked ? "on" : "off"; }} />
+            <input type="checkbox" name="active" value="on" defaultChecked={s0.active} className="size-5" />
             <span>Aktif</span>
           </label>
         )}
@@ -167,7 +167,7 @@ export function ReceiveForm({ ctx, branch, supplier, suppliers, po, lines, items
         <F id={`${id}-n`} label="Nomor surat jalan (opsional)"><input id={`${id}-n`} name="note" className={input} /></F>
         {rows.map((l, i) => (
           <fieldset key={i} className="m-0 grid min-w-0 gap-2 border-0 border-t border-[var(--separator)] p-0 pt-3">
-            <legend className="mb-1 font-semibold [overflow-wrap:anywhere]">{l.name ? `${l.name} · sisa pesanan ${l.open} ${l.unit}` : `Baris ${i + 1}`}</legend>
+            <legend className="mb-1 font-semibold [overflow-wrap:anywhere]">{l.name ? `${l.name} · sisa PO ${l.open} ${l.unit}` : `Baris ${i + 1}`}</legend>
             {l.item_id ? <input type="hidden" name={`item:${i}`} value={l.item_id} /> : (
               <F id={`${id}-i${i}`} label="Item">
                 <select id={`${id}-i${i}`} name={`item:${i}`} defaultValue="" className={input}>

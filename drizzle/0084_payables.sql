@@ -823,8 +823,8 @@ REVOKE ALL ON FUNCTION public.po_locked(uuid, uuid, uuid) FROM PUBLIC;--> statem
 CREATE FUNCTION public.po_transition(p_po uuid, p_action text, p_reason text) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
-  a record := public.stock_actor(ARRAY['purchasing','admin_pusat','owner','manager'], 'operations',
-                                 (SELECT x.branch_id FROM public.purchase_orders x WHERE x.tenant_id = public.app_tenant_id() AND x.id = p_po));
+  -- the actor lock first, before any row is read (review 2665ab81 P1-1); a manager's PO of another branch is not found
+  a record := public.stock_actor(ARRAY['purchasing','admin_pusat','owner','manager'], 'operations', NULL);
   po public.purchase_orders := public.po_locked(a.tenant_id, a.branch_id, p_po);
 BEGIN
   IF p_action = 'send' THEN
@@ -882,6 +882,11 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM jsonb_array_elements(p -> 'lines') x WHERE coalesce(x ->> 'expiry', '') = '') THEN
     RAISE EXCEPTION 'ERR_INVALID_INPUT: expiry_missing' USING ERRCODE = '22023';
+  END IF;
+  -- Every line's quantity bounded before any PO line is counted (review 2665ab81 P3).
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(p -> 'lines') x
+              WHERE CASE WHEN coalesce(x ->> 'quantity', '') ~ '^\d{1,10}(\.\d{1,4})?$' THEN (x ->> 'quantity')::numeric NOT BETWEEN 0.0001 AND 1000000000 ELSE true END) THEN
+    RAISE EXCEPTION 'ERR_INVALID_INPUT: quantity' USING ERRCODE = '22023';
   END IF;
   BEGIN
     v_supplier := (p ->> 'supplier_id')::uuid;
@@ -1080,12 +1085,12 @@ GRANT EXECUTE ON FUNCTION public.supplier_payment_record(text, uuid, jsonb) TO c
 CREATE FUNCTION public.supplier_payment_allocate(p_key text, p_payment uuid, p_targets jsonb) RETURNS bigint
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
-  a record := public.payables_actor(ARRAY['finance'], (SELECT x.branch_id FROM public.supplier_payments x WHERE x.tenant_id = public.app_tenant_id() AND x.id = p_payment));
+  a record := public.stock_actor(ARRAY['finance'], 'operations', NULL); -- the actor lock first (review 2665ab81 P1-1)
   pm public.supplier_payments;
   v_got bigint;
 BEGIN
   SELECT * INTO pm FROM public.supplier_payments x WHERE x.tenant_id = a.tenant_id AND x.id = p_payment FOR UPDATE;
-  IF NOT FOUND OR pm.branch_id <> a.branch_id THEN
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'ERR_NOT_FOUND: payment not found' USING ERRCODE = 'P0002';
   END IF;
   IF pm.state <> 'live' OR pm.allocated_amount = pm.amount THEN
@@ -1161,7 +1166,7 @@ GRANT EXECUTE ON FUNCTION public.supplier_credit_note_record(text, uuid, jsonb) 
 CREATE FUNCTION public.supplier_credit_apply(p_key text, p_credit_note uuid, p_invoice uuid, p_amount bigint) RETURNS bigint
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
-  a record := public.payables_actor(ARRAY['finance'], (SELECT x.branch_id FROM public.supplier_credit_notes x WHERE x.tenant_id = public.app_tenant_id() AND x.id = p_credit_note));
+  a record := public.stock_actor(ARRAY['finance'], 'operations', NULL); -- the actor lock first (review 2665ab81 P1-1)
   c public.supplier_credit_notes;
   inv public.supplier_invoices;
   v_take bigint;
@@ -1170,7 +1175,7 @@ BEGIN
     RAISE EXCEPTION 'ERR_INVALID_INPUT: amount' USING ERRCODE = '22023';
   END IF;
   SELECT * INTO c FROM public.supplier_credit_notes x WHERE x.tenant_id = a.tenant_id AND x.id = p_credit_note FOR UPDATE;
-  IF NOT FOUND OR c.branch_id <> a.branch_id THEN
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'ERR_NOT_FOUND: credit note not found' USING ERRCODE = 'P0002';
   END IF;
   SELECT * INTO inv FROM public.supplier_invoices x WHERE x.tenant_id = a.tenant_id AND x.id = p_invoice FOR UPDATE;
@@ -1205,14 +1210,14 @@ GRANT EXECUTE ON FUNCTION public.supplier_credit_apply(text, uuid, uuid, bigint)
 CREATE FUNCTION public.supplier_credit_expectation_write_off(p_return uuid, p_reason text) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
-  a record := public.payables_actor(ARRAY['finance'], (SELECT x.branch_id FROM public.supplier_credit_expectations x WHERE x.tenant_id = public.app_tenant_id() AND x.return_id = p_return));
+  a record := public.stock_actor(ARRAY['finance'], 'operations', NULL); -- the actor lock first (review 2665ab81 P1-1)
   e public.supplier_credit_expectations;
 BEGIN
   IF length(btrim(coalesce(p_reason, ''))) NOT BETWEEN 3 AND 300 THEN
     RAISE EXCEPTION 'ERR_INVALID_INPUT: reason' USING ERRCODE = '22023';
   END IF;
   SELECT * INTO e FROM public.supplier_credit_expectations x WHERE x.tenant_id = a.tenant_id AND x.return_id = p_return FOR UPDATE;
-  IF NOT FOUND OR e.branch_id <> a.branch_id THEN
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'ERR_NOT_FOUND: return not found' USING ERRCODE = 'P0002';
   END IF;
   IF e.state <> 'expected' THEN
@@ -1233,11 +1238,8 @@ GRANT EXECUTE ON FUNCTION public.supplier_credit_expectation_write_off(uuid, tex
 CREATE FUNCTION public.supplier_payable_reverse(p_kind text, p_id uuid, p_reason text) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
-  v_branch uuid := CASE p_kind
-    WHEN 'invoice' THEN (SELECT x.branch_id FROM public.supplier_invoices x WHERE x.tenant_id = public.app_tenant_id() AND x.id = p_id)
-    WHEN 'payment' THEN (SELECT x.branch_id FROM public.supplier_payments x WHERE x.tenant_id = public.app_tenant_id() AND x.id = p_id)
-    WHEN 'credit_note' THEN (SELECT x.branch_id FROM public.supplier_credit_notes x WHERE x.tenant_id = public.app_tenant_id() AND x.id = p_id) END;
-  a record := public.payables_actor(CASE WHEN p_kind = 'invoice' THEN ARRAY['purchasing','finance'] ELSE ARRAY['finance'] END, v_branch);
+  -- the actor lock first, before any row is read (review 2665ab81 P1-1)
+  a record := public.stock_actor(CASE WHEN p_kind = 'invoice' THEN ARRAY['purchasing','finance'] ELSE ARRAY['finance'] END, 'operations', NULL);
   inv public.supplier_invoices;
   pm public.supplier_payments;
   c public.supplier_credit_notes;
@@ -1248,7 +1250,7 @@ BEGIN
   END IF;
   IF p_kind = 'invoice' THEN
     SELECT * INTO inv FROM public.supplier_invoices x WHERE x.tenant_id = a.tenant_id AND x.id = p_id FOR UPDATE;
-    IF NOT FOUND OR inv.branch_id <> a.branch_id THEN
+    IF NOT FOUND THEN
       RAISE EXCEPTION 'ERR_NOT_FOUND: invoice not found' USING ERRCODE = 'P0002';
     END IF;
     IF inv.state <> 'open' OR inv.paid_amount <> 0 OR inv.credited_amount <> 0 THEN
@@ -1261,7 +1263,7 @@ BEGIN
     VALUES (inv.branch_id, 'SupplierInvoiceReversed', 'supplier_invoice', inv.id, jsonb_build_object('invoice_id', inv.id));
   ELSIF p_kind = 'payment' THEN
     SELECT * INTO pm FROM public.supplier_payments x WHERE x.tenant_id = a.tenant_id AND x.id = p_id FOR UPDATE;
-    IF NOT FOUND OR pm.branch_id <> a.branch_id THEN
+    IF NOT FOUND THEN
       RAISE EXCEPTION 'ERR_NOT_FOUND: payment not found' USING ERRCODE = 'P0002';
     END IF;
     IF pm.state <> 'live' THEN
@@ -1279,7 +1281,7 @@ BEGIN
     VALUES (pm.branch_id, 'SupplierPaymentReversed', 'supplier_payment', pm.id, jsonb_build_object('payment_id', pm.id));
   ELSE
     SELECT * INTO c FROM public.supplier_credit_notes x WHERE x.tenant_id = a.tenant_id AND x.id = p_id FOR UPDATE;
-    IF NOT FOUND OR c.branch_id <> a.branch_id THEN
+    IF NOT FOUND THEN
       RAISE EXCEPTION 'ERR_NOT_FOUND: credit note not found' USING ERRCODE = 'P0002';
     END IF;
     IF c.state <> 'live' THEN
@@ -1458,8 +1460,9 @@ BEGIN
                     WHERE e.tenant_id = a.tenant_id AND e.branch_id = a.branch_id AND e.state = 'expected'), '[]'::jsonb),
     'balances', coalesce((SELECT jsonb_agg(public.supplier_balance_json(a.tenant_id, a.branch_id, s.id) ORDER BY lower(s.name), s.id)
                      FROM public.suppliers s WHERE s.tenant_id = a.tenant_id
-                      AND (EXISTS (SELECT 1 FROM public.supplier_invoices i WHERE i.tenant_id = s.tenant_id AND i.branch_id = a.branch_id AND i.supplier_id = s.id)
-                           OR EXISTS (SELECT 1 FROM public.supplier_payments pm WHERE pm.tenant_id = s.tenant_id AND pm.branch_id = a.branch_id AND pm.supplier_id = s.id))), '[]'::jsonb));
+                      AND (EXISTS (SELECT 1 FROM public.supplier_invoices i WHERE i.tenant_id = s.tenant_id AND i.branch_id = a.branch_id AND i.supplier_id = s.id AND i.state <> 'reversed')
+                           OR EXISTS (SELECT 1 FROM public.supplier_payments pm WHERE pm.tenant_id = s.tenant_id AND pm.branch_id = a.branch_id AND pm.supplier_id = s.id AND pm.state = 'live')
+                           OR EXISTS (SELECT 1 FROM public.supplier_credit_notes c WHERE c.tenant_id = s.tenant_id AND c.branch_id = a.branch_id AND c.supplier_id = s.id))), '[]'::jsonb));
 END
 $$;--> statement-breakpoint
 

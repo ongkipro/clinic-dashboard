@@ -7,7 +7,7 @@ import { LoadingList } from "../../../../../components/ui/states";
 import { loadSupplier } from "../../data";
 import { SupplierForm } from "../../forms";
 import { card, Main, muted, NotOkState } from "../../frame";
-import { date, qty, RETURN_REASON, rp } from "../../labels";
+import { canSee, date, qty, RETURN_REASON, rp } from "../../labels";
 
 export const metadata: Metadata = { title: "Pemasok — Pembelian — Clinic Dashboard" };
 
@@ -15,6 +15,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const d = await loadSupplier(id);
   if (d.kind !== "ok") return <NotOkState d={d} title="Pemasok" />;
+  if (!canSee(d.p.role, "pemasok")) return <NotOkState d={{ kind: "forbidden" }} title="Pemasok" />;
   const s = d.supplier;
   return (
     <>

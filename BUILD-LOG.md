@@ -417,3 +417,8 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Tenant-wide roles (purchasing, finance, owner) land on the first branch by name in branch-picking pages; browser checks must pick the seeded branch (`?cabang=`).
 - Owner, finance, manager, auditor and the other TOTP roles are sent to the second-factor enrolment on their first page: browser specs enrol them first.
 
+## 2026-11-12 — T-067 review round (Argon `2665ab81`)
+
+- A PL/pgSQL `DECLARE` initialiser runs before the body, so an actor call that is given a subquery argument (`stock_actor(..., (SELECT branch_id FROM t WHERE id = p_id))`) reads the table before `tenant_actor_lock()`. Pass NULL to the actor, then read the row `FOR UPDATE` in the body (pattern: `branch_transfer_receive`).
+- An unchecked `<input type="checkbox">` is not in `FormData` at all; changing its `value` on change does not help. For an edit form, read `f.get(name) === "on"`.
+

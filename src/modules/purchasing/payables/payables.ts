@@ -33,11 +33,8 @@ async function command<T extends Json>(db: pg.ClientBase, name: string, key: str
   if (!out.ok) throw out.error;
   return { result: out.result, replayed: out.replayed };
 }
-const QTY = /^\d{1,10}(\.\d{1,4})?$/;
-const qty = (q: string) => {
-  if (!QTY.test(q)) throw new PayablesError("ERR_INVALID_INPUT", "quantity");
-  return q;
-};
+// Quantities are validated by the definers (po_save bounds and scale; goods_receipt_record pattern and bounds before
+// any PO line counts, review 2665ab81 P3), so the module passes them through.
 const rupiah = (n: number) => {
   if (!Number.isSafeInteger(n) || n < 0) throw new PayablesError("ERR_INVALID_INPUT", "amount");
   return n;
@@ -53,7 +50,7 @@ export type PoInput = { supplierId: string; branchId?: string | null; expectedDa
   lines: { itemId: string; quantity: string; unitPrice: number }[] };
 export async function savePurchaseOrder(db: pg.ClientBase, key: string, poId: string | null, i: PoInput) {
   const p: Record<string, Json> = { supplier_id: i.supplierId,
-    lines: i.lines.map((l) => ({ item_id: l.itemId, quantity: qty(l.quantity), unit_price: rupiah(l.unitPrice) })) };
+    lines: i.lines.map((l) => ({ item_id: l.itemId, quantity: l.quantity, unit_price: rupiah(l.unitPrice) })) };
   if (i.branchId) p.branch_id = i.branchId;
   if (i.expectedDate) p.expected_date = i.expectedDate;
   if (i.note) p.note = i.note;
@@ -74,7 +71,7 @@ export type ReceiptLine = { itemId: string; batchNo: string; expiry: string; qua
 export async function receiveGoods(db: pg.ClientBase, key: string, branchId: string | null,
   r: { supplierId: string; poId?: string | null; depotId?: string | null; deliveryNote?: string | null; lines: ReceiptLine[] }) {
   const p: Record<string, Json> = { supplier_id: r.supplierId, lines: r.lines.map((l) => {
-    const x: Record<string, Json> = { item_id: l.itemId, batch_no: l.batchNo, expiry: l.expiry, quantity: qty(l.quantity) };
+    const x: Record<string, Json> = { item_id: l.itemId, batch_no: l.batchNo, expiry: l.expiry, quantity: l.quantity };
     if (l.unitCost != null) x.unit_cost = rupiah(l.unitCost);
     return x;
   }) };

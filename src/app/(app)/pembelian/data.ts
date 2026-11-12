@@ -52,7 +52,7 @@ export async function loadSupplier(id: string) {
 export const loadPos = (cabang?: string) => frame(cabang, async (db, f) => ({ pos: (await listPurchaseOrders(db, f.branch.id)) as PoRow[] }));
 export async function loadPo(id: string) {
   if (!UUID.test(id)) return { kind: "not-found" as const };
-  return frame(undefined, async (db) => ({ po: (await getPurchaseOrder(db, id)) as PoDetail, depots: (await listDepots(db, null).catch(() => [])) as DepotRow[] }));
+  return frame(undefined, async (db) => ({ po: (await getPurchaseOrder(db, id)) as PoDetail }));
 }
 export const loadReceipts = (cabang?: string) => frame(cabang, async (db, f) => ({ receipts: (await listReceipts(db, f.branch.id, 50)) as ReceiptRow[] }));
 export const loadReturns = (cabang?: string) => frame(cabang, async (db, f) => {

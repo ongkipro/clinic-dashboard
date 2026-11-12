@@ -10,7 +10,7 @@ import { cancelTransfer, listTransfers, sendToBranch } from "../../../src/module
 import { saveItem } from "../../../src/modules/inventory/stock";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import {
-  cancelPurchaseOrder, getPurchaseOrder, listPurchaseOrders, listReceipts, payableOverview, purchasingContext, receiveGoods, recordInvoice, recordPayment,
+  applyCredit, cancelPurchaseOrder, getPurchaseOrder, listPurchaseOrders, listReceipts, payableOverview, purchasingContext, receiveGoods, recordCreditNote, recordInvoice, recordPayment,
   savePurchaseOrder, sendPurchaseOrder,
 } from "../../../src/modules/purchasing/payables/payables";
 import { getSupplier, listReturns, listSuppliers, returnToSupplier, saveSupplier } from "../../../src/modules/purchasing/suppliers/suppliers";
@@ -45,7 +45,7 @@ async function as<T>(env: IsolationEnv, tenantId: string, branchId: string, role
 const asMine = <T>(env: IsolationEnv, role: CaseRole, fn: (db: never) => Promise<T>) => as(env, env.actor.tenantId, env.actor.branchId, role, fn);
 
 let runs = 0;
-type Seed = { name: string; supplier: string; po: string; receipt: string; invoice: string; ret: string; transfer: string | null; item: string; batch: string };
+type Seed = { name: string; supplier: string; po: string; receipt: string; receiptRow: string; invoice: string; ret: string; transfer: string | null; item: string; batch: string };
 const latest = new Map<string, Seed>();
 const items = new Map<string, string>();
 async function victim(env: IsolationEnv): Promise<Seed> {
@@ -72,8 +72,11 @@ async function victim(env: IsolationEnv): Promise<Seed> {
   if (!other) other = (await env.owner.query(`insert into branches (tenant_id, code, name, timezone) values ($1, 'PMB2', 'Cabang Rahasia Dua', 'Asia/Jakarta') returning id`, [t])).rows[0].id as string;
   const gudang = (await env.owner.query(`select id from depots where tenant_id = $1 and branch_id = $2 and is_default`, [t, b])).rows[0].id as string;
   const { transferId: transfer } = await as(env, t, b, "purchasing", (db) => sendToBranch(db, k(), { fromDepotId: gudang, toBranchId: other!, lines: [{ batchId: receipt.batch_id, quantity: "1" }] }));
-  for (const x of [name, supplier, po, receiptId, invoice, ret, transfer]) env.victimSecret(x);
-  const r = { name, supplier, po, receipt: receiptId, invoice, ret, transfer, item: item!, batch: receipt.batch_id as string };
+  // a second, uninvoiced receipt line of B for the invoice attempt
+  const { receiptId: r2 } = await as(env, t, b, "pharmacist", (db) => receiveGoods(db, k(), null, { supplierId: supplier, poId: po, lines: [{ itemId: item!, batchNo: `PMB-${n}-b`, expiry: "2099-01-01", quantity: "1" }] }));
+  const receiptRow = (await env.owner.query(`select id from supplier_receipts where source_id = $1`, [r2])).rows[0].id as string;
+  for (const x of [name, supplier, po, receiptId, invoice, ret, transfer, r2, receiptRow]) env.victimSecret(x);
+  const r = { name, supplier, po, receipt: receiptId, receiptRow, invoice, ret, transfer, item: item!, batch: receipt.batch_id as string };
   latest.set(t, r);
   return r;
 }
@@ -102,7 +105,6 @@ export default defineCases(
     async run(env) {
       const v = await victim(env);
       const k = () => crypto.randomUUID();
-      const own = env.actor.tenantId === env.victim.tenantId;
       const attempts = {
         supplier: await outcome(asMine(env, "purchasing", (db) => saveSupplier(db as never, k(), v.supplier, { name: `${v.name} ubah` }))),
         po: await outcome(asMine(env, "purchasing", (db) => savePurchaseOrder(db as never, k(), null, { supplierId: v.supplier, branchId: env.actor.branchId,
@@ -117,7 +119,15 @@ export default defineCases(
           reason: "other", note: "Coba lintas" }))),
         pay: await outcome(asMine(env, "finance", (db) => recordPayment(db as never, k(), env.actor.branchId, { supplierId: v.supplier, amount: 1, method: "cash", paidOn: "2026-11-12",
           allocations: [{ invoiceId: v.invoice }] }))),
-        transfer: own ? "done" : await outcome(asMine(env, "purchasing", (db) => cancelTransfer(db as never, k(), v.transfer!))),
+        transfer: await outcome(asMine(env, "purchasing", (db) => cancelTransfer(db as never, k(), v.transfer!))),
+        // review 2665ab81 P1-1: invoice, credit note and credit application on B's receipt, return and invoice
+        invoice: await outcome(asMine(env, "purchasing", (db) => recordInvoice(db as never, k(), env.actor.branchId, { supplierId: v.supplier, number: `LNT-${k().slice(0, 8)}`,
+          invoiceDate: "2026-11-12", lines: [{ receiptId: v.receiptRow }] }))),
+        credit: await outcome(asMine(env, "purchasing", (db) => recordCreditNote(db as never, k(), env.actor.branchId, { supplierId: v.supplier, number: `NKL-${k().slice(0, 8)}`,
+          amount: 1, issuedOn: "2026-11-12", returnId: v.ret }))),
+        apply: await outcome(as(env, env.victim.tenantId, env.victim.branchId, "finance", (db) => recordCreditNote(db as never, k(), env.victim.branchId, { supplierId: v.supplier,
+          number: `NKA-${k().slice(0, 8)}`, amount: 1, issuedOn: "2026-11-12", invoiceId: v.invoice })).then((c) =>
+          asMine(env, "finance", (db) => applyCredit(db as never, k(), c.creditNoteId, v.invoice)))),
       };
       const read = await asMine(env, "purchasing", (db) => getPurchaseOrder(db as never, v.po).then((x) => x.supplier_name, () => null));
       return { attempts, body: { ...attempts, read } };

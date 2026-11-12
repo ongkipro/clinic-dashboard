@@ -9,7 +9,7 @@ import { StatusBadge } from "../../../../../components/ui/status-badge";
 import { loadPo } from "../../data";
 import { PoActions, ReceiveForm } from "../../forms";
 import { card, Main, muted, NotOkState, wideRole } from "../../frame";
-import { date, PO_STATE, qty, rp } from "../../labels";
+import { canSee, date, PO_STATE, qty, rp } from "../../labels";
 
 export const metadata: Metadata = { title: "Purchase Order — Pembelian — Clinic Dashboard" };
 
@@ -17,6 +17,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const d = await loadPo(id);
   if (d.kind !== "ok") return <NotOkState d={d} title="Purchase Order" />;
+  if (!canSee(d.p.role, "po")) return <NotOkState d={{ kind: "forbidden" }} title="Purchase Order" />;
   const po = d.po;
   const receivable = ["sent", "partially_received"].includes(po.state);
   const open = po.lines.filter((l) => l.active && Number(l.received) < Number(l.ordered));

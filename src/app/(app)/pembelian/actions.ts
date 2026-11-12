@@ -42,7 +42,7 @@ const REASON: Record<string, string> = {
   expiry_missing: "Batch tanpa tanggal kedaluwarsa tidak dapat diterima.",
   "a batch without expiry cannot be received": "Batch tanpa tanggal kedaluwarsa tidak dapat diterima.",
   expired: "Batch sudah kedaluwarsa dan tidak dapat diterima.",
-  more_than_ordered: "Jumlah diterima melebihi pesanan.",
+  more_than_ordered: "Jumlah diterima melebihi jumlah di PO.",
   item_not_ordered: "Item ini tidak ada di PO.",
   empty_purchase_order: "PO belum berisi item.",
   not_delivered: "Jumlah retur melebihi yang dikirim pemasok ini.",
@@ -93,7 +93,7 @@ export async function supplierAction(p: BuyFormState, f: FormData): Promise<BuyF
   if (terms && !/^\d{1,3}$/.test(terms)) return next(p, { error: "Syarat bayar dalam hari (0–180)." });
   return run(p, f, id ? "Pemasok disimpan." : "Pemasok ditambahkan.", (db, key) => saveSupplier(db, key, UUID.test(id) ? id : null, {
     name, npwp: str(f, "npwp") || null, contactName: str(f, "contact") || null, phone: str(f, "phone") || null, email: str(f, "email") || null,
-    address: str(f, "address") || null, paymentTermsDays: terms ? Number(terms) : 30, active: str(f, "active") !== "off",
+    address: str(f, "address") || null, paymentTermsDays: terms ? Number(terms) : 30, active: UUID.test(id) ? f.get("active") === "on" : true, // an unchecked box is absent from the form (review 2665ab81 P1-2)
   }), (r) => r.supplierId);
 }
 
