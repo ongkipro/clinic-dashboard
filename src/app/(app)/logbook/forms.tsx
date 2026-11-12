@@ -176,14 +176,14 @@ export function ScheduleForm({ ctx, branch, device, label, kind, s0, today }: {
   return (
     <Sheet label={`Jadwal ${what}`}>
       <form action={act} key={`sc${s.n ?? 0}`} aria-label={`Jadwal ${what.toLowerCase()} ${label}`} className="grid min-w-0 gap-3">
-        <Hidden ctx={ctx} branch={branch} /><input type="hidden" name="device" value={device} /><input type="hidden" name="kind" value={kind} />
+        <Hidden ctx={ctx} branch={branch} /><input type="hidden" name="device" value={device} /><input type="hidden" name="kind" value={kind} /><input type="hidden" name="existing" value={s0 ? "1" : "0"} />
         <div className={grid2}>
           <F id={`${id}-i`} label="Interval (hari)"><input id={`${id}-i`} name="interval_days" inputMode="numeric" required defaultValue={s0?.interval_days ?? (kind === "calibration" ? 180 : 30)} className={input} /></F>
           <F id={`${id}-d`} label="Jatuh tempo berikutnya"><input id={`${id}-d`} name="next_due_on" type="date" required defaultValue={s0?.next_due_on ?? today} className={input} /></F>
         </div>
         {s0 && (
           <label className="flex min-h-[52px] items-center gap-3">
-            <input type="checkbox" name="active" value="on" defaultChecked={s0.active} className="size-5" onChange={(e) => { e.currentTarget.value = e.currentTarget.checked ? "on" : "off"; }} />
+            <input type="checkbox" name="active" value="on" defaultChecked={s0.active} className="size-5" />
             <span>Jadwal aktif</span>
           </label>
         )}

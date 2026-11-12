@@ -237,7 +237,11 @@ describe("PR-82 incident register (UX-28 ▸ Insiden)", () => {
     expect(await raw(`update clinical_incidents set summary = 'x' where id = $1`, [incidentId])).toBe("raw:42501");
     // Steps in order: not before take; not by others.
     expect(await why(as(FH, (db) => handleIncident(db, key(), incidentId, { step: "investigate", investigation: "Setelan energi", rootCause: "Kalibrasi" })))).toBe("ERR_VERSION_CONFLICT:not_taken");
-    for (const p of [NUR, DOC, MGR, FH2]) expect(await code(as(p, (db) => handleIncident(db, key(), incidentId, { step: "take" }))), p.role).toBe(p === FH2 ? "ERR_FORBIDDEN" : "ERR_FORBIDDEN");
+    // Review e891e890 P1-1: the role is checked before any row is read; another branch's facility head gets not found.
+    for (const p of [NUR, DOC, MGR]) expect(await code(as(p, (db) => handleIncident(db, key(), incidentId, { step: "take" }))), p.role).toBe("ERR_FORBIDDEN");
+    for (const p of [NUR, FO]) expect(await code(as(p, (db) => handleIncident(db, key(), crypto.randomUUID(), { step: "take" }))), p.role).toBe("ERR_FORBIDDEN");
+    expect(await code(as(FH2, (db) => handleIncident(db, key(), incidentId, { step: "take" })))).toBe("ERR_NOT_FOUND");
+    expect(await code(as(FH, (db) => handleIncident(db, key(), crypto.randomUUID(), { step: "take" })))).toBe("ERR_NOT_FOUND");
     await as(FH, (db) => handleIncident(db, key(), incidentId, { step: "take" }));
     expect(await why(as(FH, (db) => handleIncident(db, key(), incidentId, { step: "close", correctiveAction: "Kalibrasi ulang" })))).toBe("ERR_VERSION_CONFLICT:investigation_unfinished");
     await as(FH, (db) => handleIncident(db, key(), incidentId, { step: "investigate", investigation: "Energi laser di atas protokol", rootCause: "Alat belum dikalibrasi" }));
@@ -297,6 +301,28 @@ describe("PR-82 incident register (UX-28 ▸ Insiden)", () => {
     // Another tenant sees nothing; direct table reads follow the same rule (RLS).
     expect(await code(as(BMGR, (db) => incidentGet(db, k)))).toBe("ERR_NOT_FOUND");
     expect((await as(PH, (db) => db.query(`select id from clinical_incidents`))).rows.map((r) => r.id)).toEqual([p2]);
+    // Review e891e890 P1-2: the table grant leaves out the handling and patient columns (they reach readers through
+    // the definers only), and a reporter's own rows are readable only while acting in a reporter role at that branch.
+    for (const col of ["investigation", "root_cause", "report_recipient", "submission_ref", "corrective_action", "officer_id", "patient_id", "visit_id"])
+      expect(await code(as(FH, (db) => db.query(`select ${col} from clinical_incidents limit 1`))), col).toBe("raw:42501");
+    expect((await as(FH, (db) => db.query(`select id, state from clinical_incidents where id = $1`, [k]))).rows).toEqual([{ id: k, state: "closed" }]);
+    const dual = await person(A, "pharmacist", A.b1);
+    const rid = await assignRole(h.admin, { tenantId: A.tenantId, staffId: dual.staffId, role: "fo_cashier" });
+    await assignBranch(h.admin, { tenantId: A.tenantId, staffRoleId: rid, branchId: A.b1 });
+    const { incidentId: d1 } = await as(dual, (db) => reportIncident(db, key(), A.b1, { classification: "kpc", occurredAt: at, summary: "Rak miring", immediateResponse: "Dipindahkan" }));
+    expect((await as(dual, (db) => db.query(`select id from clinical_incidents where id = $1`, [d1]))).rows).toHaveLength(1);
+    expect((await as({ ...dual, role: "fo_cashier" }, (db) => db.query(`select id from clinical_incidents where id = $1`, [d1]))).rows).toEqual([]);
+    expect((await as({ ...dual, role: "fo_cashier" }, (db) => db.query(`select id from clinical_incident_events where incident_id = $1`, [d1]))).rows).toEqual([]);
+    // Review e891e890 P2-4: a tenant-wide reader naming an unknown or another tenant's branch gets not found.
+    // A branch role holding two branches reads the active one's logbook only (RLS, review e891e890 P1-2).
+    const both = await person(A, "nurse", A.b1, A.b2);
+    await as({ ...both, branch: A.b2 }, (db) => recordEntry(db, key(), A.b2, { kind: "sterilization", performedOn: today(), method: "uv", items: "Set cabang dua", passed: true }));
+    expect((await as(both, (db) => db.query(`select id from logbook_entries where branch_id = $1`, [A.b2]))).rows).toEqual([]);
+    expect((await as({ ...both, branch: A.b2 }, (db) => db.query(`select id from logbook_entries where branch_id = $1`, [A.b2]))).rows.length).toBeGreaterThan(0);
+    for (const b of [crypto.randomUUID(), B.b1]) {
+      expect(await code(as(OWN, (db) => incidentList(db, b)))).toBe("ERR_NOT_FOUND");
+      expect(await code(as(AU, (db) => logbookOverview(db, b, null)))).toBe("ERR_NOT_FOUND");
+    }
     expect((await as(FO, (db) => db.query(`select id from clinical_incidents`))).rows).toEqual([]);
     expect((await as(FO, (db) => db.query(`select id from logbook_entries`))).rows).toEqual([]);
     expect((await as(BMGR, (db) => db.query(`select id from logbook_entries`))).rows).toEqual([]);

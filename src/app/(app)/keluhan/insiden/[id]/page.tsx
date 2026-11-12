@@ -48,7 +48,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
         <h2 className="m-0 text-[1.25rem] font-semibold">Laporan</h2>
         <dl className="m-0 grid min-w-0 gap-3">
           <Field label="Waktu kejadian" value={when(i.occurred_at)} />
-          {i.patient_name && <Field label="Pasien" value={i.patient_id ? <Link href={`/pasien/${i.patient_id}`} className="text-[var(--tint)]">{`${i.patient_name} · ${i.patient_mrn}`}</Link> : i.patient_name} />}
+          {i.patient_name && <Field label="Pasien" value={i.patient_id ? <Link href={`/pasien/${i.patient_id}`} className="inline-flex min-h-[var(--target)] items-center text-[var(--tint)]">{`${i.patient_name} · ${i.patient_mrn}`}</Link> : i.patient_name} />}
           {!i.patient_name && i.has_patient && <Field label="Pasien" value="Tercatat (tidak ditampilkan untuk peran ini)" />}
           <Field label="Ringkasan" value={i.summary} />
           <Field label="Tindakan segera" value={i.immediate_response} />

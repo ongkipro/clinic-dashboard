@@ -142,6 +142,15 @@ try {
   await mgr.p.getByText(/sertifikat CAL-2026-11/).first().waitFor();
   const after = await main(mgr.p);
   flow.push(["the calibration entry clears the overdue device and moves its due date", !/Alat lewat jatuh tempo kalibrasi/.test(after) && /Kalibrasi · [\s\S]*PT Kalibrasi Medika/.test(after)]);
+  // Review e891e890 P1-3: unticking "Jadwal aktif" deactivates the schedule (an unchecked box is absent from the form).
+  await mgr.p.locator("main li").filter({ hasText: "Laser Pico Kemang" }).getByRole("button", { name: "Jadwal Kalibrasi" }).click();
+  const sc = mgr.p.getByRole("form", { name: "Jadwal kalibrasi Laser Pico Kemang" });
+  await sc.getByLabel("Jadwal aktif").uncheck();
+  await sc.getByRole("button", { name: "Simpan Jadwal" }).click();
+  await ok(mgr.p, "Jadwal disimpan.");
+  await mgr.p.goto(`${BASE}/logbook?tab=calibration`);
+  await mgr.p.getByText(/berikutnya [^·]*\(nonaktif\)/).first().waitFor();
+  flow.push(["unticking Jadwal aktif deactivates the schedule", /Kalibrasi tiap 180 hari, berikutnya [^·]*\(nonaktif\)/.test(await main(mgr.p))]);
   await mgr.c.close();
 
   // Nurse: sterilization (a missing field refused, then saved), B3 waste; reports an incident with a patient.
@@ -187,6 +196,13 @@ try {
   await nur.p.goto(`${BASE}/keluhan/insiden`);
   await nur.p.getByText(/Kemerahan pasca laser/).first().waitFor();
   const mine = await main(nur.p);
+  // Review e891e890 P2-5: the incident with a patient: its detail (the patient link) measured too.
+  await nur.p.getByRole("link", { name: /^KTD ·/ }).first().click();
+  await nur.p.getByRole("heading", { name: "Kejadian Tidak Diharapkan", level: 1 }).waitFor();
+  const ktd = nur.p.url().replace(BASE, "");
+  await layouts(nur.p, ktd, "insiden-pasien");
+  await nur.p.goto(`${BASE}/keluhan/insiden`);
+  await nur.p.getByText(/Kemerahan pasca laser/).first().waitFor();
   flow.push(["the nurse sees her reports and their state only", /Insiden yang Anda laporkan dan statusnya/.test(mine) && /KTD ·[\s\S]*Dewi Lestari/.test(mine) && /Dilaporkan/.test(mine)]);
   await nur.c.close();
 

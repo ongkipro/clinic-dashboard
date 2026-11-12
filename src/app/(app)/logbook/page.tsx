@@ -86,7 +86,7 @@ async function Body({ searchParams }: { searchParams: Promise<Record<string, str
                         x.schedules.length === 0 && "Belum ada jadwal"].filter(Boolean).join(" · ")}
                     </span>
                     {o.can_schedule && x.active && (
-                      <div className="flex min-w-0 flex-wrap gap-2">
+                      <div className="flex min-w-0 flex-wrap items-start gap-2">
                         {(["calibration", "maintenance"] as const).map((k) => {
                           const s0 = x.schedules.find((s) => s.kind === k);
                           return <ScheduleForm key={k} ctx={d.ctx} branch={d.branch.id} device={x.id} label={x.label} kind={k} today={o.today} s0={s0} />;

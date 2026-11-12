@@ -103,5 +103,5 @@ export async function scheduleAction(p: LogFormState, f: FormData): Promise<LogF
   if (!/^\d{1,4}$/.test(days) || Number(days) < 1 || Number(days) > 1825) return next(p, { error: REASON.interval_days });
   if (!DATE.test(due)) return next(p, { error: "Pilih tanggal jatuh tempo berikutnya." });
   return run(p, f, "Jadwal disimpan.", (db, key, branch) =>
-    setSchedule(db, key, branch, { deviceId: dev, kind, intervalDays: Number(days), nextDueOn: due, active: str(f, "active") !== "off" }));
+    setSchedule(db, key, branch, { deviceId: dev, kind, intervalDays: Number(days), nextDueOn: due, active: str(f, "existing") === "1" ? f.get("active") === "on" : true })); // an unchecked box is absent (review e891e890 P1-3)
 }

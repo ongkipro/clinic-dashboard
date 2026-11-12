@@ -155,24 +155,29 @@ CREATE INDEX "logbook_entries_branch_idx" ON "logbook_entries" USING btree ("ten
 -- ── Readers and actors (PR-82; T-068) ─────────────────────────────────────────────────────────────────────────
 -- Logbooks are read at the branch by the room roles and the manager (writers) and by the facility head, owner,
 -- admin_pusat and auditor (readers; tenant-wide roles at any branch they may see).
+-- A branch role reads its active branch only (review e891e890 P1-2).
 CREATE FUNCTION public.logbook_readable(p_tenant uuid, p_branch uuid) RETURNS boolean
 LANGUAGE sql STABLE SET search_path = pg_catalog, pg_temp AS $$
   SELECT coalesce(public.stock_member_now(p_tenant) AND public.app_branch_allowed(p_branch) AND (
       public.app_role_in(ARRAY['owner','admin_pusat','auditor'])
-      OR public.app_role_in(ARRAY['doctor','nurse','therapist','manager','facility_head']) AND EXISTS (
+      OR public.app_role_in(ARRAY['doctor','nurse','therapist','manager','facility_head'])
+         AND p_branch = NULLIF(current_setting('app.active_branch_id', true), '')::uuid AND EXISTS (
         SELECT 1 FROM public.staff_branches sb
          WHERE sb.tenant_id = p_tenant AND sb.staff_id = public.app_staff_id() AND sb.role = public.app_acting_role() AND sb.branch_id = p_branch)), false)
 $$;--> statement-breakpoint
 REVOKE ALL ON FUNCTION public.logbook_readable(uuid, uuid) FROM PUBLIC;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION public.logbook_readable(uuid, uuid) TO clinic_app;--> statement-breakpoint
 
--- Incidents are clinical: the facility head of the branch, owner and auditor read all; a reporter reads the ones
--- they reported (the incident's own reported_by, checked in the policy).
+-- Incidents are clinical: the facility head of the branch, owner and auditor read all; a reporter acting in a
+-- reporter role at the incident's branch reads the ones they reported (review e891e890 P1-2). The table grant leaves
+-- out the handling and patient columns: those reach readers through incident_list / incident_get only.
 CREATE FUNCTION public.incident_readable(p_tenant uuid, p_branch uuid, p_reporter uuid) RETURNS boolean
 LANGUAGE sql STABLE SET search_path = pg_catalog, pg_temp AS $$
   SELECT coalesce(public.stock_member_now(p_tenant) AND public.app_branch_allowed(p_branch) AND (
       public.app_role_in(ARRAY['owner','auditor'])
-      OR (public.app_role_in(ARRAY['facility_head']) OR p_reporter = public.app_staff_id()) AND EXISTS (
+      OR (public.app_role_in(ARRAY['facility_head'])
+          OR p_reporter = public.app_staff_id() AND public.app_role_in(ARRAY['doctor','nurse','therapist','pharmacist','bc','manager']))
+         AND p_branch = NULLIF(current_setting('app.active_branch_id', true), '')::uuid AND EXISTS (
         SELECT 1 FROM public.staff_branches sb
          WHERE sb.tenant_id = p_tenant AND sb.staff_id = public.app_staff_id() AND sb.role = public.app_acting_role() AND sb.branch_id = p_branch)), false)
 $$;--> statement-breakpoint
@@ -253,10 +258,10 @@ CREATE TRIGGER logbook_entries_no_truncate BEFORE TRUNCATE ON public.logbook_ent
 ALTER TABLE public.logbook_entries ENABLE ALWAYS TRIGGER logbook_entries_no_truncate;--> statement-breakpoint
 ALTER TABLE public.clinical_incidents ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE POLICY clinical_incidents_read ON public.clinical_incidents FOR SELECT TO clinic_app USING (tenant_id = public.app_tenant_id() AND public.incident_readable(tenant_id, branch_id, reported_by));--> statement-breakpoint
-GRANT SELECT ON public.clinical_incidents TO clinic_app;--> statement-breakpoint
+GRANT SELECT (id, tenant_id, branch_id, classification, occurred_at, summary, immediate_response, state, reported_by, reported_as, reported_at, closed_at, command_key) ON public.clinical_incidents TO clinic_app;--> statement-breakpoint
 CREATE POLICY clinical_incidents_operator_read ON public.clinical_incidents FOR SELECT TO clinic_operator
   USING (tenant_id = public.app_tenant_id() AND public.operator_row_read('public.clinical_incidents', tenant_id, id));--> statement-breakpoint
-GRANT SELECT ON public.clinical_incidents TO clinic_operator;--> statement-breakpoint
+GRANT SELECT (id, tenant_id, branch_id, classification, occurred_at, summary, immediate_response, state, reported_by, reported_as, reported_at, closed_at, command_key) ON public.clinical_incidents TO clinic_operator;--> statement-breakpoint
 CREATE TRIGGER clinical_incidents_no_truncate BEFORE TRUNCATE ON public.clinical_incidents FOR EACH STATEMENT EXECUTE FUNCTION public.domain_events_immutable();--> statement-breakpoint
 ALTER TABLE public.clinical_incidents ENABLE ALWAYS TRIGGER clinical_incidents_no_truncate;--> statement-breakpoint
 ALTER TABLE public.clinical_incident_events ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
@@ -591,15 +596,15 @@ GRANT EXECUTE ON FUNCTION public.incident_report(text, uuid, jsonb) TO clinic_ap
 CREATE FUNCTION public.incident_handle(p_incident uuid, p_step text, p jsonb) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
-  a record;
+  -- the actor lock, role and capability first, before any row is read (review e891e890 P1-1); another branch's
+  -- incident is not found
+  a record := public.safety_actor(ARRAY['facility_head'], NULLIF(current_setting('app.active_branch_id', true), '')::uuid);
   i public.clinical_incidents;
 BEGIN
-  SELECT * INTO a FROM public.tenant_actor_lock();
-  SELECT * INTO i FROM public.clinical_incidents x WHERE x.tenant_id = a.tenant_id AND x.id = p_incident FOR UPDATE;
+  SELECT * INTO i FROM public.clinical_incidents x WHERE x.tenant_id = a.tenant_id AND x.branch_id = a.branch_id AND x.id = p_incident FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'ERR_NOT_FOUND: incident not found' USING ERRCODE = 'P0002';
   END IF;
-  PERFORM public.safety_actor(ARRAY['facility_head'], i.branch_id);
   IF jsonb_typeof(coalesce(p, '{}'::jsonb)) IS DISTINCT FROM 'object' THEN
     RAISE EXCEPTION 'ERR_INVALID_INPUT: body' USING ERRCODE = '22023';
   END IF;
@@ -693,7 +698,8 @@ BEGIN
   IF p_kind IS NOT NULL AND p_kind NOT IN ('sterilization','calibration','maintenance','b3_waste') THEN
     RAISE EXCEPTION 'ERR_INVALID_INPUT: kind' USING ERRCODE = '22023';
   END IF;
-  IF p_branch IS NULL OR NOT public.logbook_readable(a.tenant_id, p_branch) THEN
+  IF p_branch IS NULL OR NOT public.logbook_readable(a.tenant_id, p_branch)
+     OR NOT EXISTS (SELECT 1 FROM public.branches b WHERE b.tenant_id = a.tenant_id AND b.id = p_branch) THEN  -- review e891e890 P2-4
     RAISE EXCEPTION 'ERR_NOT_FOUND: branch not found' USING ERRCODE = 'P0002';
   END IF;
   v_today := public.safety_today(a.tenant_id, p_branch);
@@ -760,7 +766,8 @@ DECLARE
   a record := public.safety_reader(ARRAY['doctor','nurse','therapist','pharmacist','bc','manager','facility_head','owner','auditor']);
   v_all boolean;
 BEGIN
-  IF p_branch IS NULL OR NOT public.app_branch_allowed(p_branch) OR a.role NOT IN ('owner','auditor') AND a.branch_id IS DISTINCT FROM p_branch THEN
+  IF p_branch IS NULL OR NOT public.app_branch_allowed(p_branch) OR a.role NOT IN ('owner','auditor') AND a.branch_id IS DISTINCT FROM p_branch
+     OR NOT EXISTS (SELECT 1 FROM public.branches b WHERE b.tenant_id = a.tenant_id AND b.id = p_branch) THEN  -- review e891e890 P2-4
     RAISE EXCEPTION 'ERR_NOT_FOUND: branch not found' USING ERRCODE = 'P0002';
   END IF;
   v_all := a.role IN ('facility_head','owner','auditor');
