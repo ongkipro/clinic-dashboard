@@ -1,6 +1,6 @@
 # M3 exit evidence (T-069)
 
-Task T-069 (PR-16, R3). Base `62b27ed` (T-068, stacked on T-067 `ee10520` and main `c5bf36f`; neither yet integrated). Ledger run `RUN-20261112T051118Z-ae0f992d`. Built without a per-task review by owner instruction (2026-11-12): the independent R3 review that T-069's Done-when requires runs in the one-by-one review round, so T-069 is **not done** until it is recorded.
+Task T-069 (PR-16, R3). Base `18c3ef9` (T-068 with its review fixes, on T-067 with its review fixes `8551d95`, on main `c5bf36f`). Ledger runs `RUN-20261112T051118Z-ae0f992d` (the build, finished BLOCKED for the rebase; close run 1 FAIL kept) and the review-round run. The independent R3 review that T-069's Done-when requires is recorded in `docs/tasks/T-069.md`.
 
 Exit check (PLAN.md §1, M3 row): scenarios PR-14 (outcomes; session and commission effects in M4/M5), PR-16–PR-18, PR-75, PR-82, PR-89, PR-90 and CLIN-008, 017–019, 024–025 pass; stock fixture: no double deduction, depot balances never negative. Done when (TASKS.md T-069): `pnpm test -- m3` passes; an independent R3 review is recorded.
 
@@ -30,7 +30,7 @@ The end state is: gudang 4, apotek 8, room 10, branch 2 holding 5. 40 received, 
 
 ## Local run
 
-Filled from the ledger's close run (see `docs/tasks/T-069.md` "Results"): `pnpm test -- m3` with a JUnit report and `check-scenarios.py` on it.
+From the ledger's close runs, see `docs/tasks/T-069.md` "Results". The build run gave 1815 passed, 0 failed, 34 skipped (1849); `check-scenarios.py` reported 10/10 scenarios, 6/6 CLIN ids and 32 mapped cases, all passed. The review-round run re-runs `pnpm test -- m3` with a JUnit report and the scenario check on the rebased commit.
 
 ## Not proven in M3 (deferred)
 
@@ -45,8 +45,8 @@ Per scenario, `scenarios.json` "open" lists later work, including:
 
 ## CI
 
-No CI receipt yet. T-067, T-068 and T-069 are local stacked commits, held until the review round (owner, 2026-11-12). The CI receipt (`check-ci.sh`, as in M2) is taken on the integrated commit after that round.
+No CI receipt yet. T-067, T-068 and T-069 are integrated into `main` together after this review (merge --ff-only, push), and the CI run on that commit is recorded in `STATUS.md`.
 
 ## Independent R3 review
 
-Not yet recorded. It runs in the one-by-one review round after all tasks are final (owner, 2026-11-12).
+See `docs/tasks/T-069.md` "Independent R3 review".
