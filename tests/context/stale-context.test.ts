@@ -46,6 +46,7 @@ const keluhan = await import("../../src/app/(app)/keluhan/actions"); // T-057
 const templat = await import("../../src/app/(app)/templat/actions"); // T-058
 const permintaan = await import("../../src/app/(app)/permintaan/actions"); // T-056
 const stok = await import("../../src/app/(app)/stok/actions"); // T-060
+const pembelian = await import("../../src/app/(app)/pembelian/actions"); // T-067
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -147,6 +148,17 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["permintaan decideRequestAction", (f) => permintaan.decideRequestAction({}, f), () => ({ key: U(146), request: U(147), decision: "approve" })],
   ["permintaan cancelRequestAction", (f) => permintaan.cancelRequestAction({}, f), () => ({ key: U(148), request: U(147) })],
   ["stok saveItemAction", (f) => stok.saveItemAction({}, f), () => ({ key: U(149), catalog_item: U(150), unit: "ml", storage: "ruang" })],
+  ["pembelian supplierAction", (f) => pembelian.supplierAction({}, f), () => ({ key: U(201), name: "PT Uji", terms: "30" })],
+  ["pembelian poSaveAction", (f) => pembelian.poSaveAction({}, f), () => ({ key: U(202), supplier: U(203), "item:0": U(204), "qty:0": "1", "price:0": "1000" })],
+  ["pembelian poTransitionAction", (f) => pembelian.poTransitionAction({}, f), () => ({ key: U(205), po: U(206), action: "send" })],
+  ["pembelian receiveAction", (f) => pembelian.receiveAction({}, f), () => ({ key: U(207), supplier: U(203), "item:0": U(204), "batch:0": "B-1", "expiry:0": "2030-01-01", "qty:0": "1", "cost:0": "1000" })],
+  ["pembelian returnAction", (f) => pembelian.returnAction({}, f), () => ({ key: U(208), supplier: U(203), batch: U(209), qty: "1", reason: "other", note: "Uji konteks" })],
+  ["pembelian transferSendAction", (f) => pembelian.transferSendAction({}, f), () => ({ key: U(210), from: U(211), to: U(212), batch: U(209), qty: "1" })],
+  ["pembelian transferActAction", (f) => pembelian.transferActAction({}, f), () => ({ key: U(213), transfer: U(214), action: "cancel" })],
+  ["pembelian invoiceAction", (f) => pembelian.invoiceAction({}, f), () => ({ key: U(215), supplier: U(203), number: "F-1", date: "2026-11-12", receipt: U(216) })],
+  ["pembelian payAction", (f) => pembelian.payAction({}, f), () => ({ key: U(217), supplier: U(203), amount: "1000", method: "cash", date: "2026-11-12" })],
+  ["pembelian creditNoteAction", (f) => pembelian.creditNoteAction({}, f), () => ({ key: U(218), supplier: U(203), return: U(219), number: "NK-1", amount: "1000", date: "2026-11-12" })],
+  ["pembelian applyCreditAction", (f) => pembelian.applyCreditAction({}, f), () => ({ key: U(220), credit: U(221), invoice: U(222) })],
   ["stok receiveAction", (f) => stok.receiveAction({}, f), () => ({ key: U(151), item: U(152), batch_no: "B-1", expiry: "2030-01-01", quantity: "1", reason: "penerimaan" })],
   ["stok holdAction", (f) => stok.holdAction({}, f), () => ({ key: U(153), batch: U(154), state: "quarantined", reason: "Uji konteks" })],
   ["stok openVialAction", (f) => stok.openVialAction({}, f), () => ({ key: U(155), batch: U(154) })],

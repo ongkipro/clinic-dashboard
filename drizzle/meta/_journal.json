@@ -589,6 +589,13 @@
       "when": 1794442258185,
       "tag": "0083_suppliers",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1794448011872,
+      "tag": "0084_payables",
+      "breakpoints": true
     }
   ]
 }

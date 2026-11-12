@@ -313,6 +313,22 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["supplier_get", async () => ["select supplier_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
     ["supplier_return_list", async () => ["select supplier_return_list(null)", []], ["pharmacist"]],
     ["supplier_batches", async () => ["select supplier_batches($1, null)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    // T-067 (PR-90): payables writers and readers take the actor lock first (Level 3 roles: the harness gives every role a branch).
+    ["po_save", async () => ["select po_save('k-0000000019', null, '{}'::jsonb)", []], ["manager"]],
+    ["po_transition", async () => ["select po_transition($1, 'send', null)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["goods_receipt_record", async () => ["select goods_receipt_record('k-0000000020', null, '{}'::jsonb)", []], ["pharmacist"]],
+    ["supplier_invoice_record", async () => ["select supplier_invoice_record('k-0000000021', null, '{}'::jsonb)", []], ["manager"]],
+    ["supplier_payment_record", async () => ["select supplier_payment_record('k-0000000022', null, '{}'::jsonb)", []], ["manager"]],
+    ["supplier_payment_allocate", async () => ["select supplier_payment_allocate('k-0000000023', $1, null)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["supplier_credit_note_record", async () => ["select supplier_credit_note_record('k-0000000024', null, '{}'::jsonb)", []], ["pharmacist"]],
+    ["supplier_credit_apply", async () => ["select supplier_credit_apply('k-0000000025', $1, $1, null)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["supplier_credit_expectation_write_off", async () => ["select supplier_credit_expectation_write_off($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["supplier_payable_reverse", async () => ["select supplier_payable_reverse('payment', $1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["purchasing_context", async () => ["select purchasing_context()", []], ["pharmacist"]],
+    ["po_list", async () => ["select po_list(null, null)", []], ["manager"]],
+    ["po_get", async () => ["select po_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    ["goods_receipt_list", async () => ["select goods_receipt_list(null, 10)", []], ["pharmacist"]],
+    ["payable_overview", async () => ["select payable_overview(null)", []], ["manager"]],
   ];
   for (const [name, call, roles] of cases) {
     it(name, async () => {

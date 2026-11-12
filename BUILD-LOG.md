@@ -410,3 +410,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - The moving-average valuation leaves costed units first, so an "uncosted return" only happens when costed units have already left the item at the branch; a test that wants one must take them out first.
 - The authority-clock harness assigns every role to a branch; tenant-wide roles (purchasing, auditor, finance) fail its staff_branches check, so lock-order cases use a Level 3 role that reaches the same lock (the lock comes before the role check).
 
+## 2026-11-12 — T-067 Purchase orders, goods receipts and supplier payables
+
+- No-overpayment under concurrency: keep the paid / credited / allocated counters on the parent rows, lock the parents in one order (credit note → payment → invoices by id) and read the outstanding from the locked row; take least(requested, outstanding). Prove it with real concurrent calls in a loop, not a sequential replay.
+- A deferred constraint trigger fires with the NEW row of the insert, not the row as it is at commit: re-read the row there (an invoice total set after its lines would otherwise look wrong).
+- Tenant-wide roles (purchasing, finance, owner) land on the first branch by name in branch-picking pages; browser checks must pick the seeded branch (`?cabang=`).
+- Owner, finance, manager, auditor and the other TOTP roles are sent to the second-factor enrolment on their first page: browser specs enrol them first.
+
