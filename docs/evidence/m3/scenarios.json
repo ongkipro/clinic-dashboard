@@ -1,0 +1,225 @@
+{
+ "_about": "T-069 M3 exit: the PLAN.md §1 M3 exit scenarios, the Done-when CLIN ids and the stock fixture mapped to the exact test cases that prove each (JUnit classname = file, name = 'describe > test'). Checked by check-scenarios.py against a JUnit report of `pnpm test -- m3`: required scenario titles and CLIN ids present; every title a PRD §8 scenario and every CLIN id a PRD CLIN row; every mapped name in its file; every mapped case present once and passed; no failure anywhere. 'proves' states what the cases assert; 'open' what M3 does not prove and the task that completes it.",
+ "scenarios": [
+  {
+   "scenario": "PR-14 patient-chosen stop",
+   "file": "tests/treatment/treatment.test.ts",
+   "tests": [
+    "scenario PR-14: four outcomes > patient-chosen stop: counted; the performer and the actual materials are recorded",
+    "scenario PR-14: four outcomes > completed: counted; the actual materials are consumed once; the visit's treatment step is done",
+    "scenario PR-14: four outcomes > medical stop: not counted; a reason is required; no front-office blocker",
+    "scenario PR-14: four outcomes > clinic stop: not counted; the front office gets the blocker"
+   ],
+   "proves": "the four outcomes: a patient-chosen stop counts as used and records the performer and the actual materials; completed counts and consumes once; medical and clinic stops do not count (T-064)",
+   "open": "the session use and the performer's commission (PLAN M3: 'session and commission effects in M4/M5'): package sessions T-076 (M4), commission T-087 (M5)"
+  },
+  {
+   "scenario": "PR-16 no double deduction",
+   "file": "tests/inventory/materials.test.ts",
+   "tests": [
+    "scenario PR-16: no double deduction > a pack of cotton issued to a room; a treatment using the standard per-treatment model completes → stock is not deducted a second time",
+    "scenario PR-16: no double deduction > a second treatment from the same room pack is not deducted either; return and waste of a consumed bulk line are refused"
+   ],
+   "proves": "a bulk pack issued to a room is not deducted again when treatments using it complete; a consumed bulk line cannot be returned or wasted (T-062)",
+   "open": "none in M3"
+  },
+  {
+   "scenario": "PR-17 transfer",
+   "file": "tests/inventory/depots.test.ts",
+   "tests": [
+    "scenario PR-17 transfer (the transfer half) > 10 at branch A, 0 at B; 4 sent and received → A 6, B 4 with the same batch number and expiry",
+    "scenario PR-17 transfer (the transfer half) > cancel while sent returns the stock to the source depot; conservation per finished transfer"
+   ],
+   "proves": "an inter-branch transfer of 4 of 10 leaves A 6 and B 4 with the same batch number and expiry; a cancelled transfer returns the stock (T-061)",
+   "open": "PR-17's purchasing half (PO, receipt) is PR-90 below (T-067)"
+  },
+  {
+   "scenario": "PR-18 automatic list",
+   "file": "tests/pharmacy/pharmacy.test.ts",
+   "tests": [
+    "scenario PR-18: automatic list > two treatments and one product confirmed → the list shows both formulas' materials and the product, no manual entry",
+    "scenario PR-18: automatic list > an unmapped recipe row, a missing room depot and a treatment without recipe are shown, never dropped; Siapkan refuses them"
+   ],
+   "proves": "a confirmed selection of two treatments and one product puts both formulas' materials and the product on the pharmacy list without manual entry; gaps are shown, never dropped (T-065)",
+   "open": "UX-7 Diskusi Pilihan panel and UX-8 Resep panel wiring (later UI tasks); the payment rule for dispensing (T-072)"
+  },
+  {
+   "scenario": "PR-75 supplier return",
+   "file": "tests/purchasing/returns.test.ts",
+   "tests": [
+    "scenario PR-75: supplier return > a batch received from a supplier; 5 units returned with a reason → stock −5 at the moving average; a credit note is expected"
+   ],
+   "proves": "a return of 5 units with a reason lowers stock by 5 at the moving average and opens one credit expectation (T-066)",
+   "open": "posting the return (BILL-34 journal) in M8"
+  },
+  {
+   "scenario": "PR-75 supplier return",
+   "file": "tests/purchasing/payables.test.ts",
+   "tests": [
+    "invoices, payments, credit notes, reversals (open points 3–7; r1 P2-4, P2-5, P2-7, P3-8) > credit notes: from a return (closes T-066's expectation) or an invoice; applied atomically; write-off; reversal"
+   ],
+   "proves": "the expected credit is closed by the supplier's credit note and applied to an invoice (T-067)",
+   "open": "as above"
+  },
+  {
+   "scenario": "PR-82 logbook",
+   "file": "tests/safety/safety.test.ts",
+   "tests": [
+    "scenario PR-82: a device past its calibration due date > the due date passes without an entry: the branch manager sees it in Perlu Ditangani, once; an entry moves the due date"
+   ],
+   "proves": "a device past its calibration due date without an entry raises one alert for the branch manager (the Perlu Ditangani data: the manager's notification and the overdue device first in the logbook) (T-068)",
+   "open": "the Ringkasan pages that render Perlu Ditangani and the daily scheduler that calls logbook_due_scan (later tasks, as PR-73 / T-050)"
+  },
+  {
+   "scenario": "PR-89 depot transfer",
+   "file": "tests/inventory/depots.test.ts",
+   "tests": [
+    "scenario PR-89: depot transfer > 10 vials in the gudang; 4 to Ruang Tindakan 1 → gudang 6, room 4, one transfer record and two linked movements"
+   ],
+   "proves": "a transfer of 4 of 10 vials from the gudang to a room depot leaves 6 and 4 with one transfer record and two linked movements (T-061)",
+   "open": "none in M3"
+  },
+  {
+   "scenario": "PR-89 concurrent depot transfers",
+   "file": "tests/inventory/depots.test.ts",
+   "tests": [
+    "scenario PR-89: concurrent depot transfers > 5 in the gudang; two transfers of 4 at the same time → one succeeds, one is refused for insufficient stock; replaying the successful key changes nothing"
+   ],
+   "proves": "of two concurrent transfers of 4 from 5, one succeeds and one is refused for insufficient stock; replaying the successful key changes nothing (T-061)",
+   "open": "none in M3"
+  },
+  {
+   "scenario": "PR-90 supplier payable",
+   "file": "tests/purchasing/payables.test.ts",
+   "tests": [
+    "scenario PR-90: supplier payable > a goods receipt of Rp5,000,000 with an invoice due in 30 days; finance pays Rp2,000,000 → Rp3,000,000 outstanding"
+   ],
+   "proves": "an invoice of a Rp5,000,000 receipt due in 30 days, paid Rp2,000,000, shows Rp3,000,000 outstanding (T-067)",
+   "open": "posting (BILL-34) and the monthly roll-forward in M8"
+  },
+  {
+   "scenario": "PR-90 no double allocation",
+   "file": "tests/purchasing/payables.test.ts",
+   "tests": [
+    "scenario PR-90: supplier payable > no double allocation: two payments of Rp2,000,000 allocated concurrently to Rp3,000,000 outstanding → 2,000,000 + 1,000,000, never over-paid",
+    "scenario PR-90: supplier payable > payment and credit application at once never over-settle an invoice"
+   ],
+   "proves": "two concurrent payments of Rp2,000,000 on Rp3,000,000 outstanding allocate 2,000,000 and 1,000,000; a payment and a credit application at once never over-settle (T-067)",
+   "open": "none in M3"
+  }
+ ],
+ "items": [
+  {
+   "item": "CLIN-008 retried completion: one transition, one deduction",
+   "file": "tests/inventory/materials.test.ts",
+   "tests": [
+    "CLIN-008: retried completion — one transition, one deduction > a standard item: replay returns the same consumption; two concurrent completions: one wins; one consume movement"
+   ],
+   "proves": "a replayed or concurrent completion makes one transition and one consume movement (T-062)"
+  },
+  {
+   "item": "CLIN-008 retried completion: one transition, one deduction",
+   "file": "tests/treatment/treatment.test.ts",
+   "tests": [
+    "materials at the finish (P1-1) > Bahan Tambahan is a second request of the item, consumed at the finish too; an open request blocks the finish; replay consumes nothing more"
+   ],
+   "proves": "a replayed treatment finish consumes nothing more (T-064)"
+  },
+  {
+   "item": "CLIN-017 signed Rx not handed over: no stock or quota change",
+   "file": "tests/pharmacy/pharmacy.test.ts",
+   "tests": [
+    "dispensing (CLIN-017, CLIN-018, CD-19) > CLIN-017: a signed prescription prepared but not handed over changes no stock and no movement"
+   ],
+   "proves": "a signed prescription prepared but not handed over changes no stock and writes no movement (T-065)"
+  },
+  {
+   "item": "CLIN-018 handover retry: single dispensing",
+   "file": "tests/pharmacy/pharmacy.test.ts",
+   "tests": [
+    "dispensing (CLIN-017, CLIN-018, CD-19) > CLIN-018: a handover retried (same key, new key, concurrently) is one dispensing and one movement per batch"
+   ],
+   "proves": "a handover retried with the same key, a new key or concurrently is one dispensing and one movement per batch (T-065)"
+  },
+  {
+   "item": "CLIN-019 expired/recalled/BUD-lapsed stock blocked",
+   "file": "tests/inventory/items.test.ts",
+   "tests": [
+    "CLIN-019 fitness and FEFO (open point 5) > FEFO takes the fit open vial first, then sealed stock by expiry; never an expired, recalled, quarantined batch or a lapsed vial",
+    "CLIN-019 fitness and FEFO (open point 5) > the expiry day is judged in the branch's time zone: 16:30 UTC is the next day in WITA but not in WIB"
+   ],
+   "proves": "FEFO never offers an expired, recalled or quarantined batch or a lapsed vial; the expiry day is judged in the branch's time zone (T-060)"
+  },
+  {
+   "item": "CLIN-019 expired/recalled/BUD-lapsed stock blocked",
+   "file": "tests/pharmacy/pharmacy.test.ts",
+   "tests": [
+    "dispensing (CLIN-017, CLIN-018, CD-19) > quarantine, temperature excursion and recall block preparation and handover; release needs a reason; the history keeps every reason"
+   ],
+   "proves": "quarantined, temperature-excursion and recalled stock blocks preparation and handover (T-065)"
+  },
+  {
+   "item": "CLIN-019 expired/recalled/BUD-lapsed stock blocked",
+   "file": "tests/inventory/materials.test.ts",
+   "tests": [
+    "requests and issue (open points 2, 3; P1-1, P1-2) > unfit stock is not issued; insufficient stock refuses the whole issue and keeps nothing"
+   ],
+   "proves": "unfit stock is never issued to a room (T-062)"
+  },
+  {
+   "item": "CLIN-024 pharmacist adverse-effect flag escalates clinically",
+   "file": "tests/pharmacy/pharmacy.test.ts",
+   "tests": [
+    "CLIN-024 and CLIN-025 > CLIN-024: the pharmacist's adverse-effect flag from the handover becomes a clinical task for the branch's clinician"
+   ],
+   "proves": "the pharmacist's adverse-effect flag at handover becomes a clinical task for the branch's clinicians (T-065 with T-057)"
+  },
+  {
+   "item": "CLIN-024 pharmacist adverse-effect flag escalates clinically",
+   "file": "tests/clinical/complaints.test.ts",
+   "tests": [
+    "CLIN-016 and CLIN-024: worse symptoms; a pharmacist's adverse-effect flag > worse symptoms → a clinical task due by SET-31 (kuning by default); the pharmacist source is the pharmacist's"
+   ],
+   "proves": "the pharmacist source is the pharmacist's own and becomes a clinical task with its due time (T-057)"
+  },
+  {
+   "item": "CLIN-025 pending pharmacy blocks closure",
+   "file": "tests/pharmacy/pharmacy.test.ts",
+   "tests": [
+    "CLIN-024 and CLIN-025 > CLIN-025: a queued or prepared dispensing blocks closing the visit; after handover or cancellation it closes"
+   ],
+   "proves": "a queued or prepared dispensing blocks closing the visit; after handover or cancellation it closes (T-065)"
+  },
+  {
+   "item": "stock fixture: no double deduction, depot balances never negative",
+   "file": "docs/evidence/m3/m3-flow.test.ts",
+   "tests": [
+    "M3 stock fixture > one stock item through every M3 writer: no double deduction, every depot balance never negative, conservation per batch"
+   ],
+   "proves": "one item received, transferred between depots and branches, issued, consumed (with retries), returned, wasted, dispensed and returned to the supplier: each movement once, every holding ≥ 0 after every step, and the batch total equals receipts minus outflows"
+  },
+  {
+   "item": "stock fixture: no double deduction, depot balances never negative",
+   "file": "tests/inventory/items.test.ts",
+   "tests": [
+    "the batch ↔ movement invariant and the guards (plan P1-2) > a quantity changes only by a movement; a movement continues the balance; movements are never changed or deleted; nothing goes negative"
+   ],
+   "proves": "a batch quantity changes only by a movement and never goes negative (guards on the owner connection, T-060)"
+  },
+  {
+   "item": "stock fixture: no double deduction, depot balances never negative",
+   "file": "tests/inventory/depots.test.ts",
+   "tests": [
+    "guards (plan P1-2, P2-2) > a holding changes only by its movement; movements name a depot of their batch's branch; nothing is deleted; legs tie to kinds"
+   ],
+   "proves": "a depot holding changes only by its movement (T-061)"
+  }
+ ],
+ "deferred": [
+  {
+   "scenario": "PR-14 patient-chosen stop",
+   "part": "session counts as used; the performer earns commission",
+   "completes_in": "T-076 (package sessions, M4); T-087 (commission, M5)"
+  }
+ ]
+}
