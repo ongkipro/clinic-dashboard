@@ -173,7 +173,7 @@ describe("Persetujuan inbox rules (UX-26)", () => {
       Object.fromEntries(Object.entries(APPROVAL_TYPES).sort().map(([k, v]) => [k, { label: v.label, approverRoles: [...v.approverRoles] }])),
     );
     expect(rupiah(1_250_000)).toBe("Rp1.250.000");
-    expect(decidableTypes("manager").sort()).toEqual(["attribution_correction", "disposal", "stock_adjustment"]);
+    expect(decidableTypes("manager").sort()).toEqual(["attribution_correction", "disposal", "invoice_void", "stock_adjustment"]); // invoice void: T-072
     expect(decidableTypes("facility_head")).toEqual(["setting_change_fh", "catalog_clinical_review", "catalog_materials_review", "record_late_correction"]); // SET-48 drafts (T-017), catalog review (T-033), materials fallback (T-034), late record correction (T-053)
     expect(decidableTypes("pharmacist")).toEqual(["catalog_materials_review"]); // T-034 (DEC-047 (2))
     expect(decidableTypes("records_officer")).toEqual(["record_late_correction"]); // T-053 (PR-13)

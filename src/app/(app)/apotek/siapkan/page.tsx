@@ -21,7 +21,7 @@ const muted = "m-0 text-[0.88rem] text-[var(--label-2)] [overflow-wrap:anywhere]
 const date = (iso: string) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeZone: "Asia/Jakarta" }).format(new Date(iso));
 const time = (iso: string) => new Intl.DateTimeFormat("id-ID", { timeStyle: "short", timeZone: "Asia/Jakarta" }).format(new Date(iso));
 
-type Patient = { visit_id: string; name: string; mrn: string; checked_in_at: string; treatments: TreatmentPrep[]; products: DispensingRow[]; unsigned: number };
+type Patient = { visit_id: string; name: string; mrn: string | null; checked_in_at: string; treatments: TreatmentPrep[]; products: DispensingRow[]; unsigned: number };
 
 async function Body() {
   const d = await loadPrep();
@@ -30,7 +30,7 @@ async function Body() {
   if (d.kind === "no-branch") return <ListPage as="section" title="Siapkan" state={{ kind: "empty", message: "Pilih cabang aktif di Saya › Ganti Cabang." }} />;
   const l = d.list;
   const byVisit = new Map<string, Patient>();
-  const at = (p: { visit_id: string; name: string; mrn: string; checked_in_at: string }) => {
+  const at = (p: { visit_id: string; name: string; mrn: string | null; checked_in_at: string }) => {
     const x = byVisit.get(p.visit_id) ?? { ...p, treatments: [], products: [], unsigned: 0 };
     byVisit.set(p.visit_id, x);
     return x;
@@ -47,7 +47,7 @@ async function Body() {
           <li key={p.visit_id} className={card}>
             <h2 className="m-0 flex min-w-0 flex-wrap items-baseline gap-2 text-[1.25rem] font-semibold">
               <span className="[overflow-wrap:anywhere]">{p.name}</span>
-              <span className="text-[0.88rem] font-normal text-[var(--label-2)]">{`${p.mrn} · datang ${time(p.checked_in_at)}`}</span>
+              <span className="text-[0.88rem] font-normal text-[var(--label-2)]">{p.mrn ? `${p.mrn} · datang ${time(p.checked_in_at)}` : `Penjualan langsung · ${time(p.checked_in_at)}`}</span>
             </h2>
             {p.unsigned > 0 && <BlockedState reason={`${BLOCKER_LABEL.prescription_unsigned} (${p.unsigned} obat)`} unblock="Dokter menandatangani resep di Pemeriksaan" />}
             {p.treatments.map((t) => (

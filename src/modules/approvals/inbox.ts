@@ -26,6 +26,8 @@ export const APPROVAL_TYPES: Record<string, { label: string; approverRoles: read
   catalog_materials_review: { label: "Review bahan (BHP) katalog", approverRoles: ["pharmacist", "facility_head", "owner"] },
   // T-053 (PR-13): a correction of a signed record more than 48 h after signing; never the requesting doctor.
   record_late_correction: { label: "Koreksi rekam medis", approverRoles: ["records_officer", "facility_head"] },
+  // T-072 (PR-19, SET-43): a manager decides on the invoice's issue day (when SET-43 allows), afterwards the owner.
+  invoice_void: { label: "Void invoice", approverRoles: ["owner", "manager"] },
 };
 // Types the owner decides only while no facility head other than the requester could (DEC-031 D2,
 // DEC-046 (1)).
@@ -110,6 +112,7 @@ export async function listInbox(db: pg.ClientBase, role: Role, filter: { type?: 
     `${SELECT} where a.state = 'pending' and a.type = any($1::text[])
         and ($3::text <> 'owner' or a.type <> all($4::text[]) or approval_owner_decides_fh(a.id))
         and ($3::text not in ('owner','facility_head') or a.type <> 'catalog_materials_review' or not approval_ph_available(a.id))
+        and ($3::text <> 'manager' or a.type <> 'invoice_void' or approval_manager_decides_void(a.id))
       order by a.requested_at, a.id limit $2`,
     [types, limit + 1, role, OWNER_FALLBACK_TYPES],
   );
@@ -131,6 +134,8 @@ export async function inboxDetail(db: pg.ClientBase, actor: { staffId: string; r
     : actor.role === "owner" && OWNER_FALLBACK_TYPES.includes(r.type) && !(await db.query(`select approval_owner_decides_fh($1) as ok`, [id])).rows[0].ok ? "not-approver"
     // DEC-047 (2): a pharmacist decides the materials review while one other than the requester could.
     : (actor.role === "owner" || actor.role === "facility_head") && r.type === "catalog_materials_review" && (await db.query(`select approval_ph_available($1) as ok`, [id])).rows[0].ok ? "not-approver"
+    // SET-43 (T-072): a manager decides a void on the invoice's issue day only; afterwards it is the owner's.
+    : actor.role === "manager" && r.type === "invoice_void" && !(await db.query(`select approval_manager_decides_void($1) as ok`, [id])).rows[0].ok ? "not-approver"
     : null;
   return {
     ...row(r),

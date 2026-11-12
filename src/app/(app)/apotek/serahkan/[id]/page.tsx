@@ -33,8 +33,9 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
     <>
       <PageTitle title={d.patient.name} />
       <p className="m-0 flex min-w-0 flex-wrap items-center gap-2">
-        <span className="font-semibold">{d.patient.mrn}</span>
-        <span className={muted}>{`Lahir ${date(d.birth_date)}`}</span>
+        {d.patient.mrn && <span className="font-semibold">{d.patient.mrn}</span>}
+        {d.birth_date && <span className={muted}>{`Lahir ${date(d.birth_date)}`}</span>}
+        {d.source === "counter" && <span className={muted}>Penjualan langsung</span>}
         <StatusBadge tone={d.state === "handed" ? "success" : d.state === "cancelled" ? "locked" : "warning"}>{STATE_LABEL[d.state]}</StatusBadge>
       </p>
       {d.cautions.length > 0 && (
@@ -48,7 +49,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
         <h2 className="m-0 text-[1.25rem] font-semibold [overflow-wrap:anywhere]">{`${d.item.name} · ${Number(d.quantity)} ${d.item.unit}`}</h2>
         {d.external_use && <p className="m-0 font-semibold text-[var(--tint)]">Etiket biru — obat luar, tidak untuk diminum</p>}
         {d.prescription && <p className="m-0 [overflow-wrap:anywhere]">{d.prescription.signa}</p>}
-        <p className={muted}>{`Untuk ${d.patient.name} (${d.patient.mrn})`}</p>
+        <p className={muted}>{d.patient.mrn ? `Untuk ${d.patient.name} (${d.patient.mrn})` : `Untuk ${d.patient.name}`}</p>
         {batches.length > 0 && (
           <p className={muted}>{`${d.state === "handed" ? "Batch" : "Batch disarankan (FEFO)"}: ${batches.map((b) => `${b.batch_no}, kedaluwarsa ${date(b.expiry)} × ${Number(b.quantity)}`).join("; ")}`}</p>
         )}
@@ -77,7 +78,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
       )}
       {d.state === "cancelled" && <p className={muted}>{`Dibatalkan: ${d.cancel_reason}`}</p>}
       <div className="flex min-w-0 flex-wrap items-center gap-2 print:hidden">
-        <Link href={`/keluhan/baru?visit=${d.patient.visit_id}`} className="inline-flex min-h-[var(--target)] items-center px-1 font-semibold text-[var(--tint)]">Tandai Keluhan Klinis</Link>
+        {d.source !== "counter" && <Link href={`/keluhan/baru?visit=${d.patient.visit_id}`} className="inline-flex min-h-[var(--target)] items-center px-1 font-semibold text-[var(--tint)]">Tandai Keluhan Klinis</Link>}
         {open && <CancelForm ctx={r.ctx} dispensing={d.id} />}
       </div>
       <Link href={d.state === "queued" ? "/apotek/siapkan" : "/apotek/serahkan"} className="inline-flex min-h-[52px] items-center font-semibold text-[var(--tint)] print:hidden">Kembali</Link>

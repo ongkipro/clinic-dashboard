@@ -14,6 +14,7 @@
 import { sql } from "drizzle-orm";
 import { boolean, check, foreignKey, index, integer, jsonb, numeric, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { catalogItems, catalogVersions } from "../catalog/schema";
+import { invoiceLines } from "../cashier/schema";
 import { planItems } from "../clinical/schema";
 import { depots, stockBatches, stockItems } from "../inventory/schema";
 import { materialRequests } from "../inventory/schema";
@@ -209,10 +210,12 @@ export const dispensings = pgTable(
     id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
     tenantId: uuid("tenant_id").notNull(),
     branchId: uuid("branch_id").notNull(),
-    visitId: uuid("visit_id").notNull(),
-    patientId: uuid("patient_id").notNull(),
+    // A counter sale (T-072, PR-19) has no visit: the invoice line names it; the patient is optional.
+    visitId: uuid("visit_id"),
+    patientId: uuid("patient_id"),
     selectionItemId: uuid("selection_item_id"),
     prescriptionItemId: uuid("prescription_item_id"),
+    invoiceLineId: uuid("invoice_line_id"),
     stockItemId: uuid("stock_item_id").notNull(),
     quantity: numeric("quantity").notNull(),
     externalUse: boolean("external_use").notNull().default(false),
@@ -248,11 +251,14 @@ export const dispensings = pgTable(
     unique("dispensings_scope_key").on(t.tenantId, t.branchId, t.id),
     unique("dispensings_selection_item_key").on(t.tenantId, t.selectionItemId),
     unique("dispensings_prescription_item_key").on(t.tenantId, t.prescriptionItemId),
+    unique("dispensings_invoice_line_key").on(t.tenantId, t.invoiceLineId),
+    foreignKey({ name: "dispensings_invoice_line_fk", columns: [t.tenantId, t.invoiceLineId], foreignColumns: [invoiceLines.tenantId, invoiceLines.id] }).onDelete("restrict"),
     unique("dispensings_prepare_key").on(t.tenantId, t.prepareKey),
     unique("dispensings_hand_key").on(t.tenantId, t.handKey),
     index("dispensings_queue_idx").on(t.tenantId, t.branchId, t.state, t.queuedAt),
     check("dispensings_check", sql`${t.state} in (${inList(DISPENSING_STATES)}) and ${qty(t.quantity)}
-      and num_nonnulls(${t.selectionItemId}, ${t.prescriptionItemId}) = 1
+      and num_nonnulls(${t.selectionItemId}, ${t.prescriptionItemId}, ${t.invoiceLineId}) = 1
+      and ((${t.invoiceLineId} is null) = (${t.visitId} is not null)) and (${t.visitId} is null or ${t.patientId} is not null)
       and num_nonnulls(${t.preparedAt}, ${t.preparedBy}, ${t.prepareKey}, ${t.depotId}) in (0, 4)
       and num_nonnulls(${t.handedAt}, ${t.handedBy}, ${t.handKey}, ${t.checks}) in (0, 4)
       and num_nonnulls(${t.cancelledAt}, ${t.cancelledBy}, ${t.cancelReason}) in (0, 3)

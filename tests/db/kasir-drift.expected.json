@@ -1,0 +1,30 @@
+{
+  "before": {
+    "dispense_cancel(uuid,text)": "695ad67e54f1ffb0b588a4145e3244918211910184e9dbbc52a0654a2f46a686",
+    "dispense_hand_over(text,uuid,jsonb)": "eea06bce346bb400ac0843791074b22bf112b37b80d2fb854550f66986c871df",
+    "dispensing_blocker(dispensings)": "096435a18c233e7a161221475461fd4a6ceae445b4af1837fc880b409723d84e",
+    "dispensing_locked(uuid,uuid,uuid)": "a196945dc254f736c249c2c306fecc3614bac234a87ae86ddef7e574f04002b3",
+    "dispensings_guard()": "331b3d52a325cd4738dedf5c6bbceeb44d9f9c871a468009475d2966b11d2c1b",
+    "invoice_issue(text,uuid,jsonb)": "0504cb95bb375bc0009ca9470cff0e0d9cb53f7ad98f98076af80deab8356fc8",
+    "invoice_open(text,uuid,jsonb)": "8184a4cbf5087cc350b4b0b80c33d6f7cd32d870aebc51f551a0152f02cc531f",
+    "invoices_guard()": "f635a9a6ca79d05253138e6610ba771416492b5cc334051b4b059142dce0578e",
+    "pharmacy_dispensing_row(dispensings)": "189defae81f68d5cab179c0954f5eaa7eeeb1cac8029ef50ffab918a8243b503",
+    "pharmacy_handover_list()": "f0a35ad127f77ee5a637071a8c301824071e84a0124d89691a6a97a364ac6f99",
+    "pharmacy_prep_list()": "e521a921282114d0d9c756dd9c375280f857b30968a5b3cba5ddbfff8cde81d4",
+    "pharmacy_recall_trace(uuid)": "4f4b07f5a3dac5f3e1cc4c7207c704009347814902632d2ccda5daef9b0a74ac"
+  },
+  "after": {
+    "dispense_cancel(uuid,text)": "da0532dacb2c92ee61d57d4aadc19117c37054f5e4e9028a692d5f8c73a3218b",
+    "dispense_hand_over(text,uuid,jsonb)": "d758e0a1bee594e695622eed08f6538ddb9fbfc771c014216db17ef0448b6c07",
+    "dispensing_blocker(dispensings)": "36c9f9395bb6c6b110a7fb6c69a10a79fd2fd03b100f60a85fa95666ccc8f0af",
+    "dispensing_locked(uuid,uuid,uuid)": "8a2a11386b88fded5147f6b0dbf732a54b5cd3cf6ba7b884d6cb03b1780d15db",
+    "dispensings_guard()": "12d1532dbaac6f2658547d408b390af350fec3c6f693528010587977098a8475",
+    "invoice_issue(text,uuid,jsonb)": "1b39c99a82055d84675c891de4bc6c408750c9012b3bc2d15547299847ef7f90",
+    "invoice_open(text,uuid,jsonb)": "89a1f8d8b89e56cad996ed10f12b2c6e967b8916c7fce3c58dc21647132205f9",
+    "invoices_guard()": "e7d7de4fa0567fe88f0d0f501f34296c121c45af80ba69f34568930a9b4efac1",
+    "pharmacy_dispensing_row(dispensings)": "fffee1d0d47e0a720a2bea5d1ca194dabe25329110a47811fad11e6b19d4d239",
+    "pharmacy_handover_list()": "bc1e23f67cc8270e9f1c501831aaed5a1412cc17079cc92478056477c37052c1",
+    "pharmacy_prep_list()": "03f43de99f23cc08677101618416b70f1f1705331305d914e218aa13bb24a260",
+    "pharmacy_recall_trace(uuid)": "48db3d11278718d6faf362f0335ab17328b7aff7dae8e18164b059b9dee99f55"
+  }
+}

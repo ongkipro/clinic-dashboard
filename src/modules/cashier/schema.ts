@@ -4,12 +4,19 @@
 // - invoices (tenant-ledger, personal): one per sale at a branch; draft → issued → void (void is T-072). The tax state
 //   at issue (`is_pkp_at_issue`) is recorded once. A visit's invoice is that visit's patient's; a merged patient is
 //   refused (DEC-061).
+// - T-072 (Kasir, PR-19, DATA-27, DATA-28; migration 0087): `invoices.number` (INV-<branch code>-YYYYMM-NNNN, set at
+//   issue), `void_approval_id` and `voided_at`; receipts (one per Terima, KW-<branch code>-YYYYMM-NNNN, immutable,
+//   the rendered body from the tenant's receipt template), payments (one per tender of a Terima, append-only) and
+//   payment_allocations (proportional, largest remainder, target an invoice line; append-only). Method, provider,
+//   provider account, environment and is_simulated are copied onto every allocation (DATA-28).
 // - invoice_lines (tenant-ledger, personal): the frozen VAT-inclusive unit price (the branch price at issue), the
 //   quantity and discount, the line total, the tax category and basis snapshot, and the VAT split of the line total
 //   after discount (BILL-6, BILL-28): vat_base + vat_amount = line_total. `vat_recognised_*` and the tax-document
 //   reference are filled by the tax point (payment or delivery; T-072 onwards).
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, foreignKey, index, integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, foreignKey, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { approvals } from "../approvals/schema";
+import { documentTemplateVersions } from "../documents/schema";
 import { catalogItems, catalogVersions, TAX_CATEGORIES } from "../catalog/schema";
 import { branches, staff, tenants } from "../org/schema";
 import { patients } from "../patients/schema";
@@ -29,12 +36,16 @@ export const invoices = pgTable(
     soldBranchId: uuid("sold_branch_id").notNull(),
     patientId: uuid("patient_id"),
     visitId: uuid("visit_id"),
+    // A Jual Cepat sale (T-072): no visit, products only, each handed over by the pharmacist.
+    counter: boolean("counter").notNull().default(false),
     number: text("number"),
     state: text("state", { enum: PATIENT_INVOICE_STATES }).notNull().default("draft"),
     isPkpAtIssue: boolean("is_pkp_at_issue"),
     issuedAt: timestamp("issued_at", { withTimezone: true }),
     issuedBy: uuid("issued_by"),
     issuedAs: text("issued_as"),
+    voidApprovalId: uuid("void_approval_id"),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
     commandKey: text("command_key").notNull(),
     createdBy: uuid("created_by").notNull(),
     createdAs: text("created_as").notNull(),
@@ -50,13 +61,16 @@ export const invoices = pgTable(
     unique("invoices_tenant_id_id_key").on(t.tenantId, t.id),
     unique("invoices_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
     unique("invoices_command_key").on(t.tenantId, t.commandKey),
+    unique("invoices_number_key").on(t.tenantId, t.number),
+    foreignKey({ name: "invoices_void_approval_fk", columns: [t.tenantId, t.voidApprovalId], foreignColumns: [approvals.tenantId, approvals.id] }).onDelete("restrict"),
     index("invoices_branch_idx").on(t.tenantId, t.branchId, t.state, t.issuedAt),
     check("invoices_check", sql`${t.state} in (${inList(PATIENT_INVOICE_STATES)}) and ${KEY(t.commandKey)}
       and ${t.soldBranchId} = ${t.branchId}
-      and (${t.visitId} is null or ${t.patientId} is not null)
+      and (${t.visitId} is null or ${t.patientId} is not null) and (not ${t.counter} or ${t.visitId} is null)
       and ((${t.state} = 'draft') = (${t.issuedAt} is null))
       and num_nonnulls(${t.issuedAt}, ${t.issuedBy}, ${t.issuedAs}, ${t.isPkpAtIssue}) in (0, 4)
-      and (${t.number} is null or length(${t.number}) between 1 and 40)`),
+      and (${t.number} is null or length(${t.number}) between 1 and 40)
+      and ((${t.state} = 'void') = (${t.voidedAt} is not null)) and (${t.voidedAt} is null or ${t.voidApprovalId} is not null)`),
   ],
 );
 
@@ -102,3 +116,115 @@ export const invoiceLines = pgTable(
       and (${t.taxDocumentRef} is null or length(${t.taxDocumentRef}) between 1 and 80)`),
   ],
 );
+
+// T-072. A Terima: one receipt, its 1–6 tenders (payments, seq), their allocations to invoice lines.
+export const PATIENT_PAYMENT_METHODS = ["cash", "edc", "transfer", "qris", "va", "payment_link", "balance"] as const;
+export const PAYMENT_ENVIRONMENTS = ["production", "staging", "demo", "local"] as const;
+
+export const receipts = pgTable(
+  "receipts",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    invoiceId: uuid("invoice_id").notNull(),
+    number: text("number").notNull(),
+    total: bigint("total", { mode: "number" }).notNull(),
+    body: text("body").notNull(),
+    paper: text("paper").notNull(),
+    templateVersionId: uuid("template_version_id"),
+    isSimulated: boolean("is_simulated").notNull().default(false),
+    commandKey: text("command_key").notNull(),
+    issuedBy: uuid("issued_by").notNull(),
+    issuedAs: text("issued_as").notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "receipts_invoice_fk", columns: [t.tenantId, t.branchId, t.invoiceId], foreignColumns: [invoices.tenantId, invoices.branchId, invoices.id] }).onDelete("restrict"),
+    foreignKey({ name: "receipts_template_fk", columns: [t.tenantId, t.templateVersionId], foreignColumns: [documentTemplateVersions.tenantId, documentTemplateVersions.id] }).onDelete("restrict"),
+    foreignKey({ name: "receipts_issued_by_fk", columns: [t.tenantId, t.issuedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("receipts_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("receipts_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
+    unique("receipts_number_key").on(t.tenantId, t.number),
+    unique("receipts_command_key").on(t.tenantId, t.commandKey),
+    index("receipts_invoice_idx").on(t.tenantId, t.invoiceId),
+    check("receipts_check", sql`${KEY(t.commandKey)} and length(${t.number}) between 1 and 40 and ${t.total} between 1 and ${sql.raw(MONEY)}
+      and length(${t.body}) between 10 and 40000 and ${t.paper} in ('a4','80mm','58mm') and ${t.issuedAs} in ('owner','manager','fo_cashier','finance')`),
+  ],
+);
+
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    receiptId: uuid("receipt_id").notNull(),
+    seq: smallint("seq").notNull(),
+    invoiceId: uuid("invoice_id").notNull(),
+    patientId: uuid("patient_id"),
+    method: text("method", { enum: PATIENT_PAYMENT_METHODS }).notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    cashTendered: bigint("cash_tendered", { mode: "number" }),
+    changeGiven: bigint("change_given", { mode: "number" }),
+    details: jsonb("details"),
+    provider: text("provider"),
+    providerAccount: text("provider_account"),
+    environment: text("environment", { enum: PAYMENT_ENVIRONMENTS }).notNull(),
+    isSimulated: boolean("is_simulated").notNull().default(false),
+    receivedBy: uuid("received_by").notNull(),
+    receivedAs: text("received_as").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "payments_receipt_fk", columns: [t.tenantId, t.branchId, t.receiptId], foreignColumns: [receipts.tenantId, receipts.branchId, receipts.id] }).onDelete("restrict"),
+    foreignKey({ name: "payments_invoice_fk", columns: [t.tenantId, t.branchId, t.invoiceId], foreignColumns: [invoices.tenantId, invoices.branchId, invoices.id] }).onDelete("restrict"),
+    foreignKey({ name: "payments_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "payments_received_by_fk", columns: [t.tenantId, t.receivedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("payments_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("payments_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
+    unique("payments_receipt_seq_key").on(t.tenantId, t.receiptId, t.seq),
+    index("payments_invoice_idx").on(t.tenantId, t.invoiceId),
+    check("payments_check", sql`${t.seq} between 1 and 6 and ${t.method} in (${inList(PATIENT_PAYMENT_METHODS)}) and ${t.environment} in (${inList(PAYMENT_ENVIRONMENTS)})
+      and ${t.amount} between 1 and ${sql.raw(MONEY)}
+      and ((${t.method} = 'cash') = (${t.cashTendered} is not null)) and num_nonnulls(${t.cashTendered}, ${t.changeGiven}) in (0, 2)
+      and (${t.cashTendered} is null or ${t.cashTendered} between ${t.amount} and ${sql.raw(MONEY)} and ${t.changeGiven} = ${t.cashTendered} - ${t.amount})
+      and (${t.details} is null or jsonb_typeof(${t.details}) = 'object')
+      and (${t.provider} is null or length(${t.provider}) between 1 and 40) and (${t.providerAccount} is null or length(${t.providerAccount}) between 1 and 80)
+      and ${t.receivedAs} in ('owner','manager','fo_cashier','finance')`),
+  ],
+);
+
+export const paymentAllocations = pgTable(
+  "payment_allocations",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    paymentId: uuid("payment_id").notNull(),
+    invoiceLineId: uuid("invoice_line_id"),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    vatPortion: bigint("vat_portion", { mode: "number" }).notNull().default(0),
+    method: text("method", { enum: PATIENT_PAYMENT_METHODS }).notNull(),
+    provider: text("provider"),
+    providerAccount: text("provider_account"),
+    environment: text("environment", { enum: PAYMENT_ENVIRONMENTS }).notNull(),
+    isSimulated: boolean("is_simulated").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "payment_allocations_payment_fk", columns: [t.tenantId, t.branchId, t.paymentId], foreignColumns: [payments.tenantId, payments.branchId, payments.id] }).onDelete("restrict"),
+    foreignKey({ name: "payment_allocations_line_fk", columns: [t.tenantId, t.invoiceLineId], foreignColumns: [invoiceLines.tenantId, invoiceLines.id] }).onDelete("restrict"),
+    unique("payment_allocations_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("payment_allocations_payment_line_key").on(t.tenantId, t.paymentId, t.invoiceLineId),
+    index("payment_allocations_line_idx").on(t.tenantId, t.invoiceLineId),
+    // Exactly one target (DATA-28): the invoice line now; package, booking deposit, balance top-up and receivable
+    // targets arrive with their tasks (T-076, T-077, T-075, T-078) and join this count.
+    check("payment_allocations_check", sql`num_nonnulls(${t.invoiceLineId}) = 1 and ${t.amount} between 1 and ${sql.raw(MONEY)}
+      and ${t.vatPortion} between 0 and ${t.amount} and ${t.method} in (${inList(PATIENT_PAYMENT_METHODS)}) and ${t.environment} in (${inList(PAYMENT_ENVIRONMENTS)})`),
+  ],
+);
+

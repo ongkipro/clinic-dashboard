@@ -610,6 +610,13 @@
       "when": 1794495948889,
       "tag": "0086_tax_invoice",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1794506866241,
+      "tag": "0087_kasir",
+      "breakpoints": true
     }
   ]
 }

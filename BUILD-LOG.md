@@ -438,3 +438,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Validate cheap inputs (quantity) before the lookups that can fail with not-found. Otherwise a bad quantity on an unknown item reports the wrong refusal.
 - Half-up rounding in integers: (P × 100 + 55) ÷ 111. It needs a test value whose remainder is at least 56 (100,001) to tell it apart from truncation; the fixture's multiples of 111 cannot.
 
+## 2026-11-13 — T-072 Kasir
+
+- `events_payload_ok` (0018) refuses JSON null. A payload built from optional ids needs `jsonb_strip_nulls`.
+- A foreign key that references a table makes `TRUNCATE` fail (0A000) before the no-truncate trigger runs. A test that asserts 42501 for a TRUNCATE must accept either code.
+- After a server action, the page revalidates and can unmount the form that showed the success message. Keep the form mounted while its result panel is needed, or have the browser spec wait for the new view.
+- A list row and the filter chip of the same type are both links. Select the row by its list name and content, not by link text.
+

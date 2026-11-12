@@ -543,6 +543,15 @@ describe("functions (TEN-16)", () => {
     "supplier_get(uuid)",
     "supplier_return_list(uuid)",
     "supplier_batches(uuid,uuid)",
+    // T-072 (PR-19): the Kasir writers and readers, and the inbox's SET-43 void rule.
+    "payment_receive(text,uuid,jsonb)",
+    "invoice_void_request(uuid,text)",
+    "kasir_queue(uuid)",
+    "kasir_invoice_get(uuid)",
+    "kasir_visit_lines(uuid)",
+    "kasir_counter_items(uuid,text)",
+    "receipt_get(uuid)",
+    "approval_manager_decides_void(uuid)",
     // T-071 (PR-24): tax profile and the invoice foundation.
     "tax_profile_set(text,jsonb)",
     "tax_profile_get()",

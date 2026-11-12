@@ -49,6 +49,7 @@ const stok = await import("../../src/app/(app)/stok/actions"); // T-060
 const pembelian = await import("../../src/app/(app)/pembelian/actions"); // T-067
 const logbook = await import("../../src/app/(app)/logbook/actions"); // T-068
 const insiden = await import("../../src/app/(app)/keluhan/insiden/actions"); // T-068
+const kasir = await import("../../src/app/(app)/kasir/actions"); // T-072
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -165,6 +166,9 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["logbook scheduleAction", (f) => logbook.scheduleAction({}, f), () => ({ key: U(232), branch: U(231), device: U(233), kind: "calibration", interval_days: "180", next_due_on: "2026-12-01" })],
   ["insiden reportAction", (f) => insiden.reportAction({}, f), () => ({ key: U(234), branch: U(231), classification: "knc", occurred_at: "2026-11-12T09:00", tz_offset: "-420", summary: "Uji konteks", immediate_response: "Uji konteks" })],
   ["insiden stepAction", (f) => insiden.stepAction({}, f), () => ({ key: U(235), incident: U(236), step: "take" })],
+  ["kasir issueAction", (f) => kasir.issueAction({}, f), () => ({ key: U(301), "item:0": U(302), "qty:0": "1" })],
+  ["kasir receiveAction", (f) => kasir.receiveAction({}, f), () => ({ key: U(303), invoice: U(304), "m:0": "cash", "a:0": "1000", "t:0": "1000" })],
+  ["kasir voidAction", (f) => kasir.voidAction({}, f), () => ({ key: U(305), invoice: U(304), reason: "Salah item" })],
   ["stok receiveAction", (f) => stok.receiveAction({}, f), () => ({ key: U(151), item: U(152), batch_no: "B-1", expiry: "2030-01-01", quantity: "1", reason: "penerimaan" })],
   ["stok holdAction", (f) => stok.holdAction({}, f), () => ({ key: U(153), batch: U(154), state: "quarantined", reason: "Uji konteks" })],
   ["stok openVialAction", (f) => stok.openVialAction({}, f), () => ({ key: U(155), batch: U(154) })],

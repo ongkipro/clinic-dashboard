@@ -355,7 +355,9 @@ describe("authority, tenants, guards", () => {
                       select tenant_id, branch_id, invoice_id, item_id, catalog_version_id, 1, 1, 1, tax_category, tax_basis, 1, 0 from invoice_lines where invoice_id = $1 limit 1`, [inv])).toBe("raw:42501");
     const draft = (await as(FO, (db) => openInvoice(db, key(), null))).invoiceId;
     expect(await raw(`update invoices set state = 'issued', issued_at = now(), issued_by = created_by, issued_as = 'owner', is_pkp_at_issue = false where id = $1`, [draft])).toBe("raw:42501"); // no line
-    expect(await raw(`truncate invoice_lines`, [])).toBe("raw:42501");
+    // Refused either way: by the no-truncate trigger, or first by the foreign keys that reference the lines (the Kasir's
+    // allocations and counter dispensings, T-072).
+    expect(await raw(`truncate invoice_lines`, [])).toMatch(/^raw:(42501|0A000)$/);
     // RLS: the cashier roles read invoices through T-072's readers; here owner, finance and auditor only.
     expect((await as(FO, (db) => db.query(`select id from invoices`))).rows).toEqual([]);
     expect((await as(FIN, (db) => db.query(`select id from invoices where id = $1`, [inv]))).rows).toHaveLength(1);

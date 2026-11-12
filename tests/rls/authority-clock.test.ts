@@ -319,6 +319,14 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["invoice_open", async () => ["select invoice_open('k-0000000029', null, '{}'::jsonb)", []], ["manager"]],
     ["invoice_issue", async () => ["select invoice_issue('k-0000000030', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["invoice_get", async () => ["select invoice_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-072 (PR-19): the Kasir writers and readers take the actor lock first (Level 3 roles).
+    ["payment_receive", async () => ["select payment_receive('k-0000000031', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["invoice_void_request", async () => ["select invoice_void_request($1, 'Salah')", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["kasir_queue", async () => ["select kasir_queue(null)", []], ["manager"]],
+    ["kasir_invoice_get", async () => ["select kasir_invoice_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["kasir_visit_lines", async () => ["select kasir_visit_lines($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["kasir_counter_items", async () => ["select kasir_counter_items(null, null)", []], ["manager"]],
+    ["receipt_get", async () => ["select receipt_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-068 (PR-82): safety writers and readers take the actor lock first (Level 3 roles).
     ["device_schedule_set", async () => ["select device_schedule_set(null, '{}'::jsonb)", []], ["manager"]],
     ["logbook_record", async () => ["select logbook_record('k-0000000026', null, '{}'::jsonb)", []], ["manager"]],

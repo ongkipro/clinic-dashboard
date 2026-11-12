@@ -361,7 +361,7 @@ describe("dispensing (CLIN-017, CLIN-018, CD-19)", () => {
     // a recalled batch: never dispensable; the recall trace lists who received it
     const tr = await as(PH, (db) => recallTrace(db, SERUM_B));
     expect(tr.dispensed.map((x) => [x.dispensing_id, num(x.quantity)])).toContainEqual([d.id, 40]); // every handed dispensing of the batch
-    expect(tr.dispensed.every((x) => x.patient.mrn.startsWith("RM-"))).toBe(true);
+    expect(tr.dispensed.every((x) => x.patient.mrn?.startsWith("RM-"))).toBe(true);
     expect(tr.holds).toHaveLength(2);
     expect(await code(as(MGR, (db) => recallTrace(db, SERUM_B)))).toBe("ok");
     expect(await code(as(PHB2, (db) => recallTrace(db, SERUM_B)))).toBe("ERR_NOT_FOUND");

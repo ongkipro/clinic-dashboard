@@ -30,7 +30,7 @@ async function Body() {
             <RowList label="Siap diserahkan">
               {l.prepared.map((x) => (
                 <Row key={x.id} href={`/apotek/serahkan/${x.id}`} title={x.patient.name}
-                  subtitle={`${x.item.name} · ${Number(x.quantity)} ${x.item.unit} · ${x.patient.mrn}`}
+                  subtitle={`${x.item.name} · ${Number(x.quantity)} ${x.item.unit} · ${x.patient.mrn ?? "Penjualan langsung"}`}
 >
                   {/* the status under the title: a trailing badge squeezes the title at 390 px and 200 % text */}
                   {x.blocker ? <StatusBadge tone="blocked">{BLOCKER_LABEL[x.blocker]}</StatusBadge> : <StatusBadge tone="warning">{STATE_LABEL.prepared}</StatusBadge>}

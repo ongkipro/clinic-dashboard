@@ -131,11 +131,13 @@ export async function signPrescription(db: pg.ClientBase, key: string, prescript
 // ── Readers ─────────────────────────────────────────────────────────────────────────────────────────────
 export type Blocker = "prescription_unsigned" | "prescription_expired" | "payment_unpaid" | "special_item" | "stock_unavailable"
   | "no_recipe" | "recipe_unmapped" | "room_depot_missing";
-export type PatientRef = { visit_id: string; patient_id: string; name: string; mrn: string; checked_in_at: string; payment: string };
+// A counter sale (T-072) has no visit: `visit_id` is then the invoice line (the grouping key), the patient may be
+// unnamed ("Penjualan langsung", no MRN) and `checked_in_at` is the queue time.
+export type PatientRef = { visit_id: string; patient_id: string | null; name: string; mrn: string | null; checked_in_at: string; payment: string };
 export type ItemRef = { stock_item_id: string; name: string; code: string; unit: string };
 export type BatchPick = { batch_id: string; batch_no: string; expiry: string; quantity: number };
 export type DispensingRow = {
-  id: string; state: DispensingState; source: "prescription" | "selection"; patient: PatientRef; item: ItemRef; quantity: number; external_use: boolean;
+  id: string; state: DispensingState; source: "prescription" | "selection" | "counter"; patient: PatientRef; item: ItemRef; quantity: number; external_use: boolean;
   queued_at: string; prepared_at: string | null; handed_at: string | null; depot: { id: string; name: string; kind: string } | null;
   suggestion: BatchPick[] | null; blocker: Blocker | null; label: { kind: LabelKind; print_count: number; last_printed_at: string } | null;
 };
@@ -152,7 +154,7 @@ export type PrepList = {
 };
 export type HandoverList = { now: string; branch_name: string; prepared: DispensingRow[]; handed_today: DispensingRow[] };
 export type DispensingDetail = DispensingRow & {
-  birth_date: string; cautions: { fact_id: string; value: string; provenance: string }[];
+  birth_date: string | null; cautions: { fact_id: string; value: string; provenance: string }[];
   prescription: { id: string; state: PrescriptionState; is_acute: boolean; signed_at: string | null; valid_until: string | null; prescriber: string; signa: string; kfa_code: string | null } | null;
   checks: Record<Check, boolean> | null; exception_note: string | null; cancel_reason: string | null; handed_by: string | null; batches: BatchPick[];
 };
