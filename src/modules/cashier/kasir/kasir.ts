@@ -6,7 +6,7 @@
 import type pg from "pg";
 import { CommandError, runCommand, type ErrorCode, type Json } from "../../../lib/command";
 import type { TaxCategory } from "../../tax/policy";
-import { assertProductionGoLive } from "../../vendor/profile/profile";
+import { assertProductionGoLive, deployEnv } from "../../vendor/profile/profile";
 
 export class KasirError extends CommandError {
   constructor(code: ErrorCode, readonly reason?: string) {
@@ -57,7 +57,7 @@ export async function issueKasirInvoice(db: pg.ClientBase, key: string, invoiceI
   return { ...out.result, replayed: out.replayed };
 }
 
-export const TENDER_METHODS = ["cash", "edc", "transfer", "qris", "payment_link", "balance"] as const;
+export const TENDER_METHODS = ["cash", "edc", "transfer", "qris", "va", "payment_link", "balance"] as const;
 export type TenderMethod = (typeof TENDER_METHODS)[number];
 export type Tender = {
   method: TenderMethod;
@@ -104,15 +104,25 @@ export type KasirLineRow = {
   vat_amount: number; vat_recognised: number; paid: number; dispensing: { id: string; state: string } | null;
 };
 export type TenderOption = { method: TenderMethod; available: boolean; blocked: "payment_port" | "balance" | "method_disabled" | null };
+export type PortCharge = {
+  id: string; channel: "qris" | "va" | "payment_link"; amount: number; state: "pending" | "paid" | "expired" | "failed" | "cancelled"; order_ref: string; expires_at: string;
+  is_simulated: boolean; review_flag: string | null; balance_pending: number; receipt_id: string | null;
+};
 export type KasirInvoice = InvoiceRow & {
   branch: { id: string; name: string }; is_pkp_at_issue: boolean | null; voided_at: string | null; role: string; can_pay: boolean;
   lines: KasirLineRow[];
-  receipts: { id: string; number: string; total: number; issued_at: string; payments: { seq: number; method: TenderMethod; amount: number; change: number | null }[] }[];
+  receipts: { id: string; number: string; total: number; issued_at: string; is_simulated: boolean; payments: { seq: number; method: TenderMethod; amount: number; change: number | null }[] }[];
   tenders: TenderOption[];
+  port: { provider: string; simulated: boolean } | null;
+  charges: PortCharge[];
   void: { approval_id: string; state: "pending" | "approved" | "rejected" | "cancelled"; requested_at: string; reason: string | null } | null;
 };
+// The tenders depend on the deployment (T-073: the mock port is never offered in production, BILL-29).
 export const kasirInvoice = (db: pg.ClientBase, invoiceId: string) =>
-  call(async () => (await db.query(`select kasir_invoice_get($1) as r`, [invoiceId])).rows[0].r as KasirInvoice);
+  call(async () => {
+    await db.query(`select set_config('app.deploy_env', $1, true)`, [deployEnv()]);
+    return (await db.query(`select kasir_invoice_get($1) as r`, [invoiceId])).rows[0].r as KasirInvoice;
+  });
 
 export type VisitLines = {
   visit_id: string; branch_id: string; closed: boolean; patient: PatientRef;
@@ -126,7 +136,7 @@ export const kasirCounterItems = (db: pg.ClientBase, branchId: string | null, qu
   call(async () => (await db.query(`select kasir_counter_items($1, $2) as r`, [branchId, query])).rows[0].r as CounterItem[]);
 
 export type Receipt = {
-  id: string; number: string; invoice_id: string; total: number; paper: "a4" | "80mm" | "58mm"; body: string; issued_at: string;
+  id: string; number: string; invoice_id: string; total: number; paper: "a4" | "80mm" | "58mm"; body: string; issued_at: string; is_simulated: boolean;
   payments: { seq: number; method: TenderMethod; amount: number; change: number | null }[];
 };
 export const getReceipt = (db: pg.ClientBase, receiptId: string) =>

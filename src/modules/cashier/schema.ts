@@ -173,6 +173,10 @@ export const payments = pgTable(
     providerAccount: text("provider_account"),
     environment: text("environment", { enum: PAYMENT_ENVIRONMENTS }).notNull(),
     isSimulated: boolean("is_simulated").notNull().default(false),
+    // T-073 (DATA-51 chain charge → webhook event → payment): a port payment names its charge and the event that
+    // settled it (a status poll has no event). Composite FKs are added in migration 0088 (the tables are later).
+    chargeId: uuid("charge_id"),
+    webhookEventId: uuid("webhook_event_id"),
     receivedBy: uuid("received_by").notNull(),
     receivedAs: text("received_as").notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),

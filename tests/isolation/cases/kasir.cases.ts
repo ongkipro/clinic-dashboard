@@ -9,12 +9,15 @@ import {
   getReceipt, issueKasirInvoice, kasirCounterItems, kasirInvoice, kasirQueue, kasirVisitLines, openKasirInvoice, receivePayment, requestVoid,
 } from "../../../src/modules/cashier/kasir/kasir";
 import { saveItem } from "../../../src/modules/inventory/stock";
+import { setKekRingForTests } from "../../../src/lib/keys/runtime";
+import { cancelCharge, createCharge, enableMockPort, pollCharge } from "../../../src/modules/payments/payments";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { defineCases, type IsolationEnv } from "../case";
 
 process.env.DEPLOY_ENV = "local";
+setKekRingForTests({ current: 1, keys: new Map([[1, Buffer.alloc(32, 5)]]) });
 
-type CaseRole = "fo_cashier" | "owner" | "pharmacist";
+type CaseRole = "fo_cashier" | "owner" | "pharmacist" | "manager";
 const accOf = new Map<string, string>();
 async function member(env: IsolationEnv, tenantId: string, branchId: string, role: CaseRole): Promise<string> {
   const k = `${tenantId}:${role}`;
@@ -41,7 +44,7 @@ async function as<T>(env: IsolationEnv, tenantId: string, branchId: string, role
 const asMine = <T>(env: IsolationEnv, role: CaseRole, fn: (db: never) => Promise<T>) => as(env, env.actor.tenantId, env.actor.branchId, role, fn);
 
 let runs = 0;
-type Seed = { name: string; invoice: string; number: string; receipt: string; receiptNumber: string; unpaid: string; visit: string; patient: string; item: string };
+type Seed = { name: string; invoice: string; number: string; receipt: string; receiptNumber: string; unpaid: string; visit: string; patient: string; item: string; charge: string };
 const latest = new Map<string, Seed>();
 const items = new Map<string, string>();
 async function victim(env: IsolationEnv): Promise<Seed> {
@@ -70,11 +73,14 @@ async function victim(env: IsolationEnv): Promise<Seed> {
   // an unpaid tagihan of B (a void request is only for unpaid ones)
   const { invoiceId: unpaid } = await as(env, t, b, "fo_cashier", (db) => openKasirInvoice(db, k(), { counter: true, patientId: patient }));
   await as(env, t, b, "fo_cashier", (db) => issueKasirInvoice(db, k(), unpaid, [{ itemId: item!, quantity: 1 }]));
+  // T-073: a mock port for both tenants and a pending QRIS charge on B's paid-in-part tagihan.
+  for (const [tt, bb] of [[t, b], [env.actor.tenantId, env.actor.branchId]]) await as(env, tt, bb, "manager", (db) => enableMockPort(db));
+  const { charge_id: charge } = await as(env, t, b, "fo_cashier", (db) => createCharge(db, k(), invoice, { channel: "qris" }));
   const fo = (await env.owner.query(`select s.id from staff s join staff_roles r on r.staff_id = s.id where s.tenant_id = $1 and r.role = 'fo_cashier' limit 1`, [t])).rows[0].id;
   const visit = (await env.owner.query(`insert into visits (tenant_id, branch_id, patient_id, kind, checked_in_by, selection) values ($1, $2, $3, 'walk_in', $4, 'done') returning id`,
     [t, b, patient, fo])).rows[0].id as string;
-  for (const x of [name, invoice, issued.number, paid.receipt_id, paid.number, unpaid, visit, patient]) env.victimSecret(x);
-  const r = { name, invoice, number: issued.number, receipt: paid.receipt_id, receiptNumber: paid.number, unpaid, visit, patient, item: item! };
+  for (const x of [name, invoice, issued.number, paid.receipt_id, paid.number, unpaid, visit, patient, charge]) env.victimSecret(x);
+  const r = { name, invoice, number: issued.number, receipt: paid.receipt_id, receiptNumber: paid.number, unpaid, visit, patient, item: item!, charge };
   latest.set(t, r);
   return r;
 }
@@ -114,6 +120,11 @@ export default defineCases(
         })),
         pay: await outcome(asMine(env, "fo_cashier", (db) => receivePayment(db as never, k(), v.invoice, [{ method: "cash", amount: 1, cashTendered: 1 }]))),
         payOwner: await outcome(asMine(env, "owner", (db) => receivePayment(db as never, k(), v.invoice, [{ method: "edc", amount: 1 }]))),
+        // T-073: the port actions on B's tagihan and B's pending charge (both tenants have the mock port); before the
+        // void request, which would leave the unpaid tagihan waiting for a decision.
+        portCharge: await outcome(asMine(env, "fo_cashier", (db) => createCharge(db as never, k(), v.unpaid, { channel: "qris" }))),
+        portPoll: await outcome(asMine(env, "fo_cashier", (db) => pollCharge(db as never, v.charge).then(() => undefined))),
+        portCancel: await outcome(asMine(env, "fo_cashier", (db) => cancelCharge(db as never, v.charge))),
         void: await outcome(asMine(env, "fo_cashier", (db) => requestVoid(db as never, k(), v.unpaid, "Coba lintas"))),
       };
       const read = await asMine(env, "owner", (db) => kasirInvoice(db as never, v.invoice).then((x) => x.patient?.name ?? null, () => null));

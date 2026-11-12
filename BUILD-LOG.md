@@ -445,3 +445,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - After a server action, the page revalidates and can unmount the form that showed the success message. Keep the form mounted while its result panel is needed, or have the browser spec wait for the new view.
 - A list row and the filter chip of the same type are both links. Select the row by its list name and content, not by link text.
 
+## 2026-11-13 — T-073 Payment port
+
+- `audit_append` and `tenant_data_keys_for` need a staff member. A webhook has none, so the audit is written as a service (`service_identity`), and the mock secret is derived from the KEK instead of being stored under a tenant key.
+- An unbound worker connection that resolves the tenant itself must take that tenant's `staff_access` lock before locking any row, in the same order as the interactive writers.
+- A server action that has to call a second transactional path (here the webhook handler) does it after its own transaction commits, never inside `withTenantContext`, which refuses nesting.
+- When testing a guard, make sure the row you insert breaks only the rule under test: a copy-rule check must not run into the payment's own amount bound first (T-072 mutation run 2).
+- Browser specs: a 2FA role logging in a second time lands on /verifikasi. Keep the first session open instead of signing in again.
+

@@ -543,6 +543,18 @@ describe("functions (TEN-16)", () => {
     "supplier_get(uuid)",
     "supplier_return_list(uuid)",
     "supplier_batches(uuid,uuid)",
+    // T-073 (PR-68): the payment port (charges, poll, cancel, refund, the mock's status and simulator, the unbound
+    // webhook route and ingest, which refuse a bound connection).
+    "payment_port_enable(integer)",
+    "payment_charge_create(text,uuid,jsonb)",
+    "payment_charge_poll(uuid,jsonb)",
+    "payment_charge_cancel(uuid)",
+    "payment_refund(text,uuid,bigint)",
+    "payment_webhook_route(text)",
+    "payment_webhook_ingest(jsonb,boolean,boolean,text)",
+    "payment_mock_status(uuid)",
+    "simulasi_set(uuid,text)",
+    "simulasi_list(uuid)",
     // T-072 (PR-19): the Kasir writers and readers, and the inbox's SET-43 void rule.
     "payment_receive(text,uuid,jsonb)",
     "invoice_void_request(uuid,text)",

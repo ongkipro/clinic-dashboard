@@ -9,6 +9,7 @@ import { CommandError } from "../../../lib/command";
 import { issueKasirInvoice, openKasirInvoice, receivePayment, requestVoid, TENDER_METHODS, type KasirLine, type Tender, type TenderMethod } from "../../../modules/cashier/kasir/kasir";
 import { STALE_CONTEXT, staleContext } from "../../../modules/org/context/context";
 import { appPool, requestContext } from "../../../modules/org/context/store";
+import { cancelCharge, createCharge, pollCharge } from "../../../modules/payments/payments";
 import { GoLiveBlockedError } from "../../../modules/vendor/profile/profile";
 
 export type KasirFormState = { error?: string; ok?: string; n?: number; id?: string; receipt?: string; change?: number };
@@ -41,6 +42,8 @@ const REASON: Record<string, string> = {
   reason: "Tulis alasan void (3–500 karakter).",
   discount: "Diskon melebihi harga.",
   "only the owner may decide this void": "Hanya owner yang dapat memutuskan void ini.",
+  "charge pending": "Tagihan port sudah berubah. Muat ulang halaman.",
+  mock_in_production: "Simulasi tidak tersedia di produksi.",
 };
 const str = (f: FormData, k: string) => (typeof f.get(k) === "string" ? (f.get(k) as string).trim() : "");
 const money = (s: string) => s.replace(/[.\s]/g, "").replace(/^Rp/i, "");
@@ -140,3 +143,29 @@ export async function voidAction(p: KasirFormState, f: FormData): Promise<KasirF
   if (reason.length < 3) return next(p, { error: REASON.reason });
   return run(p, f, (db, key) => requestVoid(db, key, invoice, reason), () => ({ ok: "Void diajukan. Menunggu persetujuan di Persetujuan." }));
 }
+
+// ── Bayar Lewat Port (T-073): create a charge, Cek Status, Batalkan ──────────────────────────────────────────────────
+const SETTLED: Record<string, string> = {
+  applied: "Pembayaran diterima lewat port.",
+  flagged: "Pembayaran diterima tetapi perlu ditinjau (masuk saldo pasien setelah saldo aktif).",
+  duplicate: "Belum ada perubahan dari port.",
+  rejected_amount: "Jumlah dari port tidak sama dengan tagihan. Ditolak dan dicatat.",
+};
+export async function chargeAction(p: KasirFormState, f: FormData): Promise<KasirFormState> {
+  const invoice = str(f, "invoice");
+  const channel = str(f, "channel");
+  if (!UUID.test(invoice) || !["qris", "va", "payment_link"].includes(channel)) return next(p, { error: COPY.ERR_INVALID_INPUT });
+  return run(p, f, (db, key) => createCharge(db, key, invoice, { channel: channel as "qris" | "va" | "payment_link" }),
+    (r) => ({ ok: r.reused ? "Tagihan port yang masih menunggu ditampilkan." : "Tagihan port dibuat. Menunggu pembayaran." }));
+}
+export async function pollAction(p: KasirFormState, f: FormData): Promise<KasirFormState> {
+  const charge = str(f, "charge");
+  if (!UUID.test(charge)) return next(p, { error: COPY.ERR_INVALID_INPUT });
+  return run(p, f, (db) => pollCharge(db, charge), (r) => ({ ok: SETTLED[r.outcome] ?? SETTLED.duplicate }));
+}
+export async function cancelChargeAction(p: KasirFormState, f: FormData): Promise<KasirFormState> {
+  const charge = str(f, "charge");
+  if (!UUID.test(charge)) return next(p, { error: COPY.ERR_INVALID_INPUT });
+  return run(p, f, async (db) => { await cancelCharge(db, charge); return null; }, () => ({ ok: "Tagihan port dibatalkan." }));
+}
+

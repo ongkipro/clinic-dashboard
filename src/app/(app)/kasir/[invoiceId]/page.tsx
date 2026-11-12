@@ -7,9 +7,9 @@ import { PageTitle } from "../../../../components/templates/templates";
 import { BlockedState, LoadingList } from "../../../../components/ui/states";
 import { StatusBadge } from "../../../../components/ui/status-badge";
 import { loadInvoice } from "../data";
-import { TenderSheet, VoidForm } from "../forms";
+import { PortPanel, TenderSheet, VoidForm } from "../forms";
 import { card, Main, muted, NotOkState } from "../frame";
-import { PAYERS, patientLabel, payState, rp, TAX_BADGE, TENDER, VOIDERS, when } from "../labels";
+import { FLAG, PAYERS, patientLabel, payState, rp, TAX_BADGE, TENDER, VOIDERS, when } from "../labels";
 
 export const metadata: Metadata = { title: "Tagihan — Kasir — Clinic Dashboard" };
 
@@ -50,8 +50,18 @@ async function Body({ params }: { params: Promise<{ invoiceId: string }> }) {
       </section>
       {i.state === "void" ? <BlockedState reason="Tagihan dibatalkan" unblock="Buat tagihan baru bila perlu" />
         : i.void?.state === "pending" ? <BlockedState reason="Void sedang diajukan" unblock="Manajer (hari yang sama) atau owner memutuskan di Persetujuan" />
-        : i.state === "issued" && i.can_pay && PAYERS.has(d.role) ? <TenderSheet ctx={d.ctx} invoice={i.id} outstanding={i.outstanding} tenders={i.tenders} />
+        // A pending port charge first (one prominent action): pay another way only after Batalkan (no double payment).
+        : i.state === "issued" && i.can_pay && PAYERS.has(d.role) && !i.charges.some((c) => c.state === "pending")
+          ? <TenderSheet ctx={d.ctx} invoice={i.id} outstanding={i.outstanding} tenders={i.tenders} />
         : null}
+      {i.state === "issued" && i.can_pay && PAYERS.has(d.role) && !i.void_pending && i.port && (i.outstanding > 0 || i.charges.some((c) => c.state === "pending")) && (
+        <PortPanel ctx={d.ctx} invoice={i.id} outstanding={i.outstanding} simulated={i.port.simulated}
+          channels={i.tenders.filter((t) => ["qris", "va", "payment_link"].includes(t.method) && t.available).map((t) => t.method as "qris" | "va" | "payment_link")}
+          pending={i.charges.find((c) => c.state === "pending") ?? null} />
+      )}
+      {i.charges.filter((c) => c.review_flag).map((c) => (
+        <p key={c.id} className={muted}>{`${c.channel.toUpperCase()} ${rp(c.amount)}: perlu ditinjau (${FLAG[c.review_flag!] ?? c.review_flag})${c.balance_pending ? ` · ${rp(c.balance_pending)} menunggu saldo pasien` : ""}.`}</p>
+      ))}
       {i.receipts.length > 0 && (
         <section aria-label="Struk" className={card}>
           <h2 className="m-0 text-[1.25rem] font-semibold">Struk</h2>
@@ -59,7 +69,7 @@ async function Body({ params }: { params: Promise<{ invoiceId: string }> }) {
             {i.receipts.map((r) => (
               <li key={r.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <Link href={`/kasir/struk/${r.id}`} className="inline-flex min-h-[var(--target)] items-center font-semibold text-[var(--tint)]">{r.number}</Link>
-                <span className={muted}>{`${r.payments.map((p) => `${TENDER[p.method]} ${rp(p.amount)}`).join(" + ")} · ${when(r.issued_at)}`}</span>
+                <span className={muted}>{`${r.is_simulated ? "SIMULASI · " : ""}${r.payments.map((p) => `${TENDER[p.method]} ${rp(p.amount)}`).join(" + ")} · ${when(r.issued_at)}`}</span>
               </li>
             ))}
           </ul>

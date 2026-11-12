@@ -1,0 +1,18 @@
+{
+  "before": {
+    "invoice_void_sync()": "557001f4ba7bc14ae5857c792da5e059d61731a3423083852e4c2359c7c37155",
+    "kasir_invoice_get(uuid)": "b7443386f7f666f8dec9e3a5e5de71cdef259674dad939c9455f5d400bf1e7f6",
+    "kasir_receipt_body(invoices,text,timestamp with time zone,jsonb)": "d8ba2777ba6159bc40748c7ff65cbd3cbe3eef5e177cb1d20b854035d73e2bc9",
+    "payment_receive(text,uuid,jsonb)": "8eaec0b523a551fce0bb9bd44b2891df52b9a8fe83f638fae4947900980cb269",
+    "payments_guard()": "7d778b1fb9d4eb608f669c2199f2d3347ca50d47516feca61f764402fd4985a1",
+    "receipt_get(uuid)": "eda76c923a48148e49fd3fee4707a52d0fc7514cc717292c09799816a5cbd89c"
+  },
+  "after": {
+    "invoice_void_sync()": "97d07f2490c3182ca21e9bb946e8c2bb5eddf6e096a4a8cc7f4acfadf19d34f3",
+    "kasir_invoice_get(uuid)": "3168a11108f221ba778859085ac8768bcf9ea385dc572bf483a5e678701281a6",
+    "kasir_receipt_body(invoices,text,timestamp with time zone,jsonb)": "dbf1a9c1e205a40d0df2d67a8d1644235978a4f9f11a1a4e44264500f1fb6651",
+    "payment_receive(text,uuid,jsonb)": "18a2302def51482ff2aa479df89a08de027dabdcc35b26f3b2dbc7e96b9eed1c",
+    "payments_guard()": "434b27ac7a60953935695ef605290fa6d7283baf8c25ae25c61c54b4b586cb08",
+    "receipt_get(uuid)": "29f77c41867b68fd9e33a603884f485447532795dce413eb8952b55c3aab5231"
+  }
+}

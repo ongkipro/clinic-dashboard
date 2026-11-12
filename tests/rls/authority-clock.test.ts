@@ -319,6 +319,16 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["invoice_open", async () => ["select invoice_open('k-0000000029', null, '{}'::jsonb)", []], ["manager"]],
     ["invoice_issue", async () => ["select invoice_issue('k-0000000030', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["invoice_get", async () => ["select invoice_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-073 (PR-68): the port writers and readers take the actor lock first (Level 3 roles; the webhook ingest is
+    // unbound and has no actor).
+    ["payment_port_enable", async () => ["select payment_port_enable(1)", []], ["manager"]],
+    ["payment_charge_create", async () => ["select payment_charge_create('k-0000000032', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["payment_charge_poll", async () => ["select payment_charge_poll($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["payment_charge_cancel", async () => ["select payment_charge_cancel($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["payment_refund", async () => ["select payment_refund('k-0000000033', $1, 1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["payment_mock_status", async () => ["select payment_mock_status($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["simulasi_set", async () => ["select simulasi_set($1, 'paid')", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["simulasi_list", async () => ["select simulasi_list(null)", []], ["manager"]],
     // T-072 (PR-19): the Kasir writers and readers take the actor lock first (Level 3 roles).
     ["payment_receive", async () => ["select payment_receive('k-0000000031', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["invoice_void_request", async () => ["select invoice_void_request($1, 'Salah')", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],

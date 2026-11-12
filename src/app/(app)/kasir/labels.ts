@@ -15,7 +15,7 @@ export const rp = (n: number | null | undefined) => (n == null ? "—" : idr.for
 export const when = (iso: string) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(new Date(iso));
 export const time = (iso: string) => new Intl.DateTimeFormat("id-ID", { timeStyle: "short", timeZone: "Asia/Jakarta" }).format(new Date(iso));
 
-export const TENDER: Record<TenderMethod, string> = { cash: "Tunai", qris: "QRIS", edc: "EDC", transfer: "Transfer", payment_link: "Link", balance: "Saldo" };
+export const TENDER: Record<TenderMethod, string> = { cash: "Tunai", qris: "QRIS", edc: "EDC", transfer: "Transfer", va: "VA", payment_link: "Link", balance: "Saldo" };
 export const TENDER_BLOCKED: Record<string, { reason: string; unblock: string }> = {
   payment_port: { reason: "Belum tersedia — menunggu port pembayaran", unblock: "Owner dapat menghubungkan mitra pembayaran di Pengaturan" },
   balance: { reason: "Saldo pasien belum aktif", unblock: "Gunakan Tunai, EDC, atau Transfer" },
@@ -33,3 +33,8 @@ export const SEGMENTS = (active: "kasir" | "terbuka" | "jual-cepat", role: strin
   ...(COUNTER.has(role) ? [{ label: "Jual Cepat", href: `/kasir/jual-cepat${q}`, active: active === "jual-cepat" }] : []),
 ];
 export const patientLabel = (p: { name: string | null; mrn: string } | null) => (p ? `${p.name ?? "Pasien"} · ${p.mrn}` : "Penjualan langsung");
+export const FLAG: Record<string, string> = {
+  paid_after_expiry: "dibayar setelah kedaluwarsa", paid_after_failed: "dibayar setelah gagal atau dibatalkan", paid_after_cash: "dibayar setelah lunas tunai",
+  amount_mismatch: "jumlah tidak sama",
+};
+

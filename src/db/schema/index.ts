@@ -26,3 +26,4 @@ export * from "../../modules/purchasing/schema";
 export * from "../../modules/safety/schema";
 export * from "../../modules/tax/schema";
 export * from "../../modules/cashier/schema";
+export * from "../../modules/payments/schema";

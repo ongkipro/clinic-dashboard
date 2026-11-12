@@ -8,7 +8,7 @@ import { ContextFields } from "../../../components/context-fields";
 import { Button } from "../../../components/ui/button";
 import type { CounterItem, TenderMethod, TenderOption } from "../../../modules/cashier/kasir/kasir";
 import type { RenderedContext } from "../../../modules/org/context/context";
-import { issueAction, type KasirFormState, receiveAction, voidAction } from "./actions";
+import { cancelChargeAction, chargeAction, issueAction, type KasirFormState, pollAction, receiveAction, voidAction } from "./actions";
 import { rp, TENDER, TENDER_BLOCKED } from "./labels";
 
 const input = "min-h-[52px] w-full min-w-0 rounded-[var(--radius-field)] border border-[var(--control-border)] bg-white px-3";
@@ -105,8 +105,11 @@ export function IssueForm({ ctx, branch, visit, patient, initial, options, label
 
 // ── Terima: the tender sheet ───────────────────────────────────────────────────────────────────────────────────
 type Row = { k: number; method: TenderMethod; amount: string; tendered: string };
-export function TenderSheet({ ctx, invoice, outstanding, tenders }: { ctx: RenderedContext; invoice: string; outstanding: number; tenders: TenderOption[] }) {
+export function TenderSheet({ ctx, invoice, outstanding, tenders: given }: { ctx: RenderedContext; invoice: string; outstanding: number; tenders: TenderOption[] }) {
   const [s, act, pending] = useActionState<KasirFormState, FormData>(receiveAction, {});
+  // QRIS, VA and link are charges through the port (PortPanel), never a Terima row; the sheet shows them as not here.
+  const PORT = ["qris", "va", "payment_link"];
+  const tenders = given.map((t) => (PORT.includes(t.method) && t.available ? { ...t, available: false, blocked: "port_panel" as never } : t));
   const avail = tenders.filter((t) => t.available).map((t) => t.method);
   const [rows, setRows] = useState<Row[]>(() => [{ k: 0, method: avail[0] ?? "cash", amount: String(outstanding), tendered: "" }]);
   const id = useId();
@@ -178,9 +181,10 @@ export function TenderSheet({ ctx, invoice, outstanding, tenders }: { ctx: Rende
           {rows.length > 1 && <Button type="button" variant="plain" className="justify-self-start" onClick={() => setRows((x) => x.filter((y) => y.k !== r.k))}>Hapus metode ini</Button>}
         </fieldset>
       ))}
-      {tenders.filter((t) => !t.available).map((t) => (
+      {tenders.filter((t) => !t.available && (t.blocked as string) !== "port_panel").map((t) => (
         <p key={t.method} className={hint}>{`${TENDER[t.method]}: ${TENDER_BLOCKED[t.blocked ?? "payment_port"].reason}.`}</p>
       ))}
+      {tenders.some((t) => (t.blocked as string) === "port_panel") && <p className={hint}>QRIS, VA, dan Link: gunakan Bayar Lewat Port di bawah.</p>}
       {rows.length < 6 && remaining > 0 && (
         <Button type="button" variant="secondary" className="justify-self-start"
           onClick={() => setRows((x) => [...x, { k: Date.now(), method: avail.find((m) => !x.some((y) => y.method === m && m === "cash")) ?? "edc", amount: String(remaining), tendered: "" }])}>
@@ -217,3 +221,59 @@ export function VoidForm({ ctx, invoice }: { ctx: RenderedContext; invoice: stri
     </form>
   );
 }
+
+// ── Bayar Lewat Port (T-073, PR-68): a QRIS/VA/link charge for the remaining amount; Cek Status; Batalkan ─────────────
+type PortChargeView = { id: string; channel: "qris" | "va" | "payment_link"; amount: number; state: string; order_ref: string; expires_at: string; is_simulated: boolean;
+  review_flag: string | null; balance_pending: number };
+const PORT_LABEL = { qris: "QRIS", va: "VA", payment_link: "Link Bayar" } as const;
+export function PortPanel({ ctx, invoice, outstanding, channels, pending, simulated }: {
+  ctx: RenderedContext; invoice: string; outstanding: number; channels: ("qris" | "va" | "payment_link")[]; pending: PortChargeView | null; simulated: boolean;
+}) {
+  const [s, act, busy] = useActionState<KasirFormState, FormData>(chargeAction, {});
+  const [ps, pact, pbusy] = useActionState<KasirFormState, FormData>(pollAction, {});
+  const [cs, cact, cbusy] = useActionState<KasirFormState, FormData>(cancelChargeAction, {});
+  const [channel, setChannel] = useState(channels[0]);
+  return (
+    <section aria-label="Bayar lewat port" className="grid min-w-0 gap-3 rounded-[var(--radius-field)] bg-[var(--surface)] p-4">
+      <h2 className="m-0 text-[1.25rem] font-semibold">Bayar Lewat Port</h2>
+      {simulated && <p className="m-0 rounded-[var(--radius-field)] bg-[var(--warning-soft)] px-3 py-2 font-semibold text-[var(--warning)]">SIMULASI — tidak ada uang sungguhan</p>}
+      {pending ? (
+        <>
+          <p className="m-0 text-[1.25rem] font-semibold">{`${PORT_LABEL[pending.channel]} ${rp(pending.amount)} · menunggu pembayaran`}</p>
+          <p className={hint}>{`Nomor pesanan ${pending.order_ref} · berlaku sampai ${new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(new Date(pending.expires_at))}`}</p>
+          {!simulated && <p className={hint}>Untuk bayar dengan cara lain, batalkan dulu tagihan port ini.</p>}
+          {simulated && (
+            <>
+              <p className={hint}>Tandai lunas, kedaluwarsa, atau gagal di halaman Simulasi Pembayaran. Untuk bayar dengan cara lain, batalkan dulu.</p>
+              <Link href="/simulasi" className="inline-flex min-h-[var(--target)] items-center justify-self-start font-semibold text-[var(--tint)]">Buka Simulasi Pembayaran</Link>
+            </>
+          )}
+          <div className="flex min-w-0 flex-wrap gap-2">
+            <form action={pact} key={`p${ps.n ?? 0}`} aria-label="Cek status pembayaran">
+              <ContextFields ctx={ctx} /><Key /><input type="hidden" name="charge" value={pending.id} />
+              <Button type="submit" aria-disabled={pbusy}>Cek Status</Button>
+            </form>
+            <form action={cact} key={`c${cs.n ?? 0}`} aria-label="Batalkan tagihan port">
+              <ContextFields ctx={ctx} /><Key /><input type="hidden" name="charge" value={pending.id} />
+              <Button type="submit" variant="plain" aria-disabled={cbusy}>Batalkan</Button>
+            </form>
+          </div>
+          <Notice s={ps} /><Notice s={cs} />
+        </>
+      ) : (
+        <form action={act} key={`k${s.n ?? 0}`} aria-label="Buat tagihan port" className="grid min-w-0 gap-3">
+          <ContextFields ctx={ctx} /><Key /><input type="hidden" name="invoice" value={invoice} /><input type="hidden" name="channel" value={channel} />
+          <div role="group" aria-label="Kanal port" className="flex min-w-0 flex-wrap gap-2">
+            {channels.map((c) => (
+              <button key={c} type="button" aria-pressed={channel === c} onClick={() => setChannel(c)}
+                className={`min-h-[44px] rounded-full px-4 text-[0.94rem] font-semibold ${channel === c ? "bg-[var(--tint)] text-white" : "bg-[var(--surface-2)] text-[var(--label)]"}`}>{PORT_LABEL[c]}</button>
+            ))}
+          </div>
+          <Notice s={s} />
+          <Button type="submit" aria-disabled={busy} className="justify-self-start">{`Buat ${PORT_LABEL[channel]} ${rp(outstanding)}`}</Button>
+        </form>
+      )}
+    </section>
+  );
+}
+
