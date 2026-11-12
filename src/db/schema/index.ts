@@ -23,3 +23,4 @@ export * from "../../modules/inventory/schema";
 export * from "../../modules/treatment/schema";
 export * from "../../modules/pharmacy/schema";
 export * from "../../modules/purchasing/schema";
+export * from "../../modules/safety/schema";

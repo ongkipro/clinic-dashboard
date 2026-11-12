@@ -1,12 +1,13 @@
 // Keluhan (UX-28, 19:93, PR-43; T-057): the complaint tasks of the acting role. Segments by role: the facility
 // head Klinis · Layanan · Insiden; clinicians Klinis · Insiden; the manager Layanan; FO, central CS and BC
 // "Laporan Saya" (status only). Unresolved first, most urgent due time first; overdue shown in words.
-// Insiden Keselamatan Pasien is T-068 (blocked state until then).
+// The Insiden segment links to the incident register (/keluhan/insiden, T-068).
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ListPage, Row, RowList } from "../../../components/templates/templates";
-import { BlockedState, LoadingList, PermissionState } from "../../../components/ui/states";
+import { LoadingList, PermissionState } from "../../../components/ui/states";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { loadList } from "./data";
 import { CATEGORY_LABEL, HANDLES, KIND_LABEL, STATE, TRIAGE } from "./labels";
@@ -36,7 +37,10 @@ async function Body({ searchParams }: { searchParams: Promise<Record<string, str
   if (seg === "insiden") {
     return (
       <ListPage as="section" title="Keluhan" primaryAction={flag} filters={tabs} state={{ kind: "rows" }}>
-        <BlockedState reason="Register insiden keselamatan pasien belum tersedia" unblock="Insiden dicatat setelah modul insiden aktif" />
+        <div className="grid min-w-0 gap-2">
+          <p className="m-0 text-[0.94rem] text-[var(--label-2)]">Insiden keselamatan pasien (KTD, KNC, KTC, KPC, sentinel) dicatat dan ditangani di register insiden.</p>
+          <Link href="/keluhan/insiden" className="inline-flex min-h-[var(--target)] items-center justify-self-start rounded-full bg-[var(--surface)] px-4 text-[var(--tint)] no-underline">Buka Register Insiden</Link>
+        </div>
       </ListPage>
     );
   }

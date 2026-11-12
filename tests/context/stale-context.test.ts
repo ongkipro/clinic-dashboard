@@ -47,6 +47,8 @@ const templat = await import("../../src/app/(app)/templat/actions"); // T-058
 const permintaan = await import("../../src/app/(app)/permintaan/actions"); // T-056
 const stok = await import("../../src/app/(app)/stok/actions"); // T-060
 const pembelian = await import("../../src/app/(app)/pembelian/actions"); // T-067
+const logbook = await import("../../src/app/(app)/logbook/actions"); // T-068
+const insiden = await import("../../src/app/(app)/keluhan/insiden/actions"); // T-068
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -159,6 +161,10 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["pembelian payAction", (f) => pembelian.payAction({}, f), () => ({ key: U(217), supplier: U(203), amount: "1000", method: "cash", date: "2026-11-12" })],
   ["pembelian creditNoteAction", (f) => pembelian.creditNoteAction({}, f), () => ({ key: U(218), supplier: U(203), return: U(219), number: "NK-1", amount: "1000", date: "2026-11-12" })],
   ["pembelian applyCreditAction", (f) => pembelian.applyCreditAction({}, f), () => ({ key: U(220), credit: U(221), invoice: U(222) })],
+  ["logbook entryAction", (f) => logbook.entryAction({}, f), () => ({ key: U(230), branch: U(231), kind: "sterilization", performed_on: "2026-11-12", method: "uv", passed: "yes", items: "Gunting" })],
+  ["logbook scheduleAction", (f) => logbook.scheduleAction({}, f), () => ({ key: U(232), branch: U(231), device: U(233), kind: "calibration", interval_days: "180", next_due_on: "2026-12-01" })],
+  ["insiden reportAction", (f) => insiden.reportAction({}, f), () => ({ key: U(234), branch: U(231), classification: "knc", occurred_at: "2026-11-12T09:00", tz_offset: "-420", summary: "Uji konteks", immediate_response: "Uji konteks" })],
+  ["insiden stepAction", (f) => insiden.stepAction({}, f), () => ({ key: U(235), incident: U(236), step: "take" })],
   ["stok receiveAction", (f) => stok.receiveAction({}, f), () => ({ key: U(151), item: U(152), batch_no: "B-1", expiry: "2030-01-01", quantity: "1", reason: "penerimaan" })],
   ["stok holdAction", (f) => stok.holdAction({}, f), () => ({ key: U(153), batch: U(154), state: "quarantined", reason: "Uji konteks" })],
   ["stok openVialAction", (f) => stok.openVialAction({}, f), () => ({ key: U(155), batch: U(154) })],

@@ -543,6 +543,16 @@ describe("functions (TEN-16)", () => {
     "supplier_get(uuid)",
     "supplier_return_list(uuid)",
     "supplier_batches(uuid,uuid)",
+    // T-068 (PR-82): logbooks and the incident register.
+    "device_schedule_set(uuid,jsonb)",
+    "logbook_record(text,uuid,jsonb)",
+    "logbook_due_scan(date)",
+    "incident_report(text,uuid,jsonb)",
+    "incident_handle(uuid,text,jsonb)",
+    "logbook_overview(uuid,text)",
+    "incident_list(uuid)",
+    "incident_get(uuid)",
+    "incident_patient_options(uuid)",
     // T-067 (PR-90): purchase orders, goods receipts, supplier payables.
     "po_save(text,uuid,jsonb)",
     "po_transition(uuid,text,text)",

@@ -313,6 +313,15 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["supplier_get", async () => ["select supplier_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
     ["supplier_return_list", async () => ["select supplier_return_list(null)", []], ["pharmacist"]],
     ["supplier_batches", async () => ["select supplier_batches($1, null)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    // T-068 (PR-82): safety writers and readers take the actor lock first (Level 3 roles).
+    ["device_schedule_set", async () => ["select device_schedule_set(null, '{}'::jsonb)", []], ["manager"]],
+    ["logbook_record", async () => ["select logbook_record('k-0000000026', null, '{}'::jsonb)", []], ["manager"]],
+    ["incident_report", async () => ["select incident_report('k-0000000027', null, '{}'::jsonb)", []], ["manager"]],
+    ["incident_handle", async () => ["select incident_handle($1, 'take', null)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["logbook_overview", async () => ["select logbook_overview(null, null)", []], ["manager"]],
+    ["incident_list", async () => ["select incident_list(null)", []], ["manager"]],
+    ["incident_get", async () => ["select incident_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["incident_patient_options", async () => ["select incident_patient_options(null)", []], ["pharmacist"]],
     // T-067 (PR-90): payables writers and readers take the actor lock first (Level 3 roles: the harness gives every role a branch).
     ["po_save", async () => ["select po_save('k-0000000019', null, '{}'::jsonb)", []], ["manager"]],
     ["po_transition", async () => ["select po_transition($1, 'send', null)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],

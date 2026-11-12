@@ -421,4 +421,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 
 - A PL/pgSQL `DECLARE` initialiser runs before the body, so an actor call that is given a subquery argument (`stock_actor(..., (SELECT branch_id FROM t WHERE id = p_id))`) reads the table before `tenant_actor_lock()`. Pass NULL to the actor, then read the row `FOR UPDATE` in the body (pattern: `branch_transfer_receive`).
 - An unchecked `<input type="checkbox">` is not in `FormData` at all; changing its `value` on change does not help. For an edit form, read `f.get(name) === "on"`.
+||||||| parent of 62b27ed (T-068: logbooks (sterilization, calibration, maintenance, B3 waste) and the patient-safety incident register (PR-82, UX-9 Logbook, UX-28 Insiden; migration 0085; DEC-078))
+
+## 2026-11-12 — T-068 Logbooks and the incident register
+
+- `audit_events.reason_code` allows lowercase letters and underscores only (`^[a-z][a-z_]{1,40}$`): a reason code built from a value with digits (`logbook_b3_waste`) fails the insert; map such values first.
+- Built and recorded without a per-task review (owner, 2026-11-12); the review round runs once all tasks are final.
 
