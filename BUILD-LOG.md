@@ -432,3 +432,9 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A table `GRANT SELECT` with an RLS row predicate still hands every column to every reader of the row. When a reader may see a row but not all of it (a reporter and the investigation), grant the visible columns only and serve the rest through the definers.
 - A rebase that merges with diff3 leaves a `|||||||` line, which `<<<<<<<`/`>>>>>>>` scans do not catch; check for it.
 
+## 2026-11-12 — T-071 Invoice and tax foundation
+
+- A newly published *service* waits for the clinical review (DEC-046) and is not active. Fixtures that only need a tax category use products, which publish active at once.
+- Validate cheap inputs (quantity) before the lookups that can fail with not-found. Otherwise a bad quantity on an unknown item reports the wrong refusal.
+- Half-up rounding in integers: (P × 100 + 55) ÷ 111. It needs a test value whose remainder is at least 56 (100,001) to tell it apart from truncation; the fixture's multiples of 111 cannot.
+

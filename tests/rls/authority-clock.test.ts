@@ -313,6 +313,12 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["supplier_get", async () => ["select supplier_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
     ["supplier_return_list", async () => ["select supplier_return_list(null)", []], ["pharmacist"]],
     ["supplier_batches", async () => ["select supplier_batches($1, null)", ["00000000-0000-7000-8000-000000000000"]], ["pharmacist"]],
+    // T-071 (PR-24): tax and invoice writers and readers take the actor lock first (Level 3 roles).
+    ["tax_profile_set", async () => ["select tax_profile_set('k-0000000028', '{}'::jsonb)", []], ["manager"]],
+    ["tax_profile_get", async () => ["select tax_profile_get()", []], ["manager"]],
+    ["invoice_open", async () => ["select invoice_open('k-0000000029', null, '{}'::jsonb)", []], ["manager"]],
+    ["invoice_issue", async () => ["select invoice_issue('k-0000000030', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["invoice_get", async () => ["select invoice_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-068 (PR-82): safety writers and readers take the actor lock first (Level 3 roles).
     ["device_schedule_set", async () => ["select device_schedule_set(null, '{}'::jsonb)", []], ["manager"]],
     ["logbook_record", async () => ["select logbook_record('k-0000000026', null, '{}'::jsonb)", []], ["manager"]],

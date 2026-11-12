@@ -603,6 +603,13 @@
       "when": 1794455202728,
       "tag": "0085_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1794495948889,
+      "tag": "0086_tax_invoice",
+      "breakpoints": true
     }
   ]
 }

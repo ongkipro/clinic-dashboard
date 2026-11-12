@@ -278,11 +278,11 @@ describe("scope map (TEN-3, TEN-19)", () => {
   });
 
   it("fails on a table missing from scope_map", async () => {
-    // A table that does not exist yet (T-037 built patients, T-047 visits; invoices arrive with T-071).
-    const v = await inRolledBack(`create table invoices (id uuid primary key)`, async () =>
+    // A table no migration owns (invoices arrived with T-071, so the probe uses its own name).
+    const v = await inRolledBack(`create table fixture_invoices (id uuid primary key)`, async () =>
       scopeMapViolations(await relations(h.admin), await entries(h.admin)),
     );
-    expect(v).toEqual(["public.invoices: missing from scope_map"]);
+    expect(v).toEqual(["public.fixture_invoices: missing from scope_map"]);
   });
 
   it("fails on a view or materialized view missing from scope_map", async () => {
@@ -543,6 +543,12 @@ describe("functions (TEN-16)", () => {
     "supplier_get(uuid)",
     "supplier_return_list(uuid)",
     "supplier_batches(uuid,uuid)",
+    // T-071 (PR-24): tax profile and the invoice foundation.
+    "tax_profile_set(text,jsonb)",
+    "tax_profile_get()",
+    "invoice_open(text,uuid,jsonb)",
+    "invoice_issue(text,uuid,jsonb)",
+    "invoice_get(uuid)",
     // T-068 (PR-82): logbooks and the incident register.
     "device_schedule_set(uuid,jsonb)",
     "logbook_record(text,uuid,jsonb)",
