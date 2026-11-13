@@ -499,7 +499,7 @@ describe("money scenario 13 and the top-up (balance funds a package)", () => {
     expect(await h.admin.query(
       `insert into payments (tenant_id, branch_id, receipt_id, seq, invoice_id, patient_id, method, amount, environment, is_simulated, received_by, received_as, received_at)
        values ($1, $2, $3, 2, null, $4, 'balance', $6, 'local', false, $5, 'fo_cashier', now())`, [A.tenantId, A.b1, t.receipt_id, pid, FO.staffId, tu])
-      .then(() => "ok", (e) => e.message)).toBe("a payment with no invoice is a balance top-up");
+      .then(() => "ok", (e) => e.message)).toBe("a payment with no invoice is a balance top-up or a booking deposit"); // T-077: the deposit is the second kind
     for (const p of [DOC, BC, AU]) expect(await code(as(p, (db) => topUpBalance(db, key(), pid, null, { method: "edc", amount: 1_000 }))), p.role).toBe("ERR_FORBIDDEN");
     // Owner and finance (tenant-wide, no branch role) top up too: the named branch, else the first by name (review F1).
     const o1 = await as(OWN, (db) => topUpBalance(db, key(), pid, null, { method: "edc", amount: 1_000 }));

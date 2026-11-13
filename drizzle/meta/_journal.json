@@ -652,6 +652,13 @@
       "when": 1794577332944,
       "tag": "0092_one_clock",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1794595161116,
+      "tag": "0093_deposits",
+      "breakpoints": true
     }
   ]
 }

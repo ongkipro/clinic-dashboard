@@ -1,0 +1,28 @@
+{
+  "before": {
+    "appointment_cancel(uuid,text)": "7f0c8c9b09fd835215bd895cc7778aa09a809e70cee0ac10e7e04088d1e82409",
+    "appointment_no_show(uuid)": "a48279e9ce2510842f207c1eabfe7a2b8a5661690ad2a9f307a6cd2ba0950925",
+    "appointment_reschedule(uuid,timestamp with time zone,uuid)": "c0db9c75e950a3733b5a1cfd1400741ed5cb7804feaf721d197e636dddbc5d6f",
+    "invoice_issue(text,uuid,jsonb)": "382abe2fcc0bf72ffd3571440e23fa02a0ace874e3b1d7e27bc40a793e8a97cd",
+    "invoice_void_request(uuid,text)": "39bf15fa346f2e2e795ca2750f4aa4acabb0688642cc54fd02c4826345952aed",
+    "invoice_void_sync()": "d7dd863c19a65b3b72d63dcf248a1fa4281dc7ce7df1c46cf61950f587d34fe5",
+    "kasir_line_paid(uuid,uuid)": "1674954f16921d3f3c899eec0410ab22898f4d2c5528b1bf3baabdd7a37ef6f8",
+    "payment_allocations_guard()": "9b6177c2ac19323f5a720848945a9e04467c7d7319bc53267523543872042d67",
+    "payment_line_room(uuid,uuid,boolean)": "996f40803a66f430667688f611ff097716d71017b570d5bffcc84ddbc2508f96",
+    "payments_guard()": "fe62492f0164685fa067d5ab8679d1ed6462f2a54350ea8cd33c101303f6fbbd",
+    "receipt_get(uuid)": "a65ebdc2078cb493f248d458efe33b83f02b6470e976f60f9866193ae9f58078"
+  },
+  "after": {
+    "appointment_cancel(uuid,text)": "c653bde10cecdd9af62b22cbe41cd27e3c655d951821ce20cf60fc0ff18a3d0e",
+    "appointment_no_show(uuid)": "e05f6c6eed2a45f16316a3212a7222aca663406dd2e0b28604d14569294ab5e3",
+    "appointment_reschedule(uuid,timestamp with time zone,uuid)": "904987b0c6388d7cc26862c647f4893f431c12d854bd48859134e5a21151fa7d",
+    "invoice_issue(text,uuid,jsonb)": "5f2d135d2a1b22561e56c398ff34bf1ab680285359db7d7b51b150060687e907",
+    "invoice_void_request(uuid,text)": "213e97df21fff127cbd0b72fabb0951d0f45f4213e20241319895e3dda4da32b",
+    "invoice_void_sync()": "d1c424eb371830564d07a2139523e05155859fa1741bf1af376a41bd6b543543",
+    "kasir_line_paid(uuid,uuid)": "04ebd1c9fb106eb2fae985c030debe574ca1c908609e2ecbebdad59740ae23ac",
+    "payment_allocations_guard()": "956a9aee894ebd695bed007f6c1cb068599e058f1f28b3a3fa79c7a059704681",
+    "payment_line_room(uuid,uuid,boolean)": "6ec6830a91997a06100002c1ac345aa60547cc2c17a0fa083b510ea5e6a592ec",
+    "payments_guard()": "b1ab1b45b9b66a4e6ab3a5ce690621cdb69ca25735a06dbfcd811936379f0c9e",
+    "receipt_get(uuid)": "3475606016881f93c415b66946317b00f458c3802aa3d864690da18f3ebb42c7"
+  }
+}

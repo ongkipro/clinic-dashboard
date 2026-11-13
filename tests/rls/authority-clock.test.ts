@@ -331,6 +331,11 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["package_patient_get", async () => ["select package_patient_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["package_patient_search", async () => ["select package_patient_search('ab')", []], ["manager"]],
     ["package_contents_get", async () => ["select package_contents_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-077 (PR-22): the booking deposit writers take the actor lock first.
+    ["deposit_receive", async () => ["select deposit_receive('k-0000000039', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["deposit_apply", async () => ["select deposit_apply($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["appointment_cancel_clinic", async () => ["select appointment_cancel_clinic($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["deposit_refund_clinic", async () => ["select deposit_refund_clinic('k-0000000040', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-075 (PR-21): the balance reader takes the actor lock first (Level 3 roles).
     ["balance_get", async () => ["select balance_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-074 (PR-15): the release writer and the additions reader take the actor lock first (Level 3 roles).

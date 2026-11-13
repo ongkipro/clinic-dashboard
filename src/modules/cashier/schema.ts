@@ -21,6 +21,7 @@ import { documentTemplateVersions } from "../documents/schema";
 import { catalogItems, catalogVersions, TAX_CATEGORIES } from "../catalog/schema";
 import { branches, staff, tenants } from "../org/schema";
 import { patients } from "../patients/schema";
+import { appointments } from "../scheduling/schema";
 import { visits } from "../visits/schema";
 
 export const PATIENT_INVOICE_STATES = ["draft", "issued", "void"] as const;
@@ -228,6 +229,7 @@ export const paymentAllocations = pgTable(
     paymentId: uuid("payment_id").notNull(),
     invoiceLineId: uuid("invoice_line_id"),
     topUpId: uuid("top_up_id"), // T-076: the balance top-up target (DATA-28); FK in migration 0091
+    bookingDepositId: uuid("booking_deposit_id"), // T-077: the booking deposit target (DATA-28); FK in migration 0093
     amount: bigint("amount", { mode: "number" }).notNull(),
     vatPortion: bigint("vat_portion", { mode: "number" }).notNull().default(0),
     method: text("method", { enum: PATIENT_PAYMENT_METHODS }).notNull(),
@@ -246,7 +248,7 @@ export const paymentAllocations = pgTable(
     index("payment_allocations_line_idx").on(t.tenantId, t.invoiceLineId),
     // Exactly one target (DATA-28): the invoice line now; package, booking deposit, balance top-up and receivable
     // targets arrive with their tasks (T-076, T-077, T-075, T-078) and join this count.
-    check("payment_allocations_check", sql`num_nonnulls(${t.invoiceLineId}, ${t.topUpId}) = 1 and ${t.amount} between 1 and ${sql.raw(MONEY)}
+    check("payment_allocations_check", sql`num_nonnulls(${t.invoiceLineId}, ${t.topUpId}, ${t.bookingDepositId}) = 1 and ${t.amount} between 1 and ${sql.raw(MONEY)}
       and ${t.vatPortion} between 0 and ${t.amount} and ${t.method} in (${inList(PATIENT_PAYMENT_METHODS)}) and ${t.environment} in (${inList(PAYMENT_ENVIRONMENTS)})`),
   ],
 );
@@ -285,6 +287,75 @@ export const additionReleases = pgTable(
     unique("addition_releases_command_key").on(t.tenantId, t.commandKey),
     index("addition_releases_visit_idx").on(t.tenantId, t.visitId),
     check("addition_releases_check", sql`${t.releasedAs} in ('fo_cashier','manager') and ${KEY(t.commandKey)}`),
+  ],
+);
+
+// T-077 (PR-22, BILL-13, B-05, DATA-31; migration 0093; DEC-089): the booking DP. Received at the Kasir as a KW receipt and
+// one payment with no invoice (the T-076 top-up pattern), allocated to the deposit. One per appointment. Decided once:
+// applied to the visit's line on arrival, moved to balance (a patient change at or before the cutoff, or a clinic
+// cancellation), forfeited (a later patient change or a no-show) or refunded in cash (a clinic cancellation, scenario 17).
+// The cutoff is SET-10 batas_ubah, snapshotted at receipt. VAT (PKP, taxable item) is recognised at receipt and reversed
+// on a move or a refund; on apply it moves to the line.
+export const DEPOSIT_STATES = ["held", "applied", "moved_to_balance", "forfeited", "refunded"] as const;
+export const DEPOSIT_METHODS = ["cash", "edc", "transfer"] as const;
+export const bookingDeposits = pgTable(
+  "booking_deposits",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    appointmentId: uuid("appointment_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    catalogVersionId: uuid("catalog_version_id").notNull(),
+    receiptId: uuid("receipt_id").notNull(),
+    method: text("method", { enum: DEPOSIT_METHODS }).notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    taxCategory: text("tax_category", { enum: TAX_CATEGORIES }).notNull(),
+    isPkpAtReceipt: boolean("is_pkp_at_receipt").notNull(),
+    vatBase: bigint("vat_base", { mode: "number" }).notNull(),
+    vatAmount: bigint("vat_amount", { mode: "number" }).notNull(),
+    vatRecognisedAmount: bigint("vat_recognised_amount", { mode: "number" }).notNull().default(0),
+    cutoffHours: smallint("cutoff_hours").notNull(),
+    state: text("state", { enum: DEPOSIT_STATES }).notNull().default("held"),
+    appliedLineId: uuid("applied_line_id"),
+    decisionCode: text("decision_code"),
+    refundMethod: text("refund_method"),
+    refundDetails: jsonb("refund_details"),
+    decidedBy: uuid("decided_by"),
+    decidedAs: text("decided_as"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    commandKey: text("command_key").notNull(),
+    receivedBy: uuid("received_by").notNull(),
+    receivedAs: text("received_as").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "booking_deposits_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "booking_deposits_appointment_fk", columns: [t.tenantId, t.branchId, t.appointmentId], foreignColumns: [appointments.tenantId, appointments.branchId, appointments.id] }).onDelete("restrict"),
+    foreignKey({ name: "booking_deposits_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "booking_deposits_version_fk", columns: [t.tenantId, t.catalogVersionId], foreignColumns: [catalogVersions.tenantId, catalogVersions.id] }).onDelete("restrict"),
+    foreignKey({ name: "booking_deposits_receipt_fk", columns: [t.tenantId, t.receiptId], foreignColumns: [receipts.tenantId, receipts.id] }).onDelete("restrict"),
+    foreignKey({ name: "booking_deposits_line_fk", columns: [t.tenantId, t.appliedLineId], foreignColumns: [invoiceLines.tenantId, invoiceLines.id] }).onDelete("restrict"),
+    foreignKey({ name: "booking_deposits_received_by_fk", columns: [t.tenantId, t.receivedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "booking_deposits_decided_by_fk", columns: [t.tenantId, t.decidedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("booking_deposits_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("booking_deposits_appointment_key").on(t.tenantId, t.appointmentId),
+    unique("booking_deposits_receipt_key").on(t.tenantId, t.receiptId),
+    unique("booking_deposits_line_key").on(t.tenantId, t.appliedLineId),
+    unique("booking_deposits_command_key").on(t.tenantId, t.commandKey),
+    index("booking_deposits_patient_idx").on(t.tenantId, t.patientId),
+    check("booking_deposits_check", sql`${t.amount} between 1 and ${sql.raw(MONEY)} and ${KEY(t.commandKey)}
+      and ${t.method} in (${inList(DEPOSIT_METHODS)}) and ${t.state} in (${inList(DEPOSIT_STATES)}) and ${t.taxCategory} in (${inList(TAX_CATEGORIES)})
+      and ${t.vatBase} >= 0 and ${t.vatAmount} >= 0 and ${t.vatBase} + ${t.vatAmount} = ${t.amount} and (${t.isPkpAtReceipt} or ${t.vatAmount} = 0)
+      and ${t.vatRecognisedAmount} between 0 and ${t.vatAmount} and ${t.cutoffHours} between 0 and 72
+      and ${t.receivedAs} in ('owner','manager','fo_cashier','finance')
+      and ((${t.state} = 'held') = (${t.decidedAt} is null)) and ((${t.state} = 'held') = (${t.decidedBy} is null))
+      and ((${t.state} = 'applied') = (${t.appliedLineId} is not null))
+      and ((${t.state} = 'refunded') = (${t.refundMethod} is not null)) and (${t.refundMethod} is null or ${t.refundMethod} in ('cash','edc','transfer'))
+      and (${t.refundDetails} is null or ${t.refundMethod} in ('edc','transfer') and jsonb_typeof(${t.refundDetails}) = 'object')
+      and (${t.state} = 'held' or ${t.decisionCode} ~ '^[a-z][a-z_]{2,40}$')
+      and (${t.decidedAs} is null or ${t.decidedAs} in ('owner','admin_pusat','manager','fo_cashier','central_cs','finance'))`),
   ],
 );
 

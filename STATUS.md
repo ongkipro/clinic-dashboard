@@ -324,7 +324,9 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 - **T-074 done: additional treatment payment** (PR-15; migration 0089; DEC-085). Commit `f0454d5`, CI 43352267465 green. Reviews: Argon implementation `6a6e1366` APPROVE, boundary `e76fe6eb` APPROVE.
 - **T-075 done: patient balance ledger** (PR-21; migration 0090; DEC-086). Commit `e718cf8`, CI 43364408103 green. Reviews: Argon implementation and boundary `2cf34c80` APPROVE.
 - **T-076 done: packages** (PR-20; migration 0091; DEC-087). Commit `08d9660`, CI 43432407908 green. Reviews: plan Argon `ca3caa5d` APPROVE; implementation `5ceb09a2` REVISE (owner/finance top-up branch; top-up allocation ceiling) fixed, re-review `c5c5eab7` APPROVE.
-- **HYG-016 (in progress): one clock read per operation; setup-hook limit 300 s** (owner 2026-11-13, option A; migration 0092; DEC-088). Plan Argon `68e28c82` REVISE (adopted), `2fdb5108` APPROVE. Next: T-077 (plan approved).
+- **HYG-016 done: one clock read per operation; setup-hook limit 300 s** (owner 2026-11-13, option A; migration 0092; DEC-088). Commit `fab5938`, CI 43478485835 green. Reviews: plan Argon `68e28c82` REVISE (adopted), `2fdb5108` APPROVE; implementation and boundary `dfab52b0` APPROVE.
+- **T-077 (in progress): booking DP lifecycle** (PR-22; migration 0093; DEC-089). Plan Argon `d2add5d2` REVISE (adopted), `af14723c` APPROVE.
+- **Plans approved ahead (one builder at a time):** T-080 manual discounts (Argon `4ecea620` REVISE adopted, `3a5a15c6` APPROVE); T-085 Tutup Kasir (Argon `f11e741c` REVISE adopted, `8ad74204` APPROVE, conditional on three owner product decisions).
 - **Hygiene candidate (T-074 close runs 1 and 2):** scheduled as HYG-016 (above).
 - **Hygiene candidate (T-066 close run 1, CI-independent):** the vial use-by flake; scheduled as HYG-016 (above).
 - **Hygiene candidate (from CI 42615137831, recurred in CI 42753612376 attempt 1):** scheduled as HYG-015 (above).

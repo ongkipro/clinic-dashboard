@@ -556,6 +556,11 @@ describe("functions (TEN-16)", () => {
     "package_patient_get(uuid)",
     "package_patient_search(text)",
     "package_contents_get(uuid)",
+    // T-077 (PR-22): the booking deposit writers (each takes the actor lock first).
+    "deposit_receive(text,uuid,jsonb)",
+    "deposit_apply(uuid)",
+    "appointment_cancel_clinic(uuid,text)",
+    "deposit_refund_clinic(text,uuid,jsonb)",
     // T-075 (PR-21): the patient balance reader.
     "balance_get(uuid)",
     // T-074 (PR-15): the addition release and the cashier's additions reader.

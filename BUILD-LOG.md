@@ -478,3 +478,9 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - An occasional race cannot be proved by a loop: the mutant survives whenever the reads happen to agree. Prove it from the catalog instead (`prosrc` reads the clock once), which is red on the old code every time.
 - A test's time budget includes every lock it queues on. The harness serializes migrations cluster-wide (T-060), so a lock test that builds a full harness waits behind every other file's migration and times out in the full suite while passing alone. Measure the queue (sample `pg_locks` per second by `application_name`) before blaming the disk, and give a test that is not about the schema its own key and an empty migration.
 
+## 2026-11-13 — T-077 Booking DP
+
+- A role check that sits after an actor helper which already refuses the same roles can never fire. Mutation testing finds it: the mutant that removes it survives. Delete the duplicate; keep the test that proves the refusal.
+- Test an "after X" refusal before anything else refuses for a different reason. A void after a DP was applied was first tested after the remainder was paid, where the payment alone already refused the void.
+- Fixtures that go through the real writers find the real rules: a roster cannot reach a past day, a doctor's shifts cannot overlap across branches, a check-in must be today and within two hours of the start. Build the fixture inside those rules rather than writing rows past the guards.
+
