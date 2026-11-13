@@ -1,0 +1,20 @@
+{
+  "before": {
+    "invoice_issue(text,uuid,jsonb)": "1b39c99a82055d84675c891de4bc6c408750c9012b3bc2d15547299847ef7f90",
+    "invoice_lines_guard()": "935b233eee7e7458611d67116ea829e41cca0e0d7d451e0b4b4b6ce449d429be",
+    "kasir_invoice_get(uuid)": "3168a11108f221ba778859085ac8768bcf9ea385dc572bf483a5e678701281a6",
+    "kasir_visit_payment(uuid,uuid)": "5641348944d4147afad26bf11aee90a38f0854f478e565c0364cd11f245f8f28",
+    "treatment_item_blockers(visits,uuid)": "140b453ca6247422ef4471083659be909eaf78086004f1fe67a00ec078ffb5fe",
+    "treatment_start(text,uuid,jsonb)": "fafc6249adf713718eb054e2c6bdf1219836ebc3a6e39762a5bda08357dea80d",
+    "visit_close(uuid)": "3cc6f00e757e145e8a72842e74e0bd25c62dbd5646863e40d177761ab5b9e687"
+  },
+  "after": {
+    "invoice_issue(text,uuid,jsonb)": "23be2e9a30d61c74bbff8aff382920bdecb2477c7aeb7ce5b48ef6e57874ad6c",
+    "invoice_lines_guard()": "6db1743e1bc8f66509183d9b33b0727dc189e100250720598ad2f9745e5a0885",
+    "kasir_invoice_get(uuid)": "fcc5f73f7b29f47c566c2f5decbe23205e438d4927244b4f11b3042c6ea5cd83",
+    "kasir_visit_payment(uuid,uuid)": "366a891f7d4e8101e2e807b4a6ff4f6a0599d5cb47416166deef5ba242e5b935",
+    "treatment_item_blockers(visits,uuid)": "f50f6e0ab3c4f862c710f1f45ae3e7b849eddf4970d319ac1cfb6f05bf4d670d",
+    "treatment_start(text,uuid,jsonb)": "089706479b4f5d0d2ed646dec08d28349c34e2144a2538f7569cd94c5de83323",
+    "visit_close(uuid)": "461fc027cfa59fd9e4688137d2f837cc6d399bd7ba62f571edfb13aa389ebd3c"
+  }
+}

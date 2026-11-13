@@ -72,15 +72,19 @@ export const closeVisit = (db: pg.ClientBase, key: string, visitId: string) =>
   command<null>(db, "visit.close", key, { visit: visitId }, `select visit_close($1) as r`, [visitId]);
 
 // The close blocker of an open visit (PR-15, UX-6), in the order the database refuses; null when none.
-export type CloseBlocker = "unpaid_bill" | "pending_dispensing" | "pending_treatment";
-export function closeBlocker(v: Pick<Visit, "payment" | "dispensing" | "treatment">): CloseBlocker | null {
+// unbilled_addition (T-074): a performed addition not billed yet; the visit row does not carry it, so a caller that knows
+// passes it (the database refuses it before the unpaid bill).
+export type CloseBlocker = "unbilled_addition" | "unpaid_bill" | "pending_dispensing" | "pending_treatment";
+export function closeBlocker(v: Pick<Visit, "payment" | "dispensing" | "treatment"> & { unbilledAddition?: boolean }): CloseBlocker | null {
   const held = (s: Step) => s === "in_progress" || s === "blocked";
+  if (v.unbilledAddition) return "unbilled_addition";
   if (held(v.payment)) return "unpaid_bill";
   if (held(v.dispensing)) return "pending_dispensing";
   if (held(v.treatment)) return "pending_treatment";
   return null;
 }
 export const BLOCKER_COPY: Record<CloseBlocker, string> = {
+  unbilled_addition: "Tindakan tambahan belum ditagih",
   unpaid_bill: "Tagihan belum lunas",
   pending_dispensing: "Obat belum diserahkan",
   pending_treatment: "Tindakan belum selesai",

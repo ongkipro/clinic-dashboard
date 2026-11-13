@@ -543,6 +543,9 @@ describe("functions (TEN-16)", () => {
     "supplier_get(uuid)",
     "supplier_return_list(uuid)",
     "supplier_batches(uuid,uuid)",
+    // T-074 (PR-15): the addition release and the cashier's additions reader.
+    "addition_release(text,uuid,jsonb)",
+    "addition_visit_list(uuid)",
     // T-073 (PR-68): the payment port (charges, poll, cancel, refund, the mock's status and simulator, the unbound
     // webhook route and ingest, which refuse a bound connection).
     "payment_port_enable(integer)",

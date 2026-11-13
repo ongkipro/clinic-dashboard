@@ -16,6 +16,7 @@
 import { sql } from "drizzle-orm";
 import { bigint, boolean, check, foreignKey, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { approvals } from "../approvals/schema";
+import { clinicalRequests, planItems, procedureConsents } from "../clinical/schema";
 import { documentTemplateVersions } from "../documents/schema";
 import { catalogItems, catalogVersions, TAX_CATEGORIES } from "../catalog/schema";
 import { branches, staff, tenants } from "../org/schema";
@@ -91,6 +92,8 @@ export const invoiceLines = pgTable(
     taxBasis: text("tax_basis").notNull(),
     vatBase: bigint("vat_base", { mode: "number" }).notNull(),
     vatAmount: bigint("vat_amount", { mode: "number" }).notNull(),
+    // T-074 (PR-15): an addition line names its approved addition plan item (one issued invoice per addition).
+    planItemId: uuid("plan_item_id"),
     vatRecognisedAmount: bigint("vat_recognised_amount", { mode: "number" }).notNull().default(0),
     vatRecognisedAt: timestamp("vat_recognised_at", { withTimezone: true }),
     taxDocumentRef: text("tax_document_ref"),
@@ -102,6 +105,9 @@ export const invoiceLines = pgTable(
     foreignKey({ name: "invoice_lines_item_fk", columns: [t.tenantId, t.itemId], foreignColumns: [catalogItems.tenantId, catalogItems.id] }).onDelete("restrict"),
     foreignKey({ name: "invoice_lines_version_fk", columns: [t.tenantId, t.catalogVersionId], foreignColumns: [catalogVersions.tenantId, catalogVersions.id] }).onDelete("restrict"),
     unique("invoice_lines_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("invoice_lines_plan_item_key").on(t.tenantId, t.invoiceId, t.planItemId),
+    foreignKey({ name: "invoice_lines_plan_item_fk", columns: [t.tenantId, t.planItemId], foreignColumns: [planItems.tenantId, planItems.id] }).onDelete("restrict"),
+    index("invoice_lines_plan_item_idx").on(t.tenantId, t.planItemId),
     index("invoice_lines_invoice_idx").on(t.tenantId, t.invoiceId),
     check("invoice_lines_amounts_check", sql`${t.quantity} between 1 and 10000
       and ${t.unitPrice} between 0 and ${sql.raw(MONEY)}
@@ -229,6 +235,43 @@ export const paymentAllocations = pgTable(
     // targets arrive with their tasks (T-076, T-077, T-075, T-078) and join this count.
     check("payment_allocations_check", sql`num_nonnulls(${t.invoiceLineId}) = 1 and ${t.amount} between 1 and ${sql.raw(MONEY)}
       and ${t.vatPortion} between 0 and ${t.amount} and ${t.method} in (${inList(PATIENT_PAYMENT_METHODS)}) and ${t.environment} in (${inList(PAYMENT_ENVIRONMENTS)})`),
+  ],
+);
+
+// T-074 (PR-15, BILL-22, B-18; migration 0089): the release of an approved addition before payment by FO/cashier or a
+// manager, with the staff accountable for collecting, the authorizing clinician and the patient agreement in force at
+// release (so the cashier's record needs no clinical read). One per addition; insert-only.
+export const additionReleases = pgTable(
+  "addition_releases",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    visitId: uuid("visit_id").notNull(),
+    planItemId: uuid("plan_item_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    authorizedBy: uuid("authorized_by").notNull(),
+    consentId: uuid("consent_id").notNull(),
+    collectorStaffId: uuid("collector_staff_id").notNull(),
+    releasedBy: uuid("released_by").notNull(),
+    releasedAs: text("released_as").notNull(),
+    releasedAt: timestamp("released_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    commandKey: text("command_key").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "addition_releases_visit_fk", columns: [t.tenantId, t.branchId, t.visitId], foreignColumns: [visits.tenantId, visits.branchId, visits.id] }).onDelete("restrict"),
+    foreignKey({ name: "addition_releases_plan_item_fk", columns: [t.tenantId, t.planItemId], foreignColumns: [planItems.tenantId, planItems.id] }).onDelete("restrict"),
+    foreignKey({ name: "addition_releases_request_fk", columns: [t.tenantId, t.requestId], foreignColumns: [clinicalRequests.tenantId, clinicalRequests.id] }).onDelete("restrict"),
+    foreignKey({ name: "addition_releases_consent_fk", columns: [t.tenantId, t.consentId], foreignColumns: [procedureConsents.tenantId, procedureConsents.id] }).onDelete("restrict"),
+    foreignKey({ name: "addition_releases_authorized_by_fk", columns: [t.tenantId, t.authorizedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "addition_releases_collector_fk", columns: [t.tenantId, t.collectorStaffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "addition_releases_released_by_fk", columns: [t.tenantId, t.releasedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("addition_releases_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("addition_releases_plan_item_key").on(t.tenantId, t.planItemId),
+    unique("addition_releases_command_key").on(t.tenantId, t.commandKey),
+    index("addition_releases_visit_idx").on(t.tenantId, t.visitId),
+    check("addition_releases_check", sql`${t.releasedAs} in ('fo_cashier','manager') and ${KEY(t.commandKey)}`),
   ],
 );
 

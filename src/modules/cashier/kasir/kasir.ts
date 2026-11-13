@@ -48,10 +48,12 @@ export async function openKasirInvoice(db: pg.ClientBase, key: string, o: OpenIn
   return { invoiceId: out.result, replayed: out.replayed };
 }
 
-export type KasirLine = { itemId: string; quantity: number; discount?: number };
+// planItemId: an addition line (T-074, PR-15); an invoice is all addition lines or all ordinary ones.
+export type KasirLine = { itemId: string; quantity: number; discount?: number; planItemId?: string };
 export type Issued = { invoice_id: string; number: string; issued_at: string; is_pkp_at_issue: boolean; total: number };
 export async function issueKasirInvoice(db: pg.ClientBase, key: string, invoiceId: string, lines: KasirLine[]) {
-  const p = { lines: lines.map((l) => ({ item_id: l.itemId, quantity: l.quantity, ...(l.discount !== undefined ? { discount: l.discount } : {}) })) };
+  const p = { lines: lines.map((l) => ({ item_id: l.itemId, quantity: l.quantity, ...(l.discount !== undefined ? { discount: l.discount } : {}),
+    ...(l.planItemId ? { plan_item_id: l.planItemId } : {}) })) };
   const out = await command<Issued>(db, "invoice_issue", key, { invoice_id: invoiceId, issue: p }, `select invoice_issue($1, $2, $3::jsonb) as r`,
     [key, invoiceId, JSON.stringify(p)]);
   return { ...out.result, replayed: out.replayed };
@@ -101,7 +103,7 @@ export const kasirQueue = (db: pg.ClientBase, branchId: string | null = null) =>
 
 export type KasirLineRow = {
   id: string; item_id: string; name: string; quantity: number; unit_price: number; discount: number; line_total: number; tax_category: TaxCategory;
-  vat_amount: number; vat_recognised: number; paid: number; dispensing: { id: string; state: string } | null;
+  vat_amount: number; vat_recognised: number; paid: number; plan_item_id: string | null; dispensing: { id: string; state: string } | null;
 };
 export type TenderOption = { method: TenderMethod; available: boolean; blocked: "payment_port" | "balance" | "method_disabled" | null };
 export type PortCharge = {

@@ -26,6 +26,7 @@ const COPY: Record<string, string> = {
   too_early: "Belum bisa dicatat datang: paling cepat 2 jam sebelum jam janji.",
   already_open: "Pasien ini masih punya kunjungan terbuka di cabang ini.",
   already_closed: "Kunjungan ini sudah ditutup.",
+  unbilled_addition: "Belum bisa ditutup: tindakan tambahan belum ditagih.",
   unpaid_bill: "Belum bisa ditutup: tagihan belum lunas.",
   pending_dispensing: "Belum bisa ditutup: obat belum diserahkan.",
   pending_treatment: "Belum bisa ditutup: tindakan belum selesai.",

@@ -624,6 +624,13 @@
       "when": 1794518611960,
       "tag": "0088_payment_port",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1794528988918,
+      "tag": "0089_additions",
+      "breakpoints": true
     }
   ]
 }

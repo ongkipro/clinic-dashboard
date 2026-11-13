@@ -453,3 +453,8 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - When testing a guard, make sure the row you insert breaks only the rule under test: a copy-rule check must not run into the payment's own amount bound first (T-072 mutation run 2).
 - Browser specs: a 2FA role logging in a second time lands on /verifikasi. Keep the first session open instead of signing in again.
 
+## 2026-11-13 — T-074 Additional treatment payment
+
+- In PL/pgSQL a table alias inside a query is shadowed by a record variable of the same name (`l` here): the query fails at run time with "record is not assigned yet". Use aliases that differ from the function's variables.
+- An `AFTER UPDATE` trigger that recomputes another table's state is safe from deadlock only when every writer that updates the row already holds the same locks in the same order. Check the callers' lock order before choosing a trigger over re-creating a writer.
+- When the guard of a table forbids updating a finished row, an `OLD.state = 'finished'` check in a later trigger is unreachable. Its mutant is equivalent; record the reason instead of writing a test that cannot exist.

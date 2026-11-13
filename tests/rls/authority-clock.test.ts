@@ -319,6 +319,9 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["invoice_open", async () => ["select invoice_open('k-0000000029', null, '{}'::jsonb)", []], ["manager"]],
     ["invoice_issue", async () => ["select invoice_issue('k-0000000030', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["invoice_get", async () => ["select invoice_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-074 (PR-15): the release writer and the additions reader take the actor lock first (Level 3 roles).
+    ["addition_release", async () => ["select addition_release('k-0000000034', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["addition_visit_list", async () => ["select addition_visit_list($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-073 (PR-68): the port writers and readers take the actor lock first (Level 3 roles; the webhook ingest is
     // unbound and has no actor).
     ["payment_port_enable", async () => ["select payment_port_enable(1)", []], ["manager"]],
