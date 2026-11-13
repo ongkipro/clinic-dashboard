@@ -33,7 +33,7 @@ beforeAll(async () => {
     pool: authPool, baseURL: "https://vendor.test", surface: "vendor", secret: randomBytes(32).toString("base64"),
     roles: async () => [], rateLimit: false, sleep: async () => {}, allowAddress: async () => true,
   });
-}, 120_000);
+}, 300_000); // HYG-016: setup gets the suite's hook limit
 afterAll(async () => {
   await authPool?.end();
   await h?.close();

@@ -28,6 +28,14 @@ const freshKey = () => {
   }
 };
 
+// HYG-016: the DDL-lock tests below create harnesses, and a harness takes the cluster-wide migrate key
+// (MIGRATE_LOCK_KEY) before it migrates. In the full suite that key is queued by every other file's
+// migration, so these tests waited behind them inside their own 120 s budget and timed out (close runs 1-3:
+// 2, 4, 7, 13 and others). Measured (diag-1794587020): with five migrating files beside it, a harness waited
+// up to 38 s for the key. A DDL-lock test is about the DDL key, not the schema, so it takes a private migrate
+// key and, unless its own migrate step is the point, migrates nothing. Test 15 covers the migrate key.
+const ddlOnly = () => ({ migrateLockKey: freshKey(), migrate: async () => {} });
+
 const opened: pg.Client[] = [];
 async function client(name: string): Promise<pg.Client> {
   const c = testClient({ connectionString: adminUrl, application_name: name });
@@ -121,7 +129,7 @@ describe("HYG-006 database DDL lock", () => {
     const holder = await client("hyg006:holder");
     await holder.query("select pg_advisory_lock($1)", [key.toString()]);
     let h: Awaited<ReturnType<typeof createHarness>> | undefined;
-    const p = createHarness({ ddlLockKey: key, stalePattern: "^hyg006_never$" }).then((x) => (h = x));
+    const p = createHarness({ ddlLockKey: key, stalePattern: "^hyg006_never$", ...ddlOnly() }).then((x) => (h = x));
     const rows = await until("harness waiting", () => locks(key), (r) => r.some((x) => x.app.startsWith("harness:rls_") && x.mode === "ExclusiveLock" && !x.granted));
     expect(h).toBeUndefined();
     expect(await exists(rows.find((x) => x.app.startsWith("harness:"))!.app.slice("harness:".length))).toBe(false);
@@ -134,7 +142,7 @@ describe("HYG-006 database DDL lock", () => {
 
   it("2. a held exclusive lock blocks close()'s drop", { timeout: 120_000 }, async () => {
     const key = freshKey();
-    const h = await createHarness({ ddlLockKey: key, stalePattern: "^hyg006_never$" });
+    const h = await createHarness({ ddlLockKey: key, stalePattern: "^hyg006_never$", ...ddlOnly() });
     const holder = await client("hyg006:holder");
     await holder.query("select pg_advisory_lock($1)", [key.toString()]);
     let closed = false;
@@ -183,11 +191,11 @@ describe("HYG-006 database DDL lock", () => {
   it("4. the lock is not held while migrations run", { timeout: 120_000 }, async () => {
     const key = freshKey();
     const b = barrier();
-    const { runMigrations } = await import("../../src/db/migrate");
     const p = createHarness({
       ddlLockKey: key,
       stalePattern: "^hyg006_never$",
-      migrate: async (url) => { await b.hook(); await runMigrations(url); },
+      migrateLockKey: freshKey(),
+      migrate: async () => { await b.hook(); },
     });
     await b.atBarrier;
     expect((await locks(key)).filter((r) => r.app.startsWith("harness:rls_"))).toEqual([]);
@@ -227,7 +235,7 @@ describe("HYG-006 database DDL lock", () => {
     const boom = new Error("migration failed (test)");
     let name = "";
     await expect(
-      createHarness({ ddlLockKey: key, stalePattern: "^hyg006_never$", migrate: async (url) => { name = new URL(url).pathname.slice(1); throw boom; } }),
+      createHarness({ ddlLockKey: key, stalePattern: "^hyg006_never$", migrateLockKey: freshKey(), migrate: async (url) => { name = new URL(url).pathname.slice(1); throw boom; } }),
     ).rejects.toBe(boom);
     await until("harness backend gone", () => probe.query("select 1 from pg_stat_activity where application_name = $1", [`harness:${name}`]).then((r) => r.rowCount), (n) => n === 0);
     expect(await exists(name)).toBe(false);
@@ -257,6 +265,7 @@ describe("HYG-006 database DDL lock", () => {
     const p = createHarness({
       ddlLockKey: key,
       stalePattern: "^hyg006_never$",
+      migrateLockKey: freshKey(),
       migrate: async (url) => {
         name = new URL(url).pathname.slice(1);
         await holder.query("select pg_advisory_lock($1)", [key.toString()]);
@@ -518,7 +527,7 @@ describe("HYG-006 database DDL lock", () => {
     const direct = createTestDatabase(me, name, { ddlLockKey: key });
     await waiting(key, "hyg006:c13", "ExclusiveLock");
     let h: Awaited<ReturnType<typeof createHarness>> | undefined;
-    const viaHarness = createHarness({ ddlLockKey: key, stalePattern: "^hyg006_never$" }).then((x) => (h = x));
+    const viaHarness = createHarness({ ddlLockKey: key, stalePattern: "^hyg006_never$", ...ddlOnly() }).then((x) => (h = x));
     await until("harness create waiting", () => locks(key), (r) => r.some((x) => x.app.startsWith("harness:rls_") && x.mode === "ExclusiveLock" && !x.granted));
     expect(await exists(name)).toBe(false);
     await holder.query("select pg_advisory_unlock_shared($1)", [key.toString()]);
@@ -537,7 +546,7 @@ describe("HYG-006 database DDL lock", () => {
     try {
       // Setup: the create waits behind a held exclusive lock past the (shortened) threshold.
       await holder.query("select pg_advisory_lock($1)", [key.toString()]);
-      const p = createHarness({ ddlLockKey: key, stalePattern: "^hyg006_never$", slowMs: 200, observerName: "hyg006:obs14" });
+      const p = createHarness({ ddlLockKey: key, stalePattern: "^hyg006_never$", slowMs: 200, observerName: "hyg006:obs14", ...ddlOnly() });
       await until("harness create waiting", () => locks(key), (r) => r.some((x) => x.app.startsWith("harness:rls_") && x.mode === "ExclusiveLock" && !x.granted));
       await until("report printed", async () => lines.join("\n"), (t) => t.includes("DDL lock wait over 200 ms"));
       await holder.query("select pg_advisory_unlock($1)", [key.toString()]);

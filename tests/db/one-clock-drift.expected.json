@@ -1,0 +1,12 @@
+{
+  "before": {
+    "media_token_issue(uuid,text,text,integer)": "e0d40cbb930b5b3831b99da35daeeb67b7bc2e508c4c620f81773f5f8708ca9f",
+    "stock_vial_open_do(uuid,uuid,uuid,text,uuid,uuid)": "afe214ccebf5896345fdb42647e3e576e75618dc307b357abb1b6f2d923bd7fe",
+    "vendor_console_support_open(text,text,uuid,text,text[],integer)": "c387df7cab1a5aae1f373a259c963359d326ba0d474e882eadc4132916114a36"
+  },
+  "after": {
+    "media_token_issue(uuid,text,text,integer)": "170283420566dd2815d52333d4c26bd34a9d28e89248e2617bf51f087c20a09a",
+    "stock_vial_open_do(uuid,uuid,uuid,text,uuid,uuid)": "843e49f22dc5f2d5785e06e821167805285c10dd80e89d8c3bcbf656e4fcc0c5",
+    "vendor_console_support_open(text,text,uuid,text,text[],integer)": "ee1c75159adb60e347e0262d4d8e55080642211b22fa3aa1c549e6ca12787e9b"
+  }
+}

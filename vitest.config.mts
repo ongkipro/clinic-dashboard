@@ -12,9 +12,14 @@ import { defineConfig } from "vitest/config";
 // failed the same way, and the same files passed alone. These tests assert behaviour, not speed;
 // the limit only has to catch a hang, which 30 s still does. Tests whose timing is the point keep
 // their own explicit limits.
+//
+// HYG-016 (owner 2026-11-13): hooks get 300 s, the limit 66 files already set on their own beforeAll. In the
+// T-076 close runs 3-8 every failure was "Hook timed out in 120000ms" in a file on the default (catalog/prices,
+// vendor/staff, rls/readers, auth/second-factor, ...), with I/O pressure "full" at 30-75 % from other projects'
+// work on the shared disk; no assertion failed. A hung hook still fails, at 5 minutes, inside CI's 30-minute job.
 export default defineConfig({
   test: {
-    hookTimeout: 120_000,
+    hookTimeout: 300_000,
     testTimeout: 30_000,
   },
 });

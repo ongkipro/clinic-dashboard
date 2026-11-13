@@ -471,3 +471,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - AFTER triggers on one table fire in name order. When one trigger must see the effect of another (the package finish before the additions alert), name it to sort first and test the order.
 - A mutation the suite catches only because a new assertion fails on the unmutated code proves nothing. Rerun the suite green before reading mutation results.
 - A browser spec that counts elements right after `goto` can read the page before it renders; wait for the heading first. And after a server action that unmounts its own form, wait for what the revalidated page shows, not the form's message (seen three times in T-076's runs).
+
+## 2026-11-13 — HYG-016 One clock read per operation
+
+- Two `clock_timestamp()` reads in one row usually return the same microsecond, so a rule that stores an exact interval passes most runs and fails some (a 600 s media token broke `media_tokens_check`; a vial's use-by was 24 h + 1 us). Read the clock once into `v_now`, after the locks, and derive every timestamp of the operation from it. A column default of `clock_timestamp()` is a second read too: name the column.
+- An occasional race cannot be proved by a loop: the mutant survives whenever the reads happen to agree. Prove it from the catalog instead (`prosrc` reads the clock once), which is red on the old code every time.
+- A test's time budget includes every lock it queues on. The harness serializes migrations cluster-wide (T-060), so a lock test that builds a full harness waits behind every other file's migration and times out in the full suite while passing alone. Measure the queue (sample `pg_locks` per second by `application_name`) before blaming the disk, and give a test that is not about the schema its own key and an empty migration.
+

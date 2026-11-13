@@ -323,9 +323,10 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 - **T-073 done: payment port and mock adapter** (PR-68; migration 0088; DEC-084). Commit `61ef692`, CI 43329410944 green. Reviews: Argon implementation `584e77a6` APPROVE (P3 adopted), boundary `58285c76` APPROVE.
 - **T-074 done: additional treatment payment** (PR-15; migration 0089; DEC-085). Commit `f0454d5`, CI 43352267465 green. Reviews: Argon implementation `6a6e1366` APPROVE, boundary `e76fe6eb` APPROVE.
 - **T-075 done: patient balance ledger** (PR-21; migration 0090; DEC-086). Commit `e718cf8`, CI 43364408103 green. Reviews: Argon implementation and boundary `2cf34c80` APPROVE.
-- **T-076 (in progress): packages** (PR-20; migration 0091; DEC-087). Plan Argon `ec593235`, `33416c49`, `53d8864b` REVISE (all findings adopted), `ca3caa5d` APPROVE.
-- **Hygiene candidate (T-074 close runs 1 and 2):** two clock flakes made test-full red in turn — the vial (`tests/inventory/items.test.ts:202`) and the media token (`tests/clinical/media.test.ts:212`, `media_tokens_check`). Both read `clock_timestamp()` twice in one operation. Proposed to the owner as HYG-016 (one clock per operation); not approved yet.
-- **Hygiene candidate (T-066 close run 1, CI-independent):** `tests/inventory/items.test.ts:202` expects an opened vial's `use_by − opened_at` to be exactly 24 h, but `stock_vial_open_do` (0078:990) computes `use_by` from one `clock_timestamp()` while `opened_at` takes its column default, a later `clock_timestamp()`; the two differ by a microsecond now and then (seen 24.000000000277776). Fix: pass `opened_at` explicitly from the same instant, or compare with a tolerance. Not in T-066's paths.
+- **T-076 done: packages** (PR-20; migration 0091; DEC-087). Commit `08d9660`, CI 43432407908 green. Reviews: plan Argon `ca3caa5d` APPROVE; implementation `5ceb09a2` REVISE (owner/finance top-up branch; top-up allocation ceiling) fixed, re-review `c5c5eab7` APPROVE.
+- **HYG-016 (in progress): one clock read per operation; setup-hook limit 300 s** (owner 2026-11-13, option A; migration 0092; DEC-088). Plan Argon `68e28c82` REVISE (adopted), `2fdb5108` APPROVE. Next: T-077 (plan approved).
+- **Hygiene candidate (T-074 close runs 1 and 2):** scheduled as HYG-016 (above).
+- **Hygiene candidate (T-066 close run 1, CI-independent):** the vial use-by flake; scheduled as HYG-016 (above).
 - **Hygiene candidate (from CI 42615137831, recurred in CI 42753612376 attempt 1):** scheduled as HYG-015 (above).
 - **Queue:** M4 T-070–T-086 in TASKS order (DEC-079). Each task gets its own ledger run, an independent review (Argon), STATUS, BUILD-LOG and ARCHITECTURE updates, green CI, then merge --ff-only and push. Work stops at the M4 exit.
 

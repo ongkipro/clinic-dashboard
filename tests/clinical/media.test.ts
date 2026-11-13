@@ -211,6 +211,8 @@ describe("scenario PR-32: private, short-lived links", () => {
     // Lifetime: ≤ 600 s; 0 or 601 refused; the table refuses longer too.
     const t10 = await as(DOC, (db) => issueToken(db, key(), mediaId, "download", 600));
     expect(t10.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(600_000);
+    // HYG-016: one clock read — a 600 s token lasts exactly 600 s (two reads a microsecond apart broke media_tokens_check).
+    expect((await h.admin.query(`select expires_at - issued_at = interval '600 seconds' as ok from media_tokens where id = $1`, [t10.tokenId])).rows[0].ok).toBe(true);
     for (const ttl of [0, 601, 3600]) expect(await code(as(DOC, (db) => issueToken(db, key(), mediaId, "view", ttl))), String(ttl)).toBe("ERR_INVALID_INPUT");
     await h.admin.query(`alter table media_tokens disable trigger media_tokens_guard`);
     try {

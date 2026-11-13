@@ -198,8 +198,9 @@ describe("opened vials (open point 4)", () => {
     const b = (await as(PH, (db) => receiveStock(db, key(), null, { itemId: toxin, batchNo: "TOX-V", expiry: day(120), quantity: "30", reason: "penerimaan" }))).batchId;
     for (const p of [MGR, PU, DOC, NUR]) expect(await code(as(p, (db) => openVial(db, key(), b)))).toBe("ERR_FORBIDDEN");
     const { vialId } = await as(PH, (db) => openVial(db, key(), b));
-    const v = (await h.admin.query(`select remaining, extract(epoch from use_by - opened_at) / 3600 as hours from opened_vials where id = $1`, [vialId])).rows[0];
-    expect([Number(v.remaining), Number(v.hours)]).toEqual([30, 24]);
+    // HYG-016: one clock read — use-by is exactly 24 h after opening (two reads made it 24 h + 1 us).
+    const v = (await h.admin.query(`select remaining, use_by - opened_at = interval '24 hours' as exact from opened_vials where id = $1`, [vialId])).rows[0];
+    expect([Number(v.remaining), v.exact]).toEqual([30, true]);
     expect(await code(as(PH2, (db) => openVial(db, key(), b)))).toBe("ERR_VERSION_CONFLICT");
     const g = (await h.admin.query(`select id from stock_batches where item_id = $1 limit 1`, [gauze])).rows[0].id;
     expect(await code(as(PH, (db) => openVial(db, key(), g)))).toBe("ERR_INVALID_INPUT");
@@ -211,6 +212,9 @@ describe("opened vials (open point 4)", () => {
     const { vialId: v2 } = await as(PH, (db) => openVial(db, key(), b));
     expect((await h.admin.query(`select id, state from opened_vials where batch_id = $1 order by opened_at`, [b])).rows.map((r) => r.state)).toEqual(["lapsed", "open"]);
     expect(v2).not.toBe(vialId);
+    // The reopened vial: exact use-by; the lapsed one closed at the reopening's clock read (HYG-016).
+    expect((await h.admin.query(`select n.use_by - n.opened_at = interval '24 hours' as exact, o.closed_at = n.opened_at as same
+      from opened_vials n, opened_vials o where n.id = $1 and o.id = $2`, [v2, vialId])).rows[0]).toEqual({ exact: true, same: true });
   });
 });
 

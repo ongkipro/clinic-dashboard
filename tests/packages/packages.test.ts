@@ -66,8 +66,10 @@ const key = () => crypto.randomUUID();
 const why = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof CommandError ? `${e.code}:${(e as { reason?: string }).reason ?? ""}` : `raw:${e.code ?? ""}:${e.message}`));
 const code = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof CommandError ? e.code : `raw:${e.code ?? e.message}`));
 const blocked = (x: Promise<unknown>) => x.then(() => [] as string[], (e) => blockersOf(e));
-const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+// HYG-016: tomorrow in the clinic's zone. day(1) is tomorrow in UTC, which between 00:00 and 07:00 WIB is today in
+// WIB: scenario 16 then set PKP from the date of its own just-issued invoice and was refused (pkp_effective_from).
+const tomorrowWib = () => new Date(Date.now() + 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 function png(): Buffer {
   const b = Buffer.alloc(80);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b, 0);
@@ -536,7 +538,7 @@ describe("tax facts (scenarios 16 and 19; PENDING Q-05)", () => {
     const becomePkp = async () => {
       await h.admin.query("alter table tax_profile_changes disable trigger tax_profile_changes_guard");
       await h.admin.query("alter table tenants disable trigger tenants_tax_guard");
-      await as(own, (db) => setTaxProfile(db, key(), { isPkp: true, pkpEffectiveFrom: day(1), npwp: NPWP, reason: "PKP" }));
+      await as(own, (db) => setTaxProfile(db, key(), { isPkp: true, pkpEffectiveFrom: tomorrowWib(), npwp: NPWP, reason: "PKP" }));
       await h.admin.query(`update tax_profile_changes set pkp_effective_from = $2::date - 1, changed_at = now() - interval '2 days' where tenant_id = $1`, [C.tenantId, today()]);
       await h.admin.query(`update tenants set pkp_effective_from = $2::date - 1 where id = $1`, [C.tenantId, today()]);
       await h.admin.query("alter table tax_profile_changes enable always trigger tax_profile_changes_guard");

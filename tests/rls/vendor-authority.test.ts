@@ -80,7 +80,7 @@ beforeAll(async () => {
   } finally {
     c.release();
   }
-}, 120_000);
+}, 300_000); // HYG-016: setup gets the suite's hook limit (an explicit 120 s here overrode it and timed out in close run 1)
 
 afterAll(async () => {
   for (const c of opened) await c.end().catch(() => {});

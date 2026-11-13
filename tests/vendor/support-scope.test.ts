@@ -124,7 +124,8 @@ describe("scenarios PR-60", () => {
       id: s.id, operator: "Dukungan Satu", purpose: "Memeriksa data staf atas permintaan klinik", state: "active", needs_approval: false, minutes: 45,
       scope: [{ table: "public.branches", class: "config" }, { table: "public.evidence_items", class: "config" }],
     });
-    expect(Date.parse(row.ends_at!) - Date.parse(row.activated_at!)).toBe(45 * 60_000);
+    // HYG-016: one clock read — the end is exactly 45 minutes after activation (the old ms comparison flaked when two reads straddled a tick).
+    expect((await h.admin.query(`select ends_at - activated_at = interval '45 minutes' as ok from support_sessions where id = $1`, [s.id])).rows[0].ok).toBe(true);
     await asOwner(a, (db) => endSessionAsOwner(db, s.id));
     expect((await asOwner(a, (db) => sessionsForOwner(db)))[0]).toMatchObject({ state: "ended", end_reason: "owner" });
     expect(await code(read(supTok, s.id, `select 1 from branches`))).toBe("not_active");
