@@ -18,7 +18,7 @@ export const time = (iso: string) => new Intl.DateTimeFormat("id-ID", { timeStyl
 export const TENDER: Record<TenderMethod, string> = { cash: "Tunai", qris: "QRIS", edc: "EDC", transfer: "Transfer", va: "VA", payment_link: "Link", balance: "Saldo" };
 export const TENDER_BLOCKED: Record<string, { reason: string; unblock: string }> = {
   payment_port: { reason: "Belum tersedia — menunggu port pembayaran", unblock: "Owner dapat menghubungkan mitra pembayaran di Pengaturan" },
-  balance: { reason: "Saldo pasien belum aktif", unblock: "Gunakan Tunai, EDC, atau Transfer" },
+  balance: { reason: "Pasien ini belum punya saldo", unblock: "Gunakan Tunai, EDC, atau Transfer" },
   method_disabled: { reason: "Metode ini dimatikan", unblock: "Owner dapat menyalakannya di Pengaturan › Uang & Kasir" },
 };
 export const TAX_BADGE: Record<TaxCategory, string> = { taxable_service: "PPN", taxable_goods: "PPN", exempt_medical: "Bebas PPN", non_object: "Bukan objek PPN" };

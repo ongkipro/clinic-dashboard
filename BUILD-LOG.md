@@ -458,3 +458,9 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - In PL/pgSQL a table alias inside a query is shadowed by a record variable of the same name (`l` here): the query fails at run time with "record is not assigned yet". Use aliases that differ from the function's variables.
 - An `AFTER UPDATE` trigger that recomputes another table's state is safe from deadlock only when every writer that updates the row already holds the same locks in the same order. Check the callers' lock order before choosing a trigger over re-creating a writer.
 - When the guard of a table forbids updating a finished row, an `OLD.state = 'finished'` check in a later trigger is unreachable. Its mutant is equivalent; record the reason instead of writing a test that cannot exist.
+
+## 2026-11-13 — T-075 Patient balance
+
+- When a migration re-creates a function, copy it from its **latest** definition: grep every migration for the function, not only the one you expect. T-075 first copied `kasir_invoice_get` from 0088 and silently dropped T-074's line field from 0089; only the neighbouring suite caught it.
+- An RLS policy that calls a predicate function needs `EXECUTE` on that function for the querying role, even though the function is not a definer. Without the grant the policy fails with "permission denied for function".
+- `events_payload_ok` refuses numbers: an event names the entry and the kind; amounts are read from the entry.

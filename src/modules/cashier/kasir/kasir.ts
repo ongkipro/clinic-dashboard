@@ -16,7 +16,7 @@ export class KasirError extends CommandError {
 const CODE = /^(ERR_[A-Z_]+):\s*(.*)$/;
 const KNOWN = new Set([
   "ERR_FORBIDDEN", "ERR_NOT_FOUND", "ERR_INVALID_INPUT", "ERR_VERSION_CONFLICT", "ERR_TENANT_SUSPENDED", "ERR_IDEMPOTENCY_CONFLICT", "ERR_GATE_CLOSED",
-  "ERR_NOT_AVAILABLE",
+  "ERR_NOT_AVAILABLE", "ERR_BALANCE_INSUFFICIENT",
 ]);
 export async function call<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -111,7 +111,7 @@ export type PortCharge = {
   is_simulated: boolean; review_flag: string | null; balance_pending: number; receipt_id: string | null;
 };
 export type KasirInvoice = InvoiceRow & {
-  branch: { id: string; name: string }; is_pkp_at_issue: boolean | null; voided_at: string | null; role: string; can_pay: boolean;
+  branch: { id: string; name: string }; is_pkp_at_issue: boolean | null; patient_balance: number | null; voided_at: string | null; role: string; can_pay: boolean;
   lines: KasirLineRow[];
   receipts: { id: string; number: string; total: number; issued_at: string; is_simulated: boolean; payments: { seq: number; method: TenderMethod; amount: number; change: number | null }[] }[];
   tenders: TenderOption[];

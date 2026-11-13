@@ -543,6 +543,8 @@ describe("functions (TEN-16)", () => {
     "supplier_get(uuid)",
     "supplier_return_list(uuid)",
     "supplier_batches(uuid,uuid)",
+    // T-075 (PR-21): the patient balance reader.
+    "balance_get(uuid)",
     // T-074 (PR-15): the addition release and the cashier's additions reader.
     "addition_release(text,uuid,jsonb)",
     "addition_visit_list(uuid)",

@@ -25,6 +25,7 @@ const COPY: Record<string, string> = {
   ERR_IDEMPOTENCY_CONFLICT: "Isian ini sudah dikirim dengan isi lain. Muat ulang halaman.",
   ERR_GATE_CLOSED: "PPN belum dapat dihitung: saran pajak belum disetujui. Owner dapat melengkapinya di Kepatuhan.",
   ERR_NOT_AVAILABLE: "Metode bayar ini belum tersedia.",
+  ERR_BALANCE_INSUFFICIENT: "Saldo pasien tidak cukup untuk jumlah ini.",
 };
 const REASON: Record<string, string> = {
   overpayment: "Jumlah melebihi sisa tagihan.",
@@ -36,7 +37,8 @@ const REASON: Record<string, string> = {
   special_item: "Produk ini tidak dijual bebas (daftar khusus apotek).",
   product_without_stock_item: "Produk ini belum punya item stok. Apoteker dapat menambahkannya di Stok.",
   payment_port: "QRIS dan link bayar menunggu port pembayaran.",
-  balance: "Saldo pasien belum aktif.",
+  balance: "Pasien ini belum punya saldo.",
+  insufficient: "Saldo pasien tidak cukup untuk jumlah ini.",
   method_disabled: "Metode ini dimatikan di Pengaturan › Uang & Kasir.",
   patient_merged: "Pasien ini sudah digabung. Pilih rekam utama.",
   reason: "Tulis alasan void (3–500 karakter).",

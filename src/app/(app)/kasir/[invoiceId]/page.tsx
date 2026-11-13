@@ -47,6 +47,7 @@ async function Body({ params }: { params: Promise<{ invoiceId: string }> }) {
           <dt>Dibayar</dt><dd className="m-0 text-right">{rp(paid)}</dd>
         </dl>
         <p className="m-0 text-[1.75rem] font-bold leading-tight">{`Sisa ${rp(i.outstanding)}`}</p>
+        {i.patient_balance !== null && i.state === "issued" && <p className={muted}>{`Saldo pasien ${rp(i.patient_balance)}`}</p>}
       </section>
       {i.state === "void" ? <BlockedState reason="Tagihan dibatalkan" unblock="Buat tagihan baru bila perlu" />
         : i.void?.state === "pending" ? <BlockedState reason="Void sedang diajukan" unblock="Manajer (hari yang sama) atau owner memutuskan di Persetujuan" />
