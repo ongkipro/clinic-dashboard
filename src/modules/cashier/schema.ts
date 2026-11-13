@@ -96,6 +96,14 @@ export const invoiceLines = pgTable(
     planItemId: uuid("plan_item_id"),
     vatRecognisedAmount: bigint("vat_recognised_amount", { mode: "number" }).notNull().default(0),
     vatRecognisedAt: timestamp("vat_recognised_at", { withTimezone: true }),
+    // T-076 (DEC-087): the unpaid remainder cancelled when its package closes (or a stopped addition), the paid value
+    // moved to the balance (interrupted treatment; shared ceiling with T-078's refunds), the VAT reversed with it, and
+    // the substitution a difference line pays for (FK in migration 0091; the table is in the packages module).
+    cancelledAmount: bigint("cancelled_amount", { mode: "number" }).notNull().default(0),
+    movedToBalance: bigint("moved_to_balance", { mode: "number" }).notNull().default(0),
+    vatReversedAmount: bigint("vat_reversed_amount", { mode: "number" }).notNull().default(0),
+    vatReversedAt: timestamp("vat_reversed_at", { withTimezone: true }),
+    substitutionId: uuid("substitution_id"),
     taxDocumentRef: text("tax_document_ref"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
   },
@@ -109,6 +117,10 @@ export const invoiceLines = pgTable(
     foreignKey({ name: "invoice_lines_plan_item_fk", columns: [t.tenantId, t.planItemId], foreignColumns: [planItems.tenantId, planItems.id] }).onDelete("restrict"),
     index("invoice_lines_plan_item_idx").on(t.tenantId, t.planItemId),
     index("invoice_lines_invoice_idx").on(t.tenantId, t.invoiceId),
+    unique("invoice_lines_substitution_key").on(t.tenantId, t.invoiceId, t.substitutionId),
+    check("invoice_lines_t076_check", sql`${t.cancelledAmount} between 0 and ${t.lineTotal} and ${t.movedToBalance} between 0 and ${t.lineTotal}
+      and ${t.cancelledAmount} + ${t.movedToBalance} <= ${t.lineTotal} and ${t.vatReversedAmount} between 0 and ${t.vatRecognisedAmount}
+      and ((${t.vatReversedAmount} > 0) = (${t.vatReversedAt} is not null))`),
     check("invoice_lines_amounts_check", sql`${t.quantity} between 1 and 10000
       and ${t.unitPrice} between 0 and ${sql.raw(MONEY)}
       and ${t.discount} between 0 and ${t.unitPrice} * ${t.quantity}
@@ -133,7 +145,7 @@ export const receipts = pgTable(
     id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
     tenantId: uuid("tenant_id").notNull(),
     branchId: uuid("branch_id").notNull(),
-    invoiceId: uuid("invoice_id").notNull(),
+    invoiceId: uuid("invoice_id"), // T-076: null for an Isi Saldo receipt (balance_top_ups)
     number: text("number").notNull(),
     total: bigint("total", { mode: "number" }).notNull(),
     body: text("body").notNull(),
@@ -168,7 +180,7 @@ export const payments = pgTable(
     branchId: uuid("branch_id").notNull(),
     receiptId: uuid("receipt_id").notNull(),
     seq: smallint("seq").notNull(),
-    invoiceId: uuid("invoice_id").notNull(),
+    invoiceId: uuid("invoice_id"), // T-076: null for an Isi Saldo payment (balance_top_ups)
     patientId: uuid("patient_id"),
     method: text("method", { enum: PATIENT_PAYMENT_METHODS }).notNull(),
     amount: bigint("amount", { mode: "number" }).notNull(),
@@ -215,6 +227,7 @@ export const paymentAllocations = pgTable(
     branchId: uuid("branch_id").notNull(),
     paymentId: uuid("payment_id").notNull(),
     invoiceLineId: uuid("invoice_line_id"),
+    topUpId: uuid("top_up_id"), // T-076: the balance top-up target (DATA-28); FK in migration 0091
     amount: bigint("amount", { mode: "number" }).notNull(),
     vatPortion: bigint("vat_portion", { mode: "number" }).notNull().default(0),
     method: text("method", { enum: PATIENT_PAYMENT_METHODS }).notNull(),
@@ -233,7 +246,7 @@ export const paymentAllocations = pgTable(
     index("payment_allocations_line_idx").on(t.tenantId, t.invoiceLineId),
     // Exactly one target (DATA-28): the invoice line now; package, booking deposit, balance top-up and receivable
     // targets arrive with their tasks (T-076, T-077, T-075, T-078) and join this count.
-    check("payment_allocations_check", sql`num_nonnulls(${t.invoiceLineId}) = 1 and ${t.amount} between 1 and ${sql.raw(MONEY)}
+    check("payment_allocations_check", sql`num_nonnulls(${t.invoiceLineId}, ${t.topUpId}) = 1 and ${t.amount} between 1 and ${sql.raw(MONEY)}
       and ${t.vatPortion} between 0 and ${t.amount} and ${t.method} in (${inList(PATIENT_PAYMENT_METHODS)}) and ${t.environment} in (${inList(PAYMENT_ENVIRONMENTS)})`),
   ],
 );

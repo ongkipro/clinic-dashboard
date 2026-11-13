@@ -464,3 +464,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - When a migration re-creates a function, copy it from its **latest** definition: grep every migration for the function, not only the one you expect. T-075 first copied `kasir_invoice_get` from 0088 and silently dropped T-074's line field from 0089; only the neighbouring suite caught it.
 - An RLS policy that calls a predicate function needs `EXECUTE` on that function for the querying role, even though the function is not a definer. Without the grant the policy fails with "permission denied for function".
 - `events_payload_ok` refuses numbers: an event names the entry and the kind; amounts are read from the entry.
+
+## 2026-11-13 — T-076 Packages
+
+- A CHECK written as "state X ⇔ column set" breaks when a later state keeps the column (a redeemed session keeps its visit). Write the implication only in the direction the rule needs.
+- AFTER triggers on one table fire in name order. When one trigger must see the effect of another (the package finish before the additions alert), name it to sort first and test the order.
+- A mutation the suite catches only because a new assertion fails on the unmutated code proves nothing. Rerun the suite green before reading mutation results.
+- A browser spec that counts elements right after `goto` can read the page before it renders; wait for the heading first. And after a server action that unmounts its own form, wait for what the revalidated page shows, not the form's message (seen three times in T-076's runs).

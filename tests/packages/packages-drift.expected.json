@@ -1,0 +1,36 @@
+{
+  "before": {
+    "addition_finished()": "6fd0b56d294c28c19343efa267c070755e78d46e8a012b34c04d5e6909885188",
+    "addition_unbilled_counted(uuid,uuid)": "4fb1735a8b0418b420be56bbdf2eecd9a503145691a9378af74c25f747a5ab33",
+    "invoice_issue(text,uuid,jsonb)": "23be2e9a30d61c74bbff8aff382920bdecb2477c7aeb7ce5b48ef6e57874ad6c",
+    "invoice_lines_guard()": "6db1743e1bc8f66509183d9b33b0727dc189e100250720598ad2f9745e5a0885",
+    "invoice_void_sync()": "97d07f2490c3182ca21e9bb946e8c2bb5eddf6e096a4a8cc7f4acfadf19d34f3",
+    "kasir_outstanding(uuid,uuid)": "13564ee3e58bf422b580a85316d1161256d07a20843ae617d3a9f334f778f32f",
+    "kasir_record_payment(invoices,text,jsonb,jsonb,uuid,text,timestamp with time zone)": "e9249e6c2d8b3feafc253164cdf91d0a2bbc2bf9b37fb8a6abe3f70a1c1ae6cd",
+    "payment_allocations_guard()": "cf5d048df513193c75bbb3c51490f6399ab807bc8ae9b7659fa7ff7d81ef9329",
+    "payment_charge_create(text,uuid,jsonb)": "daa4efebdda755694e82b5aac5cc949a06261674573fbbb3e9dee15766eaaab2",
+    "payment_line_room(uuid,uuid,boolean)": "b52ccbab02104653a65f01795c499deb5e07d9ad293303faac32d2476b8f698b",
+    "payment_receive(text,uuid,jsonb)": "468c57dafd92bcdab8478b185628a6d08c6ee5bbe2696b7985682f3b941f516c",
+    "payments_guard()": "261e71043cd0b41de811bfd6591fc9b0057debf41406d87cf1e968b63a7179bc",
+    "receipt_get(uuid)": "29f77c41867b68fd9e33a603884f485447532795dce413eb8952b55c3aab5231",
+    "treatment_finish(text,uuid,jsonb)": "96c4d0f8e86c3d12d110574673fee4d1daaa9a9c3c0ae2055da3ea440aa9d2dd",
+    "treatment_payment_unpaid(visits,uuid)": "5a599087d64853369ec2bae3ce520cdbc4234dbbd8d9925297e4ab213ead00e6"
+  },
+  "after": {
+    "addition_finished()": "68a449c0a79525e28f44810d1af1bf116cd18fd3fd429fa0e4c07743e7efb5a1",
+    "addition_unbilled_counted(uuid,uuid)": "64ada5730e9c4a5ade76c4edfa975e8f7b02e100191d0c4e12e72440ed3625b1",
+    "invoice_issue(text,uuid,jsonb)": "382abe2fcc0bf72ffd3571440e23fa02a0ace874e3b1d7e27bc40a793e8a97cd",
+    "invoice_lines_guard()": "41ca4acd2d9b52e24832a25c663d22aa5f059914cd0d976949ba73b6d614dd6f",
+    "invoice_void_sync()": "d7dd863c19a65b3b72d63dcf248a1fa4281dc7ce7df1c46cf61950f587d34fe5",
+    "kasir_outstanding(uuid,uuid)": "325ca26722e67399ee26d83ed68e514c320ce485024c839a3f900fec78e6e528",
+    "kasir_record_payment(invoices,text,jsonb,jsonb,uuid,text,timestamp with time zone)": "140cdee0b78fb33de380ee71787452009b331287f8c9e0adb01755bf7d75b243",
+    "payment_allocations_guard()": "9b6177c2ac19323f5a720848945a9e04467c7d7319bc53267523543872042d67",
+    "payment_charge_create(text,uuid,jsonb)": "6e553a80e5c9a23024e79808e86dbfbf31c7f9ee2be35a360ed16c5cdfa13fe4",
+    "payment_line_room(uuid,uuid,boolean)": "996f40803a66f430667688f611ff097716d71017b570d5bffcc84ddbc2508f96",
+    "payment_receive(text,uuid,jsonb)": "baed2f33dd5ce0685db9ebdaee51dc7f26a8c583ceca74ba5897dfe3c31d36e6",
+    "payments_guard()": "fe62492f0164685fa067d5ab8679d1ed6462f2a54350ea8cd33c101303f6fbbd",
+    "receipt_get(uuid)": "a65ebdc2078cb493f248d458efe33b83f02b6470e976f60f9866193ae9f58078",
+    "treatment_finish(text,uuid,jsonb)": "5afaee457d8b516d0000d8dc325e786308df93903b73e6b5422aece2368a9957",
+    "treatment_payment_unpaid(visits,uuid)": "e916fff8e4f67dac9b4707b4a41d6a7c5dc3a1d10169d32605d13416447f26d8"
+  }
+}

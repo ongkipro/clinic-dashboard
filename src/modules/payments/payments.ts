@@ -15,7 +15,7 @@ export class PortError extends CommandError {
   }
 }
 const CODE = /^(ERR_[A-Z_]+):\s*(.*)$/;
-const KNOWN = new Set(["ERR_FORBIDDEN", "ERR_NOT_FOUND", "ERR_INVALID_INPUT", "ERR_VERSION_CONFLICT", "ERR_TENANT_SUSPENDED", "ERR_IDEMPOTENCY_CONFLICT", "ERR_NOT_AVAILABLE"]);
+const KNOWN = new Set(["ERR_FORBIDDEN", "ERR_NOT_FOUND", "ERR_INVALID_INPUT", "ERR_VERSION_CONFLICT", "ERR_TENANT_SUSPENDED", "ERR_IDEMPOTENCY_CONFLICT", "ERR_NOT_AVAILABLE", "ERR_MIN_DP_NOT_MET"]);
 async function call<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();

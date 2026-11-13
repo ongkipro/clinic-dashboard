@@ -16,7 +16,7 @@ export class KasirError extends CommandError {
 const CODE = /^(ERR_[A-Z_]+):\s*(.*)$/;
 const KNOWN = new Set([
   "ERR_FORBIDDEN", "ERR_NOT_FOUND", "ERR_INVALID_INPUT", "ERR_VERSION_CONFLICT", "ERR_TENANT_SUSPENDED", "ERR_IDEMPOTENCY_CONFLICT", "ERR_GATE_CLOSED",
-  "ERR_NOT_AVAILABLE", "ERR_BALANCE_INSUFFICIENT",
+  "ERR_NOT_AVAILABLE", "ERR_BALANCE_INSUFFICIENT", "ERR_MIN_DP_NOT_MET",
 ]);
 export async function call<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -49,11 +49,11 @@ export async function openKasirInvoice(db: pg.ClientBase, key: string, o: OpenIn
 }
 
 // planItemId: an addition line (T-074, PR-15); an invoice is all addition lines or all ordinary ones.
-export type KasirLine = { itemId: string; quantity: number; discount?: number; planItemId?: string };
+export type KasirLine = { itemId: string; quantity: number; discount?: number; planItemId?: string; substitutionId?: string }; // substitutionId: T-076
 export type Issued = { invoice_id: string; number: string; issued_at: string; is_pkp_at_issue: boolean; total: number };
 export async function issueKasirInvoice(db: pg.ClientBase, key: string, invoiceId: string, lines: KasirLine[]) {
   const p = { lines: lines.map((l) => ({ item_id: l.itemId, quantity: l.quantity, ...(l.discount !== undefined ? { discount: l.discount } : {}),
-    ...(l.planItemId ? { plan_item_id: l.planItemId } : {}) })) };
+    ...(l.planItemId ? { plan_item_id: l.planItemId } : {}), ...(l.substitutionId ? { substitution_id: l.substitutionId } : {}) })) };
   const out = await command<Issued>(db, "invoice_issue", key, { invoice_id: invoiceId, issue: p }, `select invoice_issue($1, $2, $3::jsonb) as r`,
     [key, invoiceId, JSON.stringify(p)]);
   return { ...out.result, replayed: out.replayed };
@@ -138,7 +138,8 @@ export const kasirCounterItems = (db: pg.ClientBase, branchId: string | null, qu
   call(async () => (await db.query(`select kasir_counter_items($1, $2) as r`, [branchId, query])).rows[0].r as CounterItem[]);
 
 export type Receipt = {
-  id: string; number: string; invoice_id: string; total: number; paper: "a4" | "80mm" | "58mm"; body: string; issued_at: string; is_simulated: boolean;
+  // invoice_id: null for an Isi Saldo receipt (T-076).
+  id: string; number: string; invoice_id: string | null; total: number; paper: "a4" | "80mm" | "58mm"; body: string; issued_at: string; is_simulated: boolean;
   payments: { seq: number; method: TenderMethod; amount: number; change: number | null }[];
 };
 export const getReceipt = (db: pg.ClientBase, receiptId: string) =>

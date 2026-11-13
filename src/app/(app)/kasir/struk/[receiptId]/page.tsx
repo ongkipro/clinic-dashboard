@@ -23,7 +23,7 @@ async function Body({ params }: { params: Promise<{ receiptId: string }> }) {
       </section>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <a href={`/kasir/struk/${r.id}/pdf`} className="inline-flex min-h-[52px] items-center rounded-full bg-[var(--tint)] px-5 font-semibold text-white no-underline">Cetak Struk</a>
-        <Link href={`/kasir/${r.invoice_id}`} className="inline-flex min-h-[var(--target)] items-center px-1 font-semibold text-[var(--tint)]">Ke tagihan</Link>
+        {r.invoice_id && <Link href={`/kasir/${r.invoice_id}`} className="inline-flex min-h-[var(--target)] items-center px-1 font-semibold text-[var(--tint)]">Ke tagihan</Link>}
       </div>
       <p className={muted}>Kirim WhatsApp belum tersedia: WhatsApp klinik belum terhubung.</p>
     </>

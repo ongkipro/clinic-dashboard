@@ -1,0 +1,218 @@
+// Packages (PR-20, BILL-7..11, BILL-16, BILL-24, BILL-25, DATA-29; T-076, migration 0091, DEC-087). A package is sold
+// as the one line of a patient's Kasir invoice with no visit; its paid value is the real money allocated to that line
+// minus what moved to balance. Sessions split the price by BILL-7 and unlock by paid value (BILL-8); a session is
+// reserved on an open visit, bound to the execution that starts it, and redeemed only on a counted outcome (B-15).
+// Expiry or cancellation moves the paid-unused value to the patient balance; the unpaid remainder is cancelled.
+import { sql } from "drizzle-orm";
+import { bigint, check, foreignKey, index, integer, pgTable, smallint, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { invoiceLines, invoices, receipts } from "../cashier/schema";
+import { catalogItems, catalogVersions, TAX_CATEGORIES } from "../catalog/schema";
+import { branches, staff, tenants } from "../org/schema";
+import { patients } from "../patients/schema";
+import { treatmentExecutions } from "../treatment/schema";
+import { visits } from "../visits/schema";
+
+export const PACKAGE_STATES = ["active", "expired", "cancelled"] as const;
+export const SESSION_STATES = ["available", "reserved", "redeemed", "closed"] as const;
+export const SUBSTITUTION_STATES = ["pending", "approved", "declined"] as const;
+const inList = (xs: readonly string[]) => sql.raw(xs.map((x) => `'${x}'`).join(","));
+const KEY = (c: unknown) => sql`${c} ~ '^[A-Za-z0-9_.:-]{8,128}$'`;
+const MONEY = "1000000000000";
+
+// Templat Paket (spec 19 §2.8): the services of a package version, in order, with their count. Editable while the
+// version is unreferenced; frozen once sold (CLIN-011); copied to a new version of the same item.
+export const packageContents = pgTable(
+  "package_contents",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    packageVersionId: uuid("package_version_id").notNull(),
+    seq: smallint("seq").notNull(),
+    serviceItemId: uuid("service_item_id").notNull(),
+    count: smallint("count").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_contents_version_fk", columns: [t.tenantId, t.packageVersionId], foreignColumns: [catalogVersions.tenantId, catalogVersions.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_contents_service_fk", columns: [t.tenantId, t.serviceItemId], foreignColumns: [catalogItems.tenantId, catalogItems.id] }).onDelete("restrict"),
+    unique("package_contents_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("package_contents_seq_key").on(t.tenantId, t.packageVersionId, t.seq),
+    unique("package_contents_service_key").on(t.tenantId, t.packageVersionId, t.serviceItemId),
+    check("package_contents_check", sql`${t.seq} between 1 and 20 and ${t.count} between 1 and 50`),
+  ],
+);
+
+export const packages = pgTable(
+  "packages",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    soldBranchId: uuid("sold_branch_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    invoiceId: uuid("invoice_id").notNull(),
+    invoiceLineId: uuid("invoice_line_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    catalogVersionId: uuid("catalog_version_id").notNull(),
+    price: bigint("price", { mode: "number" }).notNull(),
+    minDp: bigint("min_dp", { mode: "number" }).notNull(),
+    validityEnd: timestamp("validity_end", { withTimezone: true }).notNull(),
+    // Value that left the package to the balance before close (a cheaper substitution's difference).
+    movedToBalance: bigint("moved_to_balance", { mode: "number" }).notNull().default(0),
+    state: text("state", { enum: PACKAGE_STATES }).notNull().default("active"),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedBy: uuid("closed_by"),
+    closedAs: text("closed_as"),
+    closeReason: text("close_reason"),
+    paidUnusedMoved: bigint("paid_unused_moved", { mode: "number" }),
+    remainderCancelled: bigint("remainder_cancelled", { mode: "number" }),
+    vatReversedAmount: bigint("vat_reversed_amount", { mode: "number" }).notNull().default(0),
+    vatReversedAt: timestamp("vat_reversed_at", { withTimezone: true }),
+    createdBy: uuid("created_by").notNull(),
+    createdAs: text("created_as").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "packages_branch_fk", columns: [t.tenantId, t.soldBranchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "packages_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "packages_invoice_fk", columns: [t.tenantId, t.invoiceId], foreignColumns: [invoices.tenantId, invoices.id] }).onDelete("restrict"),
+    foreignKey({ name: "packages_line_fk", columns: [t.tenantId, t.invoiceLineId], foreignColumns: [invoiceLines.tenantId, invoiceLines.id] }).onDelete("restrict"),
+    foreignKey({ name: "packages_item_fk", columns: [t.tenantId, t.itemId], foreignColumns: [catalogItems.tenantId, catalogItems.id] }).onDelete("restrict"),
+    foreignKey({ name: "packages_version_fk", columns: [t.tenantId, t.catalogVersionId], foreignColumns: [catalogVersions.tenantId, catalogVersions.id] }).onDelete("restrict"),
+    foreignKey({ name: "packages_created_by_fk", columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("packages_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("packages_line_key").on(t.tenantId, t.invoiceLineId),
+    index("packages_patient_idx").on(t.tenantId, t.patientId),
+    index("packages_expiry_idx").on(t.state, t.validityEnd),
+    check("packages_check", sql`${t.state} in (${inList(PACKAGE_STATES)}) and ${t.price} between 1 and ${sql.raw(MONEY)}
+      and ${t.minDp} between 1 and ${t.price} and ${t.movedToBalance} between 0 and ${t.price}
+      and ((${t.state} = 'active') = (${t.closedAt} is null))
+      and (${t.state} = 'active' or ${t.closeReason} is not null and ${t.paidUnusedMoved} >= 0 and ${t.remainderCancelled} >= 0)
+      and ${t.vatReversedAmount} >= 0 and ((${t.vatReversedAmount} > 0) = (${t.vatReversedAt} is not null))`),
+  ],
+);
+
+export const packageSessions = pgTable(
+  "package_sessions",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    packageId: uuid("package_id").notNull(),
+    seq: smallint("seq").notNull(),
+    serviceItemId: uuid("service_item_id").notNull(),
+    allocatedValue: bigint("allocated_value", { mode: "number" }).notNull(),
+    taxCategory: text("tax_category", { enum: TAX_CATEGORIES }).notNull(),
+    taxBasis: text("tax_basis").notNull(),
+    vatBase: bigint("vat_base", { mode: "number" }).notNull(),
+    vatAmount: bigint("vat_amount", { mode: "number" }).notNull(),
+    vatRecognisedAmount: bigint("vat_recognised_amount", { mode: "number" }).notNull().default(0),
+    vatRecognisedAt: timestamp("vat_recognised_at", { withTimezone: true }),
+    state: text("state", { enum: SESSION_STATES }).notNull().default("available"),
+    reservedVisitId: uuid("reserved_visit_id"),
+    reservedExecutionId: uuid("reserved_execution_id"),
+    returnedExecutionIds: uuid("returned_execution_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    redeemedBranchId: uuid("redeemed_branch_id"),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+    version: integer("version").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_sessions_package_fk", columns: [t.tenantId, t.packageId], foreignColumns: [packages.tenantId, packages.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_sessions_service_fk", columns: [t.tenantId, t.serviceItemId], foreignColumns: [catalogItems.tenantId, catalogItems.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_sessions_visit_fk", columns: [t.tenantId, t.reservedVisitId], foreignColumns: [visits.tenantId, visits.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_sessions_execution_fk", columns: [t.tenantId, t.reservedExecutionId], foreignColumns: [treatmentExecutions.tenantId, treatmentExecutions.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_sessions_redeemed_branch_fk", columns: [t.tenantId, t.redeemedBranchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    unique("package_sessions_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("package_sessions_seq_key").on(t.tenantId, t.packageId, t.seq),
+    unique("package_sessions_execution_key").on(t.tenantId, t.reservedExecutionId),
+    index("package_sessions_visit_idx").on(t.tenantId, t.reservedVisitId),
+    check("package_sessions_check", sql`${t.state} in (${inList(SESSION_STATES)}) and ${t.seq} between 1 and 1000
+      and ${t.allocatedValue} >= 0 and ${t.taxCategory} in (${inList(TAX_CATEGORIES)})
+      and ${t.vatBase} >= 0 and ${t.vatAmount} >= 0 and ${t.vatBase} + ${t.vatAmount} = ${t.allocatedValue}
+      and ${t.vatRecognisedAmount} between 0 and ${t.vatAmount} and ((${t.vatRecognisedAmount} > 0) = (${t.vatRecognisedAt} is not null))
+      and (${t.state} <> 'reserved' or ${t.reservedVisitId} is not null) and (${t.state} not in ('available','closed') or ${t.reservedVisitId} is null) and (${t.reservedExecutionId} is null or ${t.state} in ('reserved','redeemed'))
+      and ((${t.state} = 'redeemed') = (${t.redeemedAt} is not null)) and ((${t.state} = 'redeemed') = (${t.redeemedBranchId} is not null))
+      and (${t.state} <> 'redeemed' or ${t.reservedExecutionId} is not null) and ${t.version} >= 0`),
+  ],
+);
+
+// Tukar Sesi (BILL-11): requested by FO/cashier, a manager or a BC; decided by a doctor or facility head of the
+// branch (≠ requester). Cheaper → the difference to balance; dearer → a difference line to pay; equal → the service only.
+export const packageSubstitutions = pgTable(
+  "package_substitutions",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    packageId: uuid("package_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    oldServiceItemId: uuid("old_service_item_id").notNull(),
+    newServiceItemId: uuid("new_service_item_id").notNull(),
+    oldValue: bigint("old_value", { mode: "number" }).notNull(),
+    newPrice: bigint("new_price", { mode: "number" }).notNull(),
+    difference: bigint("difference", { mode: "number" }).notNull(), // new − old: > 0 paid, < 0 to balance
+    reason: text("reason").notNull(),
+    state: text("state", { enum: SUBSTITUTION_STATES }).notNull().default("pending"),
+    requestedBy: uuid("requested_by").notNull(),
+    requestedAs: text("requested_as").notNull(),
+    decidedBy: uuid("decided_by"),
+    decidedAs: text("decided_as"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionReason: text("decision_reason"),
+    commandKey: text("command_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_substitutions_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_substitutions_package_fk", columns: [t.tenantId, t.packageId], foreignColumns: [packages.tenantId, packages.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_substitutions_session_fk", columns: [t.tenantId, t.sessionId], foreignColumns: [packageSessions.tenantId, packageSessions.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_substitutions_old_fk", columns: [t.tenantId, t.oldServiceItemId], foreignColumns: [catalogItems.tenantId, catalogItems.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_substitutions_new_fk", columns: [t.tenantId, t.newServiceItemId], foreignColumns: [catalogItems.tenantId, catalogItems.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_substitutions_requested_by_fk", columns: [t.tenantId, t.requestedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_substitutions_decided_by_fk", columns: [t.tenantId, t.decidedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("package_substitutions_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("package_substitutions_command_key").on(t.tenantId, t.commandKey),
+    index("package_substitutions_session_idx").on(t.tenantId, t.sessionId),
+    check("package_substitutions_check", sql`${t.state} in (${inList(SUBSTITUTION_STATES)}) and ${t.oldValue} >= 0 and ${t.newPrice} >= 1
+      and ${t.difference} = ${t.newPrice} - ${t.oldValue} and ${t.oldServiceItemId} <> ${t.newServiceItemId}
+      and length(btrim(${t.reason})) between 3 and 500 and ${KEY(t.commandKey)}
+      and ${t.requestedAs} in ('fo_cashier','manager','bc')
+      and ((${t.state} = 'pending') = (${t.decidedAt} is null)) and num_nonnulls(${t.decidedAt}, ${t.decidedBy}, ${t.decidedAs}) in (0, 3)
+      and (${t.decidedAs} is null or ${t.decidedAs} in ('doctor','facility_head'))
+      and (${t.state} <> 'declined' or length(btrim(${t.decisionReason})) between 3 and 500)`),
+  ],
+);
+
+// Isi Saldo (UX-13 Top Up Saldo; DEC-086 (7)): the money received for the balance, with its Kasir receipt and payment
+// (no invoice); credits `top_up` through balance_post. Not turnover (no invoice line). Insert-only.
+export const balanceTopUps = pgTable(
+  "balance_top_ups",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    receiptId: uuid("receipt_id").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    commandKey: text("command_key").notNull(),
+    receivedBy: uuid("received_by").notNull(),
+    receivedAs: text("received_as").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "balance_top_ups_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "balance_top_ups_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "balance_top_ups_receipt_fk", columns: [t.tenantId, t.receiptId], foreignColumns: [receipts.tenantId, receipts.id] }).onDelete("restrict"),
+    foreignKey({ name: "balance_top_ups_by_fk", columns: [t.tenantId, t.receivedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("balance_top_ups_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("balance_top_ups_receipt_key").on(t.tenantId, t.receiptId),
+    unique("balance_top_ups_command_key").on(t.tenantId, t.commandKey),
+    check("balance_top_ups_check", sql`${t.amount} between 1 and ${sql.raw(MONEY)} and ${KEY(t.commandKey)}
+      and ${t.receivedAs} in ('owner','manager','fo_cashier','finance')`),
+  ],
+);
+

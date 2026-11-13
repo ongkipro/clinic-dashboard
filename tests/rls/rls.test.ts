@@ -543,6 +543,19 @@ describe("functions (TEN-16)", () => {
     "supplier_get(uuid)",
     "supplier_return_list(uuid)",
     "supplier_batches(uuid,uuid)",
+    // T-076 (PR-20): the package writers, readers and the unbound expiry scan.
+    "package_reserve(text,uuid,uuid,jsonb)",
+    "package_release(uuid)",
+    "package_cancel(uuid,text)",
+    "package_expiry_scan(date)",
+    "interrupted_to_balance(text,uuid)",
+    "package_substitution_request(text,uuid,jsonb)",
+    "package_substitution_decide(uuid,boolean,text)",
+    "balance_top_up(text,uuid,uuid,jsonb)",
+    "package_contents_set(uuid,jsonb)",
+    "package_patient_get(uuid)",
+    "package_patient_search(text)",
+    "package_contents_get(uuid)",
     // T-075 (PR-21): the patient balance reader.
     "balance_get(uuid)",
     // T-074 (PR-15): the addition release and the cashier's additions reader.

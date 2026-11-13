@@ -50,6 +50,7 @@ const pembelian = await import("../../src/app/(app)/pembelian/actions"); // T-06
 const logbook = await import("../../src/app/(app)/logbook/actions"); // T-068
 const insiden = await import("../../src/app/(app)/keluhan/insiden/actions"); // T-068
 const kasir = await import("../../src/app/(app)/kasir/actions"); // T-072
+const paket = await import("../../src/app/(app)/kasir/paket-saldo/actions"); // T-076
 const simulasi = await import("../../src/app/(app)/simulasi/actions"); // T-073
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -173,6 +174,11 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["kasir chargeAction", (f) => kasir.chargeAction({}, f), () => ({ key: U(306), invoice: U(304), channel: "qris" })],
   ["kasir pollAction", (f) => kasir.pollAction({}, f), () => ({ key: U(307), charge: U(308) })],
   ["kasir cancelChargeAction", (f) => kasir.cancelChargeAction({}, f), () => ({ key: U(309), charge: U(308) })],
+  ["paket reserveAction", (f) => paket.reserveAction({}, f), () => ({ key: U(310), package: U(311), visit: U(312) })],
+  ["paket releaseAction", (f) => paket.releaseAction({}, f), () => ({ key: U(313), session: U(314) })],
+  ["paket cancelAction", (f) => paket.cancelAction({}, f), () => ({ key: U(315), package: U(311), reason: "Pindah kota" })],
+  ["paket topUpAction", (f) => paket.topUpAction({}, f), () => ({ key: U(316), patient: U(317), method: "cash", amount: "1000" })],
+  ["paket contentsAction", (f) => paket.contentsAction({}, f), () => ({ key: U(318), version: U(319), "svc:0": U(320), "cnt:0": "1" })],
   ["simulasi enableAction", (f) => simulasi.enableAction({}, f), () => ({})],
   ["simulasi simulateAction", (f) => simulasi.simulateAction({}, f), () => ({ charge: U(308), action: "paid" })],
   ["stok receiveAction", (f) => stok.receiveAction({}, f), () => ({ key: U(151), item: U(152), batch_no: "B-1", expiry: "2030-01-01", quantity: "1", reason: "penerimaan" })],

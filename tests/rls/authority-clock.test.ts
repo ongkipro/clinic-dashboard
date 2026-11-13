@@ -319,6 +319,18 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["invoice_open", async () => ["select invoice_open('k-0000000029', null, '{}'::jsonb)", []], ["manager"]],
     ["invoice_issue", async () => ["select invoice_issue('k-0000000030', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["invoice_get", async () => ["select invoice_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-076 (PR-20): the package writers and readers take the actor lock first (Level 3 roles; the scan is unbound).
+    ["package_reserve", async () => ["select package_reserve('k-0000000035', $1, $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["package_release", async () => ["select package_release($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["package_cancel", async () => ["select package_cancel($1, 'Alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["interrupted_to_balance", async () => ["select interrupted_to_balance('k-0000000036', $1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["package_substitution_request", async () => ["select package_substitution_request('k-0000000037', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["package_substitution_decide", async () => ["select package_substitution_decide($1, true, null)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["balance_top_up", async () => ["select balance_top_up('k-0000000038', $1, null, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["package_contents_set", async () => ["select package_contents_set($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["package_patient_get", async () => ["select package_patient_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["package_patient_search", async () => ["select package_patient_search('ab')", []], ["manager"]],
+    ["package_contents_get", async () => ["select package_contents_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-075 (PR-21): the balance reader takes the actor lock first (Level 3 roles).
     ["balance_get", async () => ["select balance_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-074 (PR-15): the release writer and the additions reader take the actor lock first (Level 3 roles).
