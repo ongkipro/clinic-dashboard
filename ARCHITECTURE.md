@@ -151,7 +151,7 @@ PostgreSQL 16, 55 migrations (`drizzle/0000`–`0054`), applied migrations immut
 
 ## Operations
 
-- Local: `docker compose up -d postgres`, `DB_LOCAL=1 pnpm db:migrate`.
+- Local: `docker compose up -d postgres`, `DB_LOCAL=1 pnpm db:migrate`. The local container runs with `fsync=off` and related flags (HYG-017): its data is disposable; CI and production keep the PostgreSQL defaults.
 - CI (`.github/workflows/ci.yml`): typecheck, lint, migrate, tests on PostgreSQL 16, build, audit, docs:check, image build + migration from the image, digest record.
 - First vendor user on a fresh server: `pnpm vendor:bootstrap` (DEC-036). Backups: pgBackRest sidecar with a restore drill (`ops/pgbackrest`).
 - PostgreSQL never runs as PID 1 (HYG-005): local Compose `postgres` uses Docker's init (`init: true`, exec-form healthcheck `pg_isready -t 2`, 60 s stop grace); the CI service container runs with `--init`; the pgBackRest production image's entrypoint is `tini` (`ops/pgbackrest/Dockerfile`), so Coolify, the restore drill and restored instances are covered whatever the platform sets.

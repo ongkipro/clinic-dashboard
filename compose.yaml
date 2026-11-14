@@ -9,6 +9,23 @@ services:
     # server shut down cleanly.
     init: true
     stop_grace_period: 60s
+    # HYG-017 (owner 2026-11-14): this container holds throwaway test databases and local dev data only, so it trades
+    # crash safety for I/O. Each test file creates, migrates and drops a database; with fsync on that wrote hundreds of
+    # GB per session. A host crash may lose this container's data. CI and the production image keep the defaults.
+    command:
+      - postgres
+      - -c
+      - fsync=off
+      - -c
+      - synchronous_commit=off
+      - -c
+      - full_page_writes=off
+      - -c
+      - checkpoint_timeout=30min
+      - -c
+      - max_wal_size=4GB
+      - -c
+      - autovacuum_vacuum_cost_delay=0
     environment:
       POSTGRES_USER: clinic
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clinic_local_only}

@@ -493,3 +493,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - When the test file fails to compile, every mutant is "caught". Gate the mutation run on a green suite in the same script.
 - A mutant "caught" by a flaky test is not caught. Two events written in one transaction share `now()` and uuid v7 does not order within a millisecond; the 15b event-order assertion failed at random and hid five untested rules until it compared the set. Read which test fails for each caught mutant.
 - A check placed after another that always answers first for the same rows can never fire (a converted remainder is never paid, so `line_unpaid` answered before `line_on_receivable`). Order the specific refusal first and test it.
+
+## 2026-11-14 — HYG-017 Test container durability
+
+- A test suite that creates, migrates and drops a database per file pays for crash safety it never uses. On the local
+  throwaway container, `fsync=off`, `synchronous_commit=off` and `full_page_writes=off` cut `tests/rls tests/db` from 249 s to 63 s
+  and the container's writes from about 2 GB to 124 MB per run. Keep CI on the defaults so it still runs what production runs.
+- Check a setting exists on the server's major version before planning around it: `autovacuum_vacuum_truncate` is PostgreSQL 18;
+  on 16 the per-table `vacuum_truncate` is refused on a system catalog even for a superuser.
