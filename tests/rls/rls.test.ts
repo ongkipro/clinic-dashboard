@@ -583,6 +583,13 @@ describe("functions (TEN-16)", () => {
     "instalment_schedule_cancel(uuid)",
     "instalment_schedule_get(uuid,uuid)",
     "instalment_reminder_scan(date)",
+    // T-084 (PR-79): the expense writers and readers (each takes the actor lock first).
+    "expense_category_save(uuid,jsonb)",
+    "expense_record(text,uuid,jsonb,bytea)",
+    "expense_reverse(uuid,text)",
+    "expenses_list(uuid,date,date,uuid,text)",
+    "expense_receipt(uuid)",
+    "expense_branch_totals(date,date)",
     // T-079 (PR-12, BILL-4/5): the consultation fee and control writers and readers (each takes the actor lock first).
     "consultation_fee_charge(text,uuid,jsonb)",
     "consultation_fee_exempt(text,uuid,jsonb)",

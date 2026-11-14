@@ -311,7 +311,8 @@ export const supplierInvoices = pgTable(
     check("supplier_invoices_check", sql`${t.kind} in (${inList(INVOICE_KINDS)}) and ((${t.kind} = 'expense') = (${t.expenseId} is not null))
       and ${DOCNO(t.number)} and ${t.invoiceDate} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' and ${t.dueDate} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' and ${t.dueDate} >= ${t.invoiceDate}
       and ${money(t.total, "1")} and ${money(t.paidAmount)} and ${money(t.creditedAmount)} and ${t.paidAmount} + ${t.creditedAmount} <= ${t.total}
-      and ${t.state} in (${inList(INVOICE_STATES)}) and ${KEY(t.commandKey)} and ${t.recordedAs} in ('purchasing','finance')
+      and ${t.state} in (${inList(INVOICE_STATES)}) and ${KEY(t.commandKey)}
+      and (${t.kind} = 'purchase' and ${t.recordedAs} in ('purchasing','finance') or ${t.kind} = 'expense' and ${t.recordedAs} in ('owner','finance','manager'))
       and ((${t.state} = 'paid') = (${t.paidAmount} + ${t.creditedAmount} = ${t.total} and ${t.state} <> 'reversed'))
       and (${t.state} <> 'reversed' or (${t.paidAmount} = 0 and ${t.creditedAmount} = 0))
       and ((${t.state} = 'reversed') = (${t.reversedAt} is not null)) and num_nonnulls(${t.reversedAt}, ${t.reversedBy}, ${t.reverseReason}) in (0, 3) and ${REASON(t.reverseReason)}`),

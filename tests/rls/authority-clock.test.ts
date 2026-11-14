@@ -338,6 +338,13 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["deposit_refund_clinic", async () => ["select deposit_refund_clinic('k-0000000040', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-080: the manual-discount report takes the actor lock first.
     ["discount_manual_list", async () => ["select discount_manual_list(null)", []], ["owner"]],
+    // T-084: the expense writers and readers take the actor lock first.
+    ["expense_category_save", async () => ["select expense_category_save(null, '{}'::jsonb)", []], ["owner"]],
+    ["expense_record", async () => ["select expense_record('k-0000000094', null, '{}'::jsonb, null)", []], ["owner"]],
+    ["expense_reverse", async () => ["select expense_reverse($1, 'Alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["expenses_list", async () => ["select expenses_list(null, current_date, current_date)", []], ["owner"]],
+    ["expense_receipt", async () => ["select * from expense_receipt($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["expense_branch_totals", async () => ["select expense_branch_totals(current_date, current_date)", []], ["owner"]],
     // T-083: the schedule writers and reader take the actor lock first.
     ["instalment_schedule_set", async () => ["select instalment_schedule_set('k-0000000093', '{}'::jsonb)", []], ["fo_cashier"]],
     ["instalment_schedule_cancel", async () => ["select instalment_schedule_cancel($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],

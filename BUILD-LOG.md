@@ -554,3 +554,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A guard test that changes a frozen column is caught by the identity check and never reaches the "set once" branch; test the
   set-once column itself (`reminded_on` cleared or moved after the scan set it).
 
+## 2026-11-14 — T-084 Expenses and petty cash
+
+- A deferred constraint trigger runs with the committing session's rights: `SELECT * INTO e FROM expenses` in a non-definer check needs
+  SELECT on every column, and the app role has no grant on `receipt_content`, so every commit failed with "permission denied for table
+  expenses". Integrity checks that read a table with column grants (or rows outside the session's RLS) are SECURITY DEFINER.
+- `events_payload_ok` refuses JSON null values in a domain event payload; build payloads with `jsonb_strip_nulls` when a key is optional.
+- An isolation case cannot nest `withTenantContext` (one role inside another): run each role's call on its own, then combine.
