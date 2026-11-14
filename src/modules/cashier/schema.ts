@@ -109,6 +109,10 @@ export const invoiceLines = pgTable(
     vatReversedAmount: bigint("vat_reversed_amount", { mode: "number" }).notNull().default(0),
     vatReversedAt: timestamp("vat_reversed_at", { withTimezone: true }),
     substitutionId: uuid("substitution_id"),
+    // T-080 (PR-72, DATA-61): a manual discount — within the role's SET-12 limit applied at issue, or over it requested in
+    // Persetujuan (the line stays at full price until approved; the amount lives on the approval).
+    discountKind: text("discount_kind"),
+    discountApprovalId: uuid("discount_approval_id"),
     taxDocumentRef: text("tax_document_ref"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
   },
@@ -123,6 +127,9 @@ export const invoiceLines = pgTable(
     index("invoice_lines_plan_item_idx").on(t.tenantId, t.planItemId),
     index("invoice_lines_invoice_idx").on(t.tenantId, t.invoiceId),
     unique("invoice_lines_substitution_key").on(t.tenantId, t.invoiceId, t.substitutionId),
+    foreignKey({ name: "invoice_lines_discount_approval_fk", columns: [t.tenantId, t.discountApprovalId], foreignColumns: [approvals.tenantId, approvals.id] }).onDelete("restrict"),
+    check("invoice_lines_discount_check", sql`(${t.discountKind} is null or ${t.discountKind} = 'manual')
+      and ((${t.discountKind} is null) = (${t.discount} = 0 and ${t.discountApprovalId} is null))`),
     check("invoice_lines_t076_check", sql`${t.cancelledAmount} between 0 and ${t.lineTotal} and ${t.movedToBalance} between 0 and ${t.lineTotal}
       and ${t.cancelledAmount} + ${t.movedToBalance} <= ${t.lineTotal} and ${t.vatReversedAmount} between 0 and ${t.vatRecognisedAmount}
       and ${t.receivableAmount} between 0 and ${t.lineTotal} and ${t.cancelledAmount} + ${t.movedToBalance} + ${t.receivableAmount} <= ${t.lineTotal}

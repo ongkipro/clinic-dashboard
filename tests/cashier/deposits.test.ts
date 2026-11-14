@@ -423,6 +423,8 @@ describe("the PKP gross variants (6 and 17): VAT reversed on a move or refund, c
     tx = await service({ own: COWN, fh: CFH }, "DP-PKP", { tax_category: "taxable_service", tax_basis: "Jasa", normal_price: 1_665_000, booking_dp_enabled: true, booking_dp_amount: 222_000 });
     await setupBranch(C, COWN, [CDOC.staffId], [tx.itemId]);
     await dpOn(COWN);
+    // T-080 (PR-72): the variants discount a line to the balance amount; SET-12 lets FO apply it here.
+    await as(COWN, (db) => changeSetting(db, { key: "SET-12", branchId: null, value: { fo_persen: 100, manajer_persen: 10, manajer_rupiah: 500_000 }, reason: "Uji diskon FO" }));
     const pdf = Buffer.from(`%PDF-1.7\nsaran pajak dp\n%%EOF\n`);
     const { fileId } = await as(CFIN, (db) => uploadEvidence(db, { obligationKey: "tax_advice", fileName: "saran.pdf", content: pdf, expertName: "Konsultan Pajak Sintetis", documentDate: "2026-10-01" }));
     const it = (await h.admin.query(`select item_id from evidence_files where id = $1`, [fileId])).rows[0].item_id;

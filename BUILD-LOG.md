@@ -509,3 +509,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A mutant that edits the wrong line survives for the wrong reason. Read what each mutant actually removes before writing a test for it.
 - Never read and write one file in one expression: `open(p, 'w').write(open(p).read() + x)` truncates the file before it is read. The BUILD-LOG lost 503 lines that way and the review caught it; read first, then write.
 - Drop a mutant as equivalent only with the chain written down: a void closes a package only while unpaid, and an unpaid package is never a qualifying purchase, so the void exclusion cannot be reached through the writers.
+
+## 2026-11-14 — T-080 Manual discounts
+
+- In a guard, `NOT (a AND x = (subquery))` lets the row through when the subquery finds nothing: the comparison is NULL, NOT NULL is NULL, and an IF on NULL does not raise. Wrap the allowance in `coalesce(..., false)` and test the direct UPDATE that must be refused.
+- A mutant that makes the migration fail to parse is "caught" by every test failing at setup. Read the failing test per mutant; replace such a mutant with a valid one.
+- A new limit with a strict default (FO 0 %) changes every older suite that gave an FO discount. Grep the tests for `discount:` before the first run and set the limit in their setup.
+- Start the ledger only after the worktree exists: a `cd` into a missing directory runs `delivery-ledger start` in the main checkout.
+- Before closing, walk the approved plan's review sections line by line against the diff. Here four approved items (a report reader, a
+  re-created guard, two invariants, a lock order) were missed at build and only the implementation review found them.
+

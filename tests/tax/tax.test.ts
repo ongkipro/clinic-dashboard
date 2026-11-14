@@ -14,6 +14,7 @@ import { publish } from "../../src/modules/catalog/catalog";
 import { setBranchPrice } from "../../src/modules/catalog/prices/prices";
 import { getInvoice, issueInvoice, openInvoice } from "../../src/modules/cashier/invoice/invoice";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
+import { changeSetting } from "../../src/modules/settings/settings";
 import { getTaxProfile, setTaxProfile, TaxError } from "../../src/modules/tax/tax";
 import { createHarness, type Harness, testPool } from "../rls/harness";
 
@@ -96,6 +97,8 @@ beforeAll(async () => {
   serum = await item("PJ-SRM", "Serum Pajak", "taxable_goods", 222_000);
   consult = await item("PJ-KON", "Obat Resep", "exempt_medical", 150_000);
   gift = await item("PJ-VCH", "Voucher Hadiah", "non_object", 100_000);
+  // T-080 (PR-72): these suites test the line arithmetic with FO discounts; SET-12 lets FO apply up to 100 % here.
+  await as(OWN, (db) => changeSetting(db, { key: "SET-12", branchId: null, value: { fo_persen: 100, manajer_persen: 10, manajer_rupiah: 500_000 }, reason: "Uji diskon FO" }));
 }, 300_000);
 afterAll(async () => {
   await app?.end();

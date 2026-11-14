@@ -28,6 +28,8 @@ export const APPROVAL_TYPES: Record<string, { label: string; approverRoles: read
   record_late_correction: { label: "Koreksi rekam medis", approverRoles: ["records_officer", "facility_head"] },
   // T-072 (PR-19, SET-43): a manager decides on the invoice's issue day (when SET-43 allows), afterwards the owner.
   invoice_void: { label: "Void invoice", approverRoles: ["owner", "manager"] },
+  // T-080 (PR-72, SET-12): a manager decides only within the manager limit, otherwise the owner.
+  manual_discount: { label: "Diskon manual", approverRoles: ["owner", "manager"] },
 };
 // Types the owner decides only while no facility head other than the requester could (DEC-031 D2,
 // DEC-046 (1)).
@@ -114,6 +116,7 @@ export async function listInbox(db: pg.ClientBase, role: Role, filter: { type?: 
         and ($3::text not in ('owner','facility_head') or a.type <> 'catalog_materials_review' or not approval_ph_available(a.id))
         and ($3::text <> 'manager' or a.type <> 'invoice_void' or approval_manager_decides_void(a.id))
         and ($3::text <> 'manager' or a.type <> 'refund_exception' or approval_manager_decides_refund(a.id))
+        and ($3::text <> 'manager' or a.type <> 'manual_discount' or approval_manager_decides_discount(a.id))
       order by a.requested_at, a.id limit $2`,
     [types, limit + 1, role, OWNER_FALLBACK_TYPES],
   );
@@ -139,6 +142,7 @@ export async function inboxDetail(db: pg.ClientBase, actor: { staffId: string; r
     : actor.role === "manager" && r.type === "invoice_void" && !(await db.query(`select approval_manager_decides_void($1) as ok`, [id])).rows[0].ok ? "not-approver"
     // SET-11 (T-078): a manager decides a cash refund only where the tenant allows owner_manager.
     : actor.role === "manager" && r.type === "refund_exception" && !(await db.query(`select approval_manager_decides_refund($1) as ok`, [id])).rows[0].ok ? "not-approver"
+    : actor.role === "manager" && r.type === "manual_discount" && !(await db.query(`select approval_manager_decides_discount($1) as ok`, [id])).rows[0].ok ? "not-approver"
     : null;
   return {
     ...row(r),

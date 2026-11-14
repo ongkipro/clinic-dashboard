@@ -181,6 +181,8 @@ beforeAll(async () => {
   if (cf.approvalId) await as(FH, (db) => db.query(`select approval_decide($1, true, null)`, [cf.approvalId]));
   ctlFacial = cf.itemId;
   await setFee(150_000);
+  // T-080 (PR-72): one case discounts a line to 0 as FO; SET-12 lets FO apply it here.
+  await as(OWN, (db) => changeSetting(db, { key: "SET-12", branchId: null, value: { fo_persen: 100, manajer_persen: 10, manajer_rupiah: 500_000 }, reason: "Uji diskon FO" }));
 }, 300_000);
 afterAll(async () => {
   setKekRingForTests(undefined);

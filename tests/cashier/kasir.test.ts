@@ -126,6 +126,8 @@ beforeAll(async () => {
   const apt = (await as(PH, (db) => createDepot(db, key(), { branchId: null, name: "Apotek Kasir", kind: "apotek" }))).depotId;
   const batch = (await as(PH, (db) => receiveStock(db, key(), null, { itemId: serumItem, batchNo: "KS-B1", expiry: day(200), quantity: "50", reason: "stok_awal" }))).batchId;
   await as(PH, (db) => transferBetweenDepots(db, key(), { fromDepotId: g1, toDepotId: apt, lines: [{ batchId: batch, quantity: "50" }] }));
+  // T-080 (PR-72): these suites test the line arithmetic with FO discounts; SET-12 lets FO apply up to 100 % here.
+  await as(OWN, (db) => changeSetting(db, { key: "SET-12", branchId: null, value: { fo_persen: 100, manajer_persen: 10, manajer_rupiah: 500_000 }, reason: "Uji diskon FO" }));
 }, 300_000);
 afterAll(async () => {
   await app?.end();

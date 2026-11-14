@@ -1,0 +1,32 @@
+{
+  "before": {
+    "deposit_apply_do(invoices,booking_deposits,uuid,text)": "f3815acabd023ec2e7877d3bcbeeef689020ec3bb11b90ec3d92035018d6e480",
+    "invoice_issue(text,uuid,jsonb)": "55883896dc6eb9389ab83cc7d7db2452825b13bbdb167b7b28916d03b68cc1cf",
+    "invoice_line_snapshot(invoices,uuid,integer,bigint,timestamp with time zone,uuid,uuid)": "5521054e6d3e06988581a7df3c6d81c605cc1bbdf617e2e9eb69d6eda60ece3d",
+    "invoice_lines_guard()": "3c3258c7f18e56dbb64d02b6536dbb768db5abcae00e62a7869799661ff12465",
+    "invoice_void_request(uuid,text)": "c795a7f85b90958d505a87ce18d3b60d33d6cb3cb257c87baf90ea0f8ca18c1a",
+    "kasir_invoice_get(uuid)": "d7accf60b2d17cf84bf1f2bd993450db0293467a8538429821caf5f284df0d27",
+    "kasir_record_payment(invoices,text,jsonb,jsonb,uuid,text,timestamp with time zone)": "08ff89d20907bf5f1670a4af4e86081b5df5a8214a1021d1bd5a87d2b992bbce",
+    "packages_guard()": "1928a3fbc608d677357f91786e2ad97d196950a37f901244d24b38d8a0796337",
+    "payment_allocations_guard()": "225d11af379cd0643408e4cfa29c7f2e3ef4cd0b238a31a0163138cb44a6eaa4",
+    "payment_charge_create(text,uuid,jsonb)": "71fb2f08b1c258b7314c8d915807ef58a94cc8e905b0465749e4d3fbfcb34447",
+    "payment_line_room(uuid,uuid,boolean)": "b9812ce2890578c6e8caf97951017ffce395d56050c74698b46572a4c6431f04",
+    "payment_receive(text,uuid,jsonb)": "baed2f33dd5ce0685db9ebdaee51dc7f26a8c583ceca74ba5897dfe3c31d36e6",
+    "receivable_convert(text,uuid)": "aec6fc613781a2dd703a9eadf0bbfd277acdff4c971433f0eea3b23f86d2fd87"
+  },
+  "after": {
+    "deposit_apply_do(invoices,booking_deposits,uuid,text)": "3a6fddcb041f1e2d3aec00d0bde44bfd1ad20771cc2d167dea8046d52c037e0b",
+    "invoice_issue(text,uuid,jsonb)": "a5ff5dea8c8df0574b5935a5a039548ece6560da7419ca27db9c331094e08ac3",
+    "invoice_line_snapshot(invoices,uuid,integer,bigint,timestamp with time zone,uuid,uuid,text)": "aa9a24a33ccb689351379ea64ea19c8c4c0bfc096f926d7c36fbdf41be79f861",
+    "invoice_lines_guard()": "c5585fb5619919487fce68bb71859870378717d9eda146482601c6a77a476e23",
+    "invoice_void_request(uuid,text)": "ac25ec7e1bd6c0c1a2c6b686ce86a0941281fda7de80eb1a52074a1cbd8572d9",
+    "kasir_invoice_get(uuid)": "1ecfc158fac0156a1769963419eee5122026b5a1519726dbf1be879b82acd797",
+    "kasir_record_payment(invoices,text,jsonb,jsonb,uuid,text,timestamp with time zone)": "19a567f86074a2049e61d8a4aea5388bb4692dc0cb8ab4c322eb4443a203a5a3",
+    "packages_guard()": "5154eda70cd8e57c874483c95127579e0bfaccef8b8a611487027af976ee38aa",
+    "payment_allocations_guard()": "b9941b428ba2862791666e8ec29045871f56cd53d9b0615c25ebbcc26838a529",
+    "payment_charge_create(text,uuid,jsonb)": "9d913aaec9c0786ef29805ea202e52b42b1d3a37c682af882a71012a8180a40e",
+    "payment_line_room(uuid,uuid,boolean)": "0acda65cbbccc47920c53207a70362312e01438876d54c9cd8ea61b12cf5135e",
+    "payment_receive(text,uuid,jsonb)": "61f5d31200b9208709d0a23c93f2103323b205d55067970422d23de5ef386f8d",
+    "receivable_convert(text,uuid)": "a5fc6f0920a2fdf5dd8b1f5777cba898e349cc6d21d13d490156e7139272087d"
+  }
+}
