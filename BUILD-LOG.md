@@ -537,3 +537,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   Evidence `/data/tmp/clinic-dashboard/t081/failure-close3/`. Rule: after any change to a re-created function, regenerate the drift
   expected file before closing.
 
+## 2026-11-14 — T-082 Family package sharing
+
+- A row-lock wait does not show as an ungranted lock on the table in `pg_locks` (it waits on the holder's transaction id). To prove a
+  writer blocks on a row held by another session, look for a session with `wait_event_type = 'Lock'` whose `pg_blocking_pids` contains
+  the holder.
+- A snapshot "at the sale instant" is only tested when the sale and the snapshot differ in time: the T-080 deferred package open
+  (decision after issue) is that case; a mutant reading the switch "now" survived until it was tested.
+- Mutation review removed one redundant condition (the beneficiary check re-reading the switch, already enforced by the insert guard)
+  and dropped one equivalent mutant (an UPDATE of the switch also fails the next-version check).
+

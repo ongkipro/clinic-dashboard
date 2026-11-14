@@ -338,6 +338,11 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["deposit_refund_clinic", async () => ["select deposit_refund_clinic('k-0000000040', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-080: the manual-discount report takes the actor lock first.
     ["discount_manual_list", async () => ["select discount_manual_list(null)", []], ["owner"]],
+    // T-082: the sharing switch, its reader and the beneficiary writers take the actor lock first.
+    ["package_sharing_set", async () => ["select package_sharing_set($1, true, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["package_sharing_get", async () => ["select package_sharing_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["package_beneficiary_add", async () => ["select package_beneficiary_add('k-0000000091', $1, $1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["package_beneficiary_remove", async () => ["select package_beneficiary_remove($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
     // T-081: the promo writers and readers take the actor lock first.
     ["promo_code_create", async () => ["select promo_code_create('k-0000000081', '{}'::jsonb)", []], ["admin_pusat"]],
     ["promo_code_version", async () => ["select promo_code_version('k-0000000082', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["admin_pusat"]],

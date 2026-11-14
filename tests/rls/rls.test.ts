@@ -573,6 +573,11 @@ describe("functions (TEN-16)", () => {
     "promo_code_set(uuid,boolean,integer)",
     "promo_codes_list()",
     "promo_code_check(text,uuid,uuid,integer,uuid)",
+    // T-082 (PR-93): the family sharing switch (owner), its reader, and the beneficiary writers (each takes the actor lock first).
+    "package_sharing_set(uuid,boolean,text)",
+    "package_sharing_get(uuid)",
+    "package_beneficiary_add(text,uuid,uuid,text)",
+    "package_beneficiary_remove(uuid,text)",
     // T-079 (PR-12, BILL-4/5): the consultation fee and control writers and readers (each takes the actor lock first).
     "consultation_fee_charge(text,uuid,jsonb)",
     "consultation_fee_exempt(text,uuid,jsonb)",

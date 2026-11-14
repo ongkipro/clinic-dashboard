@@ -4,7 +4,7 @@
 // reserved on an open visit, bound to the execution that starts it, and redeemed only on a counted outcome (B-15).
 // Expiry or cancellation moves the paid-unused value to the patient balance; the unpaid remainder is cancelled.
 import { sql } from "drizzle-orm";
-import { bigint, check, foreignKey, index, integer, pgTable, smallint, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, foreignKey, index, integer, pgTable, smallint, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { invoiceLines, invoices, receipts } from "../cashier/schema";
 import { catalogItems, catalogVersions, TAX_CATEGORIES } from "../catalog/schema";
 import { branches, staff, tenants } from "../org/schema";
@@ -68,6 +68,8 @@ export const packages = pgTable(
     remainderCancelled: bigint("remainder_cancelled", { mode: "number" }),
     vatReversedAmount: bigint("vat_reversed_amount", { mode: "number" }).notNull().default(0),
     vatReversedAt: timestamp("vat_reversed_at", { withTimezone: true }),
+    // T-082 (PR-93, DATA-67): family sharing, snapshotted from the template (package_sharing) at the sale instant.
+    sharingAllowed: boolean("sharing_allowed").notNull().default(false),
     createdBy: uuid("created_by").notNull(),
     createdAs: text("created_as").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
@@ -111,6 +113,8 @@ export const packageSessions = pgTable(
     state: text("state", { enum: SESSION_STATES }).notNull().default("available"),
     reservedVisitId: uuid("reserved_visit_id"),
     reservedExecutionId: uuid("reserved_execution_id"),
+    // T-082 (DATA-67): the treated patient (canonical) of a reserved or redeemed session — the owner or a beneficiary.
+    beneficiaryPatientId: uuid("beneficiary_patient_id"),
     returnedExecutionIds: uuid("returned_execution_ids").array().notNull().default(sql`'{}'::uuid[]`),
     redeemedBranchId: uuid("redeemed_branch_id"),
     redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
@@ -127,6 +131,8 @@ export const packageSessions = pgTable(
     unique("package_sessions_tenant_id_id_key").on(t.tenantId, t.id),
     unique("package_sessions_seq_key").on(t.tenantId, t.packageId, t.seq),
     unique("package_sessions_execution_key").on(t.tenantId, t.reservedExecutionId),
+    foreignKey({ name: "package_sessions_beneficiary_fk", columns: [t.tenantId, t.beneficiaryPatientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    index("package_sessions_beneficiary_idx").on(t.tenantId, t.beneficiaryPatientId).where(sql`${t.beneficiaryPatientId} is not null`),
     index("package_sessions_visit_idx").on(t.tenantId, t.reservedVisitId),
     check("package_sessions_check", sql`${t.state} in (${inList(SESSION_STATES)}) and ${t.seq} between 1 and 1000
       and ${t.allocatedValue} >= 0 and ${t.taxCategory} in (${inList(TAX_CATEGORIES)})
@@ -135,6 +141,7 @@ export const packageSessions = pgTable(
       and (${t.state} <> 'reserved' or ${t.reservedVisitId} is not null) and (${t.state} not in ('available','closed') or ${t.reservedVisitId} is null) and (${t.reservedExecutionId} is null or ${t.state} in ('reserved','redeemed'))
       and ((${t.state} = 'redeemed') = (${t.redeemedAt} is not null)) and ((${t.state} = 'redeemed') = (${t.redeemedBranchId} is not null))
       and (${t.state} <> 'redeemed' or ${t.reservedExecutionId} is not null) and ${t.version} >= 0`),
+    check("package_sessions_beneficiary_check", sql`(${t.state} in ('reserved','redeemed')) = (${t.beneficiaryPatientId} is not null)`),
   ],
 );
 
@@ -213,6 +220,68 @@ export const balanceTopUps = pgTable(
     unique("balance_top_ups_command_key").on(t.tenantId, t.commandKey),
     check("balance_top_ups_check", sql`${t.amount} between 1 and ${sql.raw(MONEY)} and ${KEY(t.commandKey)}
       and ${t.receivedAs} in ('owner','manager','fo_cashier','finance')`),
+  ],
+);
+
+// Family sharing (PR-93, P-24, DATA-67; T-082, migration 0098). The switch per package template (catalog item of kind package) is
+// versioned and insert-only: the state at an instant is the latest version changed at or before it (no row = off, the default).
+// Only the owner changes it, with a reason.
+export const packageSharing = pgTable(
+  "package_sharing",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    version: integer("version").notNull(),
+    enabled: boolean("enabled").notNull(),
+    reason: text("reason").notNull(),
+    changedBy: uuid("changed_by").notNull(),
+    changedAs: text("changed_as").notNull(),
+    changedAt: timestamp("changed_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_sharing_item_fk", columns: [t.tenantId, t.itemId], foreignColumns: [catalogItems.tenantId, catalogItems.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_sharing_changed_by_fk", columns: [t.tenantId, t.changedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("package_sharing_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("package_sharing_version_key").on(t.tenantId, t.itemId, t.version),
+    check("package_sharing_check", sql`${t.version} >= 1 and length(btrim(${t.reason})) between 3 and 500 and ${t.changedAs} = 'owner'`),
+  ],
+);
+
+// Named beneficiaries of a sharing package (PR-93, BILL-11): the patient (canonical at grant) may redeem sessions; the package owner
+// keeps ownership, refunds and the balance. Granted and removed with a reason; never deleted; one active row per canonical patient.
+export const packageBeneficiaries = pgTable(
+  "package_beneficiaries",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    packageId: uuid("package_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    grantedBy: uuid("granted_by").notNull(),
+    grantedAs: text("granted_as").notNull(),
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    grantReason: text("grant_reason").notNull(),
+    removedBy: uuid("removed_by"),
+    removedAs: text("removed_as"),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removeReason: text("remove_reason"),
+    commandKey: text("command_key").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_beneficiaries_package_fk", columns: [t.tenantId, t.packageId], foreignColumns: [packages.tenantId, packages.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_beneficiaries_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_beneficiaries_granted_by_fk", columns: [t.tenantId, t.grantedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "package_beneficiaries_removed_by_fk", columns: [t.tenantId, t.removedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("package_beneficiaries_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("package_beneficiaries_command_key").on(t.tenantId, t.commandKey),
+    index("package_beneficiaries_package_idx").on(t.tenantId, t.packageId),
+    check("package_beneficiaries_check", sql`${KEY(t.commandKey)} and length(btrim(${t.grantReason})) between 3 and 500
+      and ${t.grantedAs} in ('owner','manager','fo_cashier')
+      and num_nonnulls(${t.removedBy}, ${t.removedAs}, ${t.removedAt}, ${t.removeReason}) in (0, 4)
+      and (${t.removeReason} is null or length(btrim(${t.removeReason})) between 3 and 500)
+      and (${t.removedAs} is null or ${t.removedAs} in ('owner','manager','fo_cashier'))`),
   ],
 );
 

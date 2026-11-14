@@ -84,16 +84,27 @@ export async function topUpBalance(db: pg.ClientBase, key: string, patientId: st
 export type SessionRow = {
   id: string; seq: number; service_item_id: string; service: string | null; value: number; state: "available" | "reserved" | "redeemed" | "closed";
   visit_id: string | null; redeemed_at: string | null; redeemed_branch: string | null; pending_substitution: boolean;
+  patient: { id: string; name: string | null; mrn: string } | null; // T-082: the treated patient (owner or beneficiary)
 };
 export type PackageRow = {
   id: string; name: string; price: number; paid: number; min_dp: number; state: "active" | "expired" | "cancelled"; validity_end: string;
   invoice_id: string; invoice_number: string | null; outstanding: number; sold_branch: { id: string; name: string };
   redeemed: number; reserved: number; unlocked_value: number; next_need: number | null; paid_unused_moved: number | null; remainder_cancelled: number | null;
   sessions: SessionRow[];
+  // T-082 (PR-93): the sharing snapshot, the active beneficiaries and whether the role may add one.
+  sharing_allowed: boolean; can_share: boolean;
+  beneficiaries: { id: string; patient: { id: string; name: string | null; mrn: string }; granted_at: string }[];
+};
+// A package shared with the patient (a beneficiary projection: no billing fields, no other beneficiaries).
+export type SharedPackageRow = {
+  id: string; name: string; state: "active"; validity_end: string; sold_branch: { id: string; name: string };
+  shared_from: { id: string; name: string | null; mrn: string }; redeemed: number; reserved: number; unlocked_value: number; next_need: number | null;
+  can_reserve: boolean; can_cancel: false; can_share: false;
+  sessions: { id: string; seq: number; service_item_id: string; service: string | null; state: SessionRow["state"]; visit_id: string | null; mine: boolean }[];
 };
 export type PatientPackages = {
   patient: { id: string; name: string | null; mrn: string } | null; role: string; can_reserve: boolean; can_cancel: boolean; can_top_up: boolean;
-  balance: number; packages: PackageRow[]; visits: { id: string; checked_in_at: string }[];
+  balance: number; packages: PackageRow[]; shared_packages: SharedPackageRow[]; visits: { id: string; checked_in_at: string }[];
 };
 export const patientPackages = (db: pg.ClientBase, patientId: string) =>
   call(async () => (await db.query(`select package_patient_get($1) as r`, [patientId])).rows[0].r as PatientPackages);

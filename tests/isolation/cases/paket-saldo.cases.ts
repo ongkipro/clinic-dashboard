@@ -11,6 +11,7 @@ import { assignBranch, assignRole, createMembership, resolveContext } from "../.
 import {
   cancelPackage, packageContents, patientPackages, releaseSession, reserveSession, searchPatients, setPackageContents, topUpBalance,
 } from "../../../src/modules/packages/packages";
+import { addBeneficiary, packageSharing, removeBeneficiary, setPackageSharing } from "../../../src/modules/packages/sharing/sharing";
 import { defineCases, type IsolationEnv } from "../case";
 
 process.env.DEPLOY_ENV = "local";
@@ -42,7 +43,8 @@ async function as<T>(env: IsolationEnv, tenantId: string, branchId: string, role
 const asMine = <T>(env: IsolationEnv, role: CaseRole, fn: (db: never) => Promise<T>) => as(env, env.actor.tenantId, env.actor.branchId, role, fn);
 
 let runs = 0;
-type Seed = { name: string; mrn: string; patient: string; pkg: string; version: string; versionName: string; visit: string; session: string; service: string; draft: string };
+type Seed = { name: string; mrn: string; patient: string; pkg: string; version: string; versionName: string; visit: string; session: string; service: string; draft: string;
+  item: string; beneficiary: string; child2: string };
 const latest = new Map<string, Seed>();
 const templates = new Map<string, { item: string; version: string; versionName: string; service: string }>();
 async function victim(env: IsolationEnv): Promise<Seed> {
@@ -62,6 +64,8 @@ async function victim(env: IsolationEnv): Promise<Seed> {
       { name: versionName, tax_category: "exempt_medical", tax_basis: "Jasa medis", normal_price: 200_000 } as never, "Baru"));
     await as(env, t, b, "owner", (db) => setPackageContents(db, k(), pk.versionId, [{ serviceItemId: svc.itemId, count: 2 }]));
     tpl = { item: pk.itemId, version: pk.versionId, versionName, service: svc.itemId };
+    // T-082: B's template shares (the owner's switch), so B's package can carry a beneficiary.
+    await as(env, t, b, "owner", (db) => setPackageSharing(db as never, k(), pk.itemId, true, "Paket keluarga"));
     templates.set(t, tpl);
   }
   const name = `Pasien Rahasia Paket ${t.slice(0, 8)} ${n}`;
@@ -82,11 +86,27 @@ async function victim(env: IsolationEnv): Promise<Seed> {
   const visit = (await env.owner.query(`insert into visits (tenant_id, branch_id, patient_id, kind, checked_in_by) values ($1, $2, $3, 'walk_in', $4) returning id`,
     [t, b, patient, fo])).rows[0].id as string;
   const { sessionId: session } = await as(env, t, b, "fo_cashier", (db) => reserveSession(db, k(), pkg, visit));
+  const kid = crypto.randomUUID().replace(/-/g, "");
+  const child = (await env.owner.query(
+    `insert into patients (tenant_id, mrn, full_name, birth_date, sex, identity_type, identity_enc, identity_bidx, religion, occupation, education,
+                           marital_status, registered_branch_id, created_by, created_as)
+     values ($1, 'RM-' || (1000000000000 + floor(random() * 8999999999999))::bigint::text, 'Anak Rahasia', '2010-01-01', 'female', 'nik', $3, $4, 'islam', 'Pelajar', 'sma', 'belum_kawin', $2,
+             (select s.id from staff s where s.tenant_id = $1 limit 1), 'fo_cashier') returning id`,
+    [t, b, `v1.1.${kid}.${kid}.${kid}`, (kid + kid).slice(0, 43)])).rows[0].id as string;
+  const { beneficiaryId: beneficiary } = await as(env, t, b, "fo_cashier", (db) => addBeneficiary(db, k(), pkg, child, "Anak pemilik"));
+  const child2 = (await env.owner.query(
+    `insert into patients (tenant_id, mrn, full_name, birth_date, sex, identity_type, identity_enc, identity_bidx, religion, occupation, education,
+                           marital_status, registered_branch_id, created_by, created_as)
+     values ($1, 'RM-' || (1000000000000 + floor(random() * 8999999999999))::bigint::text, 'Anak Rahasia Dua', '2012-01-01', 'female', 'nik', $3, $4, 'islam', 'Pelajar', 'smp', 'belum_kawin', $2,
+             (select s.id from staff s where s.tenant_id = $1 limit 1), 'fo_cashier') returning id`,
+    [t, b, `v1.1.k${kid}.${kid}.${kid}`, ('k' + kid + kid).slice(0, 43)])).rows[0].id as string;
   // An unsold package version of B (Isi Paket edits only unsold versions).
   const draft = (await as(env, t, b, "owner", (db) => publish(db, { kind: "package", code: `PKD-${t.slice(0, 4).toUpperCase()}${n}` },
     { name: `Paket Draf ${n}`, tax_category: "exempt_medical", tax_basis: "Jasa medis", normal_price: 100_000 } as never, "Baru"))).versionId;
   for (const x of [name, row.mrn, patient, pkg, visit, session, tpl.versionName, draft]) env.victimSecret(x);
-  const r = { name, mrn: row.mrn as string, patient, pkg, version: tpl.version, versionName: tpl.versionName, visit, session, service: tpl.service, draft };
+  env.victimSecret(beneficiary);
+  const r = { name, mrn: row.mrn as string, patient, pkg, version: tpl.version, versionName: tpl.versionName, visit, session, service: tpl.service, draft,
+    item: tpl.item, beneficiary, child2 };
   latest.set(t, r);
   return r;
 }
@@ -119,6 +139,12 @@ export default defineCases(
         topUp: await outcome(asMine(env, "fo_cashier", (db) => topUpBalance(db as never, k(), v.patient, null, { method: "cash", amount: 1_000, cashTendered: 1_000 }))),
         // a sold version's contents are frozen even for B: the attempt is on a fresh unsold version of B (seeded below)
         contents: await outcome(asMine(env, "owner", (db) => setPackageContents(db as never, k(), v.draft, [{ serviceItemId: v.service, count: 1 }]))),
+        // T-082 (before the cancel, on an active package): B's sharing switch and B's beneficiaries. As B the release above freed
+        // the reservation, so the beneficiary can be removed; a second beneficiary is added (B's second seeded child); the read covers the switch.
+        addBeneficiary: await outcome(asMine(env, "fo_cashier", (db) => addBeneficiary(db as never, k(), v.pkg, v.child2, "Coba lintas"))),
+        shareRead: await outcome(asMine(env, "owner", (db) => packageSharing(db as never, v.item))),
+        removeBeneficiary: await outcome(asMine(env, "fo_cashier", (db) => removeBeneficiary(db as never, k(), v.beneficiary, "Coba lintas"))),
+        share: await outcome(asMine(env, "owner", (db) => setPackageSharing(db as never, k(), v.item, true, "Coba lintas"))),
         cancel: await outcome(asMine(env, "owner", (db) => cancelPackage(db as never, k(), v.pkg, "Coba lintas"))),
       };
       const read = await asMine(env, "owner", (db) => patientPackages(db as never, v.patient).then((x) => x.patient?.name ?? null, () => null));
