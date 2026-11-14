@@ -583,6 +583,14 @@ describe("functions (TEN-16)", () => {
     "instalment_schedule_cancel(uuid)",
     "instalment_schedule_get(uuid,uuid)",
     "instalment_reminder_scan(date)",
+    // T-085 (PR-19): the shift writers and readers (each takes the actor lock first) and the inbox helper (a reader without the
+    // actor lock, as approval_manager_decides_void).
+    "cash_shift_open(text,uuid,jsonb)",
+    "cash_shift_submit(text,uuid,jsonb)",
+    "cash_shift_list(uuid,text)",
+    "cash_shift_get(uuid)",
+    "cash_shift_mine(uuid)",
+    "approval_manager_decides_shift(uuid)",
     // T-084 (PR-79): the expense writers and readers (each takes the actor lock first).
     "expense_category_save(uuid,jsonb)",
     "expense_record(text,uuid,jsonb,bytea)",

@@ -569,3 +569,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A time slot clamped to "before midnight" collapses several slots into one late in the day; count slots back from the last one instead
   (`arrivalSlot`). Night runs (and night CI) expose both.
 
+## 2026-11-14 — T-085 Tutup Kasir
+
+- Adding a column to a table breaks every function that builds its row positionally (`ROW(...)::public.<table>`): `refund_request`
+  failed with "cannot cast type record to public.refunds". Before adding a column, grep `::public.<table>` and re-create those writers.
+- A guard that compares an explicit column list lets a new column through unchanged; one that compares `to_jsonb(NEW) - [...]` would
+  not. Check which form a guard uses before deciding whether it must be re-created.
+- A counter sale of a product needs an active stock item (`product_without_stock_item`), and a refund needs a patient on the invoice
+  (`invoice_without_patient`): fixtures must provide both.
+

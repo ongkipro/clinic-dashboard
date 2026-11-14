@@ -54,6 +54,7 @@ const paket = await import("../../src/app/(app)/kasir/paket-saldo/actions"); // 
 const simulasi = await import("../../src/app/(app)/simulasi/actions"); // T-073
 const piutang = await import("../../src/app/(app)/piutang/actions"); // T-078
 const biaya = await import("../../src/app/(app)/keuangan/biaya/actions"); // T-084
+const tutup = await import("../../src/app/(app)/kasir/tutup/actions"); // T-085
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -190,6 +191,8 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["biaya recordAction", (f) => biaya.recordAction({}, f), () => ({ key: U(331), branch: BRANCH_1, category: U(332), date: today, amount: "150000", funding: "bank", description: "Uji konteks" })],
   ["biaya reverseAction", (f) => biaya.reverseAction({}, f), () => ({ key: U(333), expense: U(334), reason: "Uji konteks" })],
   ["biaya saveCategoryAction", (f) => biaya.saveCategoryAction({}, f), () => ({ key: U(335), name: "Transportasi" })],
+  ["tutup openAction", (f) => tutup.openAction({}, f), () => ({ key: U(336), branch: BRANCH_1, opening_float: "200000" })],
+  ["tutup countAction", (f) => tutup.countAction({}, f), () => ({ key: U(337), shift: U(338), counted_cash: "150000", reason: "Uji konteks" })],
   ["simulasi enableAction", (f) => simulasi.enableAction({}, f), () => ({})],
   ["simulasi simulateAction", (f) => simulasi.simulateAction({}, f), () => ({ charge: U(308), action: "paid" })],
   ["stok receiveAction", (f) => stok.receiveAction({}, f), () => ({ key: U(151), item: U(152), batch_no: "B-1", expiry: "2030-01-01", quantity: "1", reason: "penerimaan" })],

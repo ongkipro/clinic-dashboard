@@ -338,6 +338,12 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["deposit_refund_clinic", async () => ["select deposit_refund_clinic('k-0000000040', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-080: the manual-discount report takes the actor lock first.
     ["discount_manual_list", async () => ["select discount_manual_list(null)", []], ["owner"]],
+    // T-085: the shift writers and readers take the actor lock first.
+    ["cash_shift_open", async () => ["select cash_shift_open('k-0000000095', null, '{}'::jsonb)", []], ["manager"]],
+    ["cash_shift_submit", async () => ["select cash_shift_submit('k-0000000096', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["cash_shift_list", async () => ["select cash_shift_list(null, null)", []], ["manager"]],
+    ["cash_shift_get", async () => ["select cash_shift_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["cash_shift_mine", async () => ["select cash_shift_mine(null)", []], ["manager"]],
     // T-084: the expense writers and readers take the actor lock first.
     ["expense_category_save", async () => ["select expense_category_save(null, '{}'::jsonb)", []], ["owner"]],
     ["expense_record", async () => ["select expense_record('k-0000000094', null, '{}'::jsonb, null)", []], ["owner"]],

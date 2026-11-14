@@ -708,6 +708,13 @@
       "when": 1794660978858,
       "tag": "0100_expenses",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1794664118529,
+      "tag": "0101_cash_shifts",
+      "breakpoints": true
     }
   ]
 }

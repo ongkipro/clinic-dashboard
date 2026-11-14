@@ -14,7 +14,7 @@
 //   after discount (BILL-6, BILL-28): vat_base + vat_amount = line_total. `vat_recognised_*` and the tax-document
 //   reference are filled by the tax point (payment or delivery; T-072 onwards).
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, date, foreignKey, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, date, foreignKey, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { approvals } from "../approvals/schema";
 import { clinicalRequests, planItems, procedureConsents } from "../clinical/schema";
 import { documentTemplateVersions } from "../documents/schema";
@@ -210,6 +210,8 @@ export const payments = pgTable(
     // settled it (a status poll has no event). Composite FKs are added in migration 0088 (the tables are later).
     chargeId: uuid("charge_id"),
     webhookEventId: uuid("webhook_event_id"),
+    // T-085 (DATA-72): the receiver's open shift, stamped by the payments_shift trigger; FK added in migration 0101 (cash_shifts is later).
+    shiftId: uuid("shift_id"),
     receivedBy: uuid("received_by").notNull(),
     receivedAs: text("received_as").notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
@@ -336,6 +338,7 @@ export const bookingDeposits = pgTable(
     decisionCode: text("decision_code"),
     refundMethod: text("refund_method"),
     refundDetails: jsonb("refund_details"),
+    shiftId: uuid("shift_id"), // T-085: the payer's shift of a clinic DP refund in cash (stamped; FK in migration 0101)
     decidedBy: uuid("decided_by"),
     decidedAs: text("decided_as"),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
@@ -400,6 +403,7 @@ export const refunds = pgTable(
     cashEntryId: uuid("cash_entry_id"),
     paidMethod: text("paid_method"),
     paidDetails: jsonb("paid_details"),
+    shiftId: uuid("shift_id"), // T-085: the payer's shift of a cash refund paid in cash (stamped; FK in migration 0101)
     failureCode: text("failure_code"),
     requestedBy: uuid("requested_by").notNull(),
     requestedAs: text("requested_as").notNull(),
@@ -680,5 +684,103 @@ export const consultationControls = pgTable(
       and ((${t.state} = 'cancelled') = (${t.cancelCode} is not null))
       and (${t.cancelCode} is null or ${t.cancelCode} in ('source_refunded'))
       and ${t.scheduledAs} in ('owner','manager','fo_cashier','doctor')`),
+  ],
+);
+
+// ── T-085 Tutup Kasir (PR-19, BILL-18, DATA-35/72; plan §1, r1 P1-2/P1-3).
+// The FK on payments/booking_deposits/refunds.shift_id is added in the migration parts (the tables are defined above; drizzle cannot
+// reference a later table from an earlier one without reordering), as T-073 did for charge_id.
+export const SHIFT_STATES = ["open", "pending_approval", "recount", "closed"] as const;
+
+export const cashShifts = pgTable(
+  "cash_shifts",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    cashierId: uuid("cashier_id").notNull(),
+    cashierRole: text("cashier_role").notNull(),
+    state: text("state", { enum: SHIFT_STATES }).notNull().default("open"),
+    openingFloat: bigint("opening_float", { mode: "number" }).notNull(),
+    autoOpened: boolean("auto_opened").notNull(),
+    openKey: text("open_key").notNull(),
+    openedBy: uuid("opened_by").notNull(),
+    openedAs: text("opened_as").notNull(),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "cash_shifts_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "cash_shifts_cashier_fk", columns: [t.tenantId, t.cashierId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "cash_shifts_opened_by_fk", columns: [t.tenantId, t.openedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("cash_shifts_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("cash_shifts_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
+    unique("cash_shifts_open_key").on(t.tenantId, t.openKey),
+    uniqueIndex("cash_shifts_one_open").on(t.tenantId, t.branchId, t.cashierId).where(sql`${t.state} = 'open'`),
+    check("cash_shifts_check", sql`${t.state} in (${inList(SHIFT_STATES)}) and ${t.openingFloat} between 0 and ${sql.raw(MONEY)}
+      and (${t.autoOpened} or ${KEY(t.openKey)}) and ${t.cashierRole} in ('owner','manager','fo_cashier','finance') and ${t.openedAs} = ${t.cashierRole}
+      and ${t.openedBy} = ${t.cashierId} and (${t.autoOpened} = false or ${t.openingFloat} = 0)
+      and ((${t.state} = 'open') = (${t.closedAt} is null)) and ((${t.state} = 'closed') = (${t.settledAt} is not null))`),
+  ],
+);
+
+export const cashShiftCounts = pgTable(
+  "cash_shift_counts",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    shiftId: uuid("shift_id").notNull(),
+    seq: smallint("seq").notNull(),
+    countedCash: bigint("counted_cash", { mode: "number" }).notNull(),
+    expectedCash: bigint("expected_cash", { mode: "number" }).notNull(),
+    reason: text("reason"),
+    threshold: bigint("threshold", { mode: "number" }).notNull(),
+    approvalId: uuid("approval_id"),
+    commandKey: text("command_key").notNull(),
+    countedBy: uuid("counted_by").notNull(),
+    countedAs: text("counted_as").notNull(),
+    countedAt: timestamp("counted_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "cash_shift_counts_shift_fk", columns: [t.tenantId, t.branchId, t.shiftId], foreignColumns: [cashShifts.tenantId, cashShifts.branchId, cashShifts.id] }).onDelete("restrict"),
+    foreignKey({ name: "cash_shift_counts_approval_fk", columns: [t.tenantId, t.approvalId], foreignColumns: [approvals.tenantId, approvals.id] }).onDelete("restrict"),
+    foreignKey({ name: "cash_shift_counts_counted_by_fk", columns: [t.tenantId, t.countedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("cash_shift_counts_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("cash_shift_counts_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
+    unique("cash_shift_counts_seq_key").on(t.tenantId, t.shiftId, t.seq),
+    unique("cash_shift_counts_approval_key").on(t.tenantId, t.approvalId),
+    unique("cash_shift_counts_command_key").on(t.tenantId, t.commandKey),
+    check("cash_shift_counts_check", sql`${KEY(t.commandKey)} and ${t.seq} between 1 and 100 and ${t.countedCash} between 0 and ${sql.raw(MONEY)}
+      and ${t.threshold} >= 0 and ((${t.countedCash} = ${t.expectedCash}) = (${t.approvalId} is null))
+      and (${t.countedCash} = ${t.expectedCash} or length(btrim(${t.reason})) between 3 and 500)
+      and ${t.countedAs} in ('owner','manager','fo_cashier','finance')`),
+  ],
+);
+
+export const cashShiftCountLines = pgTable(
+  "cash_shift_count_lines",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    countId: uuid("count_id").notNull(),
+    method: text("method", { enum: PATIENT_PAYMENT_METHODS }).notNull(),
+    payments: integer("payments").notNull(),
+    received: bigint("received", { mode: "number" }).notNull(),
+    paidOut: bigint("paid_out", { mode: "number" }).notNull(),
+    expected: bigint("expected", { mode: "number" }).notNull(),
+    counted: bigint("counted", { mode: "number" }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "cash_shift_count_lines_count_fk", columns: [t.tenantId, t.branchId, t.countId], foreignColumns: [cashShiftCounts.tenantId, cashShiftCounts.branchId, cashShiftCounts.id] }).onDelete("restrict"),
+    unique("cash_shift_count_lines_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("cash_shift_count_lines_method_key").on(t.tenantId, t.countId, t.method),
+    check("cash_shift_count_lines_check", sql`${t.method} in (${inList(PATIENT_PAYMENT_METHODS)}) and ${t.payments} >= 0 and ${t.received} >= 0 and ${t.paidOut} >= 0
+      and (${t.method} = 'cash' or ${t.paidOut} = 0) and ((${t.method} = 'cash') = (${t.counted} is not null))`),
   ],
 );
