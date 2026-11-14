@@ -519,3 +519,21 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Before closing, walk the approved plan's review sections line by line against the diff. Here four approved items (a report reader, a
   re-created guard, two invariants, a lock order) were missed at build and only the implementation review found them.
 
+## 2026-11-14 — T-081 Promo codes
+
+- PL/pgSQL inside a function: a `FOR rec IN SELECT … LOOP` over a `record` whose query aliases a table like an existing variable
+  (`l`, `u`) fails with "record is not assigned yet" or "column reference is ambiguous". Use aliases no variable uses (`pl`, `pu`, `pcv`).
+- No `CREATE TEMP TABLE` inside a definer to carry rows between loops; parallel arrays and `unnest(a, b, c)` do it without DDL.
+- A mutant that replaces a statement ending in a comment (`…; -- note`) with `NULL;` can leave a broken line; anchor mutants on the
+  statement without its comment and replace with `PERFORM 1;`. Two such mutants "caught" by a parse error were re-run and caught for real.
+- Mutation review removed two redundant guards (an `active` re-check already done by resolution; a manual-discount refusal the snapshot
+  already makes) and one equivalent mutant (a version UPDATE also fails the next-number check).- Close run 1 failed on two of my own errors, both fixed and re-run: the close script, adapted from T-080's by `sed`, kept
+  `--required-by T-080`, so every scope expansion was refused; and the drift test used the regex `s` flag, which the ES2017 target
+  rejects (TS1501), failing typecheck, the build and the build-driven `tests/platform/hosts.spec.ts`. After adapting a script, grep it
+  for the old task id; run `pnpm typecheck` after writing any test.- The implementation review again found approved plan items missing (three tests from the plan's review section). Before closing,
+  grep the plan's review sections for "test" and tick each against the test file.- Close run 3 (2026-11-14T11:03:56Z) recorded rls=FAIL (exit 1): `tests/db/promo-drift.test.ts` "the changed ones are exactly the
+  declared set" — the `after` hash of `package_close_do` was `080c2208…`, the expected file still held `bce6e48e…` from before the
+  review fix that removed its `invoice_void` guard. The expected file was regenerated (diff: that one hash only); rls re-run 690/690.
+  Evidence `/data/tmp/clinic-dashboard/t081/failure-close3/`. Rule: after any change to a re-created function, regenerate the drift
+  expected file before closing.
+

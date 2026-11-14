@@ -29,3 +29,4 @@ export * from "../../modules/cashier/schema";
 export * from "../../modules/payments/schema";
 export * from "../../modules/balance/schema";
 export * from "../../modules/packages/schema";
+export * from "../../modules/promo/schema";

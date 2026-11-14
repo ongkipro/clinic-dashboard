@@ -128,8 +128,10 @@ export const invoiceLines = pgTable(
     index("invoice_lines_invoice_idx").on(t.tenantId, t.invoiceId),
     unique("invoice_lines_substitution_key").on(t.tenantId, t.invoiceId, t.substitutionId),
     foreignKey({ name: "invoice_lines_discount_approval_fk", columns: [t.tenantId, t.discountApprovalId], foreignColumns: [approvals.tenantId, approvals.id] }).onDelete("restrict"),
-    check("invoice_lines_discount_check", sql`(${t.discountKind} is null or ${t.discountKind} = 'manual')
-      and ((${t.discountKind} is null) = (${t.discount} = 0 and ${t.discountApprovalId} is null))`),
+    // T-081 (DATA-61): a promo discount (PR-77) is pre-approved — never an approval, always an amount.
+    check("invoice_lines_discount_check", sql`(${t.discountKind} is null or ${t.discountKind} in ('manual','promo'))
+      and ((${t.discountKind} is null) = (${t.discount} = 0 and ${t.discountApprovalId} is null))
+      and (${t.discountKind} is distinct from 'promo' or ${t.discountApprovalId} is null)`),
     check("invoice_lines_t076_check", sql`${t.cancelledAmount} between 0 and ${t.lineTotal} and ${t.movedToBalance} between 0 and ${t.lineTotal}
       and ${t.cancelledAmount} + ${t.movedToBalance} <= ${t.lineTotal} and ${t.vatReversedAmount} between 0 and ${t.vatRecognisedAmount}
       and ${t.receivableAmount} between 0 and ${t.lineTotal} and ${t.cancelledAmount} + ${t.movedToBalance} + ${t.receivableAmount} <= ${t.lineTotal}

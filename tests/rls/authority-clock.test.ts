@@ -338,6 +338,12 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["deposit_refund_clinic", async () => ["select deposit_refund_clinic('k-0000000040', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-080: the manual-discount report takes the actor lock first.
     ["discount_manual_list", async () => ["select discount_manual_list(null)", []], ["owner"]],
+    // T-081: the promo writers and readers take the actor lock first.
+    ["promo_code_create", async () => ["select promo_code_create('k-0000000081', '{}'::jsonb)", []], ["admin_pusat"]],
+    ["promo_code_version", async () => ["select promo_code_version('k-0000000082', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["admin_pusat"]],
+    ["promo_code_set", async () => ["select promo_code_set($1, false, null)", ["00000000-0000-7000-8000-000000000000"]], ["admin_pusat"]],
+    ["promo_codes_list", async () => ["select promo_codes_list()", []], ["admin_pusat"]],
+    ["promo_code_check", async (t) => ["select promo_code_check('KODE-1', gen_random_uuid(), $1)", [t.branch]], ["fo_cashier"]],
     // T-079: the consultation fee and control writers and readers take the actor lock first.
     ["consultation_fee_charge", async () => ["select consultation_fee_charge('k-0000000046', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["consultation_fee_exempt", async () => ["select consultation_fee_exempt('k-0000000047', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
