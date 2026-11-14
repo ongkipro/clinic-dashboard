@@ -659,6 +659,13 @@
       "when": 1794595161116,
       "tag": "0093_deposits",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1794611376181,
+      "tag": "0094_receivables",
+      "breakpoints": true
     }
   ]
 }

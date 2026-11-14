@@ -561,6 +561,17 @@ describe("functions (TEN-16)", () => {
     "deposit_apply(uuid)",
     "appointment_cancel_clinic(uuid,text)",
     "deposit_refund_clinic(text,uuid,jsonb)",
+    // T-078 (PR-21, PR-37, PR-15): the refund, receivable and write-off writers and readers (each takes the actor lock first).
+    "refund_request(text,uuid,jsonb)",
+    "refund_pay(text,uuid,jsonb)",
+    "receivable_convert(text,uuid)",
+    "receivable_collect(text,uuid,jsonb)",
+    "receivable_write_off_request(uuid,text)",
+    "receivable_write_off_owner(text,uuid,text)",
+    "piutang_get(uuid)",
+    "refund_line_options(uuid)",
+    "refund_invoice_picks()",
+    "approval_manager_decides_refund(uuid)",
     // T-075 (PR-21): the patient balance reader.
     "balance_get(uuid)",
     // T-074 (PR-15): the addition release and the cashier's additions reader.

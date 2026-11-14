@@ -111,7 +111,7 @@ describe("Persetujuan inbox rules (UX-26)", () => {
     expect((await as(mgr, (db) => listInbox(db, mgr.role))).rows.map((r) => r.id)).not.toContain(refund);
     expect((await as(mgr, (db) => listInbox(db, mgr.role, { type: "refund_exception" }))).rows).toEqual([]);
     // Opened by link it still shows why there is no Setujui.
-    expect(await as(mgr, (db) => inboxDetail(db, actor(mgr), refund))).toMatchObject({ blocked: "not-approver", approverRoles: ["owner"] });
+    expect(await as(mgr, (db) => inboxDetail(db, actor(mgr), refund))).toMatchObject({ blocked: "not-approver", approverRoles: ["owner", "manager"] }); // SET-11 default owner (T-078)
     expect(await code(as(mgr, (db) => decideApproval(db, refund, true)))).toBe("ERR_FORBIDDEN");
   });
 
@@ -173,7 +173,7 @@ describe("Persetujuan inbox rules (UX-26)", () => {
       Object.fromEntries(Object.entries(APPROVAL_TYPES).sort().map(([k, v]) => [k, { label: v.label, approverRoles: [...v.approverRoles] }])),
     );
     expect(rupiah(1_250_000)).toBe("Rp1.250.000");
-    expect(decidableTypes("manager").sort()).toEqual(["attribution_correction", "disposal", "invoice_void", "stock_adjustment"]); // invoice void: T-072
+    expect(decidableTypes("manager").sort()).toEqual(["attribution_correction", "disposal", "invoice_void", "refund_exception", "stock_adjustment"]); // invoice void: T-072; refund under SET-11: T-078
     expect(decidableTypes("facility_head")).toEqual(["setting_change_fh", "catalog_clinical_review", "catalog_materials_review", "record_late_correction"]); // SET-48 drafts (T-017), catalog review (T-033), materials fallback (T-034), late record correction (T-053)
     expect(decidableTypes("pharmacist")).toEqual(["catalog_materials_review"]); // T-034 (DEC-047 (2))
     expect(decidableTypes("records_officer")).toEqual(["record_late_correction"]); // T-053 (PR-13)

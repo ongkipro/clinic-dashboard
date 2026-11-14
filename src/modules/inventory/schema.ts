@@ -278,7 +278,9 @@ export const stockMovements = pgTable(
            or ${t.kind} = 'transfer_out' and ${t.leg} is not distinct from 'out' and ${t.quantity} < 0
            or ${t.kind} = 'transfer_in' and ${t.leg} is not distinct from 'in' and ${t.quantity} > 0
            or ${t.kind} in ('issue','return') and (${t.leg} is not distinct from 'out' and ${t.quantity} < 0
-                                                  or ${t.leg} is not distinct from 'in' and ${t.quantity} > 0))`),
+                                                  or ${t.leg} is not distinct from 'in' and ${t.quantity} > 0)
+           -- T-078 (DATA-61, scenario 15 J2): a product a patient returns on a refund comes back with no leg.
+           or ${t.kind} = 'return' and ${t.leg} is null and ${t.quantity} > 0 and ${t.sourceKind} = 'refund')`),
   ],
 );
 

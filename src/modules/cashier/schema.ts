@@ -102,6 +102,7 @@ export const invoiceLines = pgTable(
     // the substitution a difference line pays for (FK in migration 0091; the table is in the packages module).
     cancelledAmount: bigint("cancelled_amount", { mode: "number" }).notNull().default(0),
     movedToBalance: bigint("moved_to_balance", { mode: "number" }).notNull().default(0),
+    receivableAmount: bigint("receivable_amount", { mode: "number" }).notNull().default(0), // T-078: the delivered remainder converted to a receivable
     vatReversedAmount: bigint("vat_reversed_amount", { mode: "number" }).notNull().default(0),
     vatReversedAt: timestamp("vat_reversed_at", { withTimezone: true }),
     substitutionId: uuid("substitution_id"),
@@ -121,6 +122,7 @@ export const invoiceLines = pgTable(
     unique("invoice_lines_substitution_key").on(t.tenantId, t.invoiceId, t.substitutionId),
     check("invoice_lines_t076_check", sql`${t.cancelledAmount} between 0 and ${t.lineTotal} and ${t.movedToBalance} between 0 and ${t.lineTotal}
       and ${t.cancelledAmount} + ${t.movedToBalance} <= ${t.lineTotal} and ${t.vatReversedAmount} between 0 and ${t.vatRecognisedAmount}
+      and ${t.receivableAmount} between 0 and ${t.lineTotal} and ${t.cancelledAmount} + ${t.movedToBalance} + ${t.receivableAmount} <= ${t.lineTotal}
       and ((${t.vatReversedAmount} > 0) = (${t.vatReversedAt} is not null))`),
     check("invoice_lines_amounts_check", sql`${t.quantity} between 1 and 10000
       and ${t.unitPrice} between 0 and ${sql.raw(MONEY)}
@@ -230,6 +232,7 @@ export const paymentAllocations = pgTable(
     invoiceLineId: uuid("invoice_line_id"),
     topUpId: uuid("top_up_id"), // T-076: the balance top-up target (DATA-28); FK in migration 0091
     bookingDepositId: uuid("booking_deposit_id"), // T-077: the booking deposit target (DATA-28); FK in migration 0093
+    receivableId: uuid("receivable_id"), // T-078: the receivable target (DATA-28 complete); FK in migration 0094
     amount: bigint("amount", { mode: "number" }).notNull(),
     vatPortion: bigint("vat_portion", { mode: "number" }).notNull().default(0),
     method: text("method", { enum: PATIENT_PAYMENT_METHODS }).notNull(),
@@ -248,7 +251,7 @@ export const paymentAllocations = pgTable(
     index("payment_allocations_line_idx").on(t.tenantId, t.invoiceLineId),
     // Exactly one target (DATA-28): the invoice line now; package, booking deposit, balance top-up and receivable
     // targets arrive with their tasks (T-076, T-077, T-075, T-078) and join this count.
-    check("payment_allocations_check", sql`num_nonnulls(${t.invoiceLineId}, ${t.topUpId}, ${t.bookingDepositId}) = 1 and ${t.amount} between 1 and ${sql.raw(MONEY)}
+    check("payment_allocations_check", sql`num_nonnulls(${t.invoiceLineId}, ${t.topUpId}, ${t.bookingDepositId}, ${t.receivableId}) = 1 and ${t.amount} between 1 and ${sql.raw(MONEY)}
       and ${t.vatPortion} between 0 and ${t.amount} and ${t.method} in (${inList(PATIENT_PAYMENT_METHODS)}) and ${t.environment} in (${inList(PAYMENT_ENVIRONMENTS)})`),
   ],
 );
@@ -356,6 +359,192 @@ export const bookingDeposits = pgTable(
       and (${t.refundDetails} is null or ${t.refundMethod} in ('edc','transfer') and jsonb_typeof(${t.refundDetails}) = 'object')
       and (${t.state} = 'held' or ${t.decisionCode} ~ '^[a-z][a-z_]{2,40}$')
       and (${t.decidedAs} is null or ${t.decidedAs} in ('owner','admin_pusat','manager','fo_cashier','central_cs','finance'))`),
+  ],
+);
+
+// T-078 (PR-21, PR-37, PR-15, BILL-12, BILL-22, BILL-23, B-04, B-14, B-18, DATA-32/33/61; migration 0094; DEC-090).
+// Refunds take invoice-line sources only (DEC-090 (1)): to balance by default (paid at once), or in cash as the approved
+// exception (requested → approved → paid). Receivables hold a visit's delivered unpaid remainder; collections are KW receipts
+// with a payment and no invoice; a write-off closes the open amount (owner alone, or requested and owner-approved).
+export const REFUND_STATES = ["requested", "approved", "paid", "failed"] as const;
+export const refunds = pgTable(
+  "refunds",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    invoiceId: uuid("invoice_id").notNull(),
+    invoiceLineId: uuid("invoice_line_id").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    destination: text("destination", { enum: ["balance", "cash"] }).notNull(),
+    state: text("state", { enum: REFUND_STATES }).notNull(),
+    delivered: boolean("delivered").notNull(),
+    vatReversed: bigint("vat_reversed", { mode: "number" }).notNull().default(0),
+    returnedQuantity: integer("returned_quantity"),
+    reason: text("reason").notNull(),
+    approvalId: uuid("approval_id"),
+    balanceEntryId: uuid("balance_entry_id"),
+    cashEntryId: uuid("cash_entry_id"),
+    paidMethod: text("paid_method"),
+    paidDetails: jsonb("paid_details"),
+    failureCode: text("failure_code"),
+    requestedBy: uuid("requested_by").notNull(),
+    requestedAs: text("requested_as").notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    paidBy: uuid("paid_by"),
+    paidAs: text("paid_as"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    commandKey: text("command_key").notNull(),
+    payKey: text("pay_key"),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "refunds_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "refunds_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "refunds_invoice_fk", columns: [t.tenantId, t.branchId, t.invoiceId], foreignColumns: [invoices.tenantId, invoices.branchId, invoices.id] }).onDelete("restrict"),
+    foreignKey({ name: "refunds_line_fk", columns: [t.tenantId, t.invoiceLineId], foreignColumns: [invoiceLines.tenantId, invoiceLines.id] }).onDelete("restrict"),
+    foreignKey({ name: "refunds_approval_fk", columns: [t.tenantId, t.approvalId], foreignColumns: [approvals.tenantId, approvals.id] }).onDelete("restrict"),
+    foreignKey({ name: "refunds_requested_by_fk", columns: [t.tenantId, t.requestedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "refunds_paid_by_fk", columns: [t.tenantId, t.paidBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("refunds_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("refunds_command_key").on(t.tenantId, t.commandKey),
+    unique("refunds_pay_key").on(t.tenantId, t.payKey),
+    unique("refunds_approval_key").on(t.tenantId, t.approvalId),
+    index("refunds_line_idx").on(t.tenantId, t.invoiceLineId),
+    index("refunds_patient_idx").on(t.tenantId, t.patientId),
+    check("refunds_check", sql`${t.amount} between 1 and ${sql.raw(MONEY)} and ${KEY(t.commandKey)} and (${t.payKey} is null or ${KEY(t.payKey)})
+      and ${t.destination} in ('balance','cash') and ${t.state} in (${inList(REFUND_STATES)}) and ${t.vatReversed} between 0 and ${t.amount}
+      and (${t.returnedQuantity} is null or ${t.returnedQuantity} between 1 and 10000)
+      and length(btrim(${t.reason})) between 3 and 500 and ${t.requestedAs} in ('owner','manager','fo_cashier','finance')
+      and (${t.destination} = 'cash') = (${t.approvalId} is not null)
+      and (${t.destination} = 'cash' or ${t.state} = 'paid')
+      and ((${t.state} = 'paid') = (${t.paidAt} is not null)) and ((${t.state} = 'paid') = (${t.balanceEntryId} is not null))
+      and ((${t.state} = 'paid' and ${t.destination} = 'cash') = (${t.cashEntryId} is not null))
+      and ((${t.state} = 'paid' and ${t.destination} = 'cash') = (${t.paidMethod} is not null))
+      and (${t.paidMethod} is null or ${t.paidMethod} in ('cash','transfer'))
+      and (${t.paidDetails} is null or ${t.paidMethod} = 'transfer' and jsonb_typeof(${t.paidDetails}) = 'object')
+      and ((${t.state} = 'failed') = (${t.failureCode} is not null)) and (${t.failureCode} is null or ${t.failureCode} ~ '^[a-z_]{3,40}$')
+      and (${t.paidAs} is null or ${t.paidAs} in ('owner','manager','fo_cashier','finance'))`),
+  ],
+);
+
+export const RECEIVABLE_STATES = ["open", "collected", "written_off"] as const;
+export const receivables = pgTable(
+  "receivables",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    visitId: uuid("visit_id").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    collectedAmount: bigint("collected_amount", { mode: "number" }).notNull().default(0),
+    writtenOffAmount: bigint("written_off_amount", { mode: "number" }).notNull().default(0),
+    state: text("state", { enum: RECEIVABLE_STATES }).notNull().default("open"),
+    writeOffApprovalId: uuid("write_off_approval_id"),
+    commandKey: text("command_key").notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAs: text("created_as").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivables_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivables_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivables_visit_fk", columns: [t.tenantId, t.visitId], foreignColumns: [visits.tenantId, visits.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivables_write_off_approval_fk", columns: [t.tenantId, t.writeOffApprovalId], foreignColumns: [approvals.tenantId, approvals.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivables_created_by_fk", columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("receivables_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("receivables_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
+    unique("receivables_command_key").on(t.tenantId, t.commandKey),
+    index("receivables_patient_idx").on(t.tenantId, t.patientId),
+    check("receivables_check", sql`${t.amount} between 1 and ${sql.raw(MONEY)} and ${KEY(t.commandKey)} and ${t.state} in (${inList(RECEIVABLE_STATES)})
+      and ${t.collectedAmount} >= 0 and ${t.writtenOffAmount} >= 0 and ${t.collectedAmount} + ${t.writtenOffAmount} <= ${t.amount}
+      and ((${t.state} = 'collected') = (${t.collectedAmount} = ${t.amount}))
+      and ((${t.state} = 'written_off') = (${t.writtenOffAmount} > 0)) and (${t.state} <> 'written_off' or ${t.collectedAmount} + ${t.writtenOffAmount} = ${t.amount})
+      and (${t.state} = 'open' or ${t.writeOffApprovalId} is null or ${t.state} = 'written_off')
+      and ${t.createdAs} in ('owner','manager','fo_cashier')`),
+  ],
+);
+export const receivableLines = pgTable(
+  "receivable_lines",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    receivableId: uuid("receivable_id").notNull(),
+    invoiceLineId: uuid("invoice_line_id").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivable_lines_receivable_fk", columns: [t.tenantId, t.branchId, t.receivableId], foreignColumns: [receivables.tenantId, receivables.branchId, receivables.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivable_lines_line_fk", columns: [t.tenantId, t.invoiceLineId], foreignColumns: [invoiceLines.tenantId, invoiceLines.id] }).onDelete("restrict"),
+    unique("receivable_lines_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("receivable_lines_line_key").on(t.tenantId, t.invoiceLineId),
+    index("receivable_lines_receivable_idx").on(t.tenantId, t.receivableId),
+    check("receivable_lines_check", sql`${t.amount} between 1 and ${sql.raw(MONEY)}`),
+  ],
+);
+export const receivableCollections = pgTable(
+  "receivable_collections",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    receivableId: uuid("receivable_id").notNull(),
+    receiptId: uuid("receipt_id").notNull(),
+    method: text("method").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    commandKey: text("command_key").notNull(),
+    receivedBy: uuid("received_by").notNull(),
+    receivedAs: text("received_as").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivable_collections_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivable_collections_receivable_fk", columns: [t.tenantId, t.receivableId], foreignColumns: [receivables.tenantId, receivables.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivable_collections_receipt_fk", columns: [t.tenantId, t.receiptId], foreignColumns: [receipts.tenantId, receipts.id] }).onDelete("restrict"),
+    foreignKey({ name: "receivable_collections_by_fk", columns: [t.tenantId, t.receivedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("receivable_collections_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("receivable_collections_receipt_key").on(t.tenantId, t.receiptId),
+    unique("receivable_collections_command_key").on(t.tenantId, t.commandKey),
+    index("receivable_collections_receivable_idx").on(t.tenantId, t.receivableId),
+    check("receivable_collections_check", sql`${t.amount} between 1 and ${sql.raw(MONEY)} and ${KEY(t.commandKey)}
+      and ${t.method} in ('cash','edc','transfer','balance') and ${t.receivedAs} in ('owner','manager','fo_cashier','finance')`),
+  ],
+);
+export const writeOffs = pgTable(
+  "write_offs",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    receivableId: uuid("receivable_id").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    reason: text("reason").notNull(),
+    approvalId: uuid("approval_id").notNull(),
+    ownerSelf: boolean("owner_self").notNull(),
+    requestedBy: uuid("requested_by").notNull(),
+    approvedBy: uuid("approved_by").notNull(),
+    commandKey: text("command_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "write_offs_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "write_offs_receivable_fk", columns: [t.tenantId, t.receivableId], foreignColumns: [receivables.tenantId, receivables.id] }).onDelete("restrict"),
+    foreignKey({ name: "write_offs_approval_fk", columns: [t.tenantId, t.approvalId], foreignColumns: [approvals.tenantId, approvals.id] }).onDelete("restrict"),
+    foreignKey({ name: "write_offs_requested_by_fk", columns: [t.tenantId, t.requestedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "write_offs_approved_by_fk", columns: [t.tenantId, t.approvedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("write_offs_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("write_offs_receivable_key").on(t.tenantId, t.receivableId),
+    unique("write_offs_approval_key").on(t.tenantId, t.approvalId),
+    unique("write_offs_command_key").on(t.tenantId, t.commandKey),
+    check("write_offs_check", sql`${t.amount} between 1 and ${sql.raw(MONEY)} and ${KEY(t.commandKey)} and length(btrim(${t.reason})) between 3 and 500
+      and (not ${t.ownerSelf} or ${t.requestedBy} = ${t.approvedBy})`),
   ],
 );
 

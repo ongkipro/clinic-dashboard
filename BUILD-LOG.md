@@ -484,3 +484,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Test an "after X" refusal before anything else refuses for a different reason. A void after a DP was applied was first tested after the remainder was paid, where the payment alone already refused the void.
 - Fixtures that go through the real writers find the real rules: a roster cannot reach a past day, a doctor's shifts cannot overlap across branches, a check-in must be today and within two hours of the start. Build the fixture inside those rules rather than writing rows past the guards.
 
+## 2026-11-14 — T-078 Refunds, receivables and write-offs
+
+- A server action that opens its result page must redirect on the server. When the write removes the row its form lives in (the last refundable line, the converted visit), the form unmounts on revalidation and a client-side `router.push` from its state never runs.
+- A list row that is one stretched link (`after:inset-0`) covers any control placed inside it. A row that carries a form needs its own markup.
+- A detail page that reads a table directly sees only what RLS lets the role read. The FO could not read invoice lines or catalog versions, so "Asal tagihan" was silently empty. Read through the SECURITY DEFINER reader that already decides access, and test the field as the branch role.
+- A trailing badge in a list row squeezes the title to one letter per line at 390 px and 200 % text; put the status under the title.
+- When the test file fails to compile, every mutant is "caught". Gate the mutation run on a green suite in the same script.
+- A mutant "caught" by a flaky test is not caught. Two events written in one transaction share `now()` and uuid v7 does not order within a millisecond; the 15b event-order assertion failed at random and hid five untested rules until it compared the set. Read which test fails for each caught mutant.
+- A check placed after another that always answers first for the same rows can never fire (a converted remainder is never paid, so `line_unpaid` answered before `line_on_receivable`). Order the specific refusal first and test it.

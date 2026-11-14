@@ -10,7 +10,7 @@ import type { Approval } from "./approvals";
 // tests/approvals/inbox.test.ts keeps it equal to the database rows; a task that adds a
 // type adds it to the migration and here.
 export const APPROVAL_TYPES: Record<string, { label: string; approverRoles: readonly Role[] }> = {
-  refund_exception: { label: "Refund tunai", approverRoles: ["owner"] },
+  refund_exception: { label: "Refund tunai", approverRoles: ["owner", "manager"] }, // a manager only where SET-11 allows (T-078)
   write_off: { label: "Hapus piutang", approverRoles: ["owner"] },
   attribution_correction: { label: "Koreksi atribusi staf", approverRoles: ["owner", "manager"] },
   commission_batch: { label: "Batch komisi", approverRoles: ["owner"] },
@@ -113,6 +113,7 @@ export async function listInbox(db: pg.ClientBase, role: Role, filter: { type?: 
         and ($3::text <> 'owner' or a.type <> all($4::text[]) or approval_owner_decides_fh(a.id))
         and ($3::text not in ('owner','facility_head') or a.type <> 'catalog_materials_review' or not approval_ph_available(a.id))
         and ($3::text <> 'manager' or a.type <> 'invoice_void' or approval_manager_decides_void(a.id))
+        and ($3::text <> 'manager' or a.type <> 'refund_exception' or approval_manager_decides_refund(a.id))
       order by a.requested_at, a.id limit $2`,
     [types, limit + 1, role, OWNER_FALLBACK_TYPES],
   );
@@ -136,6 +137,8 @@ export async function inboxDetail(db: pg.ClientBase, actor: { staffId: string; r
     : (actor.role === "owner" || actor.role === "facility_head") && r.type === "catalog_materials_review" && (await db.query(`select approval_ph_available($1) as ok`, [id])).rows[0].ok ? "not-approver"
     // SET-43 (T-072): a manager decides a void on the invoice's issue day only; afterwards it is the owner's.
     : actor.role === "manager" && r.type === "invoice_void" && !(await db.query(`select approval_manager_decides_void($1) as ok`, [id])).rows[0].ok ? "not-approver"
+    // SET-11 (T-078): a manager decides a cash refund only where the tenant allows owner_manager.
+    : actor.role === "manager" && r.type === "refund_exception" && !(await db.query(`select approval_manager_decides_refund($1) as ok`, [id])).rows[0].ok ? "not-approver"
     : null;
   return {
     ...row(r),

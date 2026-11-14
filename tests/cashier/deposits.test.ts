@@ -22,6 +22,7 @@ import { cancelAppointment, markNoShow, reschedule } from "../../src/modules/sch
 import { setWeek } from "../../src/modules/scheduling/rosters/rosters";
 import { changeSetting } from "../../src/modules/settings/settings";
 import { setTaxProfile } from "../../src/modules/tax/tax";
+import { mergePatients } from "../../src/modules/patients/merge/merge";
 import { checkIn } from "../../src/modules/visits/visits";
 import { createHarness, type Harness, testPool } from "../rls/harness";
 
@@ -409,9 +410,12 @@ describe("scenario 17: a clinic-caused cancellation refunded in cash", () => {
   });
 });
 
+let pkpFixture: { C: T; COWN: P; CFO: P; CFIN: P; CDOC: P; tx: { itemId: string; versionId: string }; advice: string } | undefined;
+const pkp = () => pkpFixture!;
 describe("the PKP gross variants (6 and 17): VAT reversed on a move or refund, counted once when the balance pays later", () => {
   let C: T; let COWN: P; let CFO: P; let CFH: P; let CFIN: P; let CDOC: P;
   let tx: { itemId: string; versionId: string };
+  let advice: string;
   beforeAll(async () => {
     C = await tenant("PT DP PKP");
     COWN = await person(C, "owner"); CFO = await person(C, "fo_cashier", C.b1); CFH = await person(C, "facility_head", C.b1); CFIN = await person(C, "finance");
@@ -423,6 +427,7 @@ describe("the PKP gross variants (6 and 17): VAT reversed on a move or refund, c
     const { fileId } = await as(CFIN, (db) => uploadEvidence(db, { obligationKey: "tax_advice", fileName: "saran.pdf", content: pdf, expertName: "Konsultan Pajak Sintetis", documentDate: "2026-10-01" }));
     const it = (await h.admin.query(`select item_id from evidence_files where id = $1`, [fileId])).rows[0].item_id;
     await as(COWN, (db) => decideEvidence(db, it, fileId, "approved"));
+    advice = it;
     await h.admin.query("alter table tax_profile_changes disable trigger tax_profile_changes_guard");
     await h.admin.query("alter table tenants disable trigger tenants_tax_guard");
     await as(COWN, (db) => setTaxProfile(db, key(), { isPkp: true, pkpEffectiveFrom: tomorrowWib(), npwp: NPWP, reason: "PKP" }));
@@ -430,6 +435,7 @@ describe("the PKP gross variants (6 and 17): VAT reversed on a move or refund, c
     await h.admin.query(`update tenants set pkp_effective_from = $2::date - 1 where id = $1`, [C.tenantId, today()]);
     await h.admin.query("alter table tax_profile_changes enable always trigger tax_profile_changes_guard");
     await h.admin.query("alter table tenants enable always trigger tenants_tax_guard");
+    pkpFixture = { C, COWN, CFO, CFIN, CDOC, tx, advice };
   }, 300_000);
 
   it("6 PKP: a DP of 222,000 = base 200,000 + VAT 22,000; moved to balance gross with the VAT reversed; the balance later pays the taxable line: VAT once", async () => {
@@ -478,7 +484,37 @@ describe("the PKP gross variants (6 and 17): VAT reversed on a move or refund, c
   });
 });
 
+describe("T-077 review carry-overs (P3, added in T-078)", () => {
+  it("a DP on a taxable item of a PKP tenant is refused while the vat_on_invoices gate is closed; nothing is written", async () => {
+    const { C, COWN, CFO, CDOC, tx, advice } = pkp();
+    const file = (await h.admin.query(`select id from evidence_files where item_id = $1 order by version desc limit 1`, [advice])).rows[0].id;
+    await as(COWN, (db) => decideEvidence(db, advice, file, "revoked", "Saran ditarik"));
+    try {
+      const pt = await patient(C, "Pasien Gerbang");
+      const apt = await appointment(C, pt, quarter(44 * H), CDOC, tx.versionId);
+      expect(await why(as(CFO, (db) => receiveDeposit(db, key(), apt, { method: "edc" })))).toBe("ERR_GATE_CLOSED:vat_on_invoices");
+      expect((await h.admin.query(`select count(*)::int c from booking_deposits where appointment_id = $1`, [apt])).rows[0].c).toBe(0);
+    } finally {
+      const pdf = Buffer.from(`%PDF-1.7\nsaran pajak dp ulang\n%%EOF\n`);
+      const { fileId } = await as(pkp().CFIN, (db) => uploadEvidence(db, { obligationKey: "tax_advice", fileName: "saran.pdf", content: pdf, expertName: "Konsultan Pajak Sintetis", documentDate: "2026-10-02" }));
+      await as(COWN, (db) => decideEvidence(db, advice, fileId, "approved"));
+    }
+  });
+});
+
 describe("the guard", () => {
+  it("a deposit taken after a patient merge belongs to the survivor (canonical); the duplicate's appointment is refused a new DP", async () => {
+    const dup = await patient(A, "Pasien Ganda");
+    const surv = await patient(A, "Pasien Utama");
+    const apt = await appointment(A, dup, quarter(46 * H), DOC);
+    const RO = await person(A, "records_officer", A.b1);
+    await as(RO, (db) => mergePatients(db, key(), surv, dup, "Rekam ganda pasien yang sama"));
+    const { deposit_id } = await as(FO, (db) => receiveDeposit(db, key(), apt, { method: "edc" }));
+    expect((await dep(deposit_id)).patient_id).toBe(surv);
+    await as(FO, (db) => cancelAppointment(db, key(), apt, "Pasien ganti rencana"));
+    expect(await balance(surv)).toBe(200_000);
+  });
+
   it("a deposit is decided once and never deleted; the allocation and payment guards refuse a stray deposit payment", async () => {
     const pt = await patient(A, "Pasien Guard");
     const apt = await appointment(A, pt, quarter(70 * H), DOC);

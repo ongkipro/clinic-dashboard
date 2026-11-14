@@ -336,6 +336,16 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["deposit_apply", async () => ["select deposit_apply($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["appointment_cancel_clinic", async () => ["select appointment_cancel_clinic($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
     ["deposit_refund_clinic", async () => ["select deposit_refund_clinic('k-0000000040', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-078: the refund, receivable and write-off writers and readers take the actor lock first.
+    ["refund_request", async () => ["select refund_request('k-0000000041', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["refund_pay", async () => ["select refund_pay('k-0000000042', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["receivable_convert", async () => ["select receivable_convert('k-0000000043', $1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["receivable_collect", async () => ["select receivable_collect('k-0000000044', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["receivable_write_off_request", async () => ["select receivable_write_off_request($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["receivable_write_off_owner", async () => ["select receivable_write_off_owner('k-0000000045', $1, 'alasan uji panjang')", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["piutang_get", async () => ["select piutang_get(null)", []], ["manager"]],
+    ["refund_line_options", async () => ["select refund_line_options($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["refund_invoice_picks", async () => ["select refund_invoice_picks()", []], ["manager"]],
     // T-075 (PR-21): the balance reader takes the actor lock first (Level 3 roles).
     ["balance_get", async () => ["select balance_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-074 (PR-15): the release writer and the additions reader take the actor lock first (Level 3 roles).
