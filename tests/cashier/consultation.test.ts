@@ -29,6 +29,7 @@ import { changeSetting } from "../../src/modules/settings/settings";
 import { finishTreatment, startTreatment } from "../../src/modules/treatment/treatment";
 import { closeVisit } from "../../src/modules/visits/visits";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { wibDay } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -41,7 +42,7 @@ type T = { tenantId: string; b1: string; b2: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 const TENANT_WIDE = ["owner", "finance", "admin_pusat", "purchasing", "marketing", "central_cs", "auditor"];
 const STEP: StepUp = { verified: true };
-const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
+const day = wibDay; // HYG-018: the Asia/Jakarta calendar date (the branch-local day the writers compare with)
 
 async function tenant(): Promise<T> {
   const tenantId = (await h.admin.query(`insert into tenants_registry (lifecycle_state) values ('live') returning id`)).rows[0].id as string;

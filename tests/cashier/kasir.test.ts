@@ -25,6 +25,7 @@ import { addSpecialItem, confirmSelection, handOver, handoverList, prepareDispen
 import { changeSetting } from "../../src/modules/settings/settings";
 import { setTaxProfile } from "../../src/modules/tax/tax";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { wibDay } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -55,7 +56,7 @@ const code = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof Co
 const why = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof KasirError ? `${e.code}:${e.reason}` : e instanceof CommandError ? e.code : `raw:${e.code ?? e.message}`));
 const key = () => crypto.randomUUID();
 const raw = (sql: string, args: unknown[]) => h.admin.query(sql, args).then(() => "ok", (e) => `raw:${e.code}`);
-const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
+const day = wibDay; // HYG-018: the Asia/Jakarta calendar date (the branch-local day the writers compare with)
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
 const NPWP = "012345678901234";
 const CHECKS = { identity: true, validity: true, dose: true, allergy: true, clarification: true, label: true, counselling: true };

@@ -19,6 +19,7 @@ import {
 import { getCount, holdBatch, receiveStock, recordCount, saveItem, submitCount } from "../../src/modules/inventory/stock";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { wibDay } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -48,7 +49,7 @@ const as = async <R>(p: P, fn: (db: pg.PoolClient) => Promise<R>) =>
 const code = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof CommandError ? e.code : `raw:${e.code ?? e.message}`));
 const reason = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e as { reason?: string }).reason ?? (e as Error).message);
 const key = () => crypto.randomUUID();
-const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
+const day = wibDay; // HYG-018: the Asia/Jakarta calendar date (the branch-local day the writers compare with)
 const held = async (depot: string, batch: string) =>
   Number((await h.admin.query(`select coalesce((select quantity from batch_holdings where depot_id = $1 and batch_id = $2), 0) as q`, [depot, batch])).rows[0].q);
 const batchQty = async (batch: string) => Number((await h.admin.query(`select quantity from stock_batches where id = $1`, [batch])).rows[0].quantity);

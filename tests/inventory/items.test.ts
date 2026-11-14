@@ -19,6 +19,7 @@ import {
 } from "../../src/modules/inventory/stock";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { wibDay } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -49,7 +50,7 @@ const code = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof Co
 const reason = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e as { reason?: string }).reason ?? (e as Error).message);
 const key = () => crypto.randomUUID();
 // A date relative to today (branch-agnostic for days ≥ 2 away).
-const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
+const day = wibDay; // HYG-018: the Asia/Jakarta calendar date (the branch-local day the writers compare with)
 const qtyOf = async (batch: string) => Number((await h.admin.query(`select quantity from stock_batches where id = $1`, [batch])).rows[0].quantity);
 
 let A: T; let B: T;

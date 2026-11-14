@@ -23,6 +23,7 @@ import {
   advanceStage, blockersOf, finishTreatment, getTreatment, pauseTreatment, resumeTreatment, roomList, startTreatment, type StartInput,
 } from "../../src/modules/treatment/treatment";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { wibDay } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -53,7 +54,7 @@ const as = async <R>(p: P, fn: (db: pg.PoolClient) => Promise<R>) =>
 const code = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof CommandError ? e.code : `raw:${e.code ?? e.message}`));
 const blocked = (x: Promise<unknown>) => x.then(() => [] as string[], (e) => blockersOf(e));
 const key = () => crypto.randomUUID();
-const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
+const day = wibDay; // HYG-018: the Asia/Jakarta calendar date (the branch-local day the writers compare with)
 function png(): Buffer {
   const b = Buffer.alloc(80);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b, 0);

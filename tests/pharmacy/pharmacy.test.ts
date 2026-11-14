@@ -26,6 +26,7 @@ import {
 } from "../../src/modules/pharmacy/pharmacy";
 import { closeVisit } from "../../src/modules/visits/visits";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { wibDay } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -57,7 +58,7 @@ const as = async <R>(p: P, fn: (db: pg.PoolClient) => Promise<R>) =>
 const code = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof CommandError ? e.code : `raw:${e.code ?? e.message}`));
 const why = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof CommandError ? `${e.code}:${(e as { reason?: string }).reason ?? ""}` : `raw:${e.code ?? e.message}`));
 const key = () => crypto.randomUUID();
-const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
+const day = wibDay; // HYG-018: the Asia/Jakarta calendar date (the branch-local day the writers compare with)
 const num = (x: unknown) => Number(x);
 async function patient(t: T, branch: string): Promise<string> {
   const id = crypto.randomUUID().replace(/-/g, "");

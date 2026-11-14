@@ -24,6 +24,7 @@ import { mergePatients, unmergePatients } from "../../src/modules/patients/merge
 import { changeSetting } from "../../src/modules/settings/settings";
 import { setTaxProfile } from "../../src/modules/tax/tax";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { wibDay } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -54,7 +55,7 @@ const as = async <R>(p: P, fn: (db: pg.PoolClient) => Promise<R>) =>
 const key = () => crypto.randomUUID();
 const why = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof CommandError ? `${e.code}:${(e as { reason?: string }).reason ?? ""}` : `raw:${e.code ?? e.message}`));
 const code = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof CommandError ? e.code : `raw:${e.code ?? e.message}`));
-const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
+const day = wibDay; // HYG-018: the Asia/Jakarta calendar date (the branch-local day the writers compare with)
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 async function patient(t: T, branch: string, name = "Pasien Saldo"): Promise<string> {
   const id = crypto.randomUUID().replace(/-/g, "");

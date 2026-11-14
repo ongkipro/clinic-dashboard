@@ -31,6 +31,7 @@ import { mergePatients } from "../../src/modules/patients/merge/merge";
 import { checkPromoCode, createPromoCode, listPromoCodes, setPromoCode, versionPromoCode, type PromoTerms } from "../../src/modules/promo/promo";
 import { setTaxProfile } from "../../src/modules/tax/tax";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { wibDay } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -63,7 +64,7 @@ const why = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof Kas
 const key = () => crypto.randomUUID();
 const raw = (sql: string, args: unknown[]) => h.admin.query(sql, args).then(() => "ok", (e) => `raw:${e.code}`);
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
-const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
+const day = wibDay; // HYG-018: the Asia/Jakarta calendar date (the branch-local day the writers compare with)
 const NPWP = "012345678901234";
 async function patient(t: T, branch: string, name = "Pasien Promo"): Promise<string> {
   const id = crypto.randomUUID().replace(/-/g, "");

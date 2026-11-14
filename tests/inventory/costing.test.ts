@@ -18,6 +18,7 @@ import { consumeMaterials, decideReturn, issueMaterials, proposeReturn, requestM
 import { getCount, receiveStock, recordCount, saveItem, startCount, submitCount } from "../../src/modules/inventory/stock";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { wibDay } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -46,7 +47,7 @@ const as = async <R>(p: P, fn: (db: pg.PoolClient) => Promise<R>) =>
   withTenantContext(app, await resolveContext(app, p.acc, { tenantId: p.tenantId, actingRole: p.role, activeBranchId: p.branch }), fn);
 const code = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof CommandError ? e.code : `raw:${e.code ?? e.message}`));
 const key = () => crypto.randomUUID();
-const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
+const day = wibDay; // HYG-018: the Asia/Jakarta calendar date (the branch-local day the writers compare with)
 const gudang = async (branch: string) => (await h.admin.query(`select id from depots where branch_id = $1 and is_default`, [branch])).rows[0].id as string;
 const cost = async (branch: string, item: string) => {
   const r = (await h.admin.query(`select quantity::float q, value::float v, uncosted_quantity::float u, last_unit_cost::float c from stock_costs where branch_id = $1 and item_id = $2`, [branch, item])).rows[0];

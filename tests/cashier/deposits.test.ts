@@ -25,6 +25,7 @@ import { setTaxProfile } from "../../src/modules/tax/tax";
 import { mergePatients } from "../../src/modules/patients/merge/merge";
 import { checkIn } from "../../src/modules/visits/visits";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { arrivalSlot } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -124,10 +125,9 @@ async function appointment(t: T, pt: string, start: Date, doc: P, versionId = sv
 }
 const quarter = (ms: number) => new Date(Math.ceil((Date.now() + ms) / 900_000) * 900_000);
 const H = 3_600_000;
-// An arrival slot: within check-in's two hours and today in WIB (n-th 30-minute slot from the next quarter; a test needing it
-// runs late in the WIB day only if the clock allows, so the slot is clamped to before midnight).
-const soon = (i: number) => new Date(Math.min(quarter(i * 30 * 60_000).getTime(), at0() - 30 * 60_000));
-const at0 = () => new Date(`${localDay(1)}T00:00:00+07:00`).getTime();
+// An arrival slot: within check-in's two hours and today in WIB — the i-th of three distinct 30-minute slots that end by WIB midnight
+// (HYG-018: the old clamp made soon(1) and soon(2) the same half hour after about 22:15 WIB).
+const soon = (i: number) => arrivalSlot(i, 3);
 const dep = async (id: string) => (await h.admin.query(`select * from booking_deposits where id = $1`, [id])).rows[0];
 const balance = async (pt: string) => Number((await h.admin.query(`select coalesce((select balance from balance_accounts where patient_id = $1), 0) b`, [pt])).rows[0].b);
 const events = async (id: string) => (await h.admin.query(`select type, payload from domain_events where aggregate_kind = 'booking_deposit' and aggregate_id = $1 order by occurred_at, id`, [id])).rows;

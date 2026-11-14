@@ -561,3 +561,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   expenses". Integrity checks that read a table with column grants (or rows outside the session's RLS) are SECURITY DEFINER.
 - `events_payload_ok` refuses JSON null values in a domain event payload; build payloads with `jsonb_strip_nulls` when a key is optional.
 - An isolation case cannot nest `withTenantContext` (one role inside another): run each role's call on its own, then combine.
+
+## 2026-11-15 — HYG-018 Time-of-day test fixtures
+
+- A test date compared with a branch-local day must be built in the branch timezone: `new Date().toISOString().slice(0, 10)` is the UTC
+  date, a day behind Jakarta from 00:00 to 07:00 WIB. Use `tests/support/dates.ts` `wibDay`.
+- A time slot clamped to "before midnight" collapses several slots into one late in the day; count slots back from the last one instead
+  (`arrivalSlot`). Night runs (and night CI) expose both.
+
