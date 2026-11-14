@@ -338,6 +338,10 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["deposit_refund_clinic", async () => ["select deposit_refund_clinic('k-0000000040', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-080: the manual-discount report takes the actor lock first.
     ["discount_manual_list", async () => ["select discount_manual_list(null)", []], ["owner"]],
+    // T-083: the schedule writers and reader take the actor lock first.
+    ["instalment_schedule_set", async () => ["select instalment_schedule_set('k-0000000093', '{}'::jsonb)", []], ["fo_cashier"]],
+    ["instalment_schedule_cancel", async () => ["select instalment_schedule_cancel($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["instalment_schedule_get", async () => ["select instalment_schedule_get($1, null)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
     // T-082: the sharing switch, its reader and the beneficiary writers take the actor lock first.
     ["package_sharing_set", async () => ["select package_sharing_set($1, true, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["package_sharing_get", async () => ["select package_sharing_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],

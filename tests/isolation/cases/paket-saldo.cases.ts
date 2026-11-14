@@ -12,6 +12,7 @@ import {
   cancelPackage, packageContents, patientPackages, releaseSession, reserveSession, searchPatients, setPackageContents, topUpBalance,
 } from "../../../src/modules/packages/packages";
 import { addBeneficiary, packageSharing, removeBeneficiary, setPackageSharing } from "../../../src/modules/packages/sharing/sharing";
+import { cancelInstalmentSchedule, instalmentSchedules, setInstalmentSchedule } from "../../../src/modules/packages/schedules/schedules";
 import { defineCases, type IsolationEnv } from "../case";
 
 process.env.DEPLOY_ENV = "local";
@@ -44,7 +45,7 @@ const asMine = <T>(env: IsolationEnv, role: CaseRole, fn: (db: never) => Promise
 
 let runs = 0;
 type Seed = { name: string; mrn: string; patient: string; pkg: string; version: string; versionName: string; visit: string; session: string; service: string; draft: string;
-  item: string; beneficiary: string; child2: string };
+  item: string; beneficiary: string; child2: string; schedule: string };
 const latest = new Map<string, Seed>();
 const templates = new Map<string, { item: string; version: string; versionName: string; service: string }>();
 async function victim(env: IsolationEnv): Promise<Seed> {
@@ -105,8 +106,12 @@ async function victim(env: IsolationEnv): Promise<Seed> {
     { name: `Paket Draf ${n}`, tax_category: "exempt_medical", tax_basis: "Jasa medis", normal_price: 100_000 } as never, "Baru"))).versionId;
   for (const x of [name, row.mrn, patient, pkg, visit, session, tpl.versionName, draft]) env.victimSecret(x);
   env.victimSecret(beneficiary);
+  // T-083: an agreed instalment schedule on B's package (B paid 100,000 of 200,000).
+  const due = new Date(Date.now() + 10 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+  const { scheduleId: schedule } = await as(env, t, b, "fo_cashier", (db) => setInstalmentSchedule(db, k(), { packageId: pkg }, [{ dueOn: due, amount: 50_000 }]));
+  env.victimSecret(schedule);
   const r = { name, mrn: row.mrn as string, patient, pkg, version: tpl.version, versionName: tpl.versionName, visit, session, service: tpl.service, draft,
-    item: tpl.item, beneficiary, child2 };
+    item: tpl.item, beneficiary, child2, schedule };
   latest.set(t, r);
   return r;
 }
@@ -145,6 +150,12 @@ export default defineCases(
         shareRead: await outcome(asMine(env, "owner", (db) => packageSharing(db as never, v.item))),
         removeBeneficiary: await outcome(asMine(env, "fo_cashier", (db) => removeBeneficiary(db as never, k(), v.beneficiary, "Coba lintas"))),
         share: await outcome(asMine(env, "owner", (db) => setPackageSharing(db as never, k(), v.item, true, "Coba lintas"))),
+        // T-083: B's schedule read, replaced and cancelled
+        scheduleRead: await outcome(asMine(env, "fo_cashier", (db) => instalmentSchedules(db as never, { packageId: v.pkg }))),
+        // the seeded schedule cancelled first (as B a replace would cancel it as "replaced"), then a new one set
+        scheduleCancel: await outcome(asMine(env, "fo_cashier", (db) => cancelInstalmentSchedule(db as never, k(), v.schedule))),
+        scheduleSet: await outcome(asMine(env, "fo_cashier", (db) => setInstalmentSchedule(db as never, k(), { packageId: v.pkg },
+          [{ dueOn: new Date(Date.now() + 12 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }), amount: 40_000 }]))),
         cancel: await outcome(asMine(env, "owner", (db) => cancelPackage(db as never, k(), v.pkg, "Coba lintas"))),
       };
       const read = await asMine(env, "owner", (db) => patientPackages(db as never, v.patient).then((x) => x.patient?.name ?? null, () => null));

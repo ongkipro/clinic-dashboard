@@ -547,3 +547,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Mutation review removed one redundant condition (the beneficiary check re-reading the switch, already enforced by the insert guard)
   and dropped one equivalent mutant (an UPDATE of the switch also fails the next-version check).
 
+## 2026-11-14 — T-083 Instalment schedules
+
+- An isolation case that runs several writes on B's state must order them so each succeeds as B: here a replace (set) cancelled the
+  seeded schedule as "replaced", so the following manual cancel conflicted in the positive control. Cancel first, then set.
+- A guard test that changes a frozen column is caught by the identity check and never reaches the "set once" branch; test the
+  set-once column itself (`reminded_on` cleared or moved after the scan set it).
+

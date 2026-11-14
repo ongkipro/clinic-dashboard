@@ -694,6 +694,13 @@
       "when": 1794655801504,
       "tag": "0098_package_sharing",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1794658025138,
+      "tag": "0099_instalment_schedules",
+      "breakpoints": true
     }
   ]
 }

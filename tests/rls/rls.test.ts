@@ -578,6 +578,11 @@ describe("functions (TEN-16)", () => {
     "package_sharing_get(uuid)",
     "package_beneficiary_add(text,uuid,uuid,text)",
     "package_beneficiary_remove(uuid,text)",
+    // T-083 (PR-96): the instalment schedule writers and reader (each takes the actor lock first) and the unbound reminder scan.
+    "instalment_schedule_set(text,jsonb)",
+    "instalment_schedule_cancel(uuid)",
+    "instalment_schedule_get(uuid,uuid)",
+    "instalment_reminder_scan(date)",
     // T-079 (PR-12, BILL-4/5): the consultation fee and control writers and readers (each takes the actor lock first).
     "consultation_fee_charge(text,uuid,jsonb)",
     "consultation_fee_exempt(text,uuid,jsonb)",

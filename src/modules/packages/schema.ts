@@ -4,8 +4,8 @@
 // reserved on an open visit, bound to the execution that starts it, and redeemed only on a counted outcome (B-15).
 // Expiry or cancellation moves the paid-unused value to the patient balance; the unpaid remainder is cancelled.
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, foreignKey, index, integer, pgTable, smallint, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
-import { invoiceLines, invoices, receipts } from "../cashier/schema";
+import { bigint, boolean, check, date, foreignKey, index, integer, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { invoiceLines, invoices, receipts, receivables } from "../cashier/schema";
 import { catalogItems, catalogVersions, TAX_CATEGORIES } from "../catalog/schema";
 import { branches, staff, tenants } from "../org/schema";
 import { patients } from "../patients/schema";
@@ -282,6 +282,79 @@ export const packageBeneficiaries = pgTable(
       and num_nonnulls(${t.removedBy}, ${t.removedAs}, ${t.removedAt}, ${t.removeReason}) in (0, 4)
       and (${t.removeReason} is null or length(btrim(${t.removeReason})) between 3 and 500)
       and (${t.removedAs} is null or ${t.removedAs} in ('owner','manager','fo_cashier'))`),
+  ],
+);
+
+// Reminder-only instalment schedules (PR-96, BILL-9, DATA-67; T-083, migration 0099, DEC-096). A schedule targets exactly one package or
+// receivable; versions replace each other (one active per target); base_paid is the target's paid amount when the version was set, so a
+// row k is covered when paid − base_paid ≥ its cumulative amount. A schedule creates no debt, journal, interest or entitlement: nothing
+// on the unlock or payment path reads it. Cancelled automatically when the target closes or is fully paid.
+export const INSTALMENT_STATES = ["active", "cancelled"] as const;
+export const INSTALMENT_CANCEL_REASONS = ["replaced", "target_closed", "paid", "manual"] as const;
+export const instalmentSchedules = pgTable(
+  "instalment_schedules",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(), // the target's branch (the package's sold branch, the receivable's branch)
+    patientId: uuid("patient_id").notNull(),
+    packageId: uuid("package_id"),
+    receivableId: uuid("receivable_id"),
+    version: integer("version").notNull(),
+    basePaid: bigint("base_paid", { mode: "number" }).notNull(),
+    state: text("state", { enum: INSTALMENT_STATES }).notNull().default("active"),
+    cancelReason: text("cancel_reason", { enum: INSTALMENT_CANCEL_REASONS }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: uuid("cancelled_by"),
+    cancelledAs: text("cancelled_as"),
+    commandKey: text("command_key").notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAs: text("created_as").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "instalment_schedules_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "instalment_schedules_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "instalment_schedules_package_fk", columns: [t.tenantId, t.packageId], foreignColumns: [packages.tenantId, packages.id] }).onDelete("restrict"),
+    foreignKey({ name: "instalment_schedules_receivable_fk", columns: [t.tenantId, t.receivableId], foreignColumns: [receivables.tenantId, receivables.id] }).onDelete("restrict"),
+    foreignKey({ name: "instalment_schedules_created_by_fk", columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "instalment_schedules_cancelled_by_fk", columns: [t.tenantId, t.cancelledBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("instalment_schedules_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("instalment_schedules_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
+    unique("instalment_schedules_command_key").on(t.tenantId, t.commandKey),
+    unique("instalment_schedules_package_version_key").on(t.tenantId, t.packageId, t.version),
+    unique("instalment_schedules_receivable_version_key").on(t.tenantId, t.receivableId, t.version),
+    uniqueIndex("instalment_schedules_package_active_key").on(t.tenantId, t.packageId).where(sql`${t.state} = 'active' and ${t.packageId} is not null`),
+    uniqueIndex("instalment_schedules_receivable_active_key").on(t.tenantId, t.receivableId).where(sql`${t.state} = 'active' and ${t.receivableId} is not null`),
+    check("instalment_schedules_check", sql`num_nonnulls(${t.packageId}, ${t.receivableId}) = 1 and ${t.version} >= 1 and ${t.basePaid} >= 0
+      and ${KEY(t.commandKey)} and ${t.createdAs} in ('owner','manager','fo_cashier','finance')
+      and ${t.state} in (${inList(INSTALMENT_STATES)})
+      and ((${t.state} = 'cancelled') = (${t.cancelReason} is not null)) and ((${t.state} = 'cancelled') = (${t.cancelledAt} is not null))
+      and (${t.cancelReason} is null or ${t.cancelReason} in (${inList(INSTALMENT_CANCEL_REASONS)}))
+      and (${t.cancelReason} is null or ${t.cancelReason} not in ('manual','replaced') or ${t.cancelledBy} is not null and ${t.cancelledAs} is not null)
+      and ((${t.cancelledBy} is null) = (${t.cancelledAs} is null))`),
+  ],
+);
+export const instalmentRows = pgTable(
+  "instalment_rows",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    scheduleId: uuid("schedule_id").notNull(),
+    seq: smallint("seq").notNull(),
+    dueOn: date("due_on", { mode: "string" }).notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    remindedOn: date("reminded_on", { mode: "string" }),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "instalment_rows_schedule_fk", columns: [t.tenantId, t.branchId, t.scheduleId],
+      foreignColumns: [instalmentSchedules.tenantId, instalmentSchedules.branchId, instalmentSchedules.id] }).onDelete("restrict"),
+    unique("instalment_rows_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("instalment_rows_seq_key").on(t.tenantId, t.scheduleId, t.seq),
+    check("instalment_rows_check", sql`${t.seq} between 1 and 24 and ${t.amount} between 1 and ${sql.raw(MONEY)}`),
   ],
 );
 
