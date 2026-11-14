@@ -14,7 +14,7 @@
 //   after discount (BILL-6, BILL-28): vat_base + vat_amount = line_total. `vat_recognised_*` and the tax-document
 //   reference are filled by the tax point (payment or delivery; T-072 onwards).
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, foreignKey, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, date, foreignKey, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { approvals } from "../approvals/schema";
 import { clinicalRequests, planItems, procedureConsents } from "../clinical/schema";
 import { documentTemplateVersions } from "../documents/schema";
@@ -40,6 +40,8 @@ export const invoices = pgTable(
     visitId: uuid("visit_id"),
     // A Jual Cepat sale (T-072): no visit, products only, each handed over by the pharmacist.
     counter: boolean("counter").notNull().default(false),
+    // A consultation fee invoice (T-079, PR-12): one fee line, issued only by the consultation definers; never "ordinary".
+    consultation: boolean("consultation").notNull().default(false),
     number: text("number"),
     state: text("state", { enum: PATIENT_INVOICE_STATES }).notNull().default("draft"),
     isPkpAtIssue: boolean("is_pkp_at_issue"),
@@ -73,6 +75,7 @@ export const invoices = pgTable(
       and num_nonnulls(${t.issuedAt}, ${t.issuedBy}, ${t.issuedAs}, ${t.isPkpAtIssue}) in (0, 4)
       and (${t.number} is null or length(${t.number}) between 1 and 40)
       and ((${t.state} = 'void') = (${t.voidedAt} is not null)) and (${t.voidedAt} is null or ${t.voidApprovalId} is not null)`),
+    check("invoices_consultation_check", sql`not ${t.consultation} or (${t.visitId} is not null and not ${t.counter})`),
   ],
 );
 
@@ -548,3 +551,125 @@ export const writeOffs = pgTable(
   ],
 );
 
+// ── T-079: consultation fee (BILL-4, PR-12) and free controls (BILL-5), DATA-34 ──
+export const CONSULTATION_FEE_STATES = ["charged", "waived", "recharged"] as const;
+export const CONSULTATION_WAIVERS = ["purchase", "package_session", "control", "complaint"] as const;
+export const CONSULTATION_CONTROL_STATES = ["scheduled", "used", "cancelled"] as const;
+// One decision per consultation visit (an examination was opened): charged, waived (purchase, package session, control,
+// complaint), or a purchase waiver re-charged once from the refund that took the last qualifying purchase. FKs to packages,
+// complaint tasks, refunds (deferred) and controls are declared in the migration's parts SQL (import cycles, DEFERRABLE).
+export const consultationFees = pgTable(
+  "consultation_fees",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    visitId: uuid("visit_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    state: text("state", { enum: CONSULTATION_FEE_STATES }).notNull(),
+    waiver: text("waiver", { enum: CONSULTATION_WAIVERS }),
+    feeAmount: bigint("fee_amount", { mode: "number" }),
+    feeLineId: uuid("fee_line_id"),
+    controlId: uuid("control_id"),
+    complaintTaskId: uuid("complaint_task_id"),
+    rechargeRefundId: uuid("recharge_refund_id"),
+    rechargePackageId: uuid("recharge_package_id"),
+    deducted: bigint("deducted", { mode: "number" }),
+    decidedBy: uuid("decided_by").notNull(),
+    decidedAs: text("decided_as").notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    rechargedAt: timestamp("recharged_at", { withTimezone: true }),
+    commandKey: text("command_key").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_fees_visit_fk", columns: [t.tenantId, t.branchId, t.visitId], foreignColumns: [visits.tenantId, visits.branchId, visits.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_fees_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_fees_line_fk", columns: [t.tenantId, t.feeLineId], foreignColumns: [invoiceLines.tenantId, invoiceLines.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_fees_decided_by_fk", columns: [t.tenantId, t.decidedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("consultation_fees_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("consultation_fees_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
+    unique("consultation_fees_visit_key").on(t.tenantId, t.visitId),
+    unique("consultation_fees_command_key").on(t.tenantId, t.commandKey),
+    unique("consultation_fees_control_key").on(t.tenantId, t.controlId),
+    unique("consultation_fees_complaint_key").on(t.tenantId, t.complaintTaskId),
+    unique("consultation_fees_refund_key").on(t.tenantId, t.rechargeRefundId),
+    index("consultation_fees_patient_idx").on(t.tenantId, t.patientId),
+    check("consultation_fees_check", sql`${t.state} in (${inList(CONSULTATION_FEE_STATES)}) and ${KEY(t.commandKey)}
+      and (${t.waiver} is null or ${t.waiver} in (${inList(CONSULTATION_WAIVERS)}))
+      and ((${t.state} = 'charged') = (${t.waiver} is null))
+      and (${t.state} <> 'charged' or ${t.feeLineId} is not null)
+      and (${t.state} <> 'waived' or ${t.feeLineId} is null)
+      and ((${t.state} = 'charged' or ${t.waiver} = 'purchase') = (${t.feeAmount} is not null))
+      and (${t.feeAmount} is null or ${t.feeAmount} between 1 and ${sql.raw(MONEY)})
+      and ((${t.waiver} = 'control') = (${t.controlId} is not null))
+      and ((${t.waiver} = 'complaint') = (${t.complaintTaskId} is not null))
+      and ((${t.state} = 'recharged') = (${t.rechargedAt} is not null))
+      and (${t.state} <> 'recharged' or (${t.waiver} = 'purchase' and ${t.feeLineId} is not null
+           and num_nonnulls(${t.rechargeRefundId}, ${t.rechargePackageId}) = 1 and ${t.deducted} between 0 and ${t.feeAmount}))
+      and (${t.state} = 'recharged' or num_nonnulls(${t.rechargeRefundId}, ${t.rechargePackageId}, ${t.deducted}) = 0)
+      and ${t.decidedAs} in ('owner','admin_pusat','manager','fo_cashier','finance')`),
+  ],
+);
+// The qualifying purchases frozen at a purchase waiver: a later purchase never decides an earlier fee (4b); the re-charge test
+// reads exactly these lines.
+export const consultationFeePurchases = pgTable(
+  "consultation_fee_purchases",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    feeId: uuid("fee_id").notNull(),
+    invoiceLineId: uuid("invoice_line_id").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_fee_purchases_fee_fk", columns: [t.tenantId, t.branchId, t.feeId], foreignColumns: [consultationFees.tenantId, consultationFees.branchId, consultationFees.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_fee_purchases_line_fk", columns: [t.tenantId, t.invoiceLineId], foreignColumns: [invoiceLines.tenantId, invoiceLines.id] }).onDelete("restrict"),
+    unique("consultation_fee_purchases_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("consultation_fee_purchases_line_key").on(t.tenantId, t.feeId, t.invoiceLineId),
+    index("consultation_fee_purchases_line_idx").on(t.tenantId, t.invoiceLineId),
+  ],
+);
+// A free control (BILL-5) of a purchased line: per catalog control_count, dated within control_validity_days of the purchase,
+// valid to the control date + SET-7 hari (snapshotted); used once by a visit, or cancelled when the source is fully refunded.
+export const consultationControls = pgTable(
+  "consultation_controls",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    invoiceLineId: uuid("invoice_line_id").notNull(),
+    seq: smallint("seq").notNull(),
+    controlDate: date("control_date").notNull(),
+    validUntil: date("valid_until").notNull(),
+    state: text("state", { enum: CONSULTATION_CONTROL_STATES }).notNull().default("scheduled"),
+    usedVisitId: uuid("used_visit_id"),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    cancelCode: text("cancel_code"),
+    scheduledBy: uuid("scheduled_by").notNull(),
+    scheduledAs: text("scheduled_as").notNull(),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    commandKey: text("command_key").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_controls_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_controls_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_controls_line_fk", columns: [t.tenantId, t.invoiceLineId], foreignColumns: [invoiceLines.tenantId, invoiceLines.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_controls_visit_fk", columns: [t.tenantId, t.usedVisitId], foreignColumns: [visits.tenantId, visits.id] }).onDelete("restrict"),
+    foreignKey({ name: "consultation_controls_by_fk", columns: [t.tenantId, t.scheduledBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("consultation_controls_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("consultation_controls_seq_key").on(t.tenantId, t.invoiceLineId, t.seq),
+    unique("consultation_controls_command_key").on(t.tenantId, t.commandKey),
+    index("consultation_controls_patient_idx").on(t.tenantId, t.patientId, t.state),
+    check("consultation_controls_check", sql`${t.state} in (${inList(CONSULTATION_CONTROL_STATES)}) and ${KEY(t.commandKey)}
+      and ${t.seq} between 1 and 20
+      and ${t.validUntil} >= ${t.controlDate}
+      and ((${t.state} = 'used') = (${t.usedVisitId} is not null)) and ((${t.state} = 'used') = (${t.usedAt} is not null))
+      and ((${t.state} = 'cancelled') = (${t.cancelCode} is not null))
+      and (${t.cancelCode} is null or ${t.cancelCode} in ('source_refunded'))
+      and ${t.scheduledAs} in ('owner','manager','fo_cashier','doctor')`),
+  ],
+);

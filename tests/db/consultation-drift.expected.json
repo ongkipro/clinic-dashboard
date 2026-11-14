@@ -1,0 +1,36 @@
+{
+  "before": {
+    "invoice_is_ordinary(uuid,uuid)": "41f049c3af14e363807bff64eba72fd296ee49cbe3920570454005b96ef7be0d",
+    "invoice_issue(text,uuid,jsonb)": "5f2d135d2a1b22561e56c398ff34bf1ab680285359db7d7b51b150060687e907",
+    "invoices_guard()": "e7d7de4fa0567fe88f0d0f501f34296c121c45af80ba69f34568930a9b4efac1",
+    "kasir_invoice_row(invoices,boolean)": "34068163045a5b8a6bd1f13ba7ee4bcef1874c8e8d40dcfa55ee3bf749aa6f4a",
+    "kasir_queue(uuid)": "8b2326ff2bbb3241538aaa8b647fab7cb8df3d14fdd65bd5646e0e7fba985223",
+    "package_cancel(uuid,text)": "1bdcdc2dc1da057f102b1d4e0df66a5afa26e4c2654dcf4154cc89b48660bd3e",
+    "package_close_do(packages,text,text,uuid,text,timestamp with time zone)": "5686ca3a171ae9166a7cab2791eb9695807a85f87fca392c3cbeb503a43fdf74",
+    "refund_invoice_picks()": "e21ddc476a1dd1f892694cdda35774e204e209c76c4aeef1cf346bf1d75b3f95",
+    "refund_line_delivered(invoice_lines,invoices)": "1b16615aef16132d9d850fa9b110a180d96e9cf806710db1f052ca403f117c92",
+    "refund_line_options(uuid)": "4f838e3342bd89f76135bb9734f092068d5d23163c40ef9b2113db1d45fcdcc0",
+    "refund_pay(text,uuid,jsonb)": "d1f4c1c61e823bc9aab676cdc16e4e2cd249f9e2088752332d8a24fe5f08bb0e",
+    "refund_request(text,uuid,jsonb)": "02dbcce66f662c6a5aea94ba3176f336caa3b5d8a218824005b77b4336af71cd",
+    "refund_settle(refunds,uuid,text,text)": "0f62e7c90ce0ee58fee20ee865b0aa8aa3391570f77f6b51ed9a9e8f1864e138",
+    "refunds_guard()": "76db3438639d46b7f28f0a78ee64be33873497686717274adc1f0e4eb4b91ad4",
+    "visit_close(uuid)": "461fc027cfa59fd9e4688137d2f837cc6d399bd7ba62f571edfb13aa389ebd3c"
+  },
+  "after": {
+    "invoice_is_ordinary(uuid,uuid)": "a618d2a5a5af9965a36aeee834bfd00e8e3ee4d943ebeaed1c467ab5fa9a85a3",
+    "invoice_issue(text,uuid,jsonb)": "55883896dc6eb9389ab83cc7d7db2452825b13bbdb167b7b28916d03b68cc1cf",
+    "invoices_guard()": "465d8d9154204c2712e2691c529f06bd983bcb14617f65083efcf8a05c7332fe",
+    "kasir_invoice_row(invoices,boolean)": "6a0397d637be8f41416f4d723ad293e30c3b0145c6ed5992ae37b3a9b867c207",
+    "kasir_queue(uuid)": "db3d164b4ca2a6078384387a13196fae7dd1bb228053e86f674f1bd84c13b1e9",
+    "package_cancel(uuid,text)": "18bfa1b10164a14c524dac50d0038c850425bed74732873817edae1538f528d6",
+    "package_close_do(packages,text,text,uuid,text,timestamp with time zone)": "bc7b8eabcee9d03dd9d24c1c15153e343913914cd832cabf48581689d449e98e",
+    "refund_invoice_picks()": "3d6094dd3674c759a2e0002a940edf003fce1a389fc8f3eaf5e99d11abd1bacd",
+    "refund_line_delivered(invoice_lines,invoices)": "b3747b7484745cd91eb70a61d77d2041eb731935aaf3a612f62bc25350f0d9db",
+    "refund_line_options(uuid)": "ae0387e8e916b21598174f334a36d2ecde4982b62e50801e11be9d2803658654",
+    "refund_pay(text,uuid,jsonb)": "26a97794f718cc2d1a87a6b3241a0a131e8ff5454ba4b6731ac2a28eeb8b1e63",
+    "refund_request(text,uuid,jsonb)": "fc136555e906af160329b262433c0ba3c059c98c71040582c6a24b546f65d128",
+    "refund_settle(refunds,uuid,text,text)": "4221b896029ba1d1b8938d823fe82269ea3451f284c6945d1b1a3c4ef220b7ed",
+    "refunds_guard()": "05273eec6a9f44137cdb922e97d151a929a659f62d135909858b43514a725c96",
+    "visit_close(uuid)": "ff7bacf712ef1c59bc24a00e2f72034f9f1579ff83e84b5b625286af6c209ba6"
+  }
+}

@@ -41,14 +41,15 @@ export async function requestRefund(db: pg.ClientBase, key: string, lineId: stri
   const p: Record<string, Json> = { amount: r.amount, reason: r.reason };
   if (r.destination) p.destination = r.destination;
   if (r.returnedQuantity !== undefined) p.returned_quantity = r.returnedQuantity;
-  const out = await command<{ refund_id: string; state: string; approval_id: string | null }>(db, "refund_request", key, { line_id: lineId, refund: p },
+  // fee_deducted (T-079): the consultation fee re-charged from this refund (PR-12), 0 otherwise.
+  const out = await command<{ refund_id: string; state: string; approval_id: string | null; fee_deducted: number }>(db, "refund_request", key, { line_id: lineId, refund: p },
     `select refund_request($1, $2, $3::jsonb) as r`, [key, lineId, JSON.stringify(p)]);
   return out.result;
 }
 export async function payRefund(db: pg.ClientBase, key: string, refundId: string, method: "cash" | "transfer", details?: { bank?: string; reference?: string }) {
   const p: Record<string, Json> = { method };
   if (details) p.details = details;
-  const out = await command<{ refund_id: string; state: string }>(db, "refund_pay", key, { refund_id: refundId, pay: p },
+  const out = await command<{ refund_id: string; state: string; fee_deducted: number }>(db, "refund_pay", key, { refund_id: refundId, pay: p },
     `select refund_pay($1, $2, $3::jsonb) as r`, [key, refundId, JSON.stringify(p)]);
   return { ...out.result, replayed: out.replayed };
 }

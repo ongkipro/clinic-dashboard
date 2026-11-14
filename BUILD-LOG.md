@@ -501,3 +501,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   and the container's writes from about 2 GB to 124 MB per run. Keep CI on the defaults so it still runs what production runs.
 - Check a setting exists on the server's major version before planning around it: `autovacuum_vacuum_truncate` is PostgreSQL 18;
   on 16 the per-table `vacuum_truncate` is refused on a system catalog even for a superuser.
+
+## 2026-11-14 — T-079 Consultation fee
+
+- A new OUT parameter changes a function's row type: `CREATE OR REPLACE` refuses it. Drop and re-create, re-grant (here: revoke from PUBLIC), and re-create its callers in the same migration; the drift test then treats it as a re-created function, not a changed one.
+- A check that decides "would this complete the refund" must count every refund that completes it together. The pending cash refund was tested alone and never looked absorbed; with the balance refund being requested added, it does.
+- A mutant that edits the wrong line survives for the wrong reason. Read what each mutant actually removes before writing a test for it.
+- Never read and write one file in one expression: `open(p, 'w').write(open(p).read() + x)` truncates the file before it is read. The BUILD-LOG lost 503 lines that way and the review caught it; read first, then write.
+- Drop a mutant as equivalent only with the chain written down: a void closes a package only while unpaid, and an unpaid package is never a qualifying purchase, so the void exclusion cannot be reached through the writers.

@@ -336,6 +336,12 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["deposit_apply", async () => ["select deposit_apply($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["appointment_cancel_clinic", async () => ["select appointment_cancel_clinic($1, 'alasan uji')", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
     ["deposit_refund_clinic", async () => ["select deposit_refund_clinic('k-0000000040', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    // T-079: the consultation fee and control writers and readers take the actor lock first.
+    ["consultation_fee_charge", async () => ["select consultation_fee_charge('k-0000000046', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["consultation_fee_exempt", async () => ["select consultation_fee_exempt('k-0000000047', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["control_schedule", async () => ["select control_schedule('k-0000000048', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["consultation_fee_get", async () => ["select consultation_fee_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["control_list", async () => ["select control_list($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-078: the refund, receivable and write-off writers and readers take the actor lock first.
     ["refund_request", async () => ["select refund_request('k-0000000041', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["refund_pay", async () => ["select refund_pay('k-0000000042', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],

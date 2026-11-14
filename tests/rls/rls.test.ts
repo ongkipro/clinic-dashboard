@@ -561,6 +561,12 @@ describe("functions (TEN-16)", () => {
     "deposit_apply(uuid)",
     "appointment_cancel_clinic(uuid,text)",
     "deposit_refund_clinic(text,uuid,jsonb)",
+    // T-079 (PR-12, BILL-4/5): the consultation fee and control writers and readers (each takes the actor lock first).
+    "consultation_fee_charge(text,uuid,jsonb)",
+    "consultation_fee_exempt(text,uuid,jsonb)",
+    "control_schedule(text,uuid,jsonb)",
+    "consultation_fee_get(uuid)",
+    "control_list(uuid)",
     // T-078 (PR-21, PR-37, PR-15): the refund, receivable and write-off writers and readers (each takes the actor lock first).
     "refund_request(text,uuid,jsonb)",
     "refund_pay(text,uuid,jsonb)",
