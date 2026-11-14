@@ -1,0 +1,791 @@
+{
+ "_about": "T-086 M4 exit: the money scenarios of docs/spec/fixtures/money-scenarios.md (M4 domain behaviour of 1–9, 11–13, 15–19 with sub-parts and PKP variants; the facts of 10 and 14), the M4 PRD §8 scenarios (incl. the M0–M3 deferrals that complete in M4), the M4 CLIN ids and the PLAN.md M4 items, mapped to the exact test cases that prove each (JUnit classname = file, name = 'describe > test'). Checked by check-scenarios.py against a JUnit report of `pnpm test -- money`. 'proves' states what the cases assert (rupiah where they assert it; some tests use other illustrative prices than the fixture, see README); 'open' what M4 does not prove and where it completes.",
+ "money": [
+  {
+   "scenario": "1",
+   "file": "tests/cashier/kasir.test.ts",
+   "tests": [
+    "money scenario 1 and scenario PR-42 > non-PKP: serum 333,000 + sunscreen 222,000 in cash 555,000; allocations equal the lines; no VAT; hand-over then allowed",
+    "counter sale (Jual Cepat) through the pharmacist > anonymous sale: products only, special and stockless items refused; queued until paid, then handed over"
+   ],
+   "proves": "serum 333,000 + sunscreen 222,000 paid in cash 555,000; allocations equal the lines; no VAT for a non-PKP tenant; handed over only after payment",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "1 PKP",
+   "file": "tests/cashier/kasir.test.ts",
+   "tests": [
+    "money scenario 1 and scenario PR-42 > PKP variant: VAT 33,000 + 22,000 recognised at payment (half paid → half the VAT), never twice"
+   ],
+   "proves": "VAT 33,000 + 22,000 recognised at payment; half paid → half the VAT; never twice",
+   "open": "journal lines (M8); tax adviser Q-05"
+  },
+  {
+   "scenario": "1 PKP",
+   "file": "tests/cashier/allocation.test.ts",
+   "tests": [
+    "vatDueOnPaid > money scenario 1 PKP: half paid → half the VAT; full → all"
+   ],
+   "proves": "the pure VAT due on the paid share: 16,500 of 33,000 for half",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "1 PKP",
+   "file": "tests/tax/policy.test.ts",
+   "tests": [
+    "VAT split (BILL-6; T-070 fixture) > PKP taxable: base + VAT = price; the fixture's multiples of 111 are exact",
+    "tax point and PKP boundary (A-12, PR-24) > the tax-point guard: VAT not yet recognised, only when PKP at the tax point"
+   ],
+   "proves": "base + VAT = price on the fixture's multiples of 111; VAT only when PKP at the tax point",
+   "open": "tax adviser Q-05"
+  },
+  {
+   "scenario": "2",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenarios 2 and 7: interrupted single treatment (BILL-14, BILL-25) > 2: paid, completed and counted (nothing moves); 7a medical stop → balance once; 7b clinic stop → balance and the blocker clears; 7c patient stop counted"
+   ],
+   "proves": "paid, completed and counted: nothing moves (tests at 600,000)",
+   "open": "commission (M5); journal lines (M8)"
+  },
+  {
+   "scenario": "3a",
+   "file": "tests/cashier/additions.test.ts",
+   "tests": [
+    "money scenario 3a (domain) and scenario PR-15 alerts > authorized, agreed, released before payment, performed and counted; the second alert once; paid by EDC after; the visit closes"
+   ],
+   "proves": "an addition authorized, agreed, released before payment, performed and counted; paid by EDC after; the visit closes",
+   "open": "commission (M5); journal lines (M8)"
+  },
+  {
+   "scenario": "3b",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "money scenario 3b and PR-15: a performed addition unpaid becomes a receivable > converts the delivered unpaid remainder, the visit closes, the next visit collects it; a void after conversion is refused"
+   ],
+   "proves": "a delivered unpaid remainder becomes a receivable, the visit closes, the next visit collects it",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "4a",
+   "file": "tests/cashier/consultation.test.ts",
+   "tests": [
+    "money scenario 4a and 4b: consultation only; no retroactive waiver > 4a: nothing bought → the visit cannot close until charged and paid; 4b: a later visit's purchase does not touch the charged fee"
+   ],
+   "proves": "nothing bought → the visit cannot close until the fee is charged and paid",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "4b",
+   "file": "tests/cashier/consultation.test.ts",
+   "tests": [
+    "money scenario 4a and 4b: consultation only; no retroactive waiver > 4a: nothing bought → the visit cannot close until charged and paid; 4b: a later visit's purchase does not touch the charged fee"
+   ],
+   "proves": "a later visit's purchase does not touch the charged fee",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "4c",
+   "file": "tests/cashier/consultation.test.ts",
+   "tests": [
+    "scenario PR-12 and money scenario 4c: the fee waived by a purchase is re-charged when every qualifying purchase is refunded > serum 333,000 bought → waived at close; refunded to balance → re-charge line 150,000 paid from the balance (183,000 left); events"
+   ],
+   "proves": "serum 333,000 waives the fee; refunded to balance → re-charge 150,000 paid from the balance (183,000 left)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "4d",
+   "file": "tests/cashier/consultation.test.ts",
+   "tests": [
+    "money scenario 4d: one of two purchases refunded keeps the fee waived > serum + sunscreen; the sunscreen refunded → no re-charge; then the serum → re-charge (the last purchase)"
+   ],
+   "proves": "one of two purchases refunded keeps the waiver; the last one refunded re-charges",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "5a",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "reserve, redeem, release (B-15, BILL-24, PR-14, CLIN-007/009/028; scenario 7d) > a reserved session pays the start; counted redeems it; a medical or clinic stop returns it (no blocker); a patient stop counts"
+   ],
+   "proves": "a fully paid package: a reserved session pays the start and counted redeems it",
+   "open": "commission (M5); journal lines (M8)"
+  },
+  {
+   "scenario": "5a",
+   "file": "tests/cashier/consultation.test.ts",
+   "tests": [
+    "exemptions and controls (BILL-4/5, PR-43; r1 P1-5) > a package session on the visit waives; a valid control waives at close and is used once"
+   ],
+   "proves": "a package session on the visit waives the consultation fee (BILL-4)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "5b",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenario 5: equal split, instalment unlocking, minimum DP (BILL-7..9; CLIN-006) > 5 × 600,000; DP below the first session refused; 1,000,000 unlocks one session; 1,200,000 unlocks the second (ERR_SESSION_NOT_UNLOCKED before)"
+   ],
+   "proves": "the instalment package: 5 × 600,000 equal split; a DP below the first session refused; 1,000,000 unlocks one session; session 2 locked until 1,200,000",
+   "open": "commission (M5); journal lines (M8)"
+  },
+  {
+   "scenario": "6a",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "scenario PR-22 and PR-83, money scenario 6a–6d: patient and clinic changes > 6a: a patient change at least 24 h before (reschedule and cancel) moves the DP to balance (dp_transfer)"
+   ],
+   "proves": "a patient change at least 24 h before moves the DP to balance",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "6b",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "scenario PR-22 and PR-83, money scenario 6a–6d: patient and clinic changes > the cutoff boundary: exactly at starts_at − cutoff → balance; one second later → forfeited (6b)"
+   ],
+   "proves": "exactly at the cutoff → balance; one second later → forfeited",
+   "open": "journal lines (M8); accountant A-02/A-10 (forfeited DP)"
+  },
+  {
+   "scenario": "6c",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "scenario PR-22 and PR-83, money scenario 6a–6d: patient and clinic changes > PR-83 / 6c: a no-show with a DP is forfeited; the cutoff hours are the snapshot at receipt"
+   ],
+   "proves": "a no-show with a DP is forfeited; the cutoff is the snapshot at receipt",
+   "open": "journal lines (M8); accountant A-02/A-10"
+  },
+  {
+   "scenario": "6d",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "scenario PR-22 and PR-83, money scenario 6a–6d: patient and clinic changes > 6d: a clinic cancellation moves the DP to balance at any time; central CS and admin pusat may do it"
+   ],
+   "proves": "a clinic cancellation moves the DP to balance at any time",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "6e",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "6e: applied on arrival > the visit invoice receives the DP on the booked item's line automatically; the remainder is paid as usual"
+   ],
+   "proves": "the visit invoice receives the DP on the booked item's line; the remainder is paid as usual",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "6 PKP",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "the PKP gross variants (6 and 17): VAT reversed on a move or refund, counted once when the balance pays later > 6 PKP: a DP of 222,000 = base 200,000 + VAT 22,000; moved to balance gross with the VAT reversed; the balance later pays the taxable line: VAT once"
+   ],
+   "proves": "DP 222,000 = 200,000 + VAT 22,000 moved to balance gross, VAT reversed; the balance later pays a taxable line: VAT once",
+   "open": "journal lines (M8); tax adviser Q-05"
+  },
+  {
+   "scenario": "6e PKP",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "the PKP gross variants (6 and 17): VAT reversed on a move or refund, counted once when the balance pays later > 6e PKP: applied on arrival, the deposit's 22,000 VAT moves to the line; the remainder's payment recognises only the rest (165,000 once)"
+   ],
+   "proves": "the deposit's 22,000 VAT moves to the line; the remainder recognises only the rest",
+   "open": "journal lines (M8); tax adviser Q-05"
+  },
+  {
+   "scenario": "7a",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenarios 2 and 7: interrupted single treatment (BILL-14, BILL-25) > 2: paid, completed and counted (nothing moves); 7a medical stop → balance once; 7b clinic stop → balance and the blocker clears; 7c patient stop counted"
+   ],
+   "proves": "7a medical stop → balance once",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "7b",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenarios 2 and 7: interrupted single treatment (BILL-14, BILL-25) > 2: paid, completed and counted (nothing moves); 7a medical stop → balance once; 7b clinic stop → balance and the blocker clears; 7c patient stop counted"
+   ],
+   "proves": "7b clinic stop → balance; the blocker clears",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "7c",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenarios 2 and 7: interrupted single treatment (BILL-14, BILL-25) > 2: paid, completed and counted (nothing moves); 7a medical stop → balance once; 7b clinic stop → balance and the blocker clears; 7c patient stop counted"
+   ],
+   "proves": "7c patient stop counts",
+   "open": "commission (M5); journal lines (M8)"
+  },
+  {
+   "scenario": "7d",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "reserve, redeem, release (B-15, BILL-24, PR-14, CLIN-007/009/028; scenario 7d) > a reserved session pays the start; counted redeems it; a medical or clinic stop returns it (no blocker); a patient stop counts"
+   ],
+   "proves": "a medical or clinic stop returns the reserved session; a patient stop counts",
+   "open": "commission (M5); journal lines (M8)"
+  },
+  {
+   "scenario": "8",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "scenario PR-20 and money scenario 8: expiry > Rp5,000,000 for 5 sessions, Rp3,000,000 paid, 2 counted: Rp1,000,000 to balance, Rp2,000,000 cancelled, no receivable, closed"
+   ],
+   "proves": "Rp5,000,000 for 5 sessions, Rp3,000,000 paid, 2 counted: Rp1,000,000 to balance, Rp2,000,000 cancelled, closed",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "9",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "money scenario 9: a treatment not performed > 9: refunded to balance (undelivered); 9b: the cash exception approved and paid; VAT none (exempt)"
+   ],
+   "proves": "refunded to balance (undelivered); 9b the cash exception approved and paid; no VAT (exempt)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "9",
+   "file": "tests/inventory/materials.test.ts",
+   "tests": [
+    "returns, waste, free quantity, reconciliation (open points 5–7) > free = issued − consumed − returned − wasted − pending; usable only when sealed, fit and not damaged; waste runs a room vial down"
+   ],
+   "proves": "unused materials returned: free = issued − consumed − returned − wasted − pending",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "11",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "reserve, redeem, release (B-15, BILL-24, PR-14, CLIN-007/009/028; scenario 7d) > money scenario 11: sold at branch 1, redeemed at branch 2 (the executing branch recorded)"
+   ],
+   "proves": "sold at branch 1, redeemed at branch 2; the executing branch recorded",
+   "open": "commission (M5); journal lines (M8)"
+  },
+  {
+   "scenario": "12a",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenario 12: substitution (BILL-11) > 12b cheaper: the difference to balance, the effective paid value drops (no double move at close); 12a dearer: a difference line to pay before the start"
+   ],
+   "proves": "12a dearer: a difference line to pay before the start",
+   "open": "journal lines (M8); accountant A-02/A-10"
+  },
+  {
+   "scenario": "12b",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenario 12: substitution (BILL-11) > 12b cheaper: the difference to balance, the effective paid value drops (no double move at close); 12a dearer: a difference line to pay before the start"
+   ],
+   "proves": "12b cheaper: the difference to balance; the effective paid value drops",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "13",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenario 13 and the top-up (balance funds a package) > Isi Saldo: a KW receipt and a payment with no invoice; then the balance pays the first instalment and a session is redeemed"
+   ],
+   "proves": "Isi Saldo: a receipt and a payment with no invoice; the balance pays the first instalment; a session is redeemed",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "15a",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "money scenario 15 and PR-21: a product refund > 15a: delivered serum refunded to balance by default: paid at once, moved_to_balance, from_refund, the unit back to its batch, ProductReturned"
+   ],
+   "proves": "delivered serum refunded to balance by default; the unit back to its batch",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "15b",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "money scenario 15 and PR-21: a product refund > 15b: the cash exception: requested → approved by the owner (maker-checker) → paid at the drawer: from_refund then cash_refund"
+   ],
+   "proves": "the cash exception: requested → approved by the owner → paid at the drawer",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "15 PKP",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "the PKP variant (scenario 15 PKP / 19 pattern): VAT reversed in proportion on a refund > a taxable line paid in full recognises its VAT; a partial refund to balance reverses the same share; the rest stays recognised"
+   ],
+   "proves": "a partial refund to balance reverses the same share of VAT",
+   "open": "journal lines (M8); tax adviser Q-05"
+  },
+  {
+   "scenario": "16",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "tax facts (scenarios 16 and 19; PENDING Q-05) > 16: a package sold before PKP has no VAT; a session redeemed after PKP (gate open) records its delivery VAT"
+   ],
+   "proves": "sold before PKP: no VAT; a session redeemed after PKP records its delivery VAT",
+   "open": "tax adviser Q-05"
+  },
+  {
+   "scenario": "16",
+   "file": "tests/tax/policy.test.ts",
+   "tests": [
+    "tax point and PKP boundary (A-12, PR-24) > scenario 16 (PENDING Q-05), both readings: a package paid before the PKP date, a session counted after"
+   ],
+   "proves": "both Q-05 readings pinned",
+   "open": "tax adviser Q-05"
+  },
+  {
+   "scenario": "17",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "scenario 17: a clinic-caused cancellation refunded in cash > cancels the appointment and records the refund on the deposit; no balance; FO, manager, owner only"
+   ],
+   "proves": "a clinic-caused cancellation refunded in cash, recorded on the deposit; no balance",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "17 PKP",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "the PKP gross variants (6 and 17): VAT reversed on a move or refund, counted once when the balance pays later > 17 PKP: refunded gross, VAT reversed, net 0"
+   ],
+   "proves": "refunded gross, VAT reversed, net 0",
+   "open": "journal lines (M8); tax adviser Q-05"
+  },
+  {
+   "scenario": "18",
+   "file": "tests/payments/port.test.ts",
+   "tests": [
+    "scenario PR-68 and money scenario 18 > money scenario 18: the response lost, Cek Status settles once, then two webhooks are no-ops; a retry never creates a second charge"
+   ],
+   "proves": "the response lost, Cek Status settles once; two webhooks are no-ops; a retry never creates a second charge",
+   "open": "gateway settlement (M8)"
+  },
+  {
+   "scenario": "19",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "tax facts (scenarios 16 and 19; PENDING Q-05) > 19: a PKP package paid for 3 sessions recognises their VAT; expired with 1 redeemed, the unredeemed sessions' VAT is reversed; the balance is gross"
+   ],
+   "proves": "a PKP package paid for 3 sessions recognises their VAT; at expiry the 3 paid unredeemed sessions (1,998,000) move to balance gross and their VAT (198,000) is reversed (the test title says 1 redeemed; the body redeems none, matching the fixture)",
+   "open": "journal lines (M8); tax adviser Q-05"
+  },
+  {
+   "scenario": "19",
+   "file": "tests/balance/balance.test.ts",
+   "tests": [
+    "the tender at the Kasir > PKP: VAT recognised at payment on a line paid by balance (once)"
+   ],
+   "proves": "the balance spent on a taxable item: VAT once",
+   "open": "journal lines (M8); tax adviser Q-05"
+  },
+  {
+   "scenario": "10",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "money scenario 9: a treatment not performed > a service is delivered only by a finished counted execution: a clinic stop is not delivered, a completed one is"
+   ],
+   "proves": "fact level: a service is delivered only by a finished counted execution",
+   "open": "commission (T-087, M5)"
+  },
+  {
+   "scenario": "14",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "PR-37: write-offs > the owner writes off alone: reason ≥ 10, owner-self approval, the whole open amount, audit and event",
+    "PR-37: write-offs > requested by FO, decided by the owner; a manager may not request or decide; rejected clears the link; a pending request sends the owner to Persetujuan"
+   ],
+   "proves": "fact level: the owner writes off alone; a requested write-off is decided by the owner",
+   "open": "commission (T-087, M5)"
+  }
+ ],
+ "scenarios": [
+  {
+   "scenario": "PR-24 VAT gated by tax advice",
+   "file": "tests/tax/tax.test.ts",
+   "tests": [
+    "scenario PR-24: VAT gated by tax advice (PR-97) > a PKP switch without approved tax advice is refused until the advice is recorded; then accepted"
+   ],
+   "proves": "a PKP switch without approved tax advice is refused until the advice is recorded (T-071)",
+   "open": "posting (M8)"
+  },
+  {
+   "scenario": "PR-24 PKP switch",
+   "file": "tests/tax/tax.test.ts",
+   "tests": [
+    "scenario PR-24: PKP switch > an invoice before the PKP date has no VAT and stays unchanged; an invoice on the date computes and snapshots VAT"
+   ],
+   "proves": "an invoice before the PKP date has no VAT; on the date VAT is computed and snapshotted (T-071)",
+   "open": "tax adviser Q-05"
+  },
+  {
+   "scenario": "PR-42 branch price",
+   "file": "tests/cashier/kasir.test.ts",
+   "tests": [
+    "money scenario 1 and scenario PR-42 > scenario PR-42: the branch override on a Kasir invoice, kept after a later price change"
+   ],
+   "proves": "the branch override on a Kasir invoice is kept after a later price change (M1 deferral closed by T-072)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-19 proportional allocation",
+   "file": "tests/cashier/kasir.test.ts",
+   "tests": [
+    "scenario PR-19: proportional allocation after discount > lines 600,000 and 400,000 after discount; 500,000 paid → 300,000 and 200,000; the rest completes them"
+   ],
+   "proves": "600,000 and 400,000 after discount; 500,000 paid → 300,000 and 200,000 (T-072)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "PR-68 mock gateway duplicate webhook",
+   "file": "tests/payments/port.test.ts",
+   "tests": [
+    "scenario PR-68 and money scenario 18 > duplicate webhook: one simulated payment and allocation, receipt SIMULASI, the line still unpaid (treatment start and visit close blocked)"
+   ],
+   "proves": "one simulated payment and allocation, receipt SIMULASI, the line still unpaid (T-073)",
+   "open": "the real gateway adapter (owner-gated)"
+  },
+  {
+   "scenario": "PR-68 mock hidden in production",
+   "file": "tests/payments/port.test.ts",
+   "tests": [
+    "scenario PR-68 and money scenario 18 > mock hidden in production: QRIS, VA and link not offered; no charge; the webhook 404; the simulator refused"
+   ],
+   "proves": "QRIS, VA and link not offered in production; no charge; the webhook 404 (T-073)",
+   "open": "the real gateway adapter (owner-gated)"
+  },
+  {
+   "scenario": "PR-15 alerts",
+   "file": "tests/cashier/additions.test.ts",
+   "tests": [
+    "money scenario 3a (domain) and scenario PR-15 alerts > authorized, agreed, released before payment, performed and counted; the second alert once; paid by EDC after; the visit closes"
+   ],
+   "proves": "the second alert once when an unpaid addition finishes (T-074)",
+   "open": "WhatsApp delivery (messaging tasks)"
+  },
+  {
+   "scenario": "PR-15 cannot close unpaid",
+   "file": "tests/cashier/additions.test.ts",
+   "tests": [
+    "scenario PR-15 cannot close unpaid, CLIN-020, CLIN-025 and PR-7 > CLIN-020: planned 25, paid 20, executed 25 — the +5 add-on blocks closure until its bill is paid; the board lists the visit meanwhile"
+   ],
+   "proves": "the +5 add-on blocks closure until its bill is paid (T-074)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-15 receivable",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "money scenario 3b and PR-15: a performed addition unpaid becomes a receivable > converts the delivered unpaid remainder, the visit closes, the next visit collects it; a void after conversion is refused"
+   ],
+   "proves": "a performed unpaid addition becomes a receivable; the visit closes (T-078)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "PR-7 outstanding list",
+   "file": "tests/visits/visits.test.ts",
+   "tests": [
+    "scenario PR-7: the board and the close blocker for an unpaid bill > check-in opens one visit; an unpaid bill lists it under Belum dibayar and blocks the close until settled"
+   ],
+   "proves": "an unpaid bill lists the visit under Belum dibayar and blocks the close (M1 deferral closed by T-072)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-7 outstanding list",
+   "file": "tests/cashier/additions.test.ts",
+   "tests": [
+    "scenario PR-15 cannot close unpaid, CLIN-020, CLIN-025 and PR-7 > CLIN-020: planned 25, paid 20, executed 25 — the +5 add-on blocks closure until its bill is paid; the board lists the visit meanwhile"
+   ],
+   "proves": "the PRD's Given: a visit with an unpaid addition is listed and cannot close until paid (T-074)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-45 clinician approves addition",
+   "file": "tests/clinical/requests.test.ts",
+   "tests": [
+    "scenario PR-45: clinician approves addition > a nurse proposes an additional treatment in the room; the doctor approves; the agreement step opens and FO is alerted"
+   ],
+   "proves": "the doctor approves a proposed addition; the agreement step opens and FO is alerted (M2 deferral; billing by T-074)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-21 refund goes to balance by default",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "money scenario 15 and PR-21: a product refund > 15a: delivered serum refunded to balance by default: paid at once, moved_to_balance, from_refund, the unit back to its batch, ProductReturned",
+    "money scenario 15 and PR-21: a product refund > PR-21: an undelivered product refunded to balance: its queued dispensing is cancelled; a pending cash refund blocks the handover"
+   ],
+   "proves": "a refund goes to the patient balance by default; the PRD's Given (a paid product not handed over) refunded to balance, its queued dispensing cancelled (T-078)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "PR-21 balance never expires",
+   "file": "tests/balance/balance.test.ts",
+   "tests": [
+    "scenario PR-21: the balance never expires > a balance of Rp400,000 last used two years ago pays a product in full"
+   ],
+   "proves": "a balance last used two years ago pays a product in full (T-075)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-37 maker-checker",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "money scenario 15 and PR-21: a product refund > PR-37 maker-checker and SET-11: a manager requests, may not approve their own; with owner_manager another manager approves; rejected → failed, the room freed"
+   ],
+   "proves": "a requester may not approve their own cash refund (T-078)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-37 owner write-off",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "PR-37: write-offs > the owner writes off alone: reason ≥ 10, owner-self approval, the whole open amount, audit and event"
+   ],
+   "proves": "the owner writes off alone with a reason, audited (T-078)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "PR-63 Admin Pusat boundary",
+   "file": "tests/cashier/receivables.test.ts",
+   "tests": [
+    "money scenario 15 and PR-21: a product refund > PR-63: Admin Pusat cannot request, pay, decide a refund, write off or read Piutang"
+   ],
+   "proves": "Admin Pusat cannot request, pay or decide a refund, write off or read Piutang (M0 deferral closed by T-078)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-20 session unlock and expiry",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenario 5: equal split, instalment unlocking, minimum DP (BILL-7..9; CLIN-006) > 5 × 600,000; DP below the first session refused; 1,000,000 unlocks one session; 1,200,000 unlocks the second (ERR_SESSION_NOT_UNLOCKED before)",
+    "scenario PR-20 and money scenario 8: expiry > Rp5,000,000 for 5 sessions, Rp3,000,000 paid, 2 counted: Rp1,000,000 to balance, Rp2,000,000 cancelled, no receivable, closed"
+   ],
+   "proves": "the paid value unlocks sessions; expiry moves the paid unredeemed value to balance (T-076)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "PR-14 patient-chosen stop",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "reserve, redeem, release (B-15, BILL-24, PR-14, CLIN-007/009/028; scenario 7d) > a reserved session pays the start; counted redeems it; a medical or clinic stop returns it (no blocker); a patient stop counts"
+   ],
+   "proves": "a patient stop counts the package session (the M3 deferral's session use, closed by T-076)",
+   "open": "commission (T-087, M5)"
+  },
+  {
+   "scenario": "PR-22 booking DP under 24 hours",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "scenario PR-22 and PR-83, money scenario 6a–6d: patient and clinic changes > PR-22: a DP of Rp200,000; the patient reschedules 10 h before → forfeited and recorded"
+   ],
+   "proves": "a DP of Rp200,000; rescheduled 10 h before → forfeited and recorded (T-077)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "PR-83 no-show",
+   "file": "tests/cashier/deposits.test.ts",
+   "tests": [
+    "scenario PR-22 and PR-83, money scenario 6a–6d: patient and clinic changes > PR-83 / 6c: a no-show with a DP is forfeited; the cutoff hours are the snapshot at receipt"
+   ],
+   "proves": "a no-show with a DP is forfeited (M1 deferral closed by T-077)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "PR-12 consultation fee after full refund",
+   "file": "tests/cashier/consultation.test.ts",
+   "tests": [
+    "scenario PR-12 and money scenario 4c: the fee waived by a purchase is re-charged when every qualifying purchase is refunded > serum 333,000 bought → waived at close; refunded to balance → re-charge line 150,000 paid from the balance (183,000 left); events"
+   ],
+   "proves": "the waived fee is re-charged when every qualifying purchase is refunded (T-079)",
+   "open": "journal lines (M8)"
+  },
+  {
+   "scenario": "PR-43 complaint escalation",
+   "file": "tests/cashier/consultation.test.ts",
+   "tests": [
+    "explicit exemptions before close: a control, a kontrol_gratis complaint; an expired control (review 9bef67ca P2-1) > a kontrol_gratis complaint (PR-43) exempts once; another outcome or another patient's complaint does not"
+   ],
+   "proves": "the free control of a complaint exempts the fee once (M2 waiver deferral closed by T-079)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-72 discount above limit",
+   "file": "tests/cashier/discounts.test.ts",
+   "tests": [
+    "scenario PR-72: an over-limit manual discount waits for approval > FO 15 % with a 10 % limit → issued at full price, one pending approval for the line, listed for manager and owner, not FO"
+   ],
+   "proves": "an over-limit manual discount is issued at full price and waits for approval (T-080)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-77 promo quota",
+   "file": "tests/promo/promo.test.ts",
+   "tests": [
+    "scenario PR-77 and the atomic quota (Done-when) > a code with quota 10 already used 10 times is refused as exhausted; nothing is written"
+   ],
+   "proves": "a code with its quota used is refused as exhausted; nothing written (T-081)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-93 sharing disabled by default",
+   "file": "tests/packages/sharing.test.ts",
+   "tests": [
+    "scenario PR-93 sharing disabled by default > a template without sharing: the sold package is not shared, the action is not offered, adding a beneficiary is refused, nothing written"
+   ],
+   "proves": "a package without sharing cannot take a beneficiary (T-082)",
+   "open": "the sharing UI (follow-up)"
+  },
+  {
+   "scenario": "PR-93 beneficiaries cannot exceed paid value",
+   "file": "tests/packages/sharing.test.ts",
+   "tests": [
+    "scenario PR-93 beneficiaries cannot exceed paid value > one paid session left and two beneficiaries reserving it at the same time: exactly one reservation succeeds (5 rounds)"
+   ],
+   "proves": "two beneficiaries reserving the last paid session at once: exactly one succeeds (T-082)",
+   "open": "none at M4"
+  },
+  {
+   "scenario": "PR-96 schedule does not unlock",
+   "file": "tests/packages/schedules.test.ts",
+   "tests": [
+    "scenario PR-96 schedule does not unlock > a package with the min DP paid and an agreed schedule; a date passes unpaid → one reminder for FO at the sold branch; no session unlocks; nothing of money"
+   ],
+   "proves": "an instalment schedule reminds; it never unlocks a session or creates money (T-083)",
+   "open": "patient WhatsApp reminders (messaging tasks)"
+  },
+  {
+   "scenario": "PR-79 expense",
+   "file": "tests/expenses/expenses.test.ts",
+   "tests": [
+    "scenario PR-79 expense > a petty-cash expense with a receipt photo recorded for B1 is in B1's expenses for that period (and not in B2's, nor once reversed)"
+   ],
+   "proves": "a petty-cash expense with a receipt is in its branch's expenses for the period (T-084)",
+   "open": "posting (M8)"
+  }
+ ],
+ "items": [
+  {
+   "item": "CLIN-006 package equal split and unlocking",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenario 5: equal split, instalment unlocking, minimum DP (BILL-7..9; CLIN-006) > 5 × 600,000; DP below the first session refused; 1,000,000 unlocks one session; 1,200,000 unlocks the second (ERR_SESSION_NOT_UNLOCKED before)"
+   ],
+   "proves": "equal split, minimum DP, instalment unlocking (T-076)"
+  },
+  {
+   "item": "CLIN-007 reserve, redeem, return",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "reserve, redeem, release (B-15, BILL-24, PR-14, CLIN-007/009/028; scenario 7d) > a reserved session pays the start; counted redeems it; a medical or clinic stop returns it (no blocker); a patient stop counts"
+   ],
+   "proves": "a reserved session pays the start; counted redeems it; a medical or clinic stop returns it (T-076)"
+  },
+  {
+   "item": "CLIN-009 release",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "reserve, redeem, release (B-15, BILL-24, PR-14, CLIN-007/009/028; scenario 7d) > CLIN-009 release; the visit close releases an unbound session; the in-treatment guard; one session covers one item"
+   ],
+   "proves": "the visit close releases an unbound session; the in-treatment guard (T-076)"
+  },
+  {
+   "item": "CLIN-010 mixed package weights",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenario 5: equal split, instalment unlocking, minimum DP (BILL-7..9; CLIN-006) > mixed package (CLIN-010): weights by the branch price, largest remainder; only the matching service is reserved; a catalog change keeps the sessions (CLIN-011)"
+   ],
+   "proves": "weights by the branch price, largest remainder (T-076)"
+  },
+  {
+   "item": "CLIN-011 catalog change keeps the sessions",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "money scenario 5: equal split, instalment unlocking, minimum DP (BILL-7..9; CLIN-006) > mixed package (CLIN-010): weights by the branch price, largest remainder; only the matching service is reserved; a catalog change keeps the sessions (CLIN-011)"
+   ],
+   "proves": "a catalog change keeps the sold sessions (T-076)"
+  },
+  {
+   "item": "CLIN-020 add-on blocks closure until paid",
+   "file": "tests/cashier/additions.test.ts",
+   "tests": [
+    "scenario PR-15 cannot close unpaid, CLIN-020, CLIN-025 and PR-7 > CLIN-020: planned 25, paid 20, executed 25 — the +5 add-on blocks closure until its bill is paid; the board lists the visit meanwhile"
+   ],
+   "proves": "planned 25, paid 20, executed 25: the +5 add-on blocks closure until paid (T-074)"
+  },
+  {
+   "item": "CLIN-025 pending pharmacy blocks closure",
+   "file": "tests/cashier/additions.test.ts",
+   "tests": [
+    "scenario PR-15 cannot close unpaid, CLIN-020, CLIN-025 and PR-7 > CLIN-025: pending pharmacy blocks closure (the dispensing step named)"
+   ],
+   "proves": "a pending dispensing blocks the close and is named (T-074)"
+  },
+  {
+   "item": "CLIN-028 concurrent reservations within the paid value",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "reserve, redeem, release (B-15, BILL-24, PR-14, CLIN-007/009/028; scenario 7d) > concurrent reservations within the paid value for one more session: exactly one wins"
+   ],
+   "proves": "concurrent reservations for one more session: exactly one wins (T-076)"
+  },
+  {
+   "item": "PR-68 mock never counts",
+   "file": "tests/packages/packages.test.ts",
+   "tests": [
+    "reserve, redeem, release (B-15, BILL-24, PR-14, CLIN-007/009/028; scenario 7d) > simulated port money never counts as paid: no unlock, no VAT (BILL-29)"
+   ],
+   "proves": "simulated port money never unlocks a session or recognises VAT (T-076)"
+  },
+  {
+   "item": "PR-68 mock never counts",
+   "file": "tests/cashier/additions.test.ts",
+   "tests": [
+    "scenario PR-15 cannot close unpaid, CLIN-020, CLIN-025 and PR-7 > a simulated payment of the addition before the start does not count as paid: an unreleased addition stays blocked and the alert fires"
+   ],
+   "proves": "a simulated payment of an addition does not count as paid (T-074)"
+  },
+  {
+   "item": "PR-68 mock never counts",
+   "file": "tests/payments/port.test.ts",
+   "tests": [
+    "BILL-29 on a PKP tenant, closing states, duplicates, lock order > a simulated payment never recognises VAT on a PKP line; a real one then recognises it in full"
+   ],
+   "proves": "a simulated payment never recognises VAT (T-073)"
+  },
+  {
+   "item": "PR-77 quota atomic under 2 concurrent cashiers",
+   "file": "tests/promo/promo.test.ts",
+   "tests": [
+    "scenario PR-77 and the atomic quota (Done-when) > two cashiers take the last use at the same time: exactly one issues (the second waits, then sees it used); rollback frees it",
+    "scenario PR-77 and the atomic quota (Done-when) > a burst of 6 parallel issues against quota 3 issues exactly 3"
+   ],
+   "proves": "two cashiers on the last use: exactly one issues; a burst of 6 against quota 3 issues 3 (T-081)"
+  },
+  {
+   "item": "PR-19 / BILL-18 shift close: non-zero variance always waits for approval; above threshold escalates",
+   "file": "tests/cashier/shifts.test.ts",
+   "tests": [
+    "Done-when: a non-zero variance always waits; above SET-13 it escalates to the owner > zero variance closes at once; a short count within SET-13 waits for a manager (not the requester); above SET-13 only the owner",
+    "Done-when: a non-zero variance always waits; above SET-13 it escalates to the owner > SET-13 is read at submit and frozen on the count: a later change does not reroute; rejection → recount → a new approval"
+   ],
+   "proves": "zero closes; within SET-13 a manager decides, above it only the owner; SET-13 frozen at submit; rejection → recount (T-085)"
+  }
+ ],
+ "deferred": [
+  {
+   "scenario": "commission figures of 2, 3a, 5a, 7c, 7d, 10, 11, 14 and PR-14",
+   "completes_in": "T-087 (M5)"
+  },
+  {
+   "scenario": "journal lines of every scenario; scenario 20 (gateway settlement)",
+   "completes_in": "M8 (the ledger and settlement tasks)"
+  },
+  {
+   "scenario": "the real payment gateway adapter (PR-68 beyond the mock)",
+   "completes_in": "owner-gated (no live provider calls)"
+  }
+ ]
+}
