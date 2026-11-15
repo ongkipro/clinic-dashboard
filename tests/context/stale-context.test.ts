@@ -56,6 +56,7 @@ const piutang = await import("../../src/app/(app)/piutang/actions"); // T-078
 const biaya = await import("../../src/app/(app)/keuangan/biaya/actions"); // T-084
 const tutup = await import("../../src/app/(app)/kasir/tutup/actions"); // T-085
 const komisi = await import("../../src/app/(app)/komisi/actions"); // T-087
+const pesan = await import("../../src/app/(app)/pesan/actions"); // T-090
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -202,6 +203,11 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["komisi newVersionAction", (f) => komisi.newVersionAction({}, f), () => ({ key: U(343), rule: U(344), kind: "percent", percent: "6" })],
   ["komisi decideVersionAction", (f) => komisi.decideVersionAction({}, f), () => ({ version: U(345), action: "activate" })],
   ["komisi simulateAction", (f) => komisi.simulateAction({}, f), () => ({ item: U(346), price: "1000000" })],
+  ["pesan replyAction", (f) => pesan.replyAction({}, f), () => ({ key: U(347), conversation: U(348), body: "Halo" })],
+  ["pesan templateSendAction", (f) => pesan.templateSendAction({}, f), () => ({ key: U(349), conversation: U(348), template: U(350) })],
+  ["pesan conversationAction", (f) => pesan.conversationAction({}, f), () => ({ conversation: U(348), action: "close" })],
+  ["pesan saveTemplateAction", (f) => pesan.saveTemplateAction({}, f), () => ({ key: U(351), name: "salam_uji", category: "utility", body: "Halo" })],
+  ["pesan syncTemplatesAction", (f) => pesan.syncTemplatesAction({}, f), () => ({})],
   ["simulasi enableAction", (f) => simulasi.enableAction({}, f), () => ({})],
   ["simulasi simulateAction", (f) => simulasi.simulateAction({}, f), () => ({ charge: U(308), action: "paid" })],
   ["stok receiveAction", (f) => stok.receiveAction({}, f), () => ({ key: U(151), item: U(152), batch_no: "B-1", expiry: "2030-01-01", quantity: "1", reason: "penerimaan" })],

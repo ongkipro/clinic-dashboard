@@ -68,6 +68,9 @@ async function victimWaba(env: IsolationEnv, fresh = false) {
   const known = wabas.get(t);
   if (known && !fresh) return known;
   if (known) await as(env, t, "owner", (db) => revokeWaba(db as never, known.wabaId, "manual"));
+  // another case file's live WABA for this tenant (T-090 pesan cases; one live WABA per tenant): revoke it first
+  const live = (await env.owner.query(`select id from waba_accounts where tenant_id = $1 and state <> 'revoked'`, [t])).rows[0];
+  if (live) await as(env, t, "owner", (db) => revokeWaba(db as never, live.id, "manual"));
   const port = mockWabaGraphPort();
   const { wabaId } = await as(env, t, "owner", (db) => startWabaSignup(db as never, crypto.randomUUID(), { onboardingChannel: "bsp_fallback", bspProvider: "bsp_sintetis" }));
   await as(env, t, "owner", (db) => completeWabaSignup(db as never, wabaId, "code-bsp", { port, onboardingChannel: "bsp_fallback" }));

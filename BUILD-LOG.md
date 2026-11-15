@@ -623,3 +623,15 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A command key replay must not re-generate a secret: a replayed add registers with the PIN already sealed in the row.
 - A definer that takes a JSON payload and ignores unknown keys lets a plaintext secret reach SQL unnoticed: whitelist the key set
   (`p - 'a' - 'b' <> '{}'`). A mutation survived only after an order-dependent test that had masked it was made deterministic.
+
+## 2026-11-15 — T-090 Pesan inbox
+
+- `setting_value_at` reads the bound tenant (`app_tenant_id()`), so an unbound webhook path cannot read a setting through it: read the tenant's
+  `setting_versions` directly with the same precedence.
+- A send replay must not call the provider again: check the idempotency outcome before the port call, not only the queued state.
+- Postgres regular expressions allow at most 255 repetitions (`{1,511}` fails at the first evaluation, not at CREATE): keep counts ≤ 255.
+- Isolation case files that each seed a WABA for the same victim tenant collide on "one live WABA per tenant": a seed revokes another file's
+  live WABA first and re-seeds when its own was revoked.
+- A mutation that removes a definer's own check can be equivalent when a callee or a second predicate refuses the same case (the intake's
+  unbound check behind `waba_route_resolve`; the tenant filter behind `inbox_readable`'s `stock_member_now`): drop it with its reason and
+  mutate the layer that actually decides.

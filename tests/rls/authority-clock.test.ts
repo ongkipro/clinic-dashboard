@@ -344,6 +344,17 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["cash_shift_list", async () => ["select cash_shift_list(null, null)", []], ["manager"]],
     ["cash_shift_get", async () => ["select cash_shift_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["cash_shift_mine", async () => ["select cash_shift_mine(null)", []], ["manager"]],
+    // T-090: the inbox and template writers and readers take the actor lock first.
+    ["inbox_data_key_ensure", async () => ["select * from inbox_data_key_ensure('x')", []], ["fo_cashier"]],
+    ["inbox_sealed_token", async () => ["select * from inbox_sealed_token($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["inbox_send_queue", async () => ["select inbox_send_queue('k-0000000105', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["inbox_send_record", async () => ["select inbox_send_record($1, 'wamid.x')", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["inbox_conversation_update", async () => ["select inbox_conversation_update($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["inbox_list", async () => ["select inbox_list(null, null)", []], ["fo_cashier"]],
+    ["inbox_thread_get", async () => ["select inbox_thread_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
+    ["wa_template_save", async () => ["select wa_template_save('k-0000000106', '{}'::jsonb)", []], ["owner"]],
+    ["wa_template_sync", async () => ["select wa_template_sync('{}'::jsonb)", []], ["owner"]],
+    ["wa_templates_list", async () => ["select wa_templates_list()", []], ["manager"]],
     // T-089: the WABA writers and readers take the actor lock first.
     ["waba_data_key_ensure", async () => ["select * from waba_data_key_ensure('x')", []], ["owner"]],
     ["waba_signup_start", async () => ["select waba_signup_start('k-0000000103', '{}'::jsonb)", []], ["owner"]],

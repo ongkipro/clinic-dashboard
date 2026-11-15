@@ -591,6 +591,21 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-090 (PR-28): the inbox writers and readers, the template writers and reader, the tenant key and sealed token for senders (each takes
+    // the actor lock first), and the unbound webhook intake (keys, drop, ingest — which refuse a bound connection).
+    "inbox_data_key_ensure(text)",
+    "inbox_sealed_token(uuid)",
+    "inbox_send_queue(text,uuid,jsonb)",
+    "inbox_send_record(uuid,text)",
+    "inbox_conversation_update(uuid,jsonb)",
+    "inbox_list(text,uuid)",
+    "inbox_thread_get(uuid)",
+    "wa_template_save(text,jsonb)",
+    "wa_template_sync(jsonb)",
+    "wa_templates_list()",
+    "inbox_webhook_keys(uuid,text)",
+    "meta_webhook_drop(jsonb)",
+    "meta_webhook_ingest(jsonb)",
     // T-089 (PR-27): the WABA onboarding writers and reader, the tenant key for its secrets, the server-only sealed token / PIN readers (each
     // takes the actor lock first), and the unbound webhook account update and route resolver (which refuse a bound connection).
     "waba_data_key_ensure(text)",
