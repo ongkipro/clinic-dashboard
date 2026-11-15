@@ -591,6 +591,21 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-089 (PR-27): the WABA onboarding writers and reader, the tenant key for its secrets, the server-only sealed token / PIN readers (each
+    // takes the actor lock first), and the unbound webhook account update and route resolver (which refuse a bound connection).
+    "waba_data_key_ensure(text)",
+    "waba_signup_start(text,jsonb)",
+    "waba_complete_signup(uuid,jsonb)",
+    "waba_add_number(text,uuid,jsonb)",
+    "waba_register_number(uuid,jsonb)",
+    "waba_sync_status(uuid,jsonb)",
+    "waba_migrate_to_cloud_api(uuid,jsonb)",
+    "waba_revoke(uuid,text)",
+    "waba_status()",
+    "waba_sealed_token(uuid)",
+    "waba_sealed_pin(uuid)",
+    "waba_webhook_account_update(text,text,jsonb)",
+    "waba_route_resolve(text)",
     // T-088 (PR-47): the target writer and the two readers (each takes the actor lock first).
     "staff_target_set(text,uuid,text,jsonb)",
     "target_mine(text)",

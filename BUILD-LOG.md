@@ -614,3 +614,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   an isolation marker must use the whole id.
 - A receivable needs a delivered unpaid remainder, and a treatment start needs the initial bill paid: build the fixture from a released
   addition, never from a partly paid initial bill.
+
+## 2026-11-15 — T-089 WABA onboarding
+
+- In PL/pgSQL a `CASE … END` inside an `IF` condition is read as the end of the block (`syntax error at end of input`): wrap it in parentheses.
+- A refusal that must persist (the WABA's verification_required) cannot be raised: an exception rolls the state change back. Commit the state
+  and return a coded reply instead.
+- A command key replay must not re-generate a secret: a replayed add registers with the PIN already sealed in the row.
+- A definer that takes a JSON payload and ignores unknown keys lets a plaintext secret reach SQL unnoticed: whitelist the key set
+  (`p - 'a' - 'b' <> '{}'`). A mutation survived only after an order-dependent test that had masked it was made deterministic.

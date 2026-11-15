@@ -344,6 +344,18 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["cash_shift_list", async () => ["select cash_shift_list(null, null)", []], ["manager"]],
     ["cash_shift_get", async () => ["select cash_shift_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["cash_shift_mine", async () => ["select cash_shift_mine(null)", []], ["manager"]],
+    // T-089: the WABA writers and readers take the actor lock first.
+    ["waba_data_key_ensure", async () => ["select * from waba_data_key_ensure('x')", []], ["owner"]],
+    ["waba_signup_start", async () => ["select waba_signup_start('k-0000000103', '{}'::jsonb)", []], ["owner"]],
+    ["waba_complete_signup", async () => ["select waba_complete_signup($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["admin_pusat"]],
+    ["waba_add_number", async () => ["select waba_add_number('k-0000000104', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["waba_register_number", async () => ["select waba_register_number($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["waba_sync_status", async () => ["select waba_sync_status($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["waba_migrate_to_cloud_api", async () => ["select waba_migrate_to_cloud_api($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["waba_revoke", async () => ["select waba_revoke($1, 'manual')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["waba_status", async () => ["select waba_status()", []], ["manager"]],
+    ["waba_sealed_token", async () => ["select * from waba_sealed_token($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["waba_sealed_pin", async () => ["select * from waba_sealed_pin($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     // T-088: the target writer and readers take the actor lock first.
     ["staff_target_set", async () => ["select staff_target_set('k-0000000102', $1, '2026-01', '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["target_mine", async () => ["select target_mine(null)", []], ["bc"]],
