@@ -1,0 +1,12 @@
+{
+  "before": {
+    "complaint_flag(uuid,jsonb)": "377760711a60b83d18b73c58d2b0e0052fe364fa15dd2272159ba772614efb25",
+    "complaint_guard()": "b5c27639b94742c39c01bbec82ec2153956018d8f6a71d080bd041ec27aa91b3",
+    "complaint_json(complaint_tasks,boolean)": "93d7d09e8adb4111a42fb5d9d145ffd73c0885128bed238ed0c1aad615de18e4"
+  },
+  "after": {
+    "complaint_flag(uuid,jsonb)": "4b63ac7077602eb4e7002086456b468cd548322040e4765669326166165ffc9c",
+    "complaint_guard()": "f68ba0413def36fa8b2ca63ba583ef997dd011f9be2cbb3b003871c55eb384ec",
+    "complaint_json(complaint_tasks,boolean)": "83c1228776010cf6d323b20765d9ecf0826d74e2476aa32bf8d4865534968e04"
+  }
+}

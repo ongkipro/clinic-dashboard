@@ -591,6 +591,8 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-091 (PR-43): the complaint flag from an inbound message (takes the actor lock first through complaint_actor).
+    "complaint_flag_from_message(uuid,jsonb)",
     // T-090 (PR-28): the inbox writers and readers, the template writers and reader, the tenant key and sealed token for senders (each takes
     // the actor lock first), and the unbound webhook intake (keys, drop, ingest — which refuse a bound connection).
     "inbox_data_key_ensure(text)",

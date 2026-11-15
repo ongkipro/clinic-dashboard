@@ -743,6 +743,13 @@
       "when": 1794725349235,
       "tag": "0105_inbox",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1794734673663,
+      "tag": "0106_complaint_message_flag",
+      "breakpoints": true
     }
   ]
 }

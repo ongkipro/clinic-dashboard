@@ -635,3 +635,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A mutation that removes a definer's own check can be equivalent when a callee or a second predicate refuses the same case (the intake's
   unbound check behind `waba_route_resolve`; the tenant filter behind `inbox_readable`'s `stock_member_now`): drop it with its reason and
   mutate the layer that actually decides.
+
+## 2026-11-15 — T-091 inbox complaint flag
+
+- A requirement that names a source the existing definer refuses (0074's `message_source_not_ready`) needs a migration even when the task's
+  allowed paths are module-only; record the expansion before editing and treat the task at the risk of what it touches (R3).
+- Re-creating a reviewed function to share its body: extract an internal primitive, keep the original's checks and refusals in the original,
+  and pin the before/after SHA-256 of every re-created function in the drift test.

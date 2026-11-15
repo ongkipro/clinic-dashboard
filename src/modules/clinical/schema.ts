@@ -10,6 +10,7 @@
 import { sql } from "drizzle-orm";
 import { bigint, check, customType, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { approvals } from "../approvals/schema";
+import { messages } from "../messaging/schema";
 import { catalogVersions } from "../catalog/schema";
 import { branches, staff, tenants } from "../org/schema";
 import { GUARDIAN_RELATIONS, patients } from "../patients/schema";
@@ -648,6 +649,8 @@ export const complaintTasks = pgTable(
     branchId: uuid("branch_id").notNull(),
     patientId: uuid("patient_id").notNull(),
     visitId: uuid("visit_id"),
+    // T-091 (PR-43): the inbound WhatsApp message a complaint was flagged from (source 'message' only; no visit then).
+    messageId: uuid("message_id"),
     kind: text("kind", { enum: COMPLAINT_KINDS }).notNull(),
     source: text("source", { enum: COMPLAINT_SOURCES }).notNull(),
     triage: text("triage", { enum: COMPLAINT_TRIAGE }),
@@ -673,12 +676,15 @@ export const complaintTasks = pgTable(
     foreignKey({ name: "complaint_tasks_patient_fk", columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
     foreignKey({ name: "complaint_tasks_visit_fk", columns: [t.tenantId, t.branchId, t.visitId], foreignColumns: [visits.tenantId, visits.branchId, visits.id] }).onDelete("restrict"),
     foreignKey({ name: "complaint_tasks_flagged_by_fk", columns: [t.tenantId, t.flaggedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "complaint_tasks_message_fk", columns: [t.tenantId, t.messageId], foreignColumns: [messages.tenantId, messages.id] }).onDelete("restrict"),
     foreignKey({ name: "complaint_tasks_assigned_fk", columns: [t.tenantId, t.assignedTo], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
     foreignKey({ name: "complaint_tasks_resolved_by_fk", columns: [t.tenantId, t.resolvedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
     unique("complaint_tasks_tenant_id_id_key").on(t.tenantId, t.id),
     unique("complaint_tasks_tenant_branch_id_key").on(t.tenantId, t.branchId, t.id),
     index("complaint_tasks_branch_idx").on(t.tenantId, t.branchId, t.state, t.dueAt),
     index("complaint_tasks_patient_idx").on(t.tenantId, t.patientId),
+    uniqueIndex("complaint_tasks_message_open_key").on(t.tenantId, t.messageId).where(sql`${t.messageId} is not null and ${t.state} <> 'resolved'`),
+    check("complaint_tasks_message_check", sql`(${t.source} = 'message') = (${t.messageId} is not null) and (${t.source} <> 'message' or ${t.visitId} is null)`),
     check("complaint_tasks_kind_check", sql`${t.kind} in (${inList(COMPLAINT_KINDS)})
       and ((${t.kind} = 'klinis') = (${t.triage} is not null and ${t.category} is null))
       and ((${t.kind} = 'layanan') = (${t.category} is not null and ${t.triage} is null))

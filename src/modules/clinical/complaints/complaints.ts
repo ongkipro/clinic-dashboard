@@ -78,7 +78,7 @@ export const reopenComplaint = (db: pg.ClientBase, key: string, taskId: string, 
 // ── Readers ──────────────────────────────────────────────────────────────────────────────────────
 export type ComplaintRow = {
   id: string; branch_id: string; branch_name: string; patient_id: string; patient_name: string; patient_mrn: string;
-  visit_id: string | null; kind: ComplaintKind; source: ComplaintSource; triage: Triage | null; category: ServiceCategory | null;
+  visit_id: string | null; message_id: string | null; kind: ComplaintKind; source: ComplaintSource; triage: Triage | null; category: ServiceCategory | null;
   state: ComplaintState; due_at: string; overdue: boolean; assigned_to: string | null; assigned_to_name: string | null;
   flagged_by: string; flagged_by_name: string; flagged_as: string; created_at: string; resolved_at: string | null; escalated_at: string | null;
   // Only for a handler of the kind (content true).

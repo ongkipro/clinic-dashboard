@@ -344,6 +344,8 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["cash_shift_list", async () => ["select cash_shift_list(null, null)", []], ["manager"]],
     ["cash_shift_get", async () => ["select cash_shift_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["cash_shift_mine", async () => ["select cash_shift_mine(null)", []], ["manager"]],
+    // T-091: the inbox complaint flag takes the actor lock first.
+    ["complaint_flag_from_message", async () => ["select complaint_flag_from_message($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
     // T-090: the inbox and template writers and readers take the actor lock first.
     ["inbox_data_key_ensure", async () => ["select * from inbox_data_key_ensure('x')", []], ["fo_cashier"]],
     ["inbox_sealed_token", async () => ["select * from inbox_sealed_token($1)", ["00000000-0000-7000-8000-000000000000"]], ["fo_cashier"]],
