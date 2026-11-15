@@ -591,6 +591,12 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-094 (PR-31): the outbound writers and reader (the actor lock first), the RLS predicate, and the unbound two-step dispatch.
+    "outbound_enqueue(text,jsonb)",
+    "outbound_bill(text,uuid)",
+    "outbound_backlog(uuid)",
+    "outbound_claim(timestamp with time zone)",
+    "outbound_complete(uuid,text,text,timestamp with time zone)",
     // T-093 (PR-30): the follow-up writer and readers (the actor lock first) and the unbound daily scan (refuses a bound connection).
     "followup_update(uuid,jsonb)",
     "followup_list(text,text,text)",

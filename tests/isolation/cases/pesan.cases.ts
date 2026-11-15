@@ -5,6 +5,8 @@
 // conversation (reply, template, assign, close) or B's templates is refused. As B's staff (positive control) everything succeeds.
 // T-091: B's conversation is matched to a patient; each action run delivers a fresh inbound message to B and the caller tries to flag it as a
 // complaint (PR-43 inbox flag): refused as another tenant, done as B (the positive control).
+// T-094 (PR-31): B's patient has a phone; each action run tries to queue a care reminder to B's patient with B's template — refused as another
+// tenant (the patient and template are B's), done as B; the outbound backlog never counts B's rows for the caller.
 // Synthetic data (MIG-2); no network (DEC-082).
 import { withTenantContext } from "../../../src/db/rls/context";
 import { CommandError } from "../../../src/lib/command";
@@ -15,6 +17,7 @@ import {
 } from "../../../src/modules/messaging/inbox/inbox";
 import { mockInboxPort, mockMetaAppSecret, signMeta } from "../../../src/modules/messaging/inbox/mock";
 import { flagMessage } from "../../../src/modules/messaging/inbox/flag";
+import { enqueueOutbound, outboundBacklog } from "../../../src/modules/messaging/outbound/outbound";
 import { mockWabaGraphPort } from "../../../src/modules/messaging/waba/mock";
 import { addWaNumber, completeWabaSignup, revokeWaba, startWabaSignup, wabaStatus } from "../../../src/modules/messaging/waba/waba";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
@@ -81,7 +84,7 @@ const deliver = (env: IsolationEnv, body: unknown) => {
   return receiveMetaWebhook(env.app, raw, signMeta(mockMetaAppSecret()!, raw));
 };
 // B's seed: a conversation from a delivered message (secret body and name) and one outbound message (its provider id).
-type Seed = { conversation: string; body: string; name: string; outId: string; template: string; from: string; wabaMeta: string; pn: string };
+type Seed = { conversation: string; body: string; name: string; outId: string; template: string; from: string; wabaMeta: string; pn: string; patient: string };
 const seeds = new Map<string, Seed>();
 async function victim(env: IsolationEnv, pool: import("pg").Pool): Promise<Seed> {
   const t = env.victim.tenantId;
@@ -105,7 +108,9 @@ async function victim(env: IsolationEnv, pool: import("pg").Pool): Promise<Seed>
      values ($1, 'RM-' || (1000000000000 + floor(random() * 8999999999999))::bigint::text, 'Pasien Pesan Rahasia', '1990-01-01', 'female', 'nik', 'v1.1.aa.bb.cc',
        substr(md5(random()::text) || md5(random()::text), 1, 43), 'islam', 'Karyawan', 's1', 'kawin', $2, $3, 'fo_cashier') returning id`, [t, env.victim.branchId, fo.staffId])).rows[0].id as string;
   await as(env, t, env.victim.branchId, "fo_cashier", (db) => updateConversation(db, conversation, { action: "match", patientId: pid }));
-  const s = { conversation, body, name, outId, template, from, wabaMeta: w.metaWabaId, pn: w.pn };
+  // T-094: the patient's phone (an outbound reminder needs one)
+  await env.owner.query(`insert into contact_points (tenant_id, patient_id, kind, value) values ($1, $2, 'phone', $3)`, [t, pid, `+${from}`]);
+  const s = { conversation, body, name, outId, template, from, wabaMeta: w.metaWabaId, pn: w.pn, patient: pid };
   seeds.set(t, s);
   env.victimSecret(body);
   env.victimSecret(name);
@@ -122,7 +127,9 @@ export default defineCases(
   { kind: "route", id: "/pesan", expect: "filtered", marker: (env) => seeded(env)?.name ?? "",
     async run(env) {
       await victim(env, env.app);
-      return ok({ fo: await asMine(env, "fo_cashier", (db) => inboxList(db)), owner: await asMine(env, "owner", (db) => inboxList(db)) });
+      return ok({ fo: await asMine(env, "fo_cashier", (db) => inboxList(db)), owner: await asMine(env, "owner", (db) => inboxList(db)),
+        // T-094: the outbound backlog counts only the caller's rows (counts carry no marker; the rows' ids are checked in the action case)
+        backlog: await asMine(env, "owner", (db) => outboundBacklog(db)) });
     } },
   { kind: "route", id: "/pesan/[id]", expect: "not-found", marker: (env) => seeded(env)?.body ?? "",
     async run(env) {
@@ -177,6 +184,9 @@ export default defineCases(
         unassign: await outcome(asMine(env, "fo_cashier", (db) => updateConversation(db, v.conversation, { action: "unassign" }))),
         // T-091: the complaint flag on B's fresh inbound message
         flag: await outcome(asMine(env, "fo_cashier", (db) => flagMessage(db, k(), inMsg, { kind: "klinis", summary: "Keluhan isolasi pesan" }))),
+        // T-094: a care reminder to B's patient with B's template
+        outbound: await outcome(asMine(env, "fo_cashier", (db) => enqueueOutbound(db, k(), { purpose: "care_reminder", patientId: v.patient,
+          templateId: v.template, sourceKind: "appointment", sourceId: crypto.randomUUID() }))),
       };
       return { attempts, body: { ...attempts, conversation: attempts.reply === "done" ? v.conversation : null } };
     },

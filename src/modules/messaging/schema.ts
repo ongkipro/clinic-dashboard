@@ -5,8 +5,9 @@
 // 2 before Meta business verification and 20 after (W-07), display names `Brand – Branch` (W-08). `waba_routes` (a platform table) maps a Meta
 // phone number id to its tenant for the webhook intake (T-090).
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, integer, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, integer, pgTable, primaryKey, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { branches, staff, tenants } from "../org/schema";
+import { patients } from "../patients/schema";
 
 export const WABA_STATES = ["not_connected", "signup_started", "token_exchanged", "app_subscribed", "number_pending_registration", "number_registered",
   "display_name_pending", "active", "verification_required", "quality_restricted", "revoked"] as const;
@@ -164,7 +165,7 @@ export const wabaRoutes = pgTable(
 
 // ── T-090 (PR-28, TD-22, TD-24, TD-25 part, W-05, W-10, DATA-38; migration 0105, plan Argon 92626f3c REVISE adopted / 3688a6e2 APPROVE) ──
 // The Pesan inbox: raw webhook receipts (platform until routed), conversations per number and contact, messages (bodies sealed with the tenant
-// DEK, `message.body`; never a plaintext column, W-10), and the tenant's WhatsApp templates. Media (TD-23) and costs (OBS-5) are T-094.
+// DEK, `message.body`; never a plaintext column, W-10), and the tenant's WhatsApp templates. Media storage (TD-23) waits for the object-storage adapter (ARCH-9); the cost input (OBS-5) is the template category on messages and outbound_messages (DEC-106).
 export const RECEIPT_KINDS = ["message", "status", "unknown"] as const;
 export const RECEIPT_STATES = ["received", "processed", "held_out_of_order", "duplicate", "rejected_signature", "dropped_unknown_route"] as const;
 export const CONVERSATION_STATES = ["open", "closed"] as const;
@@ -289,7 +290,7 @@ export const waTemplates = pgTable(
 );
 
 // A message: inbound or outbound (staff through the port, or a Coexistence echo from the Business app, TD-24). The body is sealed
-// (`message.body`); a media message keeps Meta's opaque media id (never a URL, TD-23) until T-094 stores the object. Statuses advance only.
+// (`message.body`); a media message keeps Meta's opaque media id (never a URL, TD-23) until the object-storage adapter stores the object (DEC-106). Statuses advance only.
 export const messages = pgTable(
   "messages",
   {
@@ -332,9 +333,86 @@ export const messages = pgTable(
       and ((${t.kind} = 'media') = (${t.mediaMetaId} is not null)) and (${t.mediaMetaId} is null or ${t.mediaMetaId} !~* '^https?://')
       and (${t.kind} <> 'text' or ${t.bodyEnc} is not null)
       and ((${t.direction} = 'in') = (${t.status} = 'received')) and (${t.direction} = 'out' or ${t.sentVia} = 'cloud_api')
-      and (${t.direction} = 'in' or ${t.sentVia} = 'business_app' or ${t.authorStaffId} is not null)
+      and (${t.direction} = 'in' or ${t.sentVia} = 'business_app' or ${t.kind} = 'template' or ${t.authorStaffId} is not null)
       and ((${t.authorStaffId} is null) = (${t.authorAs} is null))
       and (${t.status} in ('received','queued') or ${t.providerMessageId} is not null)
       and (${t.commandKey} is null or ${KEY(t.commandKey)})`),
+  ],
+);
+
+// Outbound queue (PR-31, PR-4, PR-15; T-094, migration 0109, DEC-106). Ids and codes only — no free text, no rupiah: the provider body is built
+// at send time from the ids (AGENTS: outbox payloads carry ids only). Approved templates only, so they send regardless of the 24 h window. The
+// daily budget (W-06: unique recipients per 24 h across the WABA's numbers, SET-21 of the Meta limit) defers new recipients to the next day;
+// a promo whose consent was withdrawn is skipped at dispatch. Never deleted.
+export const OUTBOUND_PURPOSES = ["care_reminder", "aftercare", "promo", "bill"] as const;
+export const OUTBOUND_CATEGORIES = ["utility", "marketing"] as const;
+export const OUTBOUND_STATES = ["queued", "sending", "sent", "skipped", "failed"] as const;
+export const OUTBOUND_SOURCES = ["visit", "invoice", "appointment", "followup", "consultation_control", "campaign", "promo_code", "patient"] as const;
+export const OUTBOUND_SKIP_REASONS = ["consent_withdrawn", "patient_merged", "number_not_sending", "template_withdrawn"] as const;
+export const OUTBOUND_DEFER_REASONS = ["budget_reached", "tenant_suspended"] as const;
+const PURPOSE_SOURCE = sql.raw(
+  "(('bill','visit'), ('care_reminder','appointment'), ('care_reminder','followup'), ('care_reminder','consultation_control'), " +
+    "('aftercare','visit'), ('promo','campaign'), ('promo','promo_code'), ('promo','patient'))",
+);
+
+export const outboundMessages = pgTable(
+  "outbound_messages",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id"),
+    purpose: text("purpose", { enum: OUTBOUND_PURPOSES }).notNull(),
+    category: text("category", { enum: OUTBOUND_CATEGORIES }).notNull(),
+    templateId: uuid("template_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    wabaId: uuid("waba_id").notNull(),
+    waNumberId: uuid("wa_number_id").notNull(),
+    conversationId: uuid("conversation_id").notNull(),
+    contactWaId: text("contact_wa_id").notNull(),
+    sourceKind: text("source_kind", { enum: OUTBOUND_SOURCES }).notNull(),
+    sourceId: uuid("source_id").notNull(),
+    plannedFor: date("planned_for").notNull(),
+    state: text("state", { enum: OUTBOUND_STATES }).notNull().default("queued"),
+    rescheduledCount: smallint("rescheduled_count").notNull().default(0),
+    attemptCount: smallint("attempt_count").notNull().default(0),
+    deferredReason: text("deferred_reason"),
+    skipReason: text("skip_reason"),
+    errorCode: text("error_code"),
+    messageId: uuid("message_id"),
+    providerMessageId: text("provider_message_id"),
+    commandKey: text("command_key").notNull(),
+    enqueuedBy: uuid("enqueued_by"),
+    enqueuedAs: text("enqueued_as"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    unique("outbound_messages_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("outbound_messages_command_key").on(t.tenantId, t.commandKey),
+    index("outbound_messages_due_idx").on(t.tenantId, t.state, t.plannedFor),
+    index("outbound_messages_recipient_idx").on(t.tenantId, t.wabaId, t.contactWaId, t.sentAt),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.templateId], foreignColumns: [waTemplates.tenantId, waTemplates.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.wabaId], foreignColumns: [wabaAccounts.tenantId, wabaAccounts.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.waNumberId], foreignColumns: [waNumbers.tenantId, waNumbers.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.conversationId], foreignColumns: [conversations.tenantId, conversations.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.messageId], foreignColumns: [messages.tenantId, messages.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.enqueuedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    check("outbound_messages_check", sql`${t.purpose} in (${inList(OUTBOUND_PURPOSES)}) and ${t.category} in (${inList(OUTBOUND_CATEGORIES)})
+      and ((${t.purpose} = 'promo') = (${t.category} = 'marketing')) and ${t.state} in (${inList(OUTBOUND_STATES)})
+      and (${t.purpose}, ${t.sourceKind}) in ${PURPOSE_SOURCE}
+      and ${t.contactWaId} ~ '^[1-9][0-9]{7,14}$' and ${KEY(t.commandKey)}
+      and ${t.rescheduledCount} between 0 and 365 and ${t.attemptCount} between 0 and 20
+      and ((${t.enqueuedBy} is null) = (${t.enqueuedAs} is null))
+      and ((${t.state} = 'sent') = (${t.sentAt} is not null and ${t.providerMessageId} is not null))
+      and ((${t.state} = 'skipped') = (${t.skipReason} is not null)) and ((${t.state} = 'failed') = (${t.errorCode} is not null))
+      and (${t.state} not in ('sending','sent','failed') or ${t.claimedAt} is not null)
+      and ((${t.state} in ('sent','skipped','failed')) = (${t.decidedAt} is not null))
+      and (${t.skipReason} is null or ${t.skipReason} in (${inList(OUTBOUND_SKIP_REASONS)}))
+      and (${t.deferredReason} is null or ${t.deferredReason} in (${inList(OUTBOUND_DEFER_REASONS)}))`),
   ],
 );

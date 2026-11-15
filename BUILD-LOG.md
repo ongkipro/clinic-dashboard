@@ -660,3 +660,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   source fact still holds; key it for ever (rule, source, step) and let the step carry what may legitimately recur.
 - A scan on an unbound worker cannot use setting_value_at (it keys on app_tenant_id()); read setting_versions for the tenant directly.
 - PL/pgSQL record names shadow table aliases: a loop record `r` and `FROM tenants_registry r` in the same function fail at run time only.
+
+## 2026-11-15 — T-094 outbound consent and budget
+
+- An unbound dispatcher cannot read tenant keys or the sealed token through the staff readers: return the ciphertext and the wrapped DEKs
+  from the unbound claim, open them in TypeScript, record the result with a separate unbound complete.
+- A mutation that produces invalid SQL fails the suite at load and looks "caught": the mutation runner now requires a failed assertion.
+- A shared recorded fixture list is part of another task's contract when its tests count it; add task-only fixtures in the task's tests.
+- In a claim loop with a budget, skip rows that cannot send (withdrawn template, number not sending) before counting the budget, or a
+  row that never sends holds a recipient's slot (review r1 P3-1).
