@@ -71,9 +71,17 @@ async function webhookKeys(db: pg.ClientBase, tenantId: string): Promise<TenantK
 
 type Parsed =
   | { kind: "message"; phoneNumberId: string; providerEventId: string; contactWaId: string; contactName: string | null; direction: "in" | "out";
-      sentVia: "cloud_api" | "business_app"; msgKind: "text" | "media"; body: string | null; mediaMetaId: string | null; mediaMimeType: string | null; at: Date }
+      sentVia: "cloud_api" | "business_app"; msgKind: "text" | "media"; body: string | null; mediaMetaId: string | null; mediaMimeType: string | null; at: Date;
+      replyAction?: ReplyAction | null; contextMessageId?: string | null }
   | { kind: "status"; phoneNumberId: string; providerEventId: string; target: string; status: "sent" | "delivered" | "read" | "failed"; at: Date };
 const DIGITS = /^[1-9][0-9]{7,14}$/;
+// T-095 (PR-69, plan r1 P1-1): a reminder's quick-reply tap (template `button` or `interactive.button_reply`) or the same words typed. Only this
+// code leaves the parser for the reply handler; the text itself is sealed like any message body (W-10).
+export type ReplyAction = "confirm" | "reschedule";
+export function replyActionOf(s: unknown): ReplyAction | null {
+  const t = String(s ?? "").trim().toLowerCase().replace(/[\s_]+/g, " ");
+  return t === "konfirmasi" ? "confirm" : t === "ubah jadwal" ? "reschedule" : null;
+}
 const at = (s: unknown) => {
   const n = Number(s);
   if (!Number.isInteger(n) || n <= 0) throw new Error("bad timestamp");
@@ -94,9 +102,13 @@ export function parseMetaWebhook(raw: string): Parsed[] {
       const from = String(m.from ?? "");
       if (!DIGITS.test(from) || typeof m.id !== "string") throw new Error("bad message");
       const media = ["image", "video", "audio", "document", "sticker"].find((k) => m[k]);
+      // a button reply carries its label as the text (button.text / button_reply.title) and its payload / id as the action (T-095)
+      const text = String(m.text?.body ?? m.button?.text ?? m.interactive?.button_reply?.title ?? "");
+      const replyAction = media ? null : replyActionOf(m.button?.payload ?? m.interactive?.button_reply?.id ?? text) ?? replyActionOf(text);
       out.push({ kind: "message", phoneNumberId: pnid, providerEventId: m.id, contactWaId: from, contactName: names.get(from) || null, direction: "in",
-        sentVia: "cloud_api", msgKind: media ? "media" : "text", body: media ? (m[media].caption ?? null) : String(m.text?.body ?? ""),
-        mediaMetaId: media ? String(m[media].id) : null, mediaMimeType: media ? String(m[media].mime_type ?? "") || null : null, at: at(m.timestamp) });
+        sentVia: "cloud_api", msgKind: media ? "media" : "text", body: media ? (m[media].caption ?? null) : text,
+        mediaMetaId: media ? String(m[media].id) : null, mediaMimeType: media ? String(m[media].mime_type ?? "") || null : null, at: at(m.timestamp),
+        replyAction, contextMessageId: typeof m.context?.id === "string" ? m.context.id : null });
     }
     for (const m of v.message_echoes ?? []) {
       const to = String(m.to ?? "");
@@ -114,10 +126,11 @@ export function parseMetaWebhook(raw: string): Parsed[] {
   return out;
 }
 
-export type WebhookAnswer = { status: 200 | 400 | 401 | 404 | 413; outcomes: string[] };
+export type WebhookAnswer = { status: 200 | 400 | 401 | 404 | 413 | 500; outcomes: string[] };
 // The whole handling of one Meta webhook POST on an unbound pool. 404 without the mock secret (no keys, or production); 413 above 64 KB;
 // 401 bad signature (a non-personal receipt per event when parseable); 400 not a WABA webhook; 200 otherwise (processed, duplicate, held,
-// dropped — Meta stops retrying).
+// dropped — Meta stops retrying); 500 when an event could not be stored with its effects (T-095: a reminder reply that cannot be applied) —
+// that event rolled back whole, so Meta's redelivery processes it again; the events before it are stored and answer "duplicate" then.
 export async function receiveMetaWebhook(pool: pg.Pool, rawBody: string, signature: string | null): Promise<WebhookAnswer> {
   const secret = mockMetaAppSecret();
   if (!secret) return { status: 404, outcomes: ["unavailable"] };
@@ -137,7 +150,15 @@ export async function receiveMetaWebhook(pool: pg.Pool, rawBody: string, signatu
     return { status: 401, outcomes: events.map(() => "rejected_signature") };
   }
   const outcomes: string[] = [];
-  for (const ev of events) outcomes.push(await ingestOne(pool, ev, rawBody, sha));
+  for (const ev of events) {
+    try {
+      outcomes.push(await ingestOne(pool, ev, rawBody, sha));
+    } catch (e) {
+      // the error name only (no message: it may carry provider or patient data)
+      console.error("meta_webhook_event_failed", e instanceof Error ? e.name : "unknown");
+      return { status: 500, outcomes: [...outcomes, "retry"] };
+    }
+  }
   return { status: 200, outcomes };
 }
 async function drop(pool: pg.Pool, p: Record<string, string>) {
@@ -177,6 +198,14 @@ async function ingestOne(pool: pg.Pool, ev: Parsed, raw: string, sha: string): P
       }
     }
     const out = (await c.query(`select meta_webhook_ingest($1::jsonb) r`, [JSON.stringify(p)])).rows[0].r as string;
+    // T-095: a reminder reply moves the appointment in the same transaction as the message (ids and the action code only). Atomic on
+    // purpose (supervisor 2026-11-16): if the reply cannot be applied, the message and its receipt roll back too and the webhook does not
+    // answer 2xx, so the provider's redelivery of the same message is processed again from the start — never a stored message whose
+    // Konfirmasi / Ubah Jadwal was silently lost, never applied twice (the redelivery after a success is a duplicate).
+    if (out === "processed" && ev.kind === "message" && ev.direction === "in" && ev.replyAction) {
+      await c.query(`select reminder_reply_handle($1::jsonb)`, [JSON.stringify({ phone_number_id: ev.phoneNumberId,
+        provider_message_id: ev.providerEventId, action: ev.replyAction, context_provider_message_id: ev.contextMessageId ?? null })]);
+    }
     await c.query("commit");
     return out;
   } catch (e) {

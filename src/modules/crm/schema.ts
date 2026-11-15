@@ -4,11 +4,12 @@
 // (`lead.contact`); contact columns and the lost note are not granted. Campaign segments and sending are T-100.
 // Follow-ups (PR-30; T-093, migration 0108, DEC-105): tasks created from decided rules by a daily unbound scan (control due, package stage
 // and expiry, locked instalments, receivables, unselected plan items, dormant patients) and by the no-show trigger; one per rule × source ×
-// step for ever (a closed task is never re-created); titles from rule codes only (no clinical content).
+// step for ever (a closed task is never re-created); titles from rule codes only (no clinical content). An Ubah Jadwal reminder reply
+// (T-095) creates a reschedule_request task for CS (PR-83).
 import { sql } from "drizzle-orm";
 import { boolean, check, date, foreignKey, index, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { invoices } from "../cashier/schema";
-import { conversations } from "../messaging/schema";
+import { conversations, messages, outboundMessages } from "../messaging/schema";
 import { branches, staff, tenants } from "../org/schema";
 import { patients } from "../patients/schema";
 import { appointments } from "../scheduling/schema";
@@ -149,7 +150,7 @@ export const leadEvents = pgTable(
   ],
 );
 
-export const FOLLOWUP_RULES = ["control_due", "package_stage", "package_expiry", "instalment_locked", "receivable", "plan_unselected", "no_show", "dormant"] as const;
+export const FOLLOWUP_RULES = ["control_due", "package_stage", "package_expiry", "instalment_locked", "receivable", "plan_unselected", "no_show", "dormant", "reschedule_request"] as const;
 export const FOLLOWUP_SOURCES = ["consultation_control", "package", "instalment_row", "receivable", "care_plan", "appointment", "patient"] as const;
 export const FOLLOWUP_STATES = ["open", "done", "dismissed"] as const;
 export const FOLLOWUP_QUEUES = ["cs", "bc"] as const;
@@ -159,7 +160,7 @@ export const FOLLOWUP_DISMISS_OUTCOMES = ["dilewati", "diganti"] as const;
 const RULE_SHAPE = sql.raw(
   "(('control_due','consultation_control','bc'), ('package_stage','package','bc'), ('package_expiry','package','bc'), " +
     "('instalment_locked','instalment_row','cs'), ('receivable','receivable','cs'), ('plan_unselected','care_plan','bc'), " +
-    "('no_show','appointment','cs'), ('dormant','patient','cs'))",
+    "('no_show','appointment','cs'), ('dormant','patient','cs'), ('reschedule_request','appointment','cs'))",
 );
 
 export const followups = pgTable(
@@ -212,5 +213,47 @@ export const followups = pgTable(
            and (${t.outcome} <> 'lainnya' or ${t.outcomeNote} is not null))
       and (${t.state} <> 'dismissed' or (${t.outcome} = 'diganti' and ${t.closedBy} is null)
            or (${t.outcome} = 'dilewati' and ${t.closedBy} is not null and ${t.outcomeNote} is not null))`),
+  ],
+);
+
+// Appointment reminders (PR-69; T-095, migration 0110, DEC-107): one H-1 and one same-day reminder per appointment, queued through the T-094
+// outbound queue by the unbound reminder scan; the patient's Konfirmasi confirms the appointment, Ubah Jadwal opens a CS follow-up. A reply is
+// recorded once and is final. Ids and codes only (the reply text stays sealed in messages, W-10).
+export const REMINDER_KINDS = ["h1", "same_day"] as const;
+export const REMINDER_REPLIES = ["confirm", "reschedule"] as const;
+
+export const appointmentReminders = pgTable(
+  "appointment_reminders",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    appointmentId: uuid("appointment_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    kind: text("kind", { enum: REMINDER_KINDS }).notNull(),
+    outboundId: uuid("outbound_id").notNull(),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    reply: text("reply", { enum: REMINDER_REPLIES }),
+    replyMessageId: uuid("reply_message_id"),
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    followupId: uuid("followup_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    unique("appointment_reminders_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("appointment_reminders_appointment_kind_key").on(t.tenantId, t.appointmentId, t.kind),
+    unique("appointment_reminders_outbound_key").on(t.tenantId, t.outboundId),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    // the reminder's branch is the appointment's (appointments_tenant_branch_id_key)
+    foreignKey({ columns: [t.tenantId, t.branchId, t.appointmentId], foreignColumns: [appointments.tenantId, appointments.branchId, appointments.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.outboundId], foreignColumns: [outboundMessages.tenantId, outboundMessages.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.replyMessageId], foreignColumns: [messages.tenantId, messages.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.followupId], foreignColumns: [followups.tenantId, followups.id] }).onDelete("restrict"),
+    check("appointment_reminders_check", sql`${t.kind} in (${inList(REMINDER_KINDS)})
+      and (${t.reply} is null or ${t.reply} in (${inList(REMINDER_REPLIES)}))
+      and ((${t.reply} is null) = (${t.replyMessageId} is null)) and ((${t.reply} is null) = (${t.repliedAt} is null))
+      and ((${t.followupId} is not null) = (${t.reply} is not distinct from 'reschedule'))`),
   ],
 );

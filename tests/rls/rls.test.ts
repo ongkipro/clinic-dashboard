@@ -591,6 +591,9 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-095 (PR-69): the unbound reminder scan and the webhook's reminder reply handler (both refuse a bound connection).
+    "reminder_scan(timestamp with time zone)",
+    "reminder_reply_handle(jsonb)",
     // T-094 (PR-31): the outbound writers and reader (the actor lock first), the RLS predicate, and the unbound two-step dispatch.
     "outbound_enqueue(text,jsonb)",
     "outbound_bill(text,uuid)",

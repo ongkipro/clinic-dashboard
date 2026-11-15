@@ -7,16 +7,20 @@
 // complaint (PR-43 inbox flag): refused as another tenant, done as B (the positive control).
 // T-094 (PR-31): B's patient has a phone; each action run tries to queue a care reminder to B's patient with B's template — refused as another
 // tenant (the patient and template are B's), done as B; the outbound backlog never counts B's rows for the caller.
+// T-095 (PR-69): B's patient has a booked appointment with a sent reminder; a Konfirmasi reply delivered through the caller's own number,
+// quoting B's reminder, never confirms B's appointment (the route resolves the caller's tenant); through B's own number (positive) it does,
+// once per seed (the appointment then stays confirmed, so later positive runs see "confirmed").
 // Synthetic data (MIG-2); no network (DEC-082).
 import { withTenantContext } from "../../../src/db/rls/context";
 import { CommandError } from "../../../src/lib/command";
 import { setKekRingForTests } from "../../../src/lib/keys/runtime";
-import { inboundText, statusEvent } from "../../../src/modules/messaging/inbox/fixtures";
+import { inboundButton, inboundText, statusEvent } from "../../../src/modules/messaging/inbox/fixtures";
 import {
   inboxList, inboxThread, receiveMetaWebhook, sendInboxMessage, syncTemplates, templateList, updateConversation,
 } from "../../../src/modules/messaging/inbox/inbox";
 import { mockInboxPort, mockMetaAppSecret, signMeta } from "../../../src/modules/messaging/inbox/mock";
 import { flagMessage } from "../../../src/modules/messaging/inbox/flag";
+import { publish } from "../../../src/modules/catalog/catalog";
 import { enqueueOutbound, outboundBacklog } from "../../../src/modules/messaging/outbound/outbound";
 import { mockWabaGraphPort } from "../../../src/modules/messaging/waba/mock";
 import { addWaNumber, completeWabaSignup, revokeWaba, startWabaSignup, wabaStatus } from "../../../src/modules/messaging/waba/waba";
@@ -84,7 +88,29 @@ const deliver = (env: IsolationEnv, body: unknown) => {
   return receiveMetaWebhook(env.app, raw, signMeta(mockMetaAppSecret()!, raw));
 };
 // B's seed: a conversation from a delivered message (secret body and name) and one outbound message (its provider id).
-type Seed = { conversation: string; body: string; name: string; outId: string; template: string; from: string; wabaMeta: string; pn: string; patient: string };
+type Seed = { conversation: string; body: string; name: string; outId: string; template: string; from: string; wabaMeta: string; pn: string; patient: string;
+  version: string; fo: string };
+// T-095: a fresh booked appointment of B's patient with a sent, unanswered H-1 reminder for each run (the positive control answers its own;
+// the negative run must face an unanswered one, or "nothing changed" would prove nothing). Written as the owner: the scan and dispatch are
+// covered by tests/crm/reminders.test.ts; this case covers only the cross-tenant reply.
+let remSeq = 0;
+async function freshReminder(env: IsolationEnv, v: Seed) {
+  const t = env.victim.tenantId;
+  const start = new Date(Date.now() + (30 + ++remSeq) * 86_400_000);
+  const appointment = (await env.owner.query(`insert into appointments (tenant_id, branch_id, patient_id, catalog_version_id, performer_staff_id, starts_at, ends_at,
+      state, channel, created_by, created_as) values ($1, $2, $3, $4, $5, $6, $7, 'booked', 'phone', $5, 'fo_cashier') returning id`,
+    [t, env.victim.branchId, v.patient, v.version, v.fo, start, new Date(start.getTime() + 1_800_000)])).rows[0].id as string;
+  const out = (await env.owner.query(`select public.outbound_enqueue_do($1, $2, 'care_reminder', $3, $4, $5, 'appointment', $6, current_date, null, null, now()) id`,
+    [t, `reminder:${appointment}:h1`, v.patient, env.victim.branchId, v.template, appointment])).rows[0].id as string;
+  const wamid = `wamid.ISOREM${Date.now()}${remSeq}`;
+  await env.owner.query(`update outbound_messages set state = 'sending', claimed_at = now(), attempt_count = 1 where id = $1`, [out]);
+  await env.owner.query(`select outbound_complete($1, $2, null, now())`, [out, wamid]);
+  await env.owner.query(`insert into appointment_reminders (tenant_id, branch_id, appointment_id, patient_id, kind, outbound_id, due_at)
+    values ($1, $2, $3, $4, 'h1', $5, now())`, [t, env.victim.branchId, appointment, v.patient, out]);
+  await expectLive(env, "B's unanswered reminder of a booked appointment", `exists (select 1 from appointment_reminders r join appointments a on a.id = r.appointment_id
+    where r.appointment_id = $1 and r.reply is null and a.state = 'booked')`, [appointment]);
+  return { appointment, wamid };
+}
 const seeds = new Map<string, Seed>();
 async function victim(env: IsolationEnv, pool: import("pg").Pool): Promise<Seed> {
   const t = env.victim.tenantId;
@@ -110,7 +136,14 @@ async function victim(env: IsolationEnv, pool: import("pg").Pool): Promise<Seed>
   await as(env, t, env.victim.branchId, "fo_cashier", (db) => updateConversation(db, conversation, { action: "match", patientId: pid }));
   // T-094: the patient's phone (an outbound reminder needs one)
   await env.owner.query(`insert into contact_points (tenant_id, patient_id, kind, value) values ($1, $2, 'phone', $3)`, [t, pid, `+${from}`]);
-  const s = { conversation, body, name, outId, template, from, wabaMeta: w.metaWabaId, pn: w.pn, patient: pid };
+  // T-095: a booked appointment of B's patient with a sent H-1 reminder (rows written as the owner: the scan and dispatch are covered by
+  // tests/crm/reminders.test.ts; this case covers only the cross-tenant reply)
+  // a service version of B's own (the catalog versions are tenant rows; no other case's seed is relied on)
+  const version = (await as(env, t, env.victim.branchId, "owner", (db) => publish(db as never, { kind: "service", code: `PS-${t.slice(0, 6).toUpperCase()}` }, {
+    name: "Layanan Pesan Rahasia", tax_category: "exempt_medical", tax_basis: "Jasa medis", normal_price: 1, category: "facial", prep_min: 0, treatment_min: 30,
+    buffer_min: 0, indications: "Indikasi", consent_template: "Templat.", delegation: "Dokter", aftercare_text: "Perawatan", eligibility: [{ role: "doctor", mode: "performs" }],
+  } as never, "Layanan uji isolasi pesan"))).versionId;
+  const s = { conversation, body, name, outId, template, from, wabaMeta: w.metaWabaId, pn: w.pn, patient: pid, version, fo: fo.staffId };
   seeds.set(t, s);
   env.victimSecret(body);
   env.victimSecret(name);
@@ -155,6 +188,19 @@ export default defineCases(
       const w = await waba(env, env.actor.tenantId, env.actor.branchId);
       // a status B has not seen yet (own: delivered; the caller: read), so the run is never answered as a duplicate
       const a = await deliver(env, statusEvent({ wabaId: w.metaWabaId, phoneNumberId: w.pn }, { id: v.outId, status: own ? "delivered" : "read", to: "6280000000000", at: Math.floor(Date.now() / 1000) }));
+      // T-095: a Konfirmasi quoting B's reminder through the caller's number: B's appointment must stay booked unless the caller is B
+      {
+        const r = await freshReminder(env, v);
+        const look = async () => (await env.owner.query(`select a.state, r.reply from appointments a join appointment_reminders r on r.appointment_id = a.id
+          where a.id = $1`, [r.appointment])).rows[0] as { state: string; reply: string | null };
+        const was = await look();
+        await deliver(env, inboundButton({ wabaId: w.metaWabaId, phoneNumberId: w.pn }, { id: `wamid.ISOREP${Date.now()}${Math.floor(Math.random() * 1e6)}`,
+          from: v.from, text: "Konfirmasi", contextId: r.wamid, at: Math.floor(Date.now() / 1000) }));
+        const now = await look();
+        // another tenant's reply changes nothing of B's; B's own reply leaves it answered and confirmed
+        if (!own && JSON.stringify(now) !== JSON.stringify(was)) throw new Error(`T-095 isolation: B's reminder changed by another tenant's reply`);
+        if (own && (now.state !== "confirmed" || now.reply !== "confirm")) throw new Error(`T-095 isolation: B's own reply did not confirm (${now.state})`);
+      }
       if (a.outcomes[0] === "dropped") return { status: 404, body: null };
       const st = (await env.owner.query(`select status from messages where provider_message_id = $1`, [v.outId])).rows[0].status as string;
       return { status: 200, body: { message: v.outId, status: st, own } };

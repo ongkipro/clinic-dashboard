@@ -669,3 +669,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A shared recorded fixture list is part of another task's contract when its tests count it; add task-only fixtures in the task's tests.
 - In a claim loop with a budget, skip rows that cannot send (withdrawn template, number not sending) before counting the budget, or a
   row that never sends holds a recipient's slot (review r1 P3-1).
+
+## 2026-11-16 — T-095 appointment reminders
+
+- A tenant filter that looks untested may be held by a second layer: here the composite FK on `reply_message_id` refused a cross-tenant
+  reply and the savepoint rolled it back, so the filter-only mutant survived. Prove each layer with an all-layers mutant, not by deleting
+  the test.
+- An isolation case that checks "nothing changed" needs fresh, unanswered victim state on every run; the positive control consumes it.
+- Vitest 5 hides stdout of passing tests: to inspect a passing run, append to a scratch file, then remove the lines.
+- Do not wrap a side effect of an acknowledged webhook in a savepoint that swallows its failure: the provider stops retrying on 2xx and the
+  action is lost. Keep the message and its effects in one transaction and answer non-2xx so the redelivery retries the whole event
+  (supervisor review 2026-11-16; regression test: a synthetic failing trigger, then the same message redelivered).

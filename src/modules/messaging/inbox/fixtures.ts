@@ -31,6 +31,15 @@ export function inboundImage(m: Meta, o: { id: string; from: string; mediaId: st
       image: { id: o.mediaId, mime_type: "image/jpeg", sha256: "0".repeat(64), ...(o.caption ? { caption: o.caption } : {}) } }],
   });
 }
+// T-095: a tap on a template's quick-reply button (Meta sends type "button" with the label, the payload set when sending, and the quoted
+// template's wamid in context.id).
+export function inboundButton(m: Meta, o: { id: string; from: string; text: string; payload?: string; contextId?: string; at: number }) {
+  return envelope(m, {
+    contacts: [{ profile: { name: "Kontak Sintetis" }, wa_id: o.from }],
+    messages: [{ from: o.from, id: o.id, timestamp: String(o.at), type: "button", button: { text: o.text, payload: o.payload ?? o.text },
+      ...(o.contextId ? { context: { from: m.displayPhone ?? "6281100000000", id: o.contextId } } : {}) }],
+  });
+}
 // A status for an outbound message.
 export function statusEvent(m: Meta, o: { id: string; status: "sent" | "delivered" | "read" | "failed"; to: string; at: number }) {
   return envelope(m, { statuses: [{ id: o.id, status: o.status, timestamp: String(o.at), recipient_id: o.to }] });

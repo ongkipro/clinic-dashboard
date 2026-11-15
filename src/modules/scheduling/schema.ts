@@ -120,11 +120,14 @@ export const appointments = pgTable(
     index("appointments_branch_start_idx").on(t.tenantId, t.branchId, t.startsAt),
     index("appointments_patient_idx").on(t.tenantId, t.patientId, t.startsAt),
     check("appointments_range_check", sql`${t.startsAt} < ${t.endsAt}`),
+    // T-095 (plan r1 P1-2): a patient's Konfirmasi reply confirms without a staff actor — state_changed_by may be null for confirmed only
     check("appointments_state_check", sql`${t.state} in ('held','booked','confirmed','arrived','no_show','cancelled','rescheduled')
       and ((${t.state} = 'held') = (${t.holdUntil} is not null))
       and ((${t.state} = 'cancelled') = (${t.stateReason} is not null and length(btrim(${t.stateReason})) between 3 and 500))
       and ((${t.state} = 'rescheduled') = (${t.rescheduledTo} is not null and ${t.rescheduledTo} <> ${t.id}))
-      and ((${t.state} in ('confirmed','arrived','no_show','cancelled','rescheduled')) = (${t.stateChangedAt} is not null and ${t.stateChangedBy} is not null))`),
+      and ((${t.state} in ('confirmed','arrived','no_show','cancelled','rescheduled')) = (${t.stateChangedAt} is not null))
+      and (${t.state} in ('confirmed','arrived','no_show','cancelled','rescheduled') or ${t.stateChangedBy} is null)
+      and (${t.state} in ('held','booked','confirmed') or ${t.stateChangedBy} is not null)`),
     check("appointments_channel_check", sql`${t.channel} in ('walk_in','phone','whatsapp','staff','online')`),
     check("appointments_source_check", sql`(${t.source} is null or ${t.source} ~ '^[a-z0-9][a-z0-9_-]{0,39}$') and (${t.campaign} is null or ${t.campaign} ~ '^[a-z0-9][a-z0-9_-]{0,39}$')`),
     check("appointments_note_check", sql`${t.note} is null or length(${t.note}) <= 500`),
