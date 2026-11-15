@@ -604,3 +604,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   error before the review fixes ran green.
 - Blocking a contribution on an attribution change is a dead end when the BC is attributed again; reverse it, let accrual follow the
   active attribution and net the attribution reversals out of the cumulative step.
+
+## 2026-11-15 — T-088 BC targets
+
+- A target's closing value must be windowed fact by fact (allocations by created_at, deposits by decided_at, collections by the share
+  collected before each bound, refunds by paid_at, moves by their entry's created_at): an invoice line's cumulative columns
+  (moved_to_balance, commission_line_basis) cannot be cut into months.
+- A seed name built from a short tenant-id prefix is not unique across tenants created in the same second (uuid v7 shares its time prefix):
+  an isolation marker must use the whole id.
+- A receivable needs a delivered unpaid remainder, and a treatment start needs the initial bill paid: build the fixture from a released
+  addition, never from a partly paid initial bill.

@@ -344,6 +344,10 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["cash_shift_list", async () => ["select cash_shift_list(null, null)", []], ["manager"]],
     ["cash_shift_get", async () => ["select cash_shift_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["cash_shift_mine", async () => ["select cash_shift_mine(null)", []], ["manager"]],
+    // T-088: the target writer and readers take the actor lock first.
+    ["staff_target_set", async () => ["select staff_target_set('k-0000000102', $1, '2026-01', '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["target_mine", async () => ["select target_mine(null)", []], ["bc"]],
+    ["target_list", async () => ["select target_list(null, null)", []], ["owner"]],
     // T-087: the commission writers and readers take the actor lock first.
     ["commission_rule_create", async () => ["select commission_rule_create('k-0000000097', '{}'::jsonb)", []], ["finance"]],
     ["commission_rule_version", async () => ["select commission_rule_version('k-0000000098', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["finance"]],

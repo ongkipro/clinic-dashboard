@@ -591,6 +591,10 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-088 (PR-47): the target writer and the two readers (each takes the actor lock first).
+    "staff_target_set(text,uuid,text,jsonb)",
+    "target_mine(text)",
+    "target_list(text,uuid)",
     // T-087 (PR-23): the commission rule, attribution and batch writers and the readers (each takes the actor lock first).
     "commission_rule_create(text,jsonb)",
     "commission_rule_version(text,uuid,jsonb)",

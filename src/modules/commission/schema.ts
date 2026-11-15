@@ -376,3 +376,39 @@ export const staffCommissionReceivables = pgTable(
       and ((${t.state} = 'open') = (${t.decidedAt} is null)) and (${t.state} = 'open' or length(btrim(${t.decisionReason})) between 3 and 500)`),
   ],
 );
+
+// ── T-088 (PR-47, DATA-36, D-07, SET-25; migration 0103, DEC-100): BC targets. One active target per staff member and period (bulanan
+// `YYYY-MM` or triwulan `YYYY-Qn`, Asia/Jakarta); a new value supersedes the active one (history kept). Set by the owner only; the staff
+// member is a BC. Closing value and plans fully selected are computed from the settlement facts (no column here).
+export const TARGET_PERIOD_KINDS = ["bulanan", "triwulan"] as const;
+export const TARGET_STATES = ["active", "superseded"] as const;
+export const staffTargets = pgTable(
+  "staff_targets",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
+    periodKind: text("period_kind", { enum: TARGET_PERIOD_KINDS }).notNull(),
+    periodKey: text("period_key").notNull(),
+    closingValueTarget: bigint("closing_value_target", { mode: "number" }).notNull(),
+    plansTarget: integer("plans_target"),
+    state: text("state", { enum: TARGET_STATES }).notNull().default("active"),
+    supersededAt: timestamp("superseded_at", { withTimezone: true }),
+    setBy: uuid("set_by").notNull(),
+    setAs: text("set_as").notNull(),
+    setAt: timestamp("set_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    commandKey: text("command_key").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "staff_targets_staff_fk", columns: [t.tenantId, t.staffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "staff_targets_set_by_fk", columns: [t.tenantId, t.setBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("staff_targets_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("staff_targets_command_key").on(t.tenantId, t.commandKey),
+    uniqueIndex("staff_targets_one_active").on(t.tenantId, t.staffId, t.periodKey).where(sql`${t.state} = 'active'`),
+    check("staff_targets_check", sql`${KEY(t.commandKey)} and ${t.closingValueTarget} between 0 and ${sql.raw(MONEY)}
+      and (${t.plansTarget} is null or ${t.plansTarget} between 0 and 100000) and ${t.setAs} = 'owner'
+      and ${t.state} in (${inList(TARGET_STATES)}) and ((${t.state} = 'superseded') = (${t.supersededAt} is not null))
+      and (${t.periodKind} = 'bulanan' and ${t.periodKey} ~ '^\\d{4}-(0[1-9]|1[0-2])$' or ${t.periodKind} = 'triwulan' and ${t.periodKey} ~ '^\\d{4}-Q[1-4]$')`),
+  ],
+);

@@ -12,6 +12,7 @@ import { publish } from "../../../src/modules/catalog/catalog";
 import {
   attributeSale, createRule, decideRuleVersion, exportBatch, getBatch, listBatches, listRules, markBatchPaid, myCommission, newRuleVersion, openBatch, simulateRule, submitBatch,
 } from "../../../src/modules/commission/commission";
+import { listTargets, myTarget, setStaffTarget } from "../../../src/modules/commission/targets/targets";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { setPackageContents } from "../../../src/modules/packages/packages";
 import { defineCases, expectLive, type IsolationEnv } from "../case";
@@ -25,7 +26,7 @@ async function member(env: IsolationEnv, tenantId: string, branchId: string, rol
   const known = accOf.get(k);
   if (known) return known;
   const acc = (await env.owner.query(`insert into auth_user (name, email) values ('Staf', $1) returning id`, [`${role}.kms87.${tenantId}@klinik-sintetis.test`])).rows[0].id as string;
-  const { staffId } = await createMembership(env.owner, { tenantId, accountId: acc, displayName: `Staf Komisi Rahasia ${role} ${tenantId.slice(0, 6)}` });
+  const { staffId } = await createMembership(env.owner, { tenantId, accountId: acc, displayName: `Staf Komisi Rahasia ${role} ${tenantId}` });
   const c = await env.owner.connect();
   try {
     const rid = await assignRole(c, { tenantId, staffId, role });
@@ -98,7 +99,7 @@ async function victim(env: IsolationEnv): Promise<Seed> {
   const ap = await as(env, t, b, "finance", (db) => submitBatch(db, approved));
   await as(env, t, b, "owner", (db) => decideApproval(db, ap, true));
   const batch = (await as(env, t, b, "finance", (db) => openBatch(db, k(), month(2 * n - 1)))).batchId;
-  for (const x of [s.itemName, s.ruleName, invoice, patient, draft, batch, approved, s.rule, `Staf Komisi Rahasia bc ${t.slice(0, 6)}`]) env.victimSecret(x);
+  for (const x of [s.itemName, s.ruleName, invoice, patient, draft, batch, approved, s.rule, `Staf Komisi Rahasia bc ${t}`]) env.victimSecret(x);
   const r = { itemName: s.itemName, item: s.item, invoice, rule: s.rule, ruleName: s.ruleName, draft, batch, approved, month: month(2 * n - 1), approvedMonth: month(2 * n) };
   latest.set(t, r);
   return r;
@@ -111,12 +112,14 @@ const route = (id: string, expect: "filtered" | "not-found", m: (env: IsolationE
 const batchMarker = (env: IsolationEnv) => latest.get(env.victim.tenantId)?.batch ?? "";
 const ruleMarker = (env: IsolationEnv) => latest.get(env.victim.tenantId)?.ruleName ?? "";
 const itemMarker = (env: IsolationEnv) => latest.get(env.victim.tenantId)?.itemName ?? "";
-const bcMarker = (env: IsolationEnv) => `Staf Komisi Rahasia bc ${env.victim.tenantId.slice(0, 6)}`;
+const bcMarker = (env: IsolationEnv) => `Staf Komisi Rahasia bc ${env.victim.tenantId}`;
 const thisMonth = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }).slice(0, 7);
 
 export default defineCases(
   route("/komisi", "filtered", batchMarker, async (env) => ok({
     owner: await asMine(env, "owner", (db) => listBatches(db as never)), finance: await asMine(env, "finance", (db) => listBatches(db as never)),
+    // T-088: Target & Scorecard Staf (the owner's list; no page yet) never lists B's staff
+    targets: await asMine(env, "owner", (db) => listTargets(db as never, { period: thisMonth() })),
   })),
   route("/komisi/batch/[id]", "not-found", batchMarker, (env, v) => asMine(env, "owner", (db) => getBatch(db as never, v.batch).then(ok, notFound))),
   route("/komisi/batch/[id]/ekspor#route", "not-found", bcMarker, (env, v) => asMine(env, "finance", (db) => exportBatch(db as never, v.approved)
@@ -126,7 +129,9 @@ export default defineCases(
   })),
   // The caller's own BC: never B's commission (B's item name is the marker; as B's BC it is on the month's rows).
   route("/saya/komisi", "filtered", itemMarker, (env, v) => asMine(env, "bc", async (db) => ({ now: await myCommission(db as never, thisMonth()),
-    old: await myCommission(db as never, v.approvedMonth) })).then(ok)),
+    old: await myCommission(db as never, v.approvedMonth),
+    // T-088: Target Saya (no page yet) reads only the caller's own target
+    target: await myTarget(db as never, thisMonth()) })).then(ok)),
   {
     kind: "action",
     id: "app/(app)/komisi/actions",
@@ -138,7 +143,10 @@ export default defineCases(
       await expectLive(env, "B's draft rule version", `exists (select 1 from commission_rule_versions where id = $1 and state = 'draft')`, [v.draft]);
       await expectLive(env, "B's draft batch", `exists (select 1 from payout_batches where id = $1 and state = 'draft')`, [v.batch]);
       await expectLive(env, "B's approved batch", `exists (select 1 from payout_batches where id = $1 and state = 'approved')`, [v.approved]);
+      const victimBc = await member(env, env.victim.tenantId, env.victim.branchId, "bc");
       const attempts = {
+        // T-088: the caller's owner setting a target for B's BC
+        target: await outcome(asMine(env, "owner", (db) => setStaffTarget(db as never, k(), victimBc.staffId, thisMonth(), { closingValueTarget: 1_000_000 }))),
         attribute: await outcome(asMine(env, "fo_cashier", (db) => attributeSale(db as never, k(), v.invoice, { closingBcId: bc.staffId, reason: "Coba lintas" }))),
         newVersion: await outcome(asMine(env, "finance", (db) => newRuleVersion(db as never, k(), v.rule, { kind: "percent", basisPoints: 900 }))),
         decide: await outcome(asMine(env, "owner", (db) => decideRuleVersion(db as never, v.draft, "activate"))),
