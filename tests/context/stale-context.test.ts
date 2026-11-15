@@ -57,6 +57,7 @@ const biaya = await import("../../src/app/(app)/keuangan/biaya/actions"); // T-0
 const tutup = await import("../../src/app/(app)/kasir/tutup/actions"); // T-085
 const komisi = await import("../../src/app/(app)/komisi/actions"); // T-087
 const pesan = await import("../../src/app/(app)/pesan/actions"); // T-090
+const lead = await import("../../src/app/(app)/lead/actions"); // T-092
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -208,6 +209,10 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["pesan conversationAction", (f) => pesan.conversationAction({}, f), () => ({ conversation: U(348), action: "close" })],
   ["pesan saveTemplateAction", (f) => pesan.saveTemplateAction({}, f), () => ({ key: U(351), name: "salam_uji", category: "utility", body: "Halo" })],
   ["pesan syncTemplatesAction", (f) => pesan.syncTemplatesAction({}, f), () => ({})],
+  ["lead createLeadAction", (f) => lead.createLeadAction({}, f), () => ({ key: U(352), source: "phone", contact_name: "Kontak Uji" })],
+  ["lead stageAction", (f) => lead.stageAction({}, f), () => ({ key: U(353), lead: U(354), to: "contacted" })],
+  ["lead leadUpdateAction", (f) => lead.leadUpdateAction({}, f), () => ({ lead: U(354), action: "unassign" })],
+  ["lead campaignAction", (f) => lead.campaignAction({}, f), () => ({ key: U(355), name: "Kampanye Uji", code: "uji", channel: "ads" })],
   ["simulasi enableAction", (f) => simulasi.enableAction({}, f), () => ({})],
   ["simulasi simulateAction", (f) => simulasi.simulateAction({}, f), () => ({ charge: U(308), action: "paid" })],
   ["stok receiveAction", (f) => stok.receiveAction({}, f), () => ({ key: U(151), item: U(152), batch_no: "B-1", expiry: "2030-01-01", quantity: "1", reason: "penerimaan" })],

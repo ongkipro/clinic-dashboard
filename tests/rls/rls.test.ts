@@ -591,6 +591,14 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-092 (PR-29): the lead writers and readers and the campaign writer and reader (each takes the actor lock first).
+    "lead_create(text,jsonb)",
+    "lead_update(uuid,jsonb)",
+    "lead_stage_set(uuid,jsonb)",
+    "lead_list(text,text)",
+    "lead_get(uuid)",
+    "campaign_save(text,jsonb)",
+    "campaigns_list()",
     // T-091 (PR-43): the complaint flag from an inbound message (takes the actor lock first through complaint_actor).
     "complaint_flag_from_message(uuid,jsonb)",
     // T-090 (PR-28): the inbox writers and readers, the template writers and reader, the tenant key and sealed token for senders (each takes

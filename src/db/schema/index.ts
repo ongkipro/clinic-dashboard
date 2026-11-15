@@ -33,3 +33,4 @@ export * from "../../modules/promo/schema";
 export * from "../../modules/expenses/schema";
 export * from "../../modules/commission/schema";
 export * from "../../modules/messaging/schema";
+export * from "../../modules/crm/schema";

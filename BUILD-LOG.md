@@ -642,3 +642,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   allowed paths are module-only; record the expansion before editing and treat the task at the risk of what it touches (R3).
 - Re-creating a reviewed function to share its body: extract an internal primitive, keep the original's checks and refusals in the original,
   and pin the before/after SHA-256 of every re-created function in the drift test.
+
+## 2026-11-15 — T-092 leads pipeline
+
+- A stage whose database refusal depends on an earlier fact (booking needs a matched patient) needs that earlier step on the screen too: the
+  first browser run found a manual lead that could never leave Dihubungi because the match action existed only in SQL. Walk every refusal
+  code to a UI path that resolves it.
+- A browser spec that changes a fixture in an early flow (matching a lead to a patient renames its list title) must assert the new state in
+  later flows, not the seed's.
+- Escalation discipline: after "verification fails after one repair attempt" stop and ask before any further change, even a test-only one;
+  the owner rejected a run made after an unauthorized second change (option B) and authorized the repair explicitly. A failing assertion
+  should save the page text it read, so the cause is observed, not inferred.
