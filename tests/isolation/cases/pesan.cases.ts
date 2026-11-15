@@ -126,7 +126,9 @@ async function victim(env: IsolationEnv, pool: import("pg").Pool): Promise<Seed>
   const outId = `wamid.ISOOUT${Date.now()}`;
   await as(env, t, env.victim.branchId, "fo_cashier", (db) => sendInboxMessage(db, crypto.randomUUID(), conversation, { kind: "text", body: "Balasan B" },
     { port: { ...mockInboxPort(), sendMessage: async () => ({ providerMessageId: outId }) } }));
-  const template = (await env.owner.query(`select id from wa_templates where tenant_id = $1 and name = 'pengingat_janji'`, [t])).rows[0].id as string;
+  // the live WABA's template (another case file may have left a revoked WABA with the same template name — T-096)
+  const template = (await env.owner.query(`select x.id from wa_templates x join waba_accounts w on w.tenant_id = x.tenant_id and w.id = x.waba_id
+      where x.tenant_id = $1 and x.name = 'pengingat_janji' and w.state <> 'revoked'`, [t])).rows[0].id as string;
   // T-091: a patient for the conversation (a flag needs a matched conversation)
   const fo = await member(env, t, env.victim.branchId, "fo_cashier");
   const pid = (await env.owner.query(`insert into patients (tenant_id, mrn, full_name, birth_date, sex, identity_type, identity_enc, identity_bidx, religion, occupation,

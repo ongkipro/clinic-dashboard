@@ -6,6 +6,8 @@
 // and expiry, locked instalments, receivables, unselected plan items, dormant patients) and by the no-show trigger; one per rule × source ×
 // step for ever (a closed task is never re-created); titles from rule codes only (no clinical content). An Ubah Jadwal reminder reply
 // (T-095) creates a reschedule_request task for CS (PR-83).
+// Aftercare (PR-70; T-096, migration 0111, DEC-108): one notice per closed visit with aftercare texts, sent as a neutral care message with a
+// link token minted at claim time (only its hash is stored, 7-day TTL), opened after a WhatsApp OTP (hashed, 5 min, 5 attempts, RATE-1).
 import { sql } from "drizzle-orm";
 import { boolean, check, date, foreignKey, index, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { invoices } from "../cashier/schema";
@@ -255,5 +257,68 @@ export const appointmentReminders = pgTable(
       and (${t.reply} is null or ${t.reply} in (${inList(REMINDER_REPLIES)}))
       and ((${t.reply} is null) = (${t.replyMessageId} is null)) and ((${t.reply} is null) = (${t.repliedAt} is null))
       and ((${t.followupId} is not null) = (${t.reply} is not distinct from 'reschedule'))`),
+  ],
+);
+
+export const AFTERCARE_OTP_OUTCOMES = ["sent", "rate_limited", "otp_locked", "link_expired", "number_not_sending"] as const;
+
+export const aftercareNotices = pgTable(
+  "aftercare_notices",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    visitId: uuid("visit_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    catalogVersionIds: uuid("catalog_version_ids").array().notNull(),
+    outboundId: uuid("outbound_id"),
+    tokenHash: text("token_hash"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    otpHash: text("otp_hash"),
+    otpExpiresAt: timestamp("otp_expires_at", { withTimezone: true }),
+    otpAttempts: smallint("otp_attempts").notNull().default(0),
+    otpLockedUntil: timestamp("otp_locked_until", { withTimezone: true }),
+    sessionHash: text("session_hash"),
+    sessionExpiresAt: timestamp("session_expires_at", { withTimezone: true }),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    unique("aftercare_notices_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("aftercare_notices_visit_key").on(t.tenantId, t.visitId),
+    unique("aftercare_notices_outbound_key").on(t.tenantId, t.outboundId),
+    unique("aftercare_notices_token_key").on(t.tokenHash),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId, t.visitId], foreignColumns: [visits.tenantId, visits.branchId, visits.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.outboundId], foreignColumns: [outboundMessages.tenantId, outboundMessages.id] }).onDelete("restrict"),
+    check("aftercare_notices_check", sql`cardinality(${t.catalogVersionIds}) between 1 and 50
+      and ((${t.tokenHash} is null) = (${t.expiresAt} is null)) and (${t.tokenHash} is null or ${t.tokenHash} ~ '^[0-9a-f]{64}$')
+      and ((${t.otpHash} is null) = (${t.otpExpiresAt} is null)) and ${t.otpAttempts} between 0 and 5
+      and ((${t.sessionHash} is null) = (${t.sessionExpiresAt} is null))`),
+  ],
+);
+
+// The OTP send log (RATE-1: ≤ 3 sends per 10 min per phone, ≤ 10 per minute per IP — counted on outcome 'sent'); support class never.
+export const aftercareOtpSends = pgTable(
+  "aftercare_otp_sends",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    noticeId: uuid("notice_id").notNull(),
+    phone: text("phone").notNull(),
+    ipHash: text("ip_hash").notNull(),
+    outcome: text("outcome", { enum: AFTERCARE_OTP_OUTCOMES }).notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    unique("aftercare_otp_sends_tenant_id_id_key").on(t.tenantId, t.id),
+    index("aftercare_otp_sends_rate_idx").on(t.tenantId, t.phone, t.sentAt),
+    index("aftercare_otp_sends_ip_idx").on(t.ipHash, t.sentAt),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.noticeId], foreignColumns: [aftercareNotices.tenantId, aftercareNotices.id] }).onDelete("restrict"),
+    check("aftercare_otp_sends_check", sql`${t.outcome} in (${inList(AFTERCARE_OTP_OUTCOMES)})
+      and ${t.ipHash} ~ '^[0-9a-f]{64}$' and ${t.phone} ~ '^[1-9][0-9]{7,14}$'`),
   ],
 );

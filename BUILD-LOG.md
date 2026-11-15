@@ -680,3 +680,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Do not wrap a side effect of an acknowledged webhook in a savepoint that swallows its failure: the provider stops retrying on 2xx and the
   action is lost. Keep the message and its effects in one transaction and answer non-2xx so the redelivery retries the whole event
   (supervisor review 2026-11-16; regression test: a synthetic failing trigger, then the same message redelivered).
+
+## 2026-11-16 — T-096 aftercare
+
+- A token minted inside a function called from a claim needs the function VOLATILE (an UPDATE in a STABLE function fails at run time) and
+  must read the claim time from the row, not from the caller's loop record (the claim updates the row without refreshing its record).
+- Rate limits that log refusals must count only the successful sends, or a refused request extends its own cooldown for ever.
+- A mutation script's DRY mode still applies each edit before restoring it: while a build, browser or close run is going, check anchors
+  read-only (count each anchor in the file), never with DRY=1.
+- A browser spec that injects a 200 % text style in its layout loop must reload the page afterwards, or later screenshots misrepresent the
+  100 % layout.

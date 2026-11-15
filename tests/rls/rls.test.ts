@@ -591,6 +591,10 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-096 (PR-70): the public aftercare page's definers (unbound: no staff session; each refuses a bound connection).
+    "aftercare_link_lookup(text,text,timestamp with time zone)",
+    "aftercare_otp_send(text,text,text,timestamp with time zone)",
+    "aftercare_otp_verify(text,text,text,timestamp with time zone)",
     // T-095 (PR-69): the unbound reminder scan and the webhook's reminder reply handler (both refuse a bound connection).
     "reminder_scan(timestamp with time zone)",
     "reminder_reply_handle(jsonb)",
