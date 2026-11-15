@@ -653,3 +653,10 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Escalation discipline: after "verification fails after one repair attempt" stop and ask before any further change, even a test-only one;
   the owner rejected a run made after an unauthorized second change (option B) and authorized the repair explicitly. A failing assertion
   should save the page text it read, so the cause is observed, not inferred.
+
+## 2026-11-15 — T-093 follow-ups from rules
+
+- A rule-generated task keyed only while open (a partial unique index) is re-created by the next daily scan after staff close it, because the
+  source fact still holds; key it for ever (rule, source, step) and let the step carry what may legitimately recur.
+- A scan on an unbound worker cannot use setting_value_at (it keys on app_tenant_id()); read setting_versions for the tenant directly.
+- PL/pgSQL record names shadow table aliases: a loop record `r` and `FROM tenants_registry r` in the same function fail at run time only.

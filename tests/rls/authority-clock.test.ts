@@ -344,6 +344,10 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["cash_shift_list", async () => ["select cash_shift_list(null, null)", []], ["manager"]],
     ["cash_shift_get", async () => ["select cash_shift_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["cash_shift_mine", async () => ["select cash_shift_mine(null)", []], ["manager"]],
+    // T-093: the follow-up writer and readers take the actor lock first.
+    ["followup_update", async () => ["select followup_update($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["followup_list", async () => ["select followup_list(null, null, null)", []], ["manager"]],
+    ["followup_get", async () => ["select followup_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-092: the lead and campaign writers and readers take the actor lock first.
     ["lead_create", async () => ["select lead_create('k-0000000107', '{}'::jsonb)", []], ["bc"]],
     ["lead_update", async () => ["select lead_update($1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["bc"]],

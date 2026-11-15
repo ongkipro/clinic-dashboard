@@ -591,6 +591,11 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-093 (PR-30): the follow-up writer and readers (the actor lock first) and the unbound daily scan (refuses a bound connection).
+    "followup_update(uuid,jsonb)",
+    "followup_list(text,text,text)",
+    "followup_get(uuid)",
+    "followup_scan(date)",
     // T-092 (PR-29): the lead writers and readers and the campaign writer and reader (each takes the actor lock first).
     "lead_create(text,jsonb)",
     "lead_update(uuid,jsonb)",

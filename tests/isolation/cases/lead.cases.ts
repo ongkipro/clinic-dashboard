@@ -2,10 +2,13 @@
 // name is a secret and a campaign whose name is a secret; then runs as the caller's own staff: B's lead and campaign are absent from the
 // lists, B's lead is not found, and every write on B's lead (next step, assign, unassign, tag a campaign) is refused. As B's staff (positive
 // control) everything succeeds (a fresh lead per run, so the next step is always available).
+// T-093 (plan r1 P1-3): B also has a follow-up (its no-show task, made by the appointments trigger); the caller's follow-up list and get never
+// show it and every follow-up write on it is refused; as B's central CS the writes succeed (a fresh task per run).
 // Synthetic data (MIG-2); no network (DEC-082).
 import { withTenantContext } from "../../../src/db/rls/context";
 import { CommandError } from "../../../src/lib/command";
 import { setKekRingForTests } from "../../../src/lib/keys/runtime";
+import { followupGet, followupList, updateFollowup } from "../../../src/modules/crm/followups/followups";
 import { campaignList, createLead, leadGet, leadList, saveCampaign, setLeadStage, updateLead } from "../../../src/modules/crm/leads/leads";
 import { assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { defineCases, expectLive, type IsolationEnv } from "../case";
@@ -37,7 +40,34 @@ async function as<T>(env: IsolationEnv, tenantId: string, role: CaseRole, fn: (d
 }
 const asMine = <T>(env: IsolationEnv, role: CaseRole, fn: (db: never) => Promise<T>) => as(env, env.actor.tenantId, role, fn);
 
-type Seed = { lead: string; name: string; campaign: string; campaignName: string };
+type Seed = { lead: string; name: string; campaign: string; campaignName: string; followup: string };
+// T-093: a follow-up in the victim tenant — a no-show task (the trigger makes it as an appointment becomes no_show; admin fixture rows).
+async function followupFor(env: IsolationEnv, tenantId: string, branchId: string): Promise<string> {
+  const o = env.owner;
+  const staff = (await o.query(`select id from staff where tenant_id = $1 limit 1`, [tenantId])).rows[0].id as string;
+  const pt = (await o.query(`insert into patients (tenant_id, mrn, full_name, birth_date, sex, identity_type, no_identity_reason, religion, occupation,
+       education, marital_status, registered_branch_id, created_by, created_as)
+     values ($1, 'RM-' || (1000000000000 + floor(random() * 8999999999999))::bigint::text, 'Pasien Tindak Lanjut Rahasia', '1990-01-01', 'female',
+       'newborn_via_guardian', 'Fixture sintetis', 'islam', 'Karyawan', 's1', 'kawin', $2, $3, 'fo_cashier') returning id`, [tenantId, branchId, staff])).rows[0].id as string;
+  const cv = (await o.query(`select id from catalog_versions where tenant_id = $1 limit 1`, [tenantId])).rows[0]?.id as string | undefined;
+  const c = await o.connect();
+  try {
+    await c.query(`alter table appointments disable trigger appointments_guard`);
+    let apt = "";
+    try {
+      if (!cv) throw new Error("no catalog version in the victim tenant");
+      apt = (await c.query(`insert into appointments (tenant_id, branch_id, patient_id, catalog_version_id, performer_staff_id, starts_at, ends_at, state, channel,
+          created_by, created_as) values ($1, $2, $3, $4, $5, now() - interval '3 hours', now() - interval '150 minutes', 'booked', 'phone', $5, 'fo_cashier') returning id`,
+        [tenantId, branchId, pt, cv, staff])).rows[0].id as string;
+      await c.query(`update appointments set state = 'no_show', state_changed_at = now(), state_changed_by = $2 where id = $1`, [apt, staff]);
+    } finally {
+      await c.query(`alter table appointments enable always trigger appointments_guard`);
+    }
+    return (await c.query(`select id from followups where rule_code = 'no_show' and source_id = $1`, [apt])).rows[0].id as string;
+  } finally {
+    c.release();
+  }
+}
 const seeds = new Map<string, Seed>();
 async function victim(env: IsolationEnv): Promise<Seed> {
   const t = env.victim.tenantId;
@@ -47,11 +77,12 @@ async function victim(env: IsolationEnv): Promise<Seed> {
   const campaignName = `Kampanye Rahasia ${t}`;
   const { campaignId } = await as(env, t, "marketing", (db) => saveCampaign(db, crypto.randomUUID(), { name: campaignName, code: `rahasia-${t.slice(-8)}`, channel: "ads" }));
   const { leadId } = await as(env, t, "central_cs", (db) => createLead(db, crypto.randomUUID(), { source: "phone", contactName: name, branchId: env.victim.branchId, campaignId }));
-  const s = { lead: leadId, name, campaign: campaignId, campaignName };
+  const s = { lead: leadId, name, campaign: campaignId, campaignName, followup: await followupFor(env, t, env.victim.branchId) };
   seeds.set(t, s);
   env.victimSecret(name);
   env.victimSecret(campaignName);
   env.victimSecret(leadId);
+  env.victimSecret(s.followup);
   return s;
 }
 const ok = (x: unknown) => ({ status: 200, body: JSON.parse(JSON.stringify(x)) });
@@ -67,12 +98,15 @@ export default defineCases(
         cs: await asMine(env, "central_cs", (db) => leadList(db, "all", "all")),
         mk: await asMine(env, "marketing", (db) => leadList(db, "all", "all")),
         campaigns: await asMine(env, "marketing", (db) => campaignList(db)),
+        followups: await asMine(env, "central_cs", (db) => followupList(db, "all", "all")),
       });
     } },
   { kind: "route", id: "/lead/[id]", expect: "not-found", marker: (env) => seeded(env)?.name ?? "",
     async run(env) {
       const v = await victim(env);
-      return asMine(env, "central_cs", (db) => leadGet(db, v.lead).then(ok, notFound));
+      const lead = await asMine(env, "central_cs", (db) => leadGet(db, v.lead).then(ok, notFound));
+      const fu = await asMine(env, "central_cs", (db) => followupGet(db, v.followup).then(ok, notFound));
+      return lead.status === 404 && fu.status === 404 ? { status: 404, body: null } : { status: 200, body: { lead: lead.body, followup: fu.body } };
     } },
   {
     kind: "action",
@@ -89,6 +123,9 @@ export default defineCases(
         assign: await outcome(asMine(env, "central_cs", (db) => updateLead(db, leadId, { action: "assign", staffId: cs.staffId }))),
         unassign: await outcome(asMine(env, "central_cs", (db) => updateLead(db, leadId, { action: "unassign" }))),
         campaign: await outcome(asMine(env, "central_cs", (db) => updateLead(db, leadId, { action: "campaign", campaignId: v.campaign }))),
+        // T-093: a fresh open follow-up in B each run (the positive control closes it)
+        followup: await outcome(asMine(env, "central_cs", async (db) => updateFollowup(db, crypto.randomUUID(),
+          await followupFor(env, env.victim.tenantId, env.victim.branchId), { action: "dismiss", note: "Uji isolasi" }))),
       };
       return { attempts, body: { ...attempts, lead: attempts.stage === "done" ? v.lead : null } };
     },

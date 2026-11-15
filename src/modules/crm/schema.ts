@@ -1,9 +1,12 @@
 // CRM: leads and campaigns (PR-29, DATA-39, UX-18; T-092, migration 0107, DEC-104). A lead follows new → contacted → booked → arrived →
 // converted, or lost with a reason, carrying its source, campaign, branch, assignee and first-response time (K13/K14 facts). Staff confirm each
 // step; the definer checks the fact behind it (an appointment, a checked-in visit, a real payment — Scenario PR-29). The contact name is sealed
-// (`lead.contact`); contact columns and the lost note are not granted. Follow-ups (PR-30) are T-093; campaign segments and sending T-100.
+// (`lead.contact`); contact columns and the lost note are not granted. Campaign segments and sending are T-100.
+// Follow-ups (PR-30; T-093, migration 0108, DEC-105): tasks created from decided rules by a daily unbound scan (control due, package stage
+// and expiry, locked instalments, receivables, unselected plan items, dormant patients) and by the no-show trigger; one per rule × source ×
+// step for ever (a closed task is never re-created); titles from rule codes only (no clinical content).
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { invoices } from "../cashier/schema";
 import { conversations } from "../messaging/schema";
 import { branches, staff, tenants } from "../org/schema";
@@ -143,5 +146,71 @@ export const leadEvents = pgTable(
     check("lead_events_check", sql`${t.kind} in (${inList(LEAD_EVENT_KINDS)}) and ${t.toStage} in (${inList(LEAD_STAGES)})
       and (${t.fromStage} is null or ${t.fromStage} in (${inList(LEAD_STAGES)})) and ((${t.kind} = 'created') = (${t.fromStage} is null))
       and ((${t.toStage} = 'lost' and ${t.kind} = 'stage_changed') = (${t.reason} is not null))`),
+  ],
+);
+
+export const FOLLOWUP_RULES = ["control_due", "package_stage", "package_expiry", "instalment_locked", "receivable", "plan_unselected", "no_show", "dormant"] as const;
+export const FOLLOWUP_SOURCES = ["consultation_control", "package", "instalment_row", "receivable", "care_plan", "appointment", "patient"] as const;
+export const FOLLOWUP_STATES = ["open", "done", "dismissed"] as const;
+export const FOLLOWUP_QUEUES = ["cs", "bc"] as const;
+export const FOLLOWUP_DONE_OUTCOMES = ["dihubungi", "jadwal_dibuat", "sudah_bayar", "tidak_tertarik", "tidak_merespons", "lainnya"] as const;
+export const FOLLOWUP_DISMISS_OUTCOMES = ["dilewati", "diganti"] as const;
+// rule → (source kind, queue): the only legal pairs (plan r1 P1-2)
+const RULE_SHAPE = sql.raw(
+  "(('control_due','consultation_control','bc'), ('package_stage','package','bc'), ('package_expiry','package','bc'), " +
+    "('instalment_locked','instalment_row','cs'), ('receivable','receivable','cs'), ('plan_unselected','care_plan','bc'), " +
+    "('no_show','appointment','cs'), ('dormant','patient','cs'))",
+);
+
+export const followups = pgTable(
+  "followups",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    leadId: uuid("lead_id"),
+    ruleCode: text("rule_code", { enum: FOLLOWUP_RULES }).notNull(),
+    sourceKind: text("source_kind", { enum: FOLLOWUP_SOURCES }).notNull(),
+    sourceId: uuid("source_id").notNull(),
+    step: text("step").notNull(),
+    roleQueue: text("role_queue", { enum: FOLLOWUP_QUEUES }).notNull(),
+    assigneeStaffId: uuid("assignee_staff_id"),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }),
+    originalDueOn: date("original_due_on").notNull(),
+    dueOn: date("due_on").notNull(),
+    snoozeCount: smallint("snooze_count").notNull().default(0),
+    state: text("state", { enum: FOLLOWUP_STATES }).notNull().default("open"),
+    outcome: text("outcome"),
+    outcomeNote: text("outcome_note"),
+    closedBy: uuid("closed_by"),
+    closedAs: text("closed_as"),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    unique("followups_tenant_id_id_key").on(t.tenantId, t.id),
+    // plan r1 P1-1: a full key — a done or dismissed task is never re-created for the same fact and step
+    unique("followups_rule_source_step_key").on(t.tenantId, t.ruleCode, t.sourceId, t.step),
+    index("followups_due_idx").on(t.tenantId, t.branchId, t.state, t.dueOn),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.leadId], foreignColumns: [leads.tenantId, leads.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.assigneeStaffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.closedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    // plan r2 P3-1: diganti is the scan's (no staff), dilewati a staff dismissal with a note
+    check("followups_check", sql`${t.state} in (${inList(FOLLOWUP_STATES)})
+      and (${t.ruleCode}, ${t.sourceKind}, ${t.roleQueue}) in ${RULE_SHAPE}
+      and ${t.step} ~ '^[a-z0-9_]{1,40}$' and ${t.snoozeCount} between 0 and 50 and ${t.dueOn} >= ${t.originalDueOn}
+      and ((${t.assigneeStaffId} is null) = (${t.assignedAt} is null))
+      and ((${t.state} = 'open') = (${t.closedAt} is null)) and ((${t.state} = 'open') = (${t.outcome} is null))
+      and ((${t.closedBy} is null) = (${t.closedAs} is null))
+      and (${t.outcomeNote} is null or length(btrim(${t.outcomeNote})) between 3 and 500)
+      and (${t.state} <> 'done' or ${t.outcome} in (${inList(FOLLOWUP_DONE_OUTCOMES)}) and ${t.closedBy} is not null
+           and (${t.outcome} <> 'lainnya' or ${t.outcomeNote} is not null))
+      and (${t.state} <> 'dismissed' or (${t.outcome} = 'diganti' and ${t.closedBy} is null)
+           or (${t.outcome} = 'dilewati' and ${t.closedBy} is not null and ${t.outcomeNote} is not null))`),
   ],
 );
