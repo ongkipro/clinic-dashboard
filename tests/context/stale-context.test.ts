@@ -55,6 +55,7 @@ const simulasi = await import("../../src/app/(app)/simulasi/actions"); // T-073
 const piutang = await import("../../src/app/(app)/piutang/actions"); // T-078
 const biaya = await import("../../src/app/(app)/keuangan/biaya/actions"); // T-084
 const tutup = await import("../../src/app/(app)/kasir/tutup/actions"); // T-085
+const komisi = await import("../../src/app/(app)/komisi/actions"); // T-087
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const TENANT_A = U(1);
@@ -193,6 +194,14 @@ const ACTIONS: [string, (f: FormData) => Promise<{ error?: string }>, () => Reco
   ["biaya saveCategoryAction", (f) => biaya.saveCategoryAction({}, f), () => ({ key: U(335), name: "Transportasi" })],
   ["tutup openAction", (f) => tutup.openAction({}, f), () => ({ key: U(336), branch: BRANCH_1, opening_float: "200000" })],
   ["tutup countAction", (f) => tutup.countAction({}, f), () => ({ key: U(337), shift: U(338), counted_cash: "150000", reason: "Uji konteks" })],
+  ["komisi openBatchAction", (f) => komisi.openBatchAction({}, f), () => ({ key: U(339), period: "2026-01" })],
+  ["komisi submitBatchAction", (f) => komisi.submitBatchAction({}, f), () => ({ batch: U(340) })],
+  ["komisi markPaidAction", (f) => komisi.markPaidAction({}, f), () => ({ batch: U(340), method: "transfer" })],
+  ["komisi decideReceivableAction", (f) => komisi.decideReceivableAction({}, f), () => ({ receivable: U(341), state: "waived", reason: "Uji konteks" })],
+  ["komisi createRuleAction", (f) => komisi.createRuleAction({}, f), () => ({ key: U(342), contribution_type: "closing_bc", name: "Aturan Uji", kind: "percent", percent: "5" })],
+  ["komisi newVersionAction", (f) => komisi.newVersionAction({}, f), () => ({ key: U(343), rule: U(344), kind: "percent", percent: "6" })],
+  ["komisi decideVersionAction", (f) => komisi.decideVersionAction({}, f), () => ({ version: U(345), action: "activate" })],
+  ["komisi simulateAction", (f) => komisi.simulateAction({}, f), () => ({ item: U(346), price: "1000000" })],
   ["simulasi enableAction", (f) => simulasi.enableAction({}, f), () => ({})],
   ["simulasi simulateAction", (f) => simulasi.simulateAction({}, f), () => ({ charge: U(308), action: "paid" })],
   ["stok receiveAction", (f) => stok.receiveAction({}, f), () => ({ key: U(151), item: U(152), batch_no: "B-1", expiry: "2030-01-01", quantity: "1", reason: "penerimaan" })],

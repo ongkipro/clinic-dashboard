@@ -715,6 +715,13 @@
       "when": 1794664118529,
       "tag": "0101_cash_shifts",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1794707496823,
+      "tag": "0102_commission",
+      "breakpoints": true
     }
   ]
 }

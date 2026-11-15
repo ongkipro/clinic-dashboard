@@ -578,3 +578,29 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A counter sale of a product needs an active stock item (`product_without_stock_item`), and a refund needs a patient on the invoice
   (`invoice_without_patient`): fixtures must provide both.
 
+## 2026-11-15 — T-087 commission engine
+
+- A test fixture that confirms a selection as a BC makes that BC the closing and guiding BC by default (`selection_confirm`); confirm as
+  the FO when the test names the BCs.
+- A treatment start needs the initial bill paid (`treatment_payment_unpaid`): pay before treating in fixtures.
+- An initial bill's line carries no `plan_item_id`; match an execution to its line as `refund_line_delivered` does (the plan item, or the
+  plan item's service = the line's item).
+- `sum(bigint)` is `numeric`: cast before passing it to a `bigint` parameter (`kasir_allocate`).
+- A server-action form that leaves the page once it succeeds (a decided draft, a paid batch) never shows its own success message:
+  redirect with a flag and let the page show it.
+- A page that lists catalog items for a role without catalog read (finance, auditor) must get them from a definer reader, not a direct
+  query (RLS returns nothing, silently).
+- A page that compares a version window with "now" must take the database clock from the reader; `Date.now()` in render fails the purity
+  lint.
+- An addition's execution has no `plan_item_id` on the initial bill's line to fall back to: exclude additions (`addition_of_visit`) from the
+  plan-item-less match, or the addition's performer takes the paid initial line.
+- Every tenant table needs `UNIQUE(tenant_id, id)` even when nothing references it (05 §3.1, `tests/db/migrations.test.ts`): run the
+  whole tests/db set during the build, not only the task's drift test (close run 1 failed on `payout_batch_items`).
+- A package session's commission line is the package line; judging the performer on the line's item (a package, whose standard scope
+  has no performer) silently drops every session's performer. Judge the performer on the executed service.
+- A batch that keeps its materialized lines across a rejection reuses stale figures: delete the children when the batch returns to
+  draft and let the guard allow a delete only in draft (review r1 P1-2).
+- Every `sum()`/`coalesce(sum())` passed to a `bigint` parameter needs `::bigint`; three new call sites repeated the T-087 stage (b)
+  error before the review fixes ran green.
+- Blocking a contribution on an attribution change is a dead end when the BC is attributed again; reverse it, let accrual follow the
+  active attribution and net the attribution reversals out of the cumulative step.

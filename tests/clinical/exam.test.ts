@@ -400,7 +400,7 @@ describe("authority, lifecycle and the visit step", () => {
     for (const t of TABLES) await expect(h.admin.query(`truncate ${t} cascade`)).rejects.toThrow();
     const trig = (await h.admin.query(`select tgname, tgenabled from pg_trigger where tgrelid = any($1::regclass[]) and not tgisinternal order by 1`, [TABLES])).rows;
     expect(trig.map((r) => `${r.tgname}:${r.tgenabled}`)).toEqual([
-      "care_plans_guard:A", "care_plans_no_truncate:A", "examinations_guard:A", "examinations_no_truncate:A", "face_map_marks_guard:A", "face_map_marks_no_truncate:A",
+      "care_plans_commission_closed:A", "care_plans_guard:A", "care_plans_no_truncate:A", "examinations_commission_signed:A", "examinations_guard:A", "examinations_no_truncate:A", "face_map_marks_guard:A", "face_map_marks_no_truncate:A",
       "intake_verifications_guard:A", "intake_verifications_no_truncate:A", "plan_items_guard:A", "plan_items_no_truncate:A"]);
   });
 

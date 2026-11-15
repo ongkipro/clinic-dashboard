@@ -31,3 +31,4 @@ export * from "../../modules/balance/schema";
 export * from "../../modules/packages/schema";
 export * from "../../modules/promo/schema";
 export * from "../../modules/expenses/schema";
+export * from "../../modules/commission/schema";
