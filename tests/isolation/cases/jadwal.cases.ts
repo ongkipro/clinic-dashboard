@@ -2,6 +2,9 @@
 // actions confirm, cancel, mark no-show and reschedule. Each case seeds in B a booked appointment for a
 // secret patient, then runs as A's owner: none of B's rows appear; B's branch and appointment are not
 // found; every write onto B's appointment is refused.
+// T-099 (PR-81; no new surface — the waitlist goes with the Jadwal cases): B also has a waitlist entry for its service; A's waitlist list of
+// B's branch is not found and A's add / remove on B's branch, patient or entry are refused (the outcome cross-tenant in waitlist.test.ts, on an offered entry); as B they succeed (a fresh entry
+// per run: a removal consumes it).
 import { withTenantContext } from "../../../src/db/rls/context";
 import { CommandError } from "../../../src/lib/command";
 import { decideApproval } from "../../../src/modules/approvals/approvals";
@@ -10,6 +13,7 @@ import { setHours, setServices, upsertRoom } from "../../../src/modules/org/bran
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { calendar, cancelAppointment, confirmAttendance, markNoShow, reschedule } from "../../../src/modules/scheduling/appointments/appointments";
 import { setWeek } from "../../../src/modules/scheduling/rosters/rosters";
+import { addToWaitlist, removeFromWaitlist, waitlistList } from "../../../src/modules/scheduling/waitlist/waitlist";
 import { defineCases, type IsolationEnv } from "../case";
 
 process.env.DEPLOY_ENV = "local";
@@ -46,7 +50,7 @@ const monday = (d: string) => {
 };
 const at = (d: string, t: string) => new Date(`${d}T${t}:00+07:00`);
 
-const seeded = new Map<string, { appt: string; appts: string[]; name: string; d: string }>();
+const seeded = new Map<string, { appt: string; appts: string[]; name: string; d: string; item: string; pt: string }>();
 async function victim(env: IsolationEnv) {
   const t = env.victim.tenantId;
   const known = seeded.get(t);
@@ -99,7 +103,7 @@ async function victim(env: IsolationEnv) {
   }
   const appt = appts[3];
   for (const s of [name, pt, ...appts]) env.victimSecret(s);
-  const r = { appt, appts, name, d };
+  const r = { appt, appts, name, d, item: v.itemId, pt };
   seeded.set(t, r);
   return r;
 }
@@ -119,7 +123,14 @@ export default defineCases(
         (c) => ({ status: 200, body: JSON.parse(JSON.stringify(c)) }),
         (e) => (e instanceof CommandError && e.code === "ERR_NOT_FOUND" ? { status: 404, body: null } : Promise.reject(e)),
       ));
-      return out;
+      // T-099: the waitlist of B's branch (A: not found; B: its entries, with the secret patient's name)
+      await as(env, env.victim.tenantId, (db) => addToWaitlist(db, crypto.randomUUID(), { branchId: env.victim.branchId, patientId: v.pt, itemId: v.item })).catch(
+        (e) => (e instanceof CommandError && e.code === "ERR_IDEMPOTENCY_CONFLICT" ? null : Promise.reject(e)));
+      const wl = await as(env, env.actor.tenantId, (db) => waitlistList(db as never, env.victim.branchId).then(
+        (rows) => ({ status: 200, body: JSON.parse(JSON.stringify(rows)) }),
+        (e) => (e instanceof CommandError && e.code === "ERR_NOT_FOUND" ? { status: 404, body: null } : Promise.reject(e)),
+      ));
+      return out.status === 404 && wl.status === 404 ? { status: 404, body: null } : { status: 200, body: { calendar: out.body, waitlist: wl.body } };
     },
   },
   {
@@ -134,7 +145,19 @@ export default defineCases(
       const move = await refused(as(env, me, (db) => reschedule(db, crypto.randomUUID(), a2, at(v.d, "13:00"), null)));
       const noShow = await refused(as(env, me, (db) => markNoShow(db, crypto.randomUUID(), a3)));
       const cancel = await refused(as(env, me, (db) => cancelAppointment(db, crypto.randomUUID(), a4, "Uji isolasi")));
-      const attempts = { confirm, move, noShow, cancel };
+      // T-099: a fresh waitlist entry in B each run (the positive control removes it): add for B's branch and a not-yet-waiting patient, remove
+      const freshPatient = async () => (await env.owner.query(`insert into patients (tenant_id, mrn, full_name, birth_date, sex, identity_type, no_identity_reason, religion,
+          occupation, education, marital_status, registered_branch_id, created_by, created_as) select $1, 'RM-' || (1000000000000 + floor(random() * 8999999999999))::bigint::text,
+          'Pasien Tunggu Iso', '1990-01-01', 'female', 'newborn_via_guardian', 'Fixture', 'islam', 'Karyawan', 's1', 'kawin', $2, (select id from staff where tenant_id = $1 limit 1),
+          'fo_cashier' returning id`, [env.victim.tenantId, env.victim.branchId])).rows[0].id as string;
+      const fresh = await freshPatient();
+      const entry = (await as(env, env.victim.tenantId, (db) => addToWaitlist(db, crypto.randomUUID(), { branchId: env.victim.branchId, patientId: fresh, itemId: v.item }))).entryId;
+      env.victimSecret(entry);
+      const other = await freshPatient(); // a patient not yet waiting (the add as B itself must succeed)
+      env.victimSecret(other);
+      const wlAdd = await refused(as(env, me, (db) => addToWaitlist(db, crypto.randomUUID(), { branchId: env.victim.branchId, patientId: other, itemId: v.item })));
+      const wlRemove = await refused(as(env, me, (db) => removeFromWaitlist(db, crypto.randomUUID(), entry)));
+      const attempts = { confirm, move, noShow, cancel, wlAdd, wlRemove };
       return { attempts, body: { ...attempts, appt: cancel === "done" ? v.appt : null } };
     },
   },

@@ -3,8 +3,8 @@
 // recorded per branch and cancelled, never deleted. Written only by roster_set_week, leave_add and
 // leave_cancel (migration 0060); the past (before today in branch time) is kept as it was.
 import { sql } from "drizzle-orm";
-import { boolean, check, date, foreignKey, index, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
-import { catalogVersions } from "../catalog/schema";
+import { boolean, check, date, foreignKey, index, pgTable, text, time, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { catalogItems, catalogVersions } from "../catalog/schema";
 import { branches, staff, tenants } from "../org/schema";
 import { patients } from "../patients/schema";
 
@@ -158,5 +158,54 @@ export const resourceReservations = pgTable(
     unique("resource_reservations_appointment_resource_key").on(t.tenantId, t.appointmentId, t.kind, t.resourceId),
     check("resource_reservations_kind_check", sql`${t.kind} in ('staff','room','device')`),
     check("resource_reservations_range_check", sql`${t.startsAt} < ${t.endsAt}`),
+  ],
+);
+
+// T-099 (PR-81; plan docs/tasks/T-099.md; DEC-111): the waitlist for a service (a catalog item, not a version) at a branch. No free text
+// and no preferred window (plan r1). A cancelled or rescheduled future slot offers the oldest waiting entry (a trigger, ids only).
+export const WAITLIST_STATES = ["waiting", "offered", "booked", "removed"] as const;
+export const WAITLIST_RECORDERS = ["owner", "admin_pusat", "manager", "fo_cashier", "central_cs"] as const;
+export const waitlistEntries = pgTable(
+  "waitlist_entries",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    state: text("state", { enum: WAITLIST_STATES }).notNull().default("waiting"),
+    offeredAppointmentId: uuid("offered_appointment_id"),
+    offeredAt: timestamp("offered_at", { withTimezone: true }),
+    bookedAppointmentId: uuid("booked_appointment_id"),
+    commandKey: text("command_key").notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAs: text("created_as", { enum: WAITLIST_RECORDERS }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    closedBy: uuid("closed_by"),
+    closedAs: text("closed_as"),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closeReason: text("close_reason"),
+  },
+  (t) => [
+    unique("waitlist_entries_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("waitlist_entries_command_key").on(t.tenantId, t.commandKey),
+    uniqueIndex("waitlist_entries_one_open").on(t.tenantId, t.patientId, t.branchId, t.itemId).where(sql`${t.state} in ('waiting','offered')`),
+    uniqueIndex("waitlist_entries_one_offer_per_slot").on(t.tenantId, t.offeredAppointmentId).where(sql`${t.state} = 'offered'`),
+    index("waitlist_entries_queue_idx").on(t.tenantId, t.branchId, t.itemId, t.state, t.createdAt),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.itemId], foreignColumns: [catalogItems.tenantId, catalogItems.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId, t.offeredAppointmentId], foreignColumns: [appointments.tenantId, appointments.branchId, appointments.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId, t.bookedAppointmentId], foreignColumns: [appointments.tenantId, appointments.branchId, appointments.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.closedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    check("waitlist_entries_check", sql`${t.state} in ('waiting','offered','booked','removed')
+      and ${t.commandKey} ~ '^[A-Za-z0-9_.:-]{8,128}$'
+      and (${t.state} = 'offered') = (${t.offeredAppointmentId} is not null and ${t.offeredAt} is not null)
+      and (${t.state} = 'booked') = (${t.bookedAppointmentId} is not null)
+      and (${t.state} in ('waiting','offered')) = (${t.closedAt} is null)
+      and ((${t.closedBy} is null) = (${t.closedAs} is null)) and ((${t.closedAt} is null) = (${t.closeReason} is null))
+      and (${t.closeReason} is null or ${t.state} = ${t.closeReason})`),
   ],
 );

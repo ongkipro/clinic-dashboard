@@ -591,6 +591,12 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-099 (PR-81): the bound waitlist writers and reader (the actor lock first).
+    "waitlist_add(text,jsonb)",
+    "waitlist_remove(uuid)",
+    "waitlist_offer_outcome(uuid,uuid,uuid)",
+    "waitlist_entry_authorized(uuid)",
+    "waitlist_list(uuid,uuid)",
     // T-098 (PR-78): the bound survey writer and readers (the actor lock first).
     "survey_record(text,jsonb)",
     "survey_list(uuid,date,date)",

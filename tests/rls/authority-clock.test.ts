@@ -344,6 +344,12 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["cash_shift_list", async () => ["select cash_shift_list(null, null)", []], ["manager"]],
     ["cash_shift_get", async () => ["select cash_shift_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["cash_shift_mine", async () => ["select cash_shift_mine(null)", []], ["manager"]],
+    // T-099: the waitlist writers and reader take the actor lock first.
+    ["waitlist_add", async () => ["select waitlist_add('k-0000000114', '{}'::jsonb)", []], ["manager"]],
+    ["waitlist_remove", async () => ["select waitlist_remove($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["waitlist_offer_outcome", async () => ["select waitlist_offer_outcome($1, $1, null)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["waitlist_entry_authorized", async () => ["select waitlist_entry_authorized($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["waitlist_list", async () => ["select waitlist_list($1, null)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-098: the survey writer and readers take the actor lock first.
     ["survey_record", async () => ["select survey_record('k-0000000113', '{}'::jsonb)", []], ["manager"]],
     ["survey_list", async () => ["select survey_list(null, null, null)", []], ["manager"]],

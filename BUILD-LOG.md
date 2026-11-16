@@ -719,3 +719,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A granted definer's idempotent replay is an authorization path of its own: re-check the stored row's scope against the current actor
   before answering a replay (review r1 P1). Validate id inputs as text before casting (P2).
 - Typecheck an edited test before launching a heavy verification; a test that cannot compile turns every mutant into a load failure.
+
+## 2026-11-16 — T-099 waitlist and the offer on cancellation
+
+- A trigger that tests "still in the future" while a writer may have waited on a lock must read clock_timestamp(), not now(): now() is
+  the transaction start (Sol r2 P2); the test holds staff_access past a slot's start and expects no offer.
+- One trigger on appointments covers every cancel path (patient, clinic, deposit refund, reschedule) without re-creating any writer.
+- Isolation positive controls: an add attempt as B itself needs a patient who is not already waiting (the route case seeds one).
+- Review r1 (Sol 629155a6): rows that keep a frozen patient id must be compared canonically at use time (patient_canonical on both sides,
+  patient_cluster for duplicates) — a merge redirects identities without moving rows. A decision about "the current offer" must name the
+  offer it means, or a delayed retry decides a newer one. A keyed command whose replay is answered before the definer needs its own
+  authority re-check first (waitlist_entry_authorized).
