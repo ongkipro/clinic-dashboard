@@ -702,3 +702,9 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   unmounts on success and takes its notice with it — redirect with a whitelisted outcome code and show the notice at page level.
 - Browser runs 1–3 failed (runner auth URL; no main landmark and a never-approved service missing; the unmounting success notice); each
   repair beyond the first was approved by the supervisor under the owner's delegation, and run 4 passed.
+
+## 2026-11-16 — HYG-020 consultation event order
+
+- Two events written in one transaction share occurred_at (`now()` is the transaction start) and their uuid v7 ids tie on the millisecond
+  prefix, so `order by occurred_at, id` orders them by random bits; a test must not assert an order the event contract does not define —
+  assert the multiplicity and types, and select each payload by its type. Latent since T-079; surfaced on CI after T-097 (168/400 reproduced).

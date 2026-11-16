@@ -251,9 +251,12 @@ describe("scenario PR-12 and money scenario 4c: the fee waived by a purchase is 
     const pay = (await h.admin.query(`select p.method, p.amount::int a, a.invoice_line_id from payments p join payment_allocations a on a.payment_id = p.id where p.invoice_id = $1`, [fi[0].id])).rows;
     expect(pay).toEqual([{ method: "balance", a: 150_000, invoice_line_id: f1.fee_line_id }]);
     const ev = await visitEvents(c.v);
-    expect(ev.map((e) => e.type)).toEqual(["ConsultationFeeCharged", "ConsultationFeeRecharged"]);
-    expect(Object.keys(ev[0].payload).sort()).toEqual(["invoice_id", "invoice_line_id", "visit_id"]);
-    expect(Object.keys(ev[1].payload).sort()).toEqual(["fee_id", "refund_id", "visit_id"]);
+    // HYG-020: both events are written in one transaction (occurred_at = now() for both, ids tie within a millisecond) and TD-50 /
+    // DATA-59 define no order among them — assert exactly one of each type and each payload by its type, not by position
+    expect(ev.map((e) => e.type).sort()).toEqual(["ConsultationFeeCharged", "ConsultationFeeRecharged"]);
+    const byType = (t: string) => ev.find((e) => e.type === t)!.payload;
+    expect(Object.keys(byType("ConsultationFeeCharged")).sort()).toEqual(["invoice_id", "invoice_line_id", "visit_id"]);
+    expect(Object.keys(byType("ConsultationFeeRecharged")).sort()).toEqual(["fee_id", "refund_id", "visit_id"]);
     expect(r.fee_deducted).toBe(150_000);
     // (the returned unit's stock movement, scenario 15 J2, is T-078's: tests/cashier/receivables.test.ts 15a)
     expect(await events("refund", r.refund_id)).toEqual(["RefundPaid"]);
