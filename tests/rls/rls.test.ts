@@ -591,6 +591,13 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-097 (PR-94): the unbound automation scan; the bound draft writers and the log / draft readers (the actor lock first).
+    "automation_scan(timestamp with time zone)",
+    "automation_draft_propose(text,jsonb,text)",
+    "automation_draft_decide(uuid,boolean,text)",
+    "automation_draft_cancel(uuid)",
+    "automation_log_list(text,text)",
+    "automation_draft_get()",
     // T-096 (PR-70): the public aftercare page's definers (unbound: no staff session; each refuses a bound connection).
     "aftercare_link_lookup(text,text,timestamp with time zone)",
     "aftercare_otp_send(text,text,text,timestamp with time zone)",

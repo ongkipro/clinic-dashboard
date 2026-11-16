@@ -785,6 +785,13 @@
       "when": 1794767837565,
       "tag": "0111_aftercare",
       "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1794776913724,
+      "tag": "0112_automation",
+      "breakpoints": true
     }
   ]
 }

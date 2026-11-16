@@ -344,6 +344,12 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["cash_shift_list", async () => ["select cash_shift_list(null, null)", []], ["manager"]],
     ["cash_shift_get", async () => ["select cash_shift_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["cash_shift_mine", async () => ["select cash_shift_mine(null)", []], ["manager"]],
+    // T-097: the automation draft writers and the log / draft readers take the actor lock first.
+    ["automation_draft_propose", async () => ["select automation_draft_propose('k-0000000111', '{}'::jsonb, 'alasan')", []], ["manager"]],
+    ["automation_draft_decide", async () => ["select automation_draft_decide($1, true, null)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["automation_draft_cancel", async () => ["select automation_draft_cancel($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["automation_log_list", async () => ["select automation_log_list(null, 'all')", []], ["manager"]],
+    ["automation_draft_get", async () => ["select automation_draft_get()", []], ["manager"]],
     // T-094: the outbound writers and reader take the actor lock first.
     ["outbound_enqueue", async () => ["select outbound_enqueue('k-0000000109', '{}'::jsonb)", []], ["manager"]],
     ["outbound_bill", async () => ["select outbound_bill('k-0000000110', $1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],

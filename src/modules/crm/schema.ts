@@ -6,10 +6,13 @@
 // and expiry, locked instalments, receivables, unselected plan items, dormant patients) and by the no-show trigger; one per rule × source ×
 // step for ever (a closed task is never re-created); titles from rule codes only (no clinical content). An Ubah Jadwal reminder reply
 // (T-095) creates a reschedule_request task for CS (PR-83).
+// Automation scenarios (PR-94, UX-55; T-097, migration 0112, DEC-109): one occurrence per (scenario, source, offset), queued through the
+// T-094 outbound queue under a per-patient daily cap (SET-19 batas_harian); marketing proposes SET-19 drafts that Admin Pusat or the owner
+// decides.
 // Aftercare (PR-70; T-096, migration 0111, DEC-108): one notice per closed visit with aftercare texts, sent as a neutral care message with a
 // link token minted at claim time (only its hash is stored, 7-day TTL), opened after a WhatsApp OTP (hashed, 5 min, 5 attempts, RATE-1).
 import { sql } from "drizzle-orm";
-import { boolean, check, date, foreignKey, index, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { invoices } from "../cashier/schema";
 import { conversations, messages, outboundMessages } from "../messaging/schema";
 import { branches, staff, tenants } from "../org/schema";
@@ -322,3 +325,78 @@ export const aftercareOtpSends = pgTable(
       and ${t.ipHash} ~ '^[0-9a-f]{64}$' and ${t.phone} ~ '^[1-9][0-9]{7,14}$'`),
   ],
 );
+
+export const AUTOMATION_SCENARIOS = ["pengingat", "aftercare", "kepuasan", "rencana", "belum_jadwal", "isi_ulang", "ulang_tahun"] as const;
+export const AUTOMATION_SOURCES = ["appointment", "visit", "dispensing", "patient"] as const;
+export const AUTOMATION_SKIPS = ["cap_horizon_exceeded", "no_consent", "patient_phone_required", "number_not_sending", "template_not_usable", "template_missing"] as const;
+export const AUTOMATION_DRAFT_STATES = ["pending", "approved", "rejected", "cancelled"] as const;
+
+export const automationOccurrences = pgTable(
+  "automation_occurrences",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    scenario: text("scenario", { enum: AUTOMATION_SCENARIOS }).notNull(),
+    sourceKind: text("source_kind", { enum: AUTOMATION_SOURCES }).notNull(),
+    sourceId: uuid("source_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    offsetDays: integer("offset_days").notNull(),
+    originalPlannedFor: date("original_planned_for").notNull(),
+    plannedFor: date("planned_for"),
+    capDeferredDays: smallint("cap_deferred_days").notNull().default(0),
+    state: text("state", { enum: ["queued", "skipped"] }).notNull(),
+    skipReason: text("skip_reason"),
+    outboundId: uuid("outbound_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    unique("automation_occurrences_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("automation_occurrences_key").on(t.tenantId, t.scenario, t.sourceId, t.offsetDays),
+    index("automation_occurrences_log_idx").on(t.tenantId, t.createdAt),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.outboundId], foreignColumns: [outboundMessages.tenantId, outboundMessages.id] }).onDelete("restrict"),
+    check("automation_occurrences_check", sql`${t.scenario} in (${inList(AUTOMATION_SCENARIOS)}) and ${t.sourceKind} in (${inList(AUTOMATION_SOURCES)})
+      and ${t.state} in ('queued','skipped')
+      and ((${t.state} = 'queued') = (${t.outboundId} is not null and ${t.plannedFor} is not null))
+      and ((${t.state} = 'skipped') = (${t.skipReason} is not null))
+      and (${t.skipReason} is null or ${t.skipReason} in (${inList(AUTOMATION_SKIPS)}))
+      and ${t.capDeferredDays} between 0 and 7 and (${t.plannedFor} is null or ${t.plannedFor} = ${t.originalPlannedFor} + ${t.capDeferredDays})`),
+  ],
+);
+
+export const automationScenarioDrafts = pgTable(
+  "automation_scenario_drafts",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    value: jsonb("value").notNull(),
+    reason: text("reason").notNull(),
+    state: text("state", { enum: AUTOMATION_DRAFT_STATES }).notNull().default("pending"),
+    commandKey: text("command_key").notNull(),
+    proposedBy: uuid("proposed_by").notNull(),
+    proposedAt: timestamp("proposed_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    decidedBy: uuid("decided_by"),
+    decidedAs: text("decided_as"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionReason: text("decision_reason"),
+    settingVersionId: uuid("setting_version_id"),
+  },
+  (t) => [
+    unique("automation_scenario_drafts_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("automation_scenario_drafts_command_key").on(t.tenantId, t.commandKey),
+    uniqueIndex("automation_scenario_drafts_one_pending").on(t.tenantId).where(sql`${t.state} = 'pending'`),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.proposedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.decidedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    check("automation_scenario_drafts_check", sql`${t.state} in (${inList(AUTOMATION_DRAFT_STATES)})
+      and length(btrim(${t.reason})) between 3 and 500
+      and ((${t.state} = 'pending') = (${t.decidedAt} is null)) and ((${t.decidedBy} is null) = (${t.decidedAs} is null))
+      and (${t.state} <> 'approved' or ${t.decidedBy} is not null and ${t.settingVersionId} is not null)
+      and (${t.state} <> 'rejected' or ${t.decidedBy} is not null and ${t.decisionReason} is not null and length(btrim(${t.decisionReason})) between 3 and 500)
+      and (${t.state} <> 'cancelled' or ${t.decidedBy} = ${t.proposedBy})`),
+  ],
+);
+

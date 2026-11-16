@@ -690,3 +690,15 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   read-only (count each anchor in the file), never with DRY=1.
 - A browser spec that injects a 200 % text style in its layout loop must reload the page afterwards, or later screenshots misrepresent the
   100 % layout.
+
+## 2026-11-16 — T-097 automation scenarios
+
+- A lock mutant can survive because another layer serializes the same writers (here the tenant-wide staff_access lock held by every
+  caller). Probe each layer alone, then write the all-layers mutant against a test whose callers hold no lock themselves.
+- A browser runner derived from a public-page task points the auth pool at the app login; a staff page signs in through Better Auth, which
+  refuses that role. Take the auth URL from the seed (`authUrl`).
+- An isolation action case must not paper over a consumed positive control: give each attempt its own fresh victim state.
+- A page must own its main landmark when the shell leaves it to pages; a form rendered only while its object exists (a pending draft)
+  unmounts on success and takes its notice with it — redirect with a whitelisted outcome code and show the notice at page level.
+- Browser runs 1–3 failed (runner auth URL; no main landmark and a never-approved service missing; the unmounting success notice); each
+  repair beyond the first was approved by the supervisor under the owner's delegation, and run 4 passed.
