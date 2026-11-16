@@ -25,7 +25,7 @@ import { setTaxProfile } from "../../src/modules/tax/tax";
 import { mergePatients } from "../../src/modules/patients/merge/merge";
 import { checkIn } from "../../src/modules/visits/visits";
 import { createHarness, type Harness, testPool } from "../rls/harness";
-import { arrivalSlot } from "../support/dates";
+import { arrivalSlot, withinHours } from "../support/dates";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -246,7 +246,7 @@ describe("scenario PR-22 and PR-83, money scenario 6a–6d: patient and clinic c
     const pt = await patient(A, "Pasien PR22");
     const apt = await appointment(A, pt, quarter(10 * H), DOC);
     const { deposit_id } = await as(FO, (db) => receiveDeposit(db, key(), apt, { method: "cash", cashTendered: 200_000 }));
-    const moved = await as(FO, (db) => reschedule(db, key(), apt, quarter(72 * H), DOC.staffId));
+    const moved = await as(FO, (db) => reschedule(db, key(), apt, withinHours(quarter(72 * H)), DOC.staffId));
     const d = await dep(deposit_id);
     expect([d.state, d.decision_code, d.decided_by]).toEqual(["forfeited", "patient_reschedule_after_cutoff", FO.staffId]);
     expect(await balance(pt)).toBe(0);
@@ -255,12 +255,28 @@ describe("scenario PR-22 and PR-83, money scenario 6a–6d: patient and clinic c
     expect((await h.admin.query(`select count(*)::int c from booking_deposits where appointment_id = $1`, [moved.appointmentId])).rows[0].c).toBe(0);
   });
 
+  it("HYG-021: a reschedule target that ends after the 23:45 closing is refused (slot_taken); one that ends by 23:45 is accepted", async () => {
+    // Fixed targets on day +6 (no other fixture appointment of this doctor falls there): the clock-independent form of the night window,
+    // where quarter(72 h) lands on 23:30 or 23:45.
+    const pt = await patient(A, "Pasien Jam Tutup");
+    const d = localDay(6);
+    const apt = await appointment(A, pt, quarter(20 * H), DOC);
+    const reason = (x: Promise<unknown>) => x.then(() => "ok", (e) => (e instanceof CommandError ? `${e.code}:${(e as { reason?: string }).reason}` : `raw:${e.message}`));
+    expect(await reason(as(FO, (db) => reschedule(db, key(), apt, new Date(`${d}T23:30:00+07:00`), DOC.staffId)))).toBe("ERR_VERSION_CONFLICT:slot_taken");
+    expect((await h.admin.query(`select state from appointments where id = $1`, [apt])).rows[0].state).toBe("booked"); // nothing changed
+    // the fixture's target policy: withinHours moves 23:30 to 23:15, which the writer accepts
+    const target = withinHours(new Date(`${d}T23:30:00+07:00`));
+    expect(target.toISOString()).toBe(new Date(`${d}T23:15:00+07:00`).toISOString());
+    const moved = await as(FO, (db) => reschedule(db, key(), apt, target, DOC.staffId));
+    expect(moved.startsAt.toISOString()).toBe(new Date(`${d}T23:15:00+07:00`).toISOString());
+  });
+
   it("6a: a patient change at least 24 h before (reschedule and cancel) moves the DP to balance (dp_transfer)", async () => {
     const pt = await patient(A, "Pasien 6a");
     for (const [i, act] of ["reschedule", "cancel"].entries()) {
       const apt = await appointment(A, pt, quarter((30 + i * 3) * H), DOC);
       const { deposit_id } = await as(FO, (db) => receiveDeposit(db, key(), apt, { method: "edc" }));
-      if (act === "reschedule") await as(FO, (db) => reschedule(db, key(), apt, quarter(80 * H), DOC.staffId));
+      if (act === "reschedule") await as(FO, (db) => reschedule(db, key(), apt, withinHours(quarter(80 * H)), DOC.staffId));
       else await as(FO, (db) => cancelAppointment(db, key(), apt, "Pasien ganti rencana"));
       const d = await dep(deposit_id);
       expect([d.state, d.decision_code], act).toEqual(["moved_to_balance", `patient_${act}_before_cutoff`]);

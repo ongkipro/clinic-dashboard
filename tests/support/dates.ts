@@ -19,3 +19,13 @@ export function arrivalSlot(i: number, count = 3, now = Date.now()): Date {
   const start = Math.min(first, last - (count - 1) * 30 * 60_000);
   return new Date(start + i * 30 * 60_000);
 }
+
+// HYG-021: a reschedule target inside the fixture branch's hours (deposits.test.ts: open and rostered 00:00–23:45, a 30-minute service).
+// `t` is moved back by whole quarter hours so the slot ends by `closes` (HH:MM, Asia/Jakarta) on the same local date; unchanged when it
+// already fits. quarter(72 h) lands on 23:30 or 23:45 for now in 23:15:01–23:45:00 WIB and quarter(80 h) for now in 15:15:01–15:45:00 WIB;
+// the writer refuses such a slot (ERR_VERSION_CONFLICT: slot_taken).
+export function withinHours(t: Date, closes = "23:45", minutes = 30): Date {
+  const close = new Date(`${wibDay(0, t.getTime())}T${closes}:00+07:00`).getTime();
+  const over = t.getTime() + minutes * 60_000 - close;
+  return over > 0 ? new Date(t.getTime() - Math.ceil(over / 900_000) * 900_000) : t;
+}

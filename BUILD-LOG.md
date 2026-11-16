@@ -730,3 +730,9 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   patient_cluster for duplicates) — a merge redirects identities without moving rows. A decision about "the current offer" must name the
   offer it means, or a delayed retry decides a newer one. A keyed command whose replay is answered before the definer needs its own
   authority re-check first (waitlist_entry_authorized).
+
+## 2026-11-17 — HYG-021 deposits reschedule targets
+
+- A clock-derived fixture target must fit the fixture's own hours: quarter(72 h) and quarter(80 h) ended after the 23:45 closing in two
+  30-minute windows a day. Reproduce at a fixed target (clock-independent) before fixing; assert the domain refusal reason.
+- A mutant that changes a constant by less than the rounding step can be equivalent on aligned inputs (23:59 vs 23:45 at quarter hours).
