@@ -348,8 +348,8 @@ export const OUTBOUND_PURPOSES = ["care_reminder", "aftercare", "promo", "bill"]
 export const OUTBOUND_CATEGORIES = ["utility", "marketing"] as const;
 export const OUTBOUND_STATES = ["queued", "sending", "sent", "skipped", "failed"] as const;
 export const OUTBOUND_SOURCES = ["visit", "invoice", "appointment", "followup", "consultation_control", "campaign", "promo_code", "patient"] as const;
-export const OUTBOUND_SKIP_REASONS = ["consent_withdrawn", "patient_merged", "number_not_sending", "template_withdrawn"] as const;
-export const OUTBOUND_DEFER_REASONS = ["budget_reached", "tenant_suspended"] as const;
+export const OUTBOUND_SKIP_REASONS = ["consent_withdrawn", "patient_merged", "number_not_sending", "template_withdrawn", "campaign_locked", "cap_horizon_exceeded"] as const;
+export const OUTBOUND_DEFER_REASONS = ["budget_reached", "tenant_suspended", "cap_reached"] as const;
 const PURPOSE_SOURCE = sql.raw(
   "(('bill','visit'), ('care_reminder','appointment'), ('care_reminder','followup'), ('care_reminder','consultation_control'), " +
     "('aftercare','visit'), ('promo','campaign'), ('promo','promo_code'), ('promo','patient'))",

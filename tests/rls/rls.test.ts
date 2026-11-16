@@ -591,6 +591,14 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-100 (PR-94): the bound campaign writers and readers (the actor lock first).
+    "campaign_actor_check(text)",
+    "campaign_segment_save(text,jsonb)",
+    "campaign_schedule(uuid,jsonb)",
+    "campaign_unschedule(uuid,text)",
+    "campaign_send(uuid)",
+    "campaign_workspace_list()",
+    "campaign_segment_preview(jsonb)",
     // T-099 (PR-81): the bound waitlist writers and reader (the actor lock first).
     "waitlist_add(text,jsonb)",
     "waitlist_remove(uuid)",

@@ -742,3 +742,20 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Next 16 stops `next build` on a known advisory (experimental.agentUpgrade 'security' is the default): a newly published advisory can
   turn a green pipeline red mid-run. Patch through the package manager with exact versions and keep the paired eslint-config-next in step;
   check the lockfile diff touches only that family.
+
+## 2026-11-17 — T-100 campaigns and segments; launch preflight
+
+- Domain-event payloads carry no numbers (TD-50 validator): counts go in the command's result, never in the event.
+- A frequency cap that is enforced only at enqueue leaks on every path that moves a row's effective day (budget deferral, suspension
+  deferral, overdue carryover): one dispatch-time check governs them all; count with the real today so a candidate never counts against
+  its own destination day.
+- Re-created shared functions are derived mechanically from their reviewed bodies with asserted unique insertion anchors, and the drift
+  test removes exactly those blocks and compares the rest verbatim.
+- A defence-in-depth check behind a TS pre-check needs its own test that calls the definer directly; otherwise the pre-check hides it.
+- Launch preflight (Panel 2, 2026-11-17): create every runner path in one completed call, run gate/preflight.sh (bash -n, exists, dirs,
+  restore trap) in its own completed call, then bg_run in a separate call; suites and mutations only through bg_run with an adequate
+  timeout; never a short foreground wrapper. Recurring races (a file or the redirect target created in the same parallel batch as its
+  launch) cost several runs before this was enforced.
+- A task restarted on a new base: close the old ledger run BLOCKED, start the new run on the clean base BEFORE re-applying the carried
+  work (so it is the run's own change set), re-apply with a 3-way patch that excludes the ledger's own files, and merge shared docs by
+  keeping both histories; never drop the stash.

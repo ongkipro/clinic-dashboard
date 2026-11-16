@@ -14,7 +14,7 @@
 import { sql } from "drizzle-orm";
 import { boolean, check, date, foreignKey, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { invoices } from "../cashier/schema";
-import { conversations, messages, outboundMessages } from "../messaging/schema";
+import { conversations, messages, outboundMessages, waTemplates } from "../messaging/schema";
 import { branches, staff, tenants } from "../org/schema";
 import { patients } from "../patients/schema";
 import { appointments } from "../scheduling/schema";
@@ -30,7 +30,33 @@ const KEY = (c: unknown) => sql`${c} ~ '^[A-Za-z0-9_.:-]{8,128}$'`;
 const CIPHER = (c: unknown) => sql`${c} ~ '^v1\\.[1-9][0-9]{0,8}\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$'`;
 const DEK = (c: unknown) => sql`${c} ~ '^dek:v[1-9][0-9]{0,8}$'`;
 
-// A campaign tag for leads (minimal; segments, scheduling and sending are T-100).
+// T-100 (PR-94, UX-19, DEC-112): a saved segment — a closed set of non-clinical rules (branch, last visit date window, birthday month, age
+// band, sex); members are computed at read / send time and always intersected with an active marketing_wa consent (PR-4). No member list.
+export const CAMPAIGN_SEND_STATES = ["draft", "scheduled", "queued", "cancelled"] as const;
+export const campaignSegments = pgTable(
+  "campaign_segments",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    name: text("name").notNull(),
+    rules: jsonb("rules").notNull(),
+    commandKey: text("command_key").notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAs: text("created_as").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    unique("campaign_segments_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("campaign_segments_command_key").on(t.tenantId, t.commandKey),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    check("campaign_segments_check", sql`${KEY(t.commandKey)} and length(btrim(${t.name})) between 2 and 120 and jsonb_typeof(${t.rules}) = 'object'
+      and ${t.createdAs} in ('owner','admin_pusat','marketing')`),
+  ],
+);
+
+// A campaign tag for leads (T-092); T-100 adds the campaign workspace (segment, template, schedule, send state) — expand-only columns.
 export const campaigns = pgTable(
   "campaigns",
   {
@@ -45,9 +71,21 @@ export const campaigns = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
     commandKey: text("command_key").notNull(),
+    segmentId: uuid("segment_id"),
+    templateId: uuid("template_id"),
+    scheduledFor: date("scheduled_for"),
+    sendState: text("send_state", { enum: CAMPAIGN_SEND_STATES }).notNull().default("draft"),
+    queuedAt: timestamp("queued_at", { withTimezone: true }),
+    queuedBy: uuid("queued_by"),
   },
   (t) => [
     unique("campaigns_tenant_id_id_key").on(t.tenantId, t.id),
+    foreignKey({ name: "campaigns_segment_fk", columns: [t.tenantId, t.segmentId], foreignColumns: [campaignSegments.tenantId, campaignSegments.id] }).onDelete("restrict"),
+    foreignKey({ name: "campaigns_template_fk", columns: [t.tenantId, t.templateId], foreignColumns: [waTemplates.tenantId, waTemplates.id] }).onDelete("restrict"),
+    foreignKey({ name: "campaigns_queued_by_fk", columns: [t.tenantId, t.queuedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    check("campaigns_send_check", sql`${t.sendState} in (${inList(CAMPAIGN_SEND_STATES)})
+      and (${t.sendState} in ('scheduled','queued')) <= (${t.segmentId} is not null and ${t.templateId} is not null and ${t.scheduledFor} is not null)
+      and (${t.sendState} = 'queued') = (${t.queuedAt} is not null and ${t.queuedBy} is not null)`),
     unique("campaigns_code_key").on(t.tenantId, t.code),
     unique("campaigns_command_key").on(t.tenantId, t.commandKey),
     foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
