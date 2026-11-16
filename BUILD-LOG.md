@@ -736,3 +736,9 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A clock-derived fixture target must fit the fixture's own hours: quarter(72 h) and quarter(80 h) ended after the 23:45 closing in two
   30-minute windows a day. Reproduce at a fixed target (clock-independent) before fixing; assert the domain refusal reason.
 - A mutant that changes a constant by less than the rounding step can be equivalent on aligned inputs (23:59 vs 23:45 at quarter hours).
+
+## 2026-11-17 — HYG-022 Next.js security patch
+
+- Next 16 stops `next build` on a known advisory (experimental.agentUpgrade 'security' is the default): a newly published advisory can
+  turn a green pipeline red mid-run. Patch through the package manager with exact versions and keep the paired eslint-config-next in step;
+  check the lockfile diff touches only that family.
