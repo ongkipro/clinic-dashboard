@@ -591,6 +591,10 @@ describe("functions (TEN-16)", () => {
     "cash_shift_get(uuid)",
     "cash_shift_mine(uuid)",
     "approval_manager_decides_shift(uuid)",
+    // T-098 (PR-78): the bound survey writer and readers (the actor lock first).
+    "survey_record(text,jsonb)",
+    "survey_list(uuid,date,date)",
+    "survey_summary(uuid,date,date)",
     // T-097 (PR-94): the unbound automation scan; the bound draft writers and the log / draft readers (the actor lock first).
     "automation_scan(timestamp with time zone)",
     "automation_draft_propose(text,jsonb,text)",

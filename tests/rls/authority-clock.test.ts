@@ -344,6 +344,10 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["cash_shift_list", async () => ["select cash_shift_list(null, null)", []], ["manager"]],
     ["cash_shift_get", async () => ["select cash_shift_get($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["cash_shift_mine", async () => ["select cash_shift_mine(null)", []], ["manager"]],
+    // T-098: the survey writer and readers take the actor lock first.
+    ["survey_record", async () => ["select survey_record('k-0000000113', '{}'::jsonb)", []], ["manager"]],
+    ["survey_list", async () => ["select survey_list(null, null, null)", []], ["manager"]],
+    ["survey_summary", async () => ["select survey_summary(null, null, null)", []], ["manager"]],
     // T-097: the automation draft writers and the log / draft readers take the actor lock first.
     ["automation_draft_propose", async () => ["select automation_draft_propose('k-0000000111', '{}'::jsonb, 'alasan')", []], ["manager"]],
     ["automation_draft_decide", async () => ["select automation_draft_decide($1, true, null)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],

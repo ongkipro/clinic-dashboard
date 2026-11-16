@@ -155,8 +155,8 @@ export const leadEvents = pgTable(
   ],
 );
 
-export const FOLLOWUP_RULES = ["control_due", "package_stage", "package_expiry", "instalment_locked", "receivable", "plan_unselected", "no_show", "dormant", "reschedule_request"] as const;
-export const FOLLOWUP_SOURCES = ["consultation_control", "package", "instalment_row", "receivable", "care_plan", "appointment", "patient"] as const;
+export const FOLLOWUP_RULES = ["control_due", "package_stage", "package_expiry", "instalment_locked", "receivable", "plan_unselected", "no_show", "dormant", "reschedule_request", "survey_low"] as const;
+export const FOLLOWUP_SOURCES = ["consultation_control", "package", "instalment_row", "receivable", "care_plan", "appointment", "patient", "survey"] as const;
 export const FOLLOWUP_STATES = ["open", "done", "dismissed"] as const;
 export const FOLLOWUP_QUEUES = ["cs", "bc"] as const;
 export const FOLLOWUP_DONE_OUTCOMES = ["dihubungi", "jadwal_dibuat", "sudah_bayar", "tidak_tertarik", "tidak_merespons", "lainnya"] as const;
@@ -165,7 +165,7 @@ export const FOLLOWUP_DISMISS_OUTCOMES = ["dilewati", "diganti"] as const;
 const RULE_SHAPE = sql.raw(
   "(('control_due','consultation_control','bc'), ('package_stage','package','bc'), ('package_expiry','package','bc'), " +
     "('instalment_locked','instalment_row','cs'), ('receivable','receivable','cs'), ('plan_unselected','care_plan','bc'), " +
-    "('no_show','appointment','cs'), ('dormant','patient','cs'), ('reschedule_request','appointment','cs'))",
+    "('no_show','appointment','cs'), ('dormant','patient','cs'), ('reschedule_request','appointment','cs'), ('survey_low','survey','cs'))",
 );
 
 export const followups = pgTable(
@@ -400,3 +400,38 @@ export const automationScenarioDrafts = pgTable(
   ],
 );
 
+// T-098 (PR-78, plan r1 §2; DEC-110): one satisfaction survey per closed visit. Score 1–5 only — no free text (no clinical content).
+// review_eligible = score >= 4 (no send in T-098); a score <= 2 links the manager's survey_low follow-up.
+export const SURVEY_RECORDERS = ["owner", "central_cs", "manager"] as const;
+export const surveys = pgTable(
+  "surveys",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    visitId: uuid("visit_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    score: smallint("score").notNull(),
+    reviewEligible: boolean("review_eligible").notNull(),
+    followupId: uuid("followup_id"),
+    commandKey: text("command_key").notNull(),
+    recordedBy: uuid("recorded_by").notNull(),
+    recordedAs: text("recorded_as", { enum: SURVEY_RECORDERS }).notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    unique("surveys_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("surveys_visit_key").on(t.tenantId, t.visitId),
+    unique("surveys_command_key").on(t.tenantId, t.commandKey),
+    index("surveys_branch_recorded_idx").on(t.tenantId, t.branchId, t.recordedAt),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.branchId, t.visitId], foreignColumns: [visits.tenantId, visits.branchId, visits.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.patientId], foreignColumns: [patients.tenantId, patients.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.followupId], foreignColumns: [followups.tenantId, followups.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.tenantId, t.recordedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    check("surveys_check", sql`${t.score} between 1 and 5 and ${t.reviewEligible} = (${t.score} >= 4)
+      and ((${t.followupId} is not null) = (${t.score} <= 2))
+      and ${t.commandKey} ~ '^[A-Za-z0-9_.:-]{8,128}$' and ${t.recordedAs} in (${inList(SURVEY_RECORDERS)})`),
+  ],
+);

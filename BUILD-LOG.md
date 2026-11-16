@@ -708,3 +708,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Two events written in one transaction share occurred_at (`now()` is the transaction start) and their uuid v7 ids tie on the millisecond
   prefix, so `order by occurred_at, id` orders them by random bits; a test must not assert an order the event contract does not define —
   assert the multiplicity and types, and select each payload by its type. Latent since T-079; surfaced on CI after T-097 (168/400 reproduced).
+
+## 2026-11-16 — T-098 satisfaction surveys
+
+- Adding a follow-up rule touches three places: the schema's rule list and RULE_SHAPE (Drizzle re-creates followups_check), and
+  followup_list's own p_rule filter (a hard-coded list) — the drift test pins both and the hash of the reviewed previous body.
+- A score-only survey keeps clinical content out by construction; the low-score task carries ids only.
+- Host gate: one task-agnostic script (/data/tmp/clinic-dashboard/gate/host-gate.sh, GATE_DIR + GATE_EXEC) with raw decimal load / io
+  and suite-holder blocking (opaque holders block too), reused from HYG-020; 18 synthetic cases.
+- A granted definer's idempotent replay is an authorization path of its own: re-check the stored row's scope against the current actor
+  before answering a replay (review r1 P1). Validate id inputs as text before casting (P2).
+- Typecheck an edited test before launching a heavy verification; a test that cannot compile turns every mutant into a load failure.
