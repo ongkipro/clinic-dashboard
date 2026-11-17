@@ -101,6 +101,27 @@ export async function monitor(db: pg.ClientBase, branchId: string) {
   return call(async () => (await db.query(`select satusehat_monitor($1) r`, [branchId])).rows[0].r as { outbox: Record<string, number>; links: Record<string, number> });
 }
 
+// ── The UX-23 page (increment 3): the projection per role is decided in the database (satusehat_page) ─────────────────────────────────
+export type PageException = { visit_id: string; type: string; status: string; reason: string | null; attempt_id: string | null;
+  error_code: string | null; error_path: string | null; at: string; patient_id: string | null };
+export type SatusehatPage = {
+  role: string; branch_id: string; environment: "sandbox" | "production"; credential_active: boolean;
+  counts?: { outbox: Record<string, number>; links: Record<string, number> };
+  exceptions?: PageException[]; held_items?: { visit_id: string; reason: string; since: string }[];
+  identity_queue?: { patient_id: string; mrn: string; name: string; reason: string | null; state: string }[];
+  no_room?: { visit_id: string; signed_at: string }[]; rooms?: { id: string; name: string }[];
+  practitioners?: { staff_id: string; name: string; ihs: string | null }[];
+  services?: { item_id: string; code: string; name: string | null; map: { code: string; display: string; validated: boolean } | null }[];
+  mine?: { visit_id: string; patient_id: string; patient_name: string; signed_at: string; state: string | null; links: { type: string; status: string; reason: string | null; error_code: string | null }[] }[];
+};
+export async function satusehatPage(db: pg.ClientBase, branchId: string) {
+  await bindDeployEnv(db);
+  return call(async () => (await db.query(`select satusehat_page($1) r`, [branchId])).rows[0].r as SatusehatPage);
+}
+// The provider's error body (clinical class): the facility head only; audited as a clinical read.
+export const errorBody = (db: pg.ClientBase, attemptId: string) =>
+  call(async () => (await db.query(`select satusehat_error_body($1) r`, [attemptId])).rows[0].r as Record<string, unknown>);
+
 // ── The worker ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 // Tokens in worker memory only (plan §6): keyed by tenant (TEN-4), environment, branch, credential row, generation and organization; a rotated

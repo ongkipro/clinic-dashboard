@@ -618,6 +618,9 @@ describe("functions (TEN-16)", () => {
     // T-102 increment 2: the unbound no-search step for Medication; the bound code-map writer.
     "satusehat_no_search(uuid,integer,uuid,timestamp with time zone)",
     "satusehat_code_map_set(text,uuid,text,text)",
+    // T-102 increment 3: the UX-23 page reader and the facility head's error-body reader (the actor lock first).
+    "satusehat_page(uuid)",
+    "satusehat_error_body(uuid)",
     // T-099 (PR-81): the bound waitlist writers and reader (the actor lock first).
     "waitlist_add(text,jsonb)",
     "waitlist_remove(uuid)",

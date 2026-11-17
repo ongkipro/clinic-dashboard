@@ -178,7 +178,7 @@ export const NAV: readonly NavGroup[] = [
     ["status-backup", "Status Backup", "/ekspor/backup", "O"],
   ]),
   group("integrasi", "Integrasi", [
-    ["satusehat", "SATUSEHAT", "/satusehat", "O M FH RO"],
+    ["satusehat", "SATUSEHAT", "/satusehat", "O AP M FH RO D"],
     ["whatsapp", "WhatsApp", "/pesan/nomor", "AP"],
     ["pembayaran", "Pembayaran", "/kasir/pengaturan-bayar", "O"],
     ["email-google", "Email & Google Business", "/pengaturan/cabang/integrasi", "AP"],

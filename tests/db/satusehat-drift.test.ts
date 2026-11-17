@@ -132,3 +132,42 @@ describe("T-102 increment 2: 0116 → 0117 changes only the allowlist", () => {
   });
 });
 
+// Increment 3: 0117 → 0118 adds exactly satusehat_page and satusehat_error_body (bound definers, granted to clinic_app only); nothing else
+// changes — no function re-created, no check, policy or trigger.
+describe("T-102 increment 3: 0117 → 0118 adds only the page readers", () => {
+  let h3: Harness; let b: Map<string, Fn>; let a: Map<string, Fn>; let dirs3: string[] = [];
+  const s3: Record<"b" | "a", { policies: Map<string, string>; checks: Map<string, string>; triggers: Map<string, string> }> = {} as never;
+  beforeAll(async () => {
+    const toB = migrationsUpTo("0117_satusehat_resources"); const toA = migrationsUpTo("0118_satusehat_page");
+    dirs3 = [toB, toA];
+    let url = "";
+    h3 = await createHarness({ migrate: async (u) => { url = u; await runMigrations(u, { folder: toB }); } });
+    b = await capture(h3.admin);
+    s3.b = { policies: await policies(h3.admin), checks: await checks(h3.admin), triggers: await triggers(h3.admin) };
+    await runMigrations(url, { folder: toA });
+    a = await capture(h3.admin);
+    s3.a = { policies: await policies(h3.admin), checks: await checks(h3.admin), triggers: await triggers(h3.admin) };
+  }, 300_000);
+  afterAll(async () => {
+    await h3?.close();
+    for (const d of dirs3) rmSync(d, { recursive: true, force: true });
+  });
+  it("every existing function unchanged; the two added readers are bound definers granted to clinic_app only", () => {
+    for (const [k, f] of b) {
+      expect({ k, def: a.get(k)?.def, acl: a.get(k)?.acl, secdef: a.get(k)?.secdef, config: a.get(k)?.config }).toEqual({ k, def: f.def, acl: f.acl, secdef: f.secdef, config: f.config });
+    }
+    const added = [...a.keys()].filter((k) => !b.has(k)).sort();
+    expect(added).toEqual(["satusehat_error_body(uuid)", "satusehat_page(uuid)"]);
+    for (const k of added) {
+      expect({ k, secdef: a.get(k)!.secdef, config: a.get(k)!.config }).toEqual({ k, secdef: true, config: "search_path=pg_catalog, pg_temp" });
+      expect(a.get(k)!.acl ?? "", k).toMatch(/clinic_app=X\//);
+      expect(a.get(k)!.acl ?? "", k).not.toMatch(/(^|[{,])=X|clinic_(vendor|executor|operator|worker)=X\//);
+    }
+  });
+  it("no check, policy or trigger changed or added", () => {
+    for (const x of ["policies", "checks", "triggers"] as const) {
+      for (const [k, v] of s3.b[x]) expect(s3.a[x].get(k), `${x} ${k}`).toBe(v);
+      expect([...s3.a[x].keys()].filter((k) => !s3.b[x].has(k)), x).toEqual([]);
+    }
+  });
+});

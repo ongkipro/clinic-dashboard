@@ -797,3 +797,12 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Re-queue paths each need their own proof: two releases applied together hide either one missing.
 - A fingerprint projection must list what the writer emits even inside arrays it owns: a provider may append extensions (review r1).
 - A refused cross-tenant call is proven by the victim's unchanged state (maps, audit, queue), not only by the error code.
+
+## 2026-11-17 — T-102 increment 3: the SATUSEHAT page
+
+- Project per role in the database, one reader, sections by role; the page only renders what came back (07 :63 is the contract).
+- A clinical-class body read that is audited per opening belongs on its own page: a list that embedded it would audit reads nobody made.
+- Do not offer an action that cannot help: a visit held for a missing room or identity re-holds on Kirim Ulang; name the fix instead.
+- A label built from a type name and a noun repeats itself for the type that is the noun (Kunjungan · kunjungan); special-case it.
+- A one-off lookup that keeps a sealed identifier for minutes is still storage; describe it so, and do not build it without need (Panel 2).
+- Derive an action's eligibility from the command's own predicate and prove it by running the command over every state the page shows (review r1).
