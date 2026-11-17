@@ -621,6 +621,17 @@ describe("functions (TEN-16)", () => {
     // T-102 increment 3: the UX-23 page reader and the facility head's error-body reader (the actor lock first).
     "satusehat_page(uuid)",
     "satusehat_error_body(uuid)",
+    // T-103 (PR-61): vendor server-fee billing — the clinic's Bayar and reader (the actor lock first) and the executor workers (issuer, fenced finish, recovery, Advice, approved requests, reminders).
+    "vendor_billing_bayar_begin(text,uuid,text,text[],timestamp with time zone)",
+    "vendor_billing_tenant_view()",
+    "vendor_billing_issue(timestamp with time zone,text)",
+    "vendor_billing_bayar_finish(uuid,integer,text,jsonb,timestamp with time zone,text)",
+    "vendor_billing_recover(timestamp with time zone,text)",
+    "vendor_billing_advice_due(timestamp with time zone,integer)",
+    "vendor_billing_advice_record(uuid,integer,jsonb,timestamp with time zone,text)",
+    "vendor_billing_apply_fee_change(uuid,uuid,text)",
+    "vendor_billing_apply_waiver(uuid,uuid,text)",
+    "vendor_billing_reminders(timestamp with time zone,text)",
     // T-099 (PR-81): the bound waitlist writers and reader (the actor lock first).
     "waitlist_add(text,jsonb)",
     "waitlist_remove(uuid)",

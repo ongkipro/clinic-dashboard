@@ -806,3 +806,16 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A label built from a type name and a noun repeats itself for the type that is the noun (Kunjungan · kunjungan); special-case it.
 - A one-off lookup that keeps a sealed identifier for minutes is still storage; describe it so, and do not build it without need (Panel 2).
 - Derive an action's eligibility from the command's own predicate and prove it by running the command over every state the page shows (review r1).
+
+## 2026-11-17 — T-103 increment 1: vendor server-fee billing domain
+
+- An undecided money policy is a gate in code, not a default: NULL closes the action and names the owner decision (Panel 2).
+- An issued document that can never change must not be issued while one of its inputs (VAT) is unknown; block issuance instead.
+- `creating` does not prove the provider was not called: recover to `unknown`, never to `failed`, and let a late answer learn the id once.
+- A settlement on an invoice that was meanwhile credited or waived is still money received: allocate up to the payable, credit the rest.
+- Sequential tests cannot see a missing lock; force the interleaving (a blocker holds the row locks while writers queue) and check a ledger invariant.
+- A lock mutant that survives alone is not proof of redundancy: name the covering layer, keep the guard, and kill the combined mutant.
+- Keep the probe's survivors as evidence; the matrix that counts is the one rerun on the final freeze.
+- A non-2xx answer to a create is not a provider rejection: only a 2xx with a validated non-success code is; anything else is unknown (review r1).
+- Every worker that takes several tenants' locks takes them in one order (tenant id); prove it with a forced queue order, not a parallel launch.
+- A fixed-width pad truncates in PostgreSQL; identifiers that grow need minimum-width formatting and a boundary test.

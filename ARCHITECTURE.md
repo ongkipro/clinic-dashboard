@@ -118,6 +118,7 @@ flowchart LR
 | `vendor/staff` | vendor staff, roles, IP allowlist, maker-checker requests, `vendor_guard`, `vendor_log` | T-020 |
 | `vendor/profile` | vendor profile + residency gate | T-018 |
 | `vendor/lifecycle` | tenant lifecycle transitions, capabilities | T-022 |
+| `vendor/billing` | server-fee billing (PR-61, DEC-114; migration 0119; T-103 increment 1): fee versions, invoices, AutoLaris attempts and Advice through a port (mock only), credits, reminders. Tables `server_fee_versions`, `vendor_invoices`, `vendor_payment_attempts`, `vendor_advice_observations`, `autolaris_settlement_rules`, `vendor_payments`, `vendor_payment_allocations`, `vendor_credit_notes`, `vendor_credit_allocations`, `vendor_attempt_notes`, `vendor_billing_policy`, `vendor_reminders`, `vendor_billing_reviews` (platform, no table grant). Clinic: `vendor_billing_bayar_begin`, `vendor_billing_tenant_view`. Executor: `vendor_billing_issue`, `_bayar_finish`, `_recover`, `_advice_due`, `_advice_record`, `_apply_fee_change`, `_apply_waiver`, `_reminders`. | T-103 |
 | `vendor/tenants` | tenant creation, first-owner invitation (maker-checker) | T-023 |
 | `vendor/team` | Tim Vendor invitations, state changes | HYG-003 |
 | `vendor/onboarding` | onboarding grant, invitation drafts | T-024 |
