@@ -205,6 +205,7 @@ describe("T-102 Scenario PR-35 (outage) and the reporting context", () => {
     expect(await links(v)).toEqual([
       expect.objectContaining({ fhir_type: "Encounter", status: "confirmed", confirmed_revision: 1, organization_id: A.org1 }),
       expect.objectContaining({ fhir_type: "Condition", local_key: "exam:L70.0", status: "confirmed", confirmed_revision: 1 }),
+      expect.objectContaining({ fhir_type: "Observation", local_key: "exam:nadi", status: "confirmed", confirmed_revision: 1 }), // increment 2
     ]);
     const enc = [...port.store.values()].find((x) => x.resourceType === "Encounter" && JSON.stringify(x.identifier).includes(v))!;
     expect(enc).toMatchObject({ class: { code: "AMB" }, subject: { reference: "Patient/P10000001" }, serviceProvider: { reference: `Organization/${A.org1}` },
@@ -332,7 +333,7 @@ describe("T-102 facility context, credentials and the token cache", () => {
     await sync(port, 1);
     expect(port.count("update")).toBe(updates);
     expect((await links(s.v)).filter((l) => l.organization_id === C.org1).map((l) => [l.status, l.status_reason]))
-      .toEqual([["exception", "organization_changed"], ["exception", "organization_changed"]]);
+      .toEqual([["exception", "organization_changed"], ["exception", "organization_changed"], ["exception", "organization_changed"]]); // + the vital (increment 2)
     void cRo;
   });
 });
@@ -679,7 +680,7 @@ describe("T-102 mutation probe 1 repairs (test gaps)", () => {
     await as(FH, (db) => linkPractitioner(db, key(), { staffId: DOC3.staffId, ihs: "N10000003" }));
     await sync(port, 21);
     expect((await outbox(s.v)).at(-1)!.state).toBe("done");
-    expect((await links(s.v)).map((l) => [l.local_key, l.status, l.confirmed_revision])).toEqual([["visit", "confirmed", 2], ["exam:L70.0", "confirmed", 2], ["exam:L71.0", "confirmed", 2]]);
+    expect((await links(s.v)).map((l) => [l.local_key, l.status, l.confirmed_revision])).toEqual([["visit", "confirmed", 2], ["exam:L70.0", "confirmed", 2], ["exam:L71.0", "confirmed", 2], ["exam:nadi", "confirmed", 2]]);
   });
 });
 

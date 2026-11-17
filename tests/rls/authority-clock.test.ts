@@ -361,6 +361,7 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["satusehat_context_room_set", async () => ["select satusehat_context_room_set($1, $1)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["satusehat_resend", async () => ["select satusehat_resend($1, 'remote_checked')", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     ["satusehat_monitor", async () => ["select satusehat_monitor($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["satusehat_code_map_set", async () => ["select satusehat_code_map_set('k-0000000118', $1, '99.29', 'Uji')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     // T-099: the waitlist writers and reader take the actor lock first.
     ["waitlist_add", async () => ["select waitlist_add('k-0000000114', '{}'::jsonb)", []], ["manager"]],
     ["waitlist_remove", async () => ["select waitlist_remove($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],

@@ -53,3 +53,96 @@ export const hasIdentifier = (r: Fhir, system: string, value: string) =>
 // The Encounter's diagnosis references as sent (read-back comparison for an uncertain update, plan §5).
 export const diagnosisRefs = (r: Fhir) =>
   ((r.diagnosis as { condition?: { reference?: string } }[] | undefined) ?? []).map((d) => (d.condition?.reference ?? "").replace(/^Condition\//, ""));
+
+// ── Increment 2 (plan r4 §2; addendum docs/tasks/T-102.md; official resource pages, Q-19 "Increment 2 additions") ───────────────────────
+export const observationSystem = (org: string) => `http://sys-ids.kemkes.go.id/observation/${org}`;
+export const procedureSystem = (org: string) => `http://sys-ids.kemkes.go.id/procedure/${org}`;
+export const medicationSystem = (org: string) => `http://sys-ids.kemkes.go.id/medication/${org}`;
+export const prescriptionSystem = (org: string) => `http://sys-ids.kemkes.go.id/prescription/${org}`;
+export const prescriptionItemSystem = (org: string) => `http://sys-ids.kemkes.go.id/prescription-item/${org}`;
+export const dispenseSystem = (org: string) => `http://sys-ids.kemkes.go.id/medicationdispense/${org}`;
+const ident = (system: string, value: string) => [{ system, use: "official", value }];
+
+export type ObservationInput = { org: string; visitId: string; field: string; code: string; display: string; value: number; unit: string; ucum: string;
+  patientIhs: string; practitionerIhs: string; encounterId: string; effective: string };
+export function observation(i: ObservationInput): Fhir {
+  return {
+    resourceType: "Observation",
+    identifier: ident(observationSystem(i.org), `${i.visitId}:${i.field}`),
+    status: "final",
+    category: [{ coding: [{ system: "http://terminology.hl7.org/CodeSystem/observation-category", code: "vital-signs", display: "Vital Signs" }] }],
+    code: { coding: [{ system: "http://loinc.org", code: i.code, display: i.display }] },
+    subject: { reference: `Patient/${i.patientIhs}` },
+    encounter: { reference: `Encounter/${i.encounterId}` },
+    performer: [{ reference: `Practitioner/${i.practitionerIhs}` }],
+    effectiveDateTime: utc(i.effective),
+    valueQuantity: { value: i.value, unit: i.unit, system: "http://unitsofmeasure.org", code: i.ucum },
+  };
+}
+
+export type ProcedureInput = { org: string; executionId: string; code: string; display: string; patientIhs: string; practitionerIhs: string;
+  encounterId: string; start: string; end: string };
+export function procedure(i: ProcedureInput): Fhir {
+  return {
+    resourceType: "Procedure",
+    identifier: ident(procedureSystem(i.org), i.executionId),
+    status: "completed",
+    code: { coding: [{ system: "http://hl7.org/fhir/sid/icd-9-cm", code: i.code, display: i.display }] },
+    subject: { reference: `Patient/${i.patientIhs}` },
+    encounter: { reference: `Encounter/${i.encounterId}` },
+    performedPeriod: { start: utc(i.start), end: utc(i.end) },
+    performer: [{ actor: { reference: `Practitioner/${i.practitionerIhs}` } }],
+  };
+}
+
+// Non-compound (NC) only: racikan is out of T-102 (plan §2). Medication.code (KFA) is mandatory for non-racikan.
+export type MedicationInput = { org: string; itemId: string; kfa: string };
+export function medication(i: MedicationInput): Fhir {
+  return {
+    resourceType: "Medication",
+    identifier: ident(medicationSystem(i.org), i.itemId),
+    code: { coding: [{ system: "http://sys-ids.kemkes.go.id/kfa", code: i.kfa }] },
+    status: "active",
+    extension: [{ url: "https://fhir.kemkes.go.id/r4/StructureDefinition/MedicationType",
+      valueCodeableConcept: { coding: [{ system: "https://terminology.kemkes.go.id/CodeSystem/medication-type", code: "NC", display: "Non-compound" }] } }],
+  };
+}
+
+export type MedicationRequestInput = { org: string; prescriptionId: string; itemId: string; medicationId: string; patientIhs: string; encounterId: string;
+  practitionerIhs: string; authoredOn: string; signa: string; quantity: number };
+export function medicationRequest(i: MedicationRequestInput): Fhir {
+  return {
+    resourceType: "MedicationRequest",
+    identifier: [...ident(prescriptionSystem(i.org), i.prescriptionId), ...ident(prescriptionItemSystem(i.org), i.itemId)],
+    status: "completed",
+    intent: "order",
+    category: [{ coding: [{ system: "http://terminology.hl7.org/CodeSystem/medicationrequest-category", code: "outpatient", display: "Outpatient" }] }],
+    medicationReference: { reference: `Medication/${i.medicationId}` },
+    subject: { reference: `Patient/${i.patientIhs}` },
+    encounter: { reference: `Encounter/${i.encounterId}` },
+    authoredOn: utc(i.authoredOn),
+    requester: { reference: `Practitioner/${i.practitionerIhs}` },
+    dosageInstruction: [{ text: i.signa }],
+    dispenseRequest: { quantity: { value: i.quantity } },
+    substitution: { allowedBoolean: false },
+  };
+}
+
+export type MedicationDispenseInput = { org: string; dispensingId: string; medicationId: string; requestId: string; patientIhs: string; encounterId: string;
+  practitionerIhs: string; handedOver: string; quantity: number };
+export function medicationDispense(i: MedicationDispenseInput): Fhir {
+  return {
+    resourceType: "MedicationDispense",
+    identifier: ident(dispenseSystem(i.org), i.dispensingId),
+    status: "completed",
+    category: { coding: [{ system: "http://terminology.hl7.org/fhir/CodeSystem/medicationdispense-category", code: "outpatient", display: "Outpatient" }] },
+    medicationReference: { reference: `Medication/${i.medicationId}` },
+    subject: { reference: `Patient/${i.patientIhs}` },
+    context: { reference: `Encounter/${i.encounterId}` },
+    performer: [{ actor: { reference: `Practitioner/${i.practitionerIhs}` } }],
+    authorizingPrescription: [{ reference: `MedicationRequest/${i.requestId}` }],
+    quantity: { value: i.quantity },
+    whenHandedOver: utc(i.handedOver),
+    substitution: { wasSubstituted: false },
+  };
+}

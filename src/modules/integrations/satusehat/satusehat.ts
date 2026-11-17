@@ -12,7 +12,8 @@ import { ensureWabaTenantKeys } from "../../messaging/waba/waba";
 import { IDENTITY_PURPOSE } from "../../patients/patients";
 import { bindDeployEnv } from "../../payments/payments";
 import { assertProductionGoLive } from "../../vendor/profile/profile";
-import { condition, conditionSystem, conditionValue, diagnosisRefs, encounter, encounterSystem, hasIdentifier } from "./fhir";
+import { condition, conditionSystem, conditionValue, diagnosisRefs, dispenseSystem, encounter, encounterSystem, hasIdentifier, medication, medicationDispense,
+  medicationRequest, medicationSystem, observation, observationSystem, prescriptionItemSystem, procedure, procedureSystem } from "./fhir";
 import { mockSatusehatPort } from "./mock";
 import type { Auth, CallResult, Fhir, SatusehatPort } from "./port";
 
@@ -79,6 +80,13 @@ export async function linkPractitioner(db: pg.ClientBase, key: string, i: { staf
   return call(async () => (await db.query(`select satusehat_practitioner_link_set($1, $2, $3, 'manual') r`, [key, i.staffId, i.ihs])).rows[0].r as string);
 }
 
+// The tenant's ICD-9 CM map for a service (owner / facility head; increment 2): a new row ends the current one; unvalidated until the
+// owner-gated sandbox step. An already sent revision is never re-sent under the new map — only a later revision pins it.
+export async function setCodeMap(db: pg.ClientBase, key: string, i: { itemId: string; code: string; display: string }) {
+  await assertProductionGoLive(db);
+  return call(async () => (await db.query(`select satusehat_code_map_set($1, $2, $3, $4) r`, [key, i.itemId, i.code, i.display])).rows[0].r as string);
+}
+
 export const resolveIdentity = (db: pg.ClientBase, patientId: string, ihs: string | null, evidence: string) =>
   call(async () => (await db.query(`select satusehat_identity_resolve($1, $2, $3) r`, [patientId, ihs, evidence])).rows[0].r as string);
 export const setContextRoom = (db: pg.ClientBase, visitId: string, roomId: string) =>
@@ -102,13 +110,17 @@ const tokens = new Map<CacheKey, { token: string; until: number }>();
 export const tokenCacheKeys = () => [...tokens.keys()];
 export const clearTokenCache = () => tokens.clear();
 
+// Everything a builder reads, pinned per link revision by satusehat_materialize (increment 2 adds the other resource types' fields).
 type Pinned = { visit_id: string; organization: string; patient_ihs: string; practitioner_ihs?: string; location_id?: string; arrived_at?: string;
-  in_progress_at?: string; finished_at?: string; code?: string; rank?: number };
+  in_progress_at?: string; finished_at?: string; code?: string; rank?: number; display?: string; field?: string; value?: number; unit?: string; ucum?: string;
+  effective?: string; execution_id?: string; start?: string; end?: string; item_id?: string; kfa?: string; prescription_id?: string; signa?: string;
+  quantity?: string | number; authored_on?: string; dispensing_id?: string; handed_over?: string };
+type LinkType = "Encounter" | "Condition" | "Observation" | "Procedure" | "Medication" | "MedicationRequest" | "MedicationDispense";
 type Packet = {
   tenant_id: string; branch_id: string; visit_id: string; revision: number; environment: Auth["environment"]; organization_id: string;
   credential: { id: string; generation: number; organization_id: string; client_id: string; secret_enc: string };
   keys: { version: number; wrapped: string; is_current: boolean }[];
-  links: { id: string; fhir_type: "Encounter" | "Condition"; local_key: string; status: string; remote_id: string | null; check_after: string | null;
+  links: { id: string; fhir_type: LinkType; local_key: string; status: string; remote_id: string | null; check_after: string | null;
     next_at: string; sent_refs: string[] | null; materialized: Pinned; previous: Pinned | null }[];
 };
 type IdentityPacket = { identity: { patient_id: string; identity_enc: string }; keys: Packet["keys"]; credential: Packet["credential"] | null;
@@ -143,6 +155,7 @@ const ref = (r: unknown) => ((r as { reference?: unknown } | undefined)?.referen
 const codings = (c: unknown, display = true) =>
   (((c as { coding?: unknown[] } | undefined)?.coding ?? []) as unknown[]).map((x) => pick(x, display ? ["system", "code", "display"] : ["system", "code"]));
 const idents = (r: Fhir) => ((r.identifier as unknown[] | undefined) ?? []).map((x) => pick(x, ["system", "use", "value"]));
+export const MEDICATION_TYPE_URL = "https://fhir.kemkes.go.id/r4/StructureDefinition/MedicationType";
 export function mappedProjection(r: Fhir): Record<string, unknown> {
   if (r.resourceType === "Encounter") {
     return {
@@ -157,9 +170,49 @@ export function mappedProjection(r: Fhir): Record<string, unknown> {
         period: pick((h as { period?: unknown }).period, ["start", "end"]) })),
     };
   }
+  if (r.resourceType === "Condition") {
+    return {
+      resourceType: r.resourceType, identifier: idents(r), clinicalStatus: codings(r.clinicalStatus),
+      category: ((r.category as unknown[] | undefined) ?? []).map((c) => codings(c)), code: codings(r.code, false), subject: ref(r.subject), encounter: ref(r.encounter),
+    };
+  }
+  // Increment 2 (addendum r2): exactly the fields fhir.ts emits per type, displays where the builder writes one
+  const refs = (a: unknown) => ((a as unknown[] | undefined) ?? []).map(ref);
+  const actors = (a: unknown) => ((a as unknown[] | undefined) ?? []).map((x) => ref((x as { actor?: unknown }).actor));
+  if (r.resourceType === "Observation") {
+    return {
+      resourceType: r.resourceType, identifier: idents(r), status: r.status ?? null, category: ((r.category as unknown[] | undefined) ?? []).map((c) => codings(c)),
+      code: codings(r.code), subject: ref(r.subject), encounter: ref(r.encounter), performer: refs(r.performer), effectiveDateTime: r.effectiveDateTime ?? null,
+      valueQuantity: pick(r.valueQuantity, ["value", "unit", "system", "code"]),
+    };
+  }
+  if (r.resourceType === "Procedure") {
+    return {
+      resourceType: r.resourceType, identifier: idents(r), status: r.status ?? null, code: codings(r.code), subject: ref(r.subject), encounter: ref(r.encounter),
+      performedPeriod: pick(r.performedPeriod, ["start", "end"]), performer: actors(r.performer),
+    };
+  }
+  if (r.resourceType === "Medication") {
+    return {
+      resourceType: r.resourceType, identifier: idents(r), code: codings(r.code, false), status: r.status ?? null,
+      // only the extension the builder writes (MedicationType); any other extension is provider-added and ignored (inc2 review r1 P1)
+      extension: ((r.extension as unknown[] | undefined) ?? []).filter((e) => (e as { url?: unknown }).url === MEDICATION_TYPE_URL)
+        .map((e) => ({ url: MEDICATION_TYPE_URL, value: codings((e as { valueCodeableConcept?: unknown }).valueCodeableConcept) })),
+    };
+  }
+  if (r.resourceType === "MedicationRequest") {
+    return {
+      resourceType: r.resourceType, identifier: idents(r), status: r.status ?? null, intent: r.intent ?? null,
+      category: ((r.category as unknown[] | undefined) ?? []).map((c) => codings(c)), medicationReference: ref(r.medicationReference), subject: ref(r.subject),
+      encounter: ref(r.encounter), authoredOn: r.authoredOn ?? null, requester: ref(r.requester),
+      dosageInstruction: ((r.dosageInstruction as unknown[] | undefined) ?? []).map((d) => pick(d, ["text"])),
+      dispenseRequest: pick(pick(r.dispenseRequest, ["quantity"]).quantity, ["value"]), substitution: pick(r.substitution, ["allowedBoolean"]),
+    };
+  }
   return {
-    resourceType: r.resourceType, identifier: idents(r), clinicalStatus: codings(r.clinicalStatus),
-    category: ((r.category as unknown[] | undefined) ?? []).map((c) => codings(c)), code: codings(r.code, false), subject: ref(r.subject), encounter: ref(r.encounter),
+    resourceType: r.resourceType, identifier: idents(r), status: r.status ?? null, category: codings(r.category), medicationReference: ref(r.medicationReference),
+    subject: ref(r.subject), context: ref(r.context), performer: actors(r.performer), authorizingPrescription: refs(r.authorizingPrescription),
+    quantity: pick(r.quantity, ["value"]), whenHandedOver: r.whenHandedOver ?? null, substitution: pick(r.substitution, ["wasSubstituted"]),
   };
 }
 export const bodyFingerprint = (r: Fhir) => createHash("sha256").update(JSON.stringify(mappedProjection(r))).digest("hex");
@@ -267,11 +320,55 @@ async function identityLookup(p: IdentityPacket, port: SatusehatPort, now: Date)
   }
 }
 
-// Bodies come only from the pinned values of the link's revision (review r1 P1-3), never from the current packet.
+// Bodies come only from the pinned values of the link's revision (review r1 P1-3), never from the current packet. `ids` holds the confirmed
+// remote ids of the visit's parents (Encounter, Medication, MedicationRequest), by local key.
 const encBody = (m: Pinned, diagnoses: string[]) => encounter({ org: m.organization, visitId: m.visit_id, patientIhs: m.patient_ihs,
   practitionerIhs: m.practitioner_ihs!, locationId: m.location_id!, arrivedAt: m.arrived_at!, inProgressAt: m.in_progress_at!, finishedAt: m.finished_at!, diagnoses });
-const condBody = (m: Pinned, encounterId: string) => condition({ org: m.organization, visitId: m.visit_id, code: m.code!, patientIhs: m.patient_ihs, encounterId });
+type Ids = Map<string, string>;
+function bodyFor(l: Packet["links"][number], ids: Ids): Fhir | null {
+  const m = l.materialized;
+  const enc = ids.get("Encounter:visit");
+  const med = m.item_id ? ids.get(`Medication:med:${m.item_id}`) : undefined;
+  const req = m.item_id ? ids.get(`MedicationRequest:mreq:${m.item_id}`) : undefined;
+  switch (l.fhir_type) {
+    case "Condition": return enc ? condition({ org: m.organization, visitId: m.visit_id, code: m.code!, patientIhs: m.patient_ihs, encounterId: enc }) : null;
+    case "Observation": return enc ? observation({ org: m.organization, visitId: m.visit_id, field: m.field!, code: m.code!, display: m.display!,
+      value: Number(m.value), unit: m.unit!, ucum: m.ucum!, patientIhs: m.patient_ihs, practitionerIhs: m.practitioner_ihs!, encounterId: enc, effective: m.effective! }) : null;
+    case "Procedure": return enc ? procedure({ org: m.organization, executionId: m.execution_id!, code: m.code!, display: m.display!, patientIhs: m.patient_ihs,
+      practitionerIhs: m.practitioner_ihs!, encounterId: enc, start: m.start!, end: m.end! }) : null;
+    case "Medication": return medication({ org: m.organization, itemId: m.item_id!, kfa: m.kfa! });
+    case "MedicationRequest": return enc && med ? medicationRequest({ org: m.organization, prescriptionId: m.prescription_id!, itemId: m.item_id!, medicationId: med,
+      patientIhs: m.patient_ihs, encounterId: enc, practitionerIhs: m.practitioner_ihs!, authoredOn: m.authored_on!, signa: m.signa!, quantity: Number(m.quantity) }) : null;
+    case "MedicationDispense": return enc && med && req ? medicationDispense({ org: m.organization, dispensingId: m.dispensing_id!, medicationId: med, requestId: req,
+      patientIhs: m.patient_ihs, encounterId: enc, practitionerIhs: m.practitioner_ihs!, handedOver: m.handed_over!, quantity: Number(m.quantity) }) : null;
+    default: return null;
+  }
+}
+// The exact stable identifier a reconciliation matches (plan §5): MedicationRequest matches its per-item identifier.
+function identityOf(l: Packet["links"][number]): { system: string; value: string } {
+  const m = l.materialized;
+  switch (l.fhir_type) {
+    case "Encounter": return { system: encounterSystem(m.organization), value: m.visit_id };
+    case "Condition": return { system: conditionSystem(m.organization), value: conditionValue(m.visit_id, m.code!) };
+    case "Observation": return { system: observationSystem(m.organization), value: `${m.visit_id}:${m.field}` };
+    case "Procedure": return { system: procedureSystem(m.organization), value: m.execution_id! };
+    case "Medication": return { system: medicationSystem(m.organization), value: m.item_id! };
+    case "MedicationRequest": return { system: prescriptionItemSystem(m.organization), value: m.item_id! };
+    default: return { system: dispenseSystem(m.organization), value: m.dispensing_id! };
+  }
+}
+// The documented search per type (Q-19 "Searches"); Medication has none (Detail Data only).
+function searchParams(l: Packet["links"][number], ids: Ids): Record<string, string> | null {
+  const enc = ids.get("Encounter:visit");
+  switch (l.fhir_type) {
+    case "Encounter": return { subject: l.materialized.patient_ihs };
+    case "MedicationDispense": return enc ? { subject: l.materialized.patient_ihs, context: enc } : null;
+    case "Medication": return null;
+    default: return enc ? { encounter: enc } : null;
+  }
+}
 const ok = <T>(r: CallResult<T>) => (r.kind === "ok" ? (r.value as unknown as { id: string; versionId: string | null }) : null);
+const ORDER: LinkType[] = ["Encounter", "Condition", "Observation", "Procedure", "Medication", "MedicationRequest", "MedicationDispense"];
 
 async function sendVisit(w: Q, clock: () => Date, c: { id: string; gen: number }, p: Packet, port: SatusehatPort, token: string, encounterOnly = false) {
   const enc = p.links.find((l) => l.fhir_type === "Encounter");
@@ -279,48 +376,47 @@ async function sendVisit(w: Q, clock: () => Date, c: { id: string; gen: number }
   const conds = p.links.filter((l) => l.fhir_type === "Condition");
   // the diagnoses the Encounter names: confirmed Conditions in rank order
   const diag = conds.filter((l) => l.status === "confirmed" && l.remote_id).sort((a, b) => Number(a.materialized.rank) - Number(b.materialized.rank)).map((l) => l.remote_id!);
-  const eb = encBody(enc.materialized, diag);
-  // the Encounter's remote id once it has been confirmed at some revision (a Condition is sent only after that — plan §2 dependency order)
-  let confirmedEnc: string | null = enc.status === "confirmed" ? enc.remote_id : null;
-  if (enc.status === "queued" && !enc.remote_id) {
-    const s = await step(w, clock, c.id, c.gen, enc.id, "create", () => port.create(token, p.environment, eb),
-      (r) => ({ remote_id: ok(r)?.id ?? null, remote_version: ok(r)?.versionId ?? null, refs: diag }), eb);
-    if (s?.status === "confirmed") confirmedEnc = ok(s.r)!.id;
-  } else if (enc.status === "queued" && enc.remote_id) {
-    const s = await step(w, clock, c.id, c.gen, enc.id, "update", () => port.update(token, p.environment, enc.remote_id!, eb),
-      (r) => ({ remote_id: enc.remote_id, remote_version: ok(r)?.versionId ?? null, refs: diag }), eb);
-    if (s?.status === "confirmed") confirmedEnc = enc.remote_id;
-  } else if (enc.status === "outcome_unknown") {
-    const id = await reconcile(w, clock, c, p, port, token, enc);
-    if (id) confirmedEnc = id;
-  }
-  if (encounterOnly || !confirmedEnc) return;
-  for (const l of conds) {
-    const body = condBody(l.materialized, confirmedEnc);
+  const ids: Ids = new Map(p.links.filter((l) => l.status === "confirmed" && l.remote_id).map((l) => [`${l.fhir_type}:${l.local_key}`, l.remote_id!]));
+  const links = [...p.links].sort((a, b) => ORDER.indexOf(a.fhir_type) - ORDER.indexOf(b.fhir_type));
+  for (const l of links) {
+    if (encounterOnly && l.fhir_type !== "Encounter") continue;
+    // only queued or uncertain links are worked; a held link has no pin for its revision (its inputs are incomplete) and is never built
+    if (!l.materialized || !(l.status === "queued" || l.status === "outcome_unknown")) continue;
+    const k = `${l.fhir_type}:${l.local_key}`;
+    const body = l.fhir_type === "Encounter" ? encBody(l.materialized, diag) : bodyFor(l, ids);
+    if (!body) continue; // a parent is not confirmed yet: dependency order (plan §2)
+    const refs = l.fhir_type === "Encounter" ? { refs: diag } : {};
     if (l.status === "queued" && !l.remote_id) {
-      await step(w, clock, c.id, c.gen, l.id, "create", () => port.create(token, p.environment, body),
-        (r) => ({ remote_id: ok(r)?.id ?? null, remote_version: ok(r)?.versionId ?? null }), body);
+      const s = await step(w, clock, c.id, c.gen, l.id, "create", () => port.create(token, p.environment, body),
+        (r) => ({ remote_id: ok(r)?.id ?? null, remote_version: ok(r)?.versionId ?? null, ...refs }), body);
+      if (s?.status === "confirmed") ids.set(k, ok(s.r)!.id);
     } else if (l.status === "queued" && l.remote_id) {
-      await step(w, clock, c.id, c.gen, l.id, "update", () => port.update(token, p.environment, l.remote_id!, body),
-        (r) => ({ remote_id: l.remote_id, remote_version: ok(r)?.versionId ?? null }), body);
+      const s = await step(w, clock, c.id, c.gen, l.id, "update", () => port.update(token, p.environment, l.remote_id!, body),
+        (r) => ({ remote_id: l.remote_id, remote_version: ok(r)?.versionId ?? null, ...refs }), body);
+      if (s?.status === "confirmed") ids.set(k, l.remote_id);
     } else if (l.status === "outcome_unknown") {
-      await reconcile(w, clock, c, p, port, token, l, confirmedEnc);
+      const id = await reconcile(w, clock, c, p, port, token, l, ids);
+      if (id) ids.set(k, id);
     }
   }
 }
 
-// Plan §5: an uncertain create is searched by the exact stable identifier (Encounter?subject, Condition?encounter); an uncertain update is
-// read back by id and the fingerprint of everything read compared (in SQL) with the fingerprint of the body the uncertain write sent.
+// Plan §5: an uncertain create is searched by the exact stable identifier with the documented parameters; Medication has no search, so an
+// uncertain Medication create becomes an exception at once (no fallback, no blind retry). An uncertain update is read back by id and the
+// fingerprint of its mapped fields compared (in SQL) with the fingerprint of the body the uncertain write sent.
 async function reconcile(w: Q, clock: () => Date, c: { id: string; gen: number }, p: Packet, port: SatusehatPort, token: string,
-  l: Packet["links"][number], encId?: string): Promise<string | null> {
+  l: Packet["links"][number], ids: Ids): Promise<string | null> {
   if (new Date(l.check_after ?? 0) > clock()) return null;
-  const m = l.materialized;
   if (!l.remote_id) {
+    if (l.fhir_type === "Medication") {
+      await w(`select satusehat_no_search($1, $2, $3, $4)`, [c.id, c.gen, l.id, clock()]);
+      return null;
+    }
+    const params = searchParams(l, ids);
+    if (!params) return null; // its parent is not confirmed yet: the search waits
+    const { system, value } = identityOf(l);
     const isEnc = l.fhir_type === "Encounter";
-    const system = isEnc ? encounterSystem(m.organization) : conditionSystem(m.organization);
-    const value = isEnc ? m.visit_id : conditionValue(m.visit_id, m.code!);
-    const s = await step(w, clock, c.id, c.gen, l.id, "search",
-      () => port.search(token, p.environment, l.fhir_type, isEnc ? { subject: m.patient_ihs } : { encounter: encId! }),
+    const s = await step(w, clock, c.id, c.gen, l.id, "search", () => port.search(token, p.environment, l.fhir_type, params),
       (r) => {
         if (r.kind !== "ok") return {};
         const b = r.value as { total: number; entries: Fhir[]; hasNext: boolean };

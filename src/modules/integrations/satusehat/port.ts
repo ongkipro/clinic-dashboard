@@ -3,7 +3,7 @@
 // Data") and the documented searches (Encounter?subject, Condition?encounter). The adapter in tests and local runs is the mock (mock.ts,
 // guide-shaped synthetic fixtures — not recorded responses). No live adapter exists yet (planned for the owner-gated sandbox step, TD-34);
 // external connectivity is unverified.
-export type FhirType = "Encounter" | "Condition";
+export type FhirType = "Encounter" | "Condition" | "Observation" | "Procedure" | "Medication" | "MedicationRequest" | "MedicationDispense";
 export type Fhir = Record<string, unknown> & { resourceType: FhirType; id?: string };
 export type Auth = { environment: "sandbox" | "production"; organizationId: string; clientId: string; clientSecret: string };
 export type Token = { accessToken: string; expiresInSec: number; issuedAtMs: number };

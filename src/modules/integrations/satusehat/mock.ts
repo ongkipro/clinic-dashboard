@@ -84,7 +84,9 @@ export function mockSatusehatPort(): MockSatusehat {
     },
     async create(token, _env, body) {
       calls.push({ kind: "create", type: body.resourceType, token });
-      const id = `${body.resourceType === "Encounter" ? "enc" : "cnd"}-${String(++seq).padStart(6, "0")}`;
+      const prefix: Record<string, string> = { Encounter: "enc", Condition: "cnd", Observation: "obs", Procedure: "prc", Medication: "med",
+        MedicationRequest: "mrq", MedicationDispense: "mds" };
+      const id = `${prefix[body.resourceType] ?? "res"}-${String(++seq).padStart(6, "0")}`;
       const effect = () => {
         store.set(id, { ...structuredClone(body), id, meta: { versionId: "1" } });
         return { id, versionId: "1" };
@@ -118,9 +120,14 @@ export function mockSatusehatPort(): MockSatusehat {
       calls.push({ kind: "search", type, token });
       const f = failRead<Bundle>(take("search"));
       if (f) return f;
-      const hits = [...store.values()].filter((r) => r.resourceType === type && (type === "Encounter"
-        ? (r.subject as { reference: string }).reference === `Patient/${params.subject}`
-        : (r.encounter as { reference: string }).reference === `Encounter/${params.encounter}`));
+      // the documented searches only (Q-19): Encounter?subject; Condition / Observation / Procedure / MedicationRequest ?encounter;
+      // MedicationDispense ?subject&context; Medication has no search (the mock refuses it, as the guide documents none)
+      if (type === "Medication") return { kind: "http_4xx", status: 400, code: "not-supported", path: null, body: guideOperationOutcome("not-supported", null) };
+      const refOf = (v: unknown) => (v as { reference?: string } | undefined)?.reference;
+      const hits = [...store.values()].filter((r) => r.resourceType === type && (
+        type === "Encounter" ? refOf(r.subject) === `Patient/${params.subject}`
+        : type === "MedicationDispense" ? refOf(r.subject) === `Patient/${params.subject}` && refOf(r.context) === `Encounter/${params.context}`
+        : refOf(r.encounter) === `Encounter/${params.encounter}`));
       return { kind: "ok", status: 200, value: guideBundle(hits) };
     },
   };

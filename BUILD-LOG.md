@@ -786,3 +786,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Never edit a test file while a mutation run is going: the run then mixes two test files and is not evidence.
 - A read-back comparison is a projection of what the writer controls, not equality with what the server returns (a server may add a narrative
   or a display); and anything pinned must be read back from the pin, never from today's active row.
+
+## 2026-11-17 — T-102 increment 2: the other SATUSEHAT resources
+
+- One rule for every resource type on a correction: re-pin every input and advance without a send only when the fingerprint is equal; a
+  "the source is immutable" shortcut is wrong because a map or a practitioner id can change between revisions (addendum review).
+- Where the guide documents no search (Medication), an uncertain create is a person's decision — never a fallback search, never a retry.
+- A link whose inputs are incomplete has no pin; the worker builds only queued or uncertain links that have one.
+- Test helpers must match exact keys: a prefix match hid a renamed key from every assertion (mutation probe).
+- Re-queue paths each need their own proof: two releases applied together hide either one missing.
+- A fingerprint projection must list what the writer emits even inside arrays it owns: a provider may append extensions (review r1).
+- A refused cross-tenant call is proven by the victim's unchanged state (maps, audit, queue), not only by the error code.

@@ -75,3 +75,60 @@ describe("T-102: the SATUSEHAT migration adds and changes nothing else", () => {
     expect([...snap.after.policies.keys()].filter((k) => k.startsWith("satusehat_"))).toEqual([]); // deny by default, readers only
   });
 });
+
+// Increment 2: 0116 → 0117 re-creates exactly satusehat_materialize, satusehat_release and satusehat_practitioner_link_set and adds
+// satusehat_ihs, satusehat_no_search, satusehat_requeue_links and satusehat_code_map_set; no other function, check, policy or trigger changes.
+describe("T-102 increment 2: 0116 → 0117 changes only the allowlist", () => {
+  let h2: Harness; let b: Map<string, Fn>; let a: Map<string, Fn>; let dirs2: string[] = [];
+  const s2: Record<"b" | "a", { policies: Map<string, string>; checks: Map<string, string>; triggers: Map<string, string> }> = {} as never;
+  beforeAll(async () => {
+    const toB = migrationsUpTo("0116_satusehat"); const toA = migrationsUpTo("0117_satusehat_resources");
+    dirs2 = [toB, toA];
+    let url = "";
+    h2 = await createHarness({ migrate: async (u) => { url = u; await runMigrations(u, { folder: toB }); } });
+    b = await capture(h2.admin);
+    s2.b = { policies: await policies(h2.admin), checks: await checks(h2.admin), triggers: await triggers(h2.admin) };
+    await runMigrations(url, { folder: toA });
+    a = await capture(h2.admin);
+    s2.a = { policies: await policies(h2.admin), checks: await checks(h2.admin), triggers: await triggers(h2.admin) };
+  }, 300_000);
+  afterAll(async () => {
+    await h2?.close();
+    for (const d of dirs2) rmSync(d, { recursive: true, force: true });
+  });
+  it("re-created and added functions are exactly the allowlist; every other function, its ACL and definer settings unchanged; helper grants exact", () => {
+    const RECREATED = ["satusehat_materialize(satusehat_outbox,text,text,jsonb)", "satusehat_practitioner_link_set(text,uuid,text,text)",
+      "satusehat_release(uuid,integer,timestamp with time zone)"];
+    for (const [k, f] of b) {
+      if (RECREATED.includes(k)) continue;
+      expect({ k, def: a.get(k)?.def, acl: a.get(k)?.acl, secdef: a.get(k)?.secdef, config: a.get(k)?.config }).toEqual({ k, def: f.def, acl: f.acl, secdef: f.secdef, config: f.config });
+    }
+    // a re-created function keeps its ACL, definer flag and search_path
+    for (const k of RECREATED) expect({ k, acl: a.get(k)!.acl, secdef: a.get(k)!.secdef, config: a.get(k)!.config }).toEqual({ k, acl: b.get(k)!.acl, secdef: b.get(k)!.secdef, config: b.get(k)!.config });
+    expect([...a].filter(([k, f]) => b.has(k) && b.get(k)!.def !== f.def).map(([k]) => k).sort()).toEqual([
+      "satusehat_materialize(satusehat_outbox,text,text,jsonb)", "satusehat_practitioner_link_set(text,uuid,text,text)",
+      "satusehat_release(uuid,integer,timestamp with time zone)"]);
+    expect([...b.keys()].filter((k) => !a.has(k))).toEqual([]);
+    const added = [...a.keys()].filter((k) => !b.has(k)).sort();
+    expect(added).toEqual(["satusehat_code_map_set(text,uuid,text,text)", "satusehat_ihs(uuid,uuid)", "satusehat_no_search(uuid,integer,uuid,timestamp with time zone)",
+      "satusehat_requeue_links(uuid,text,uuid[])"]);
+    expect(added.filter((k) => /clinic_app=X\//.test(a.get(k)!.acl ?? "")).sort()).toEqual(["satusehat_code_map_set(text,uuid,text,text)",
+      "satusehat_no_search(uuid,integer,uuid,timestamp with time zone)"]);
+    // the internal helpers: revoked from PUBLIC, granted to no role (only the table owner's definers call them)
+    for (const k of ["satusehat_ihs(uuid,uuid)", "satusehat_requeue_links(uuid,text,uuid[])"]) {
+      expect({ k, acl: a.get(k)!.acl, secdef: a.get(k)!.secdef }).toEqual({ k, acl: expect.not.stringMatching(/(^|[{,])=X|clinic_/), secdef: false });
+      expect(a.get(k)!.acl, k).not.toBeNull();
+    }
+    for (const k of added) expect(a.get(k)!.acl ?? "", k).not.toMatch(/clinic_(vendor|executor|operator)=X\//);
+    for (const k of ["satusehat_code_map_set(text,uuid,text,text)", "satusehat_no_search(uuid,integer,uuid,timestamp with time zone)"]) {
+      expect({ k, secdef: a.get(k)!.secdef, config: a.get(k)!.config }).toEqual({ k, secdef: true, config: "search_path=pg_catalog, pg_temp" });
+    }
+  });
+  it("no check, policy or trigger changed or added", () => {
+    for (const x of ["policies", "checks", "triggers"] as const) {
+      for (const [k, v] of s2.b[x]) expect(s2.a[x].get(k), `${x} ${k}`).toBe(v);
+      expect([...s2.a[x].keys()].filter((k) => !s2.b[x].has(k)), x).toEqual([]);
+    }
+  });
+});
+
