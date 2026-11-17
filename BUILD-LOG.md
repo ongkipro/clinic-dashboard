@@ -759,3 +759,30 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A task restarted on a new base: close the old ledger run BLOCKED, start the new run on the clean base BEFORE re-applying the carried
   work (so it is the run's own change set), re-apply with a 3-way patch that excludes the ledger's own files, and merge shared docs by
   keeping both histories; never drop the stash.
+
+## 2026-11-17 — T-102 increment 1: SATUSEHAT foundation
+
+- Panel 2 split T-102 into three increments (A), approved the increment-1 test and doc paths (B, recorded by expand-scope before editing) and
+  manual practitioner IHS entry (C). Task and M7 acceptance stay open until increment 3.
+- Read the official SATUSEHAT platform docs read-only for Q-19 (token, Patient / Practitioner by NIK, newborn nik-ibu, no-NIK search-only,
+  Encounter / Condition fields, identifiers, searches, read by id, PUT / PATCH replace only, terminology document v12.0); every rule the
+  guide does not state (withdrawal, conditional create) stays a manual or held path, never a guess.
+- A guard trigger shared by several tables reads fields through `to_jsonb(NEW)`: plpgsql resolves `NEW.<field>` even in a branch for another
+  table (dry run 1: "record new has no field outcome").
+- Audit rows carry no free text outside break-glass (`audit_events_reason_check`): a staff reason is a closed code set in `reason_code`.
+- A lease protects local state only; a write that may still commit remotely needs a per-resource barrier (no newer write while it is
+  unresolved) and an update is confirmed by reading the content back, never by identifier presence (plan review r2).
+- The worker runs each SQL step in its own short transaction with `app.deploy_env` bound; a remote call never sits inside a transaction.
+- Mutation probe 1: 31/42; the 11 survivors were test gaps (the test reused the code's identifier helper; the worker hid the definer's barrier and
+  fence; candidates were never ambiguous); repaired test-only and all 11 then caught.
+- Gated close 1 failed on two things a full-suite probe would have shown before the freeze: an inventory test that names every trigger of the
+  record tables, and the 05 §3.1 contract (every tenant table has `id` + UNIQUE(tenant_id, id); natural keys alone are not enough). Lesson: run
+  the whole suite once before the first freeze of a migration task, not only the task's own files.
+- Implementation review r1 found what the tests had not: a check constraint broken by the trigger's own supersede, a pass-wide clock that
+  defeated the fence, and a read-back that compared only diagnoses. Lessons: a trigger on a clinical writer must be insert-only — any update it
+  makes can fail on state the clinician cannot see; fence with the time at each boundary, never the pass start; confirm an uncertain write by
+  the fingerprint of the exact body it sent. Synchronised tests must make the race real (a row due only for the second claimant), or the
+  serialising lock survives its mutant.
+- Never edit a test file while a mutation run is going: the run then mixes two test files and is not evidence.
+- A read-back comparison is a projection of what the writer controls, not equality with what the server returns (a server may add a narrative
+  or a display); and anything pinned must be read back from the pin, never from today's active row.

@@ -352,6 +352,15 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["campaign_send", async () => ["select campaign_send($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["campaign_workspace_list", async () => ["select campaign_workspace_list()", []], ["owner"]],
     ["campaign_segment_preview", async () => ["select campaign_segment_preview('{}'::jsonb)", []], ["owner"]],
+    // T-102: the SATUSEHAT commands and readers take the actor lock first.
+    ["satusehat_credential_set", async () => ["select satusehat_credential_set('k-0000000116', '{}'::jsonb)", []], ["owner"]],
+    ["satusehat_credential_revoke", async () => ["select satusehat_credential_revoke($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["satusehat_credential_status", async () => ["select satusehat_credential_status()", []], ["owner"]],
+    ["satusehat_practitioner_link_set", async () => ["select satusehat_practitioner_link_set('k-0000000117', $1, 'N1', 'manual')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["satusehat_identity_resolve", async () => ["select satusehat_identity_resolve($1, null, 'bukti')", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
+    ["satusehat_context_room_set", async () => ["select satusehat_context_room_set($1, $1)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
+    ["satusehat_resend", async () => ["select satusehat_resend($1, 'remote_checked')", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
+    ["satusehat_monitor", async () => ["select satusehat_monitor($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],
     // T-099: the waitlist writers and reader take the actor lock first.
     ["waitlist_add", async () => ["select waitlist_add('k-0000000114', '{}'::jsonb)", []], ["manager"]],
     ["waitlist_remove", async () => ["select waitlist_remove($1)", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],

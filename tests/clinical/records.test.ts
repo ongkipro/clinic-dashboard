@@ -383,7 +383,7 @@ describe("retention, guards, readers, events, cross-tenant", () => {
     const trig = (await h.admin.query(`select tgname, tgenabled from pg_trigger where tgrelid = any($1::regclass[]) and not tgisinternal order by 1`, [TABLES])).rows;
     expect(trig.map((r) => `${r.tgname}:${r.tgenabled}`)).toEqual([
       "record_copy_requests_guard:A", "record_copy_requests_no_truncate:A", "record_corrections_guard:A", "record_corrections_no_truncate:A",
-      "record_versions_guard:A", "record_versions_no_truncate:A"]);
+      "record_versions_guard:A", "record_versions_no_truncate:A", "satusehat_on_record_version:A"]);
     expect((await h.admin.query(`select tgenabled from pg_trigger where tgname = 'approvals_record_correction_sync'`)).rows[0].tgenabled).toBe("A");
   });
 

@@ -1,0 +1,340 @@
+// SATUSEHAT reporting (PR-35, TD-30–TD-33, UX-23; T-102 increment 1, migration 0116, DEC-113). Signing a record never waits on SATUSEHAT: the
+// record_versions trigger only inserts an outbox item. The worker (runSatusehatSync, an unbound connection) leases one item per visit after
+// the visit closes, lets SQL derive the facility context and identity, sends Encounter + Conditions from the pinned signed version through the
+// port (mock by default; DEC-082 — no live call is authorized), and records every attempt through fenced definers. Secrets: the client secret
+// and the patient NIK are opened in this process only for the port call, never logged, stored in clear, returned or put in an event.
+import { createHash } from "node:crypto";
+import type pg from "pg";
+import { CommandError, runCommand, type ErrorCode } from "../../../lib/command";
+import { decryptField, encryptField, type KekRing, type TenantKeys, type WrappedDek } from "../../../lib/keys/envelope";
+import { EncryptionUnavailableError, kekRing } from "../../../lib/keys/runtime";
+import { ensureWabaTenantKeys } from "../../messaging/waba/waba";
+import { IDENTITY_PURPOSE } from "../../patients/patients";
+import { bindDeployEnv } from "../../payments/payments";
+import { assertProductionGoLive } from "../../vendor/profile/profile";
+import { condition, conditionSystem, conditionValue, diagnosisRefs, encounter, encounterSystem, hasIdentifier } from "./fhir";
+import { mockSatusehatPort } from "./mock";
+import type { Auth, CallResult, Fhir, SatusehatPort } from "./port";
+
+export const SECRET_PURPOSE = "satusehat.secret";
+
+export class SatusehatError extends CommandError {
+  constructor(code: ErrorCode, readonly reason?: string) {
+    super(code);
+  }
+}
+const CODE = /^(ERR_[A-Z_]+):?\s*(.*)$/;
+const KNOWN = new Set(["ERR_FORBIDDEN", "ERR_NOT_FOUND", "ERR_INVALID_INPUT", "ERR_VERSION_CONFLICT", "ERR_TENANT_SUSPENDED", "ERR_IDEMPOTENCY_CONFLICT"]);
+async function call<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof CommandError) throw e;
+    const m = CODE.exec((e as { message?: string }).message ?? "");
+    if (m && KNOWN.has(m[1])) throw new SatusehatError(m[1] as ErrorCode, m[2] || undefined);
+    throw e;
+  }
+}
+function ring(): KekRing {
+  const r = kekRing();
+  if (!r) throw new EncryptionUnavailableError();
+  return r;
+}
+function keysOf(tenantId: string, rows: { version: number; wrapped: string; is_current?: boolean }[]): TenantKeys | null {
+  if (!rows.length) return null;
+  const deks: WrappedDek[] = rows.map((r) => ({ tenantId, version: r.version, wrapped: r.wrapped }));
+  const cur = rows.find((r) => r.is_current !== false) ?? rows[rows.length - 1];
+  return { tenantId, current: deks.find((d) => d.version === cur.version)!, byVersion: (v) => deks.find((d) => d.version === v) };
+}
+
+// ── Bound commands ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+// Credentials of a branch (owner / admin_pusat): the secret sealed here with the tenant DEK; SQL never sees it in clear.
+export async function setCredentials(db: pg.ClientBase, key: string, i: { branchId: string; environment: "sandbox" | "production";
+  organizationId: string; clientId: string; clientSecret: string }) {
+  await assertProductionGoLive(db);
+  if (!/^.{8,500}$/.test(i.clientSecret)) throw new SatusehatError("ERR_INVALID_INPUT", "secret");
+  const tenantId = (await db.query(`select app_tenant_id() t`)).rows[0].t as string;
+  const keys = await ensureWabaTenantKeys(db, ring(), tenantId); // owner / admin_pusat + configuration (0104)
+  const sealed = encryptField(ring(), keys, SECRET_PURPOSE, i.clientSecret);
+  const body = { branch_id: i.branchId, environment: i.environment, organization_id: i.organizationId, client_id: i.clientId,
+    secret_enc: sealed, dek_ref: `dek:v${sealed.split(".")[1]}` };
+  // the idempotency body excludes the sealed value (a fresh IV each time); the secret's fingerprint is not stored either
+  const out = await call(() => runCommand<string>(db, { command: "satusehat_credential_set", key,
+    body: { branch_id: i.branchId, environment: i.environment, organization_id: i.organizationId, client_id: i.clientId } },
+    async (c) => (await c.query(`select satusehat_credential_set($1, $2::jsonb) r`, [key, JSON.stringify(body)])).rows[0].r as string));
+  if (!out.ok) throw out.error;
+  return { credentialId: out.result, replayed: out.replayed };
+}
+export const revokeCredentials = (db: pg.ClientBase, id: string) => call(() => db.query(`select satusehat_credential_revoke($1)`, [id])).then(() => undefined);
+export type CredentialStatus = { id: string; branch_id: string; environment: string; organization_id: string; client_id: string; generation: number;
+  created_at: string; revoked_at: string | null };
+export const credentialStatus = (db: pg.ClientBase) =>
+  call(async () => (await db.query(`select satusehat_credential_status() r`)).rows[0].r as CredentialStatus[]);
+
+// The practitioner IHS id (DEC-113 (6)), entered by hand by the owner or a facility head. A NIK lookup would need the branch secret in a bound
+// staff session; increment 1 keeps the secret worker-only and records the id manually (the lookup is a Panel 2 question for increment 3).
+export async function linkPractitioner(db: pg.ClientBase, key: string, i: { staffId: string; ihs: string }) {
+  await assertProductionGoLive(db);
+  return call(async () => (await db.query(`select satusehat_practitioner_link_set($1, $2, $3, 'manual') r`, [key, i.staffId, i.ihs])).rows[0].r as string);
+}
+
+export const resolveIdentity = (db: pg.ClientBase, patientId: string, ihs: string | null, evidence: string) =>
+  call(async () => (await db.query(`select satusehat_identity_resolve($1, $2, $3) r`, [patientId, ihs, evidence])).rows[0].r as string);
+export const setContextRoom = (db: pg.ClientBase, visitId: string, roomId: string) =>
+  call(() => db.query(`select satusehat_context_room_set($1, $2)`, [visitId, roomId])).then(() => undefined);
+export const RESEND_REASONS = ["remote_checked", "provider_recovered", "data_corrected"] as const;
+export async function resend(db: pg.ClientBase, visitId: string, reason: (typeof RESEND_REASONS)[number]) {
+  await bindDeployEnv(db);
+  return call(async () => (await db.query(`select satusehat_resend($1, $2) r`, [visitId, reason])).rows[0].r as number);
+}
+export async function monitor(db: pg.ClientBase, branchId: string) {
+  await bindDeployEnv(db);
+  return call(async () => (await db.query(`select satusehat_monitor($1) r`, [branchId])).rows[0].r as { outbox: Record<string, number>; links: Record<string, number> });
+}
+
+// ── The worker ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+// Tokens in worker memory only (plan §6): keyed by tenant (TEN-4), environment, branch, credential row, generation and organization; a rotated
+// credential or a replaced organization gets a new key, so an old token is never used.
+type CacheKey = string;
+const tokens = new Map<CacheKey, { token: string; until: number }>();
+export const tokenCacheKeys = () => [...tokens.keys()];
+export const clearTokenCache = () => tokens.clear();
+
+type Pinned = { visit_id: string; organization: string; patient_ihs: string; practitioner_ihs?: string; location_id?: string; arrived_at?: string;
+  in_progress_at?: string; finished_at?: string; code?: string; rank?: number };
+type Packet = {
+  tenant_id: string; branch_id: string; visit_id: string; revision: number; environment: Auth["environment"]; organization_id: string;
+  credential: { id: string; generation: number; organization_id: string; client_id: string; secret_enc: string };
+  keys: { version: number; wrapped: string; is_current: boolean }[];
+  links: { id: string; fhir_type: "Encounter" | "Condition"; local_key: string; status: string; remote_id: string | null; check_after: string | null;
+    next_at: string; sent_refs: string[] | null; materialized: Pinned; previous: Pinned | null }[];
+};
+type IdentityPacket = { identity: { patient_id: string; identity_enc: string }; keys: Packet["keys"]; credential: Packet["credential"] | null;
+  environment: Auth["environment"]; branch_id: string; tenant_id: string };
+
+async function tokenFor(p: { tenant_id: string; branch_id: string; environment: Auth["environment"]; credential: Packet["credential"]; keys: Packet["keys"] },
+  port: SatusehatPort, now: Date): Promise<string> {
+  const c = p.credential;
+  const k: CacheKey = [p.tenant_id, p.environment, p.branch_id, c.id, c.generation, c.organization_id].join("|");
+  const hit = tokens.get(k);
+  if (hit && hit.until > now.getTime()) return hit.token;
+  const keys = keysOf(p.tenant_id, p.keys);
+  if (!keys) throw new Error("token_unavailable");
+  const t = await port.token({ environment: p.environment, organizationId: c.organization_id, clientId: c.client_id,
+    clientSecret: decryptField(ring(), keys, SECRET_PURPOSE, c.secret_enc) });
+  tokens.set(k, { token: t.accessToken, until: t.issuedAtMs + (t.expiresInSec - 60) * 1000 });
+  return t.accessToken;
+}
+
+const outcomeOf = (r: CallResult<unknown>) => r.kind === "ok" ? { outcome: "ok", http_status: r.status }
+  : r.kind === "http_4xx" ? { outcome: "http_4xx", http_status: r.status, error_code: r.code, error_path: r.path, body: r.body }
+  : r.kind === "http_5xx" ? { outcome: "http_5xx", http_status: r.status } : { outcome: r.kind };
+
+// The fingerprint of the mapped fields (review r1 P1-3, r2 P2-1): an explicit projection of exactly what the builders emit, per resource type,
+// taken from the attempted body and from the read-back alike — every mapped reference and code compared, while anything the server adds
+// (`id`, `meta`, `text`, a reference's `display`, extensions) is ignored. Arrays keep their order (diagnosis rank, statusHistory).
+const pick = (o: unknown, keys: readonly string[]) =>
+  Object.fromEntries(keys.map((k) => [k, (o as Record<string, unknown> | undefined)?.[k] ?? null]));
+const ref = (r: unknown) => ((r as { reference?: unknown } | undefined)?.reference ?? null);
+// a coding as the builders emit it: with its display where they write one (class, participant type, diagnosis use, clinical status,
+// category — review r3), without one where they do not (the ICD-10 code; references never carry a writer display)
+const codings = (c: unknown, display = true) =>
+  (((c as { coding?: unknown[] } | undefined)?.coding ?? []) as unknown[]).map((x) => pick(x, display ? ["system", "code", "display"] : ["system", "code"]));
+const idents = (r: Fhir) => ((r.identifier as unknown[] | undefined) ?? []).map((x) => pick(x, ["system", "use", "value"]));
+export function mappedProjection(r: Fhir): Record<string, unknown> {
+  if (r.resourceType === "Encounter") {
+    return {
+      resourceType: r.resourceType, identifier: idents(r), status: r.status ?? null, class: pick(r.class, ["system", "code", "display"]),
+      subject: ref(r.subject), period: pick(r.period, ["start", "end"]), serviceProvider: ref(r.serviceProvider),
+      participant: ((r.participant as unknown[] | undefined) ?? []).map((p) => ({
+        type: (((p as { type?: unknown[] }).type ?? []) as unknown[]).map((c) => codings(c)), individual: ref((p as { individual?: unknown }).individual) })),
+      location: ((r.location as unknown[] | undefined) ?? []).map((l) => ref((l as { location?: unknown }).location)),
+      diagnosis: ((r.diagnosis as unknown[] | undefined) ?? []).map((d) => ({ condition: ref((d as { condition?: unknown }).condition),
+        use: codings((d as { use?: unknown }).use), rank: (d as { rank?: unknown }).rank ?? null })),
+      statusHistory: ((r.statusHistory as unknown[] | undefined) ?? []).map((h) => ({ status: (h as { status?: unknown }).status ?? null,
+        period: pick((h as { period?: unknown }).period, ["start", "end"]) })),
+    };
+  }
+  return {
+    resourceType: r.resourceType, identifier: idents(r), clinicalStatus: codings(r.clinicalStatus),
+    category: ((r.category as unknown[] | undefined) ?? []).map((c) => codings(c)), code: codings(r.code, false), subject: ref(r.subject), encounter: ref(r.encounter),
+  };
+}
+export const bodyFingerprint = (r: Fhir) => createHash("sha256").update(JSON.stringify(mappedProjection(r))).digest("hex");
+
+// One remote step between fenced begin / finish definers; a thrown network error counts as lost (the write may have committed). The clock is
+// read at each SQL boundary (review r1 P1-2): a lease that runs out during the remote call fences the answer.
+async function step<T>(w: Q, clock: () => Date, item: string, gen: number, link: string, verb: "create" | "update" | "search" | "read",
+  run: () => Promise<CallResult<T>>, extra: (r: CallResult<T>) => Record<string, unknown> = () => ({}), body?: Fhir) {
+  const att = await w<string | null>(`select satusehat_begin($1, $2, $3, $4, $5, $6) a`, [item, gen, link, verb, clock(), body ? bodyFingerprint(body) : null]);
+  if (!att) return null;
+  let r: CallResult<T>;
+  try {
+    r = await run();
+  } catch {
+    r = { kind: "lost" };
+  }
+  const st = await w<string>(`select satusehat_finish($1, $2::jsonb, $3) s`, [att, JSON.stringify({ ...outcomeOf(r), ...extra(r) }), clock()]);
+  return { r, status: st };
+}
+
+export type SyncResult = { leased: number; held: number; done: number; queued: number; stale: number; identity: number };
+
+// One worker statement in its own short transaction with the deploy environment bound (DEL-3): no transaction ever stays open across a
+// remote call, so a slow SATUSEHAT never holds a row lock or the signing path.
+type Q = <T = unknown>(sql: string, args?: unknown[]) => Promise<T>;
+function workerQ(worker: pg.Pool | pg.ClientBase): Q {
+  return async (sql, args = []) => {
+    const c = "connect" in worker && typeof (worker as pg.Pool).totalCount === "number" ? await (worker as pg.Pool).connect() : null;
+    const db = c ?? (worker as pg.ClientBase);
+    try {
+      await db.query("begin");
+      await bindDeployEnv(db);
+      const r = (await db.query(sql, args)).rows[0];
+      await db.query("commit");
+      return (r ? Object.values(r)[0] : null) as never;
+    } catch (e) {
+      await db.query("rollback").catch(() => undefined);
+      throw e;
+    } finally {
+      c?.release();
+    }
+  };
+}
+
+// One worker pass: claim, then per item prepare → (identity lookup) → Conditions need a confirmed Encounter; the Encounter is created
+// first without diagnoses, the Conditions next, then the Encounter is updated to name them (guide: Encounter.diagnosis) → release. `clock` is
+// read at every SQL boundary (tests inject an advancing clock; production uses the wall clock).
+export async function runSatusehatSync(worker: pg.Pool | pg.ClientBase, o: { now?: Date; clock?: () => Date; port?: SatusehatPort } = {}): Promise<SyncResult> {
+  const port = o.port ?? mockSatusehatPort();
+  const clock = o.clock ?? (o.now ? (() => o.now!) : () => new Date());
+  const res: SyncResult = { leased: 0, held: 0, done: 0, queued: 0, stale: 0, identity: 0 };
+  const w = workerQ(worker);
+  const prepare = (c: { id: string; gen: number }) => w<Packet & IdentityPacket & { held?: string; stale?: boolean }>(`select satusehat_prepare($1, $2, $3) r`, [c.id, c.gen, clock()]);
+  const release = async (c: { id: string; gen: number }) => {
+    const st = await w<string>(`select satusehat_release($1, $2, $3) s`, [c.id, c.gen, clock()]);
+    res[st === "done" ? "done" : st === "stale" ? "stale" : "queued"]++;
+  };
+  const claimed = await w<{ id: string; gen: number }[]>(`select satusehat_claim($1) r`, [clock()]);
+  res.leased = claimed.length;
+  for (const c of claimed) {
+    let p = await prepare(c);
+    if (p.stale) { res.stale++; continue; }
+    if (p.held) { res.held++; continue; }
+    if (p.identity) {
+      res.identity++;
+      const outcome = await identityLookup(p, port, clock());
+      const st = await w<string>(`select satusehat_identity_record($1, $2, $3::jsonb, $4) s`, [c.id, c.gen, JSON.stringify(outcome), clock()]);
+      if (st === "stale" || st === "retry") { res[st === "stale" ? "stale" : "queued"]++; continue; }
+      p = await prepare(c); // review → held identity_review; matched → the work packet
+      if (p.stale) { res.stale++; continue; }
+      if (p.held) { res.held++; continue; }
+    }
+    let token: string;
+    try {
+      token = await tokenFor(p, port, clock());
+    } catch {
+      await release(c);
+      continue;
+    }
+    await sendVisit(w, clock, c, p, port, token);
+    if (await w<boolean>(`select satusehat_refs_check($1, $2, $3) r`, [c.id, c.gen, clock()])) {
+      const q = await prepare(c);
+      if (!q.stale && !q.held) await sendVisit(w, clock, c, q, port, token, true);
+    }
+    await release(c);
+  }
+  return res;
+}
+
+async function identityLookup(p: IdentityPacket, port: SatusehatPort, now: Date) {
+  try {
+    if (!p.credential) return { kind: "error" };
+    const keys = keysOf(p.tenant_id, p.keys);
+    if (!keys) return { kind: "error" };
+    const token = await tokenFor({ ...p, credential: p.credential }, port, now);
+    const nik = decryptField(ring(), keys, IDENTITY_PURPOSE, p.identity.identity_enc);
+    const r = await port.searchPatientByNik(token, p.environment, nik);
+    if (r.kind !== "ok") return { kind: "error" };
+    if (r.value.length === 0) return { kind: "none" };
+    if (r.value.length > 1) return { kind: "many" };
+    const h = r.value[0];
+    return { kind: "one", ihs: h.ihs, name: h.name, birth_date: h.birthDate, gender: h.gender };
+  } catch {
+    return { kind: "error" };
+  }
+}
+
+// Bodies come only from the pinned values of the link's revision (review r1 P1-3), never from the current packet.
+const encBody = (m: Pinned, diagnoses: string[]) => encounter({ org: m.organization, visitId: m.visit_id, patientIhs: m.patient_ihs,
+  practitionerIhs: m.practitioner_ihs!, locationId: m.location_id!, arrivedAt: m.arrived_at!, inProgressAt: m.in_progress_at!, finishedAt: m.finished_at!, diagnoses });
+const condBody = (m: Pinned, encounterId: string) => condition({ org: m.organization, visitId: m.visit_id, code: m.code!, patientIhs: m.patient_ihs, encounterId });
+const ok = <T>(r: CallResult<T>) => (r.kind === "ok" ? (r.value as unknown as { id: string; versionId: string | null }) : null);
+
+async function sendVisit(w: Q, clock: () => Date, c: { id: string; gen: number }, p: Packet, port: SatusehatPort, token: string, encounterOnly = false) {
+  const enc = p.links.find((l) => l.fhir_type === "Encounter");
+  if (!enc) return;
+  const conds = p.links.filter((l) => l.fhir_type === "Condition");
+  // the diagnoses the Encounter names: confirmed Conditions in rank order
+  const diag = conds.filter((l) => l.status === "confirmed" && l.remote_id).sort((a, b) => Number(a.materialized.rank) - Number(b.materialized.rank)).map((l) => l.remote_id!);
+  const eb = encBody(enc.materialized, diag);
+  // the Encounter's remote id once it has been confirmed at some revision (a Condition is sent only after that — plan §2 dependency order)
+  let confirmedEnc: string | null = enc.status === "confirmed" ? enc.remote_id : null;
+  if (enc.status === "queued" && !enc.remote_id) {
+    const s = await step(w, clock, c.id, c.gen, enc.id, "create", () => port.create(token, p.environment, eb),
+      (r) => ({ remote_id: ok(r)?.id ?? null, remote_version: ok(r)?.versionId ?? null, refs: diag }), eb);
+    if (s?.status === "confirmed") confirmedEnc = ok(s.r)!.id;
+  } else if (enc.status === "queued" && enc.remote_id) {
+    const s = await step(w, clock, c.id, c.gen, enc.id, "update", () => port.update(token, p.environment, enc.remote_id!, eb),
+      (r) => ({ remote_id: enc.remote_id, remote_version: ok(r)?.versionId ?? null, refs: diag }), eb);
+    if (s?.status === "confirmed") confirmedEnc = enc.remote_id;
+  } else if (enc.status === "outcome_unknown") {
+    const id = await reconcile(w, clock, c, p, port, token, enc);
+    if (id) confirmedEnc = id;
+  }
+  if (encounterOnly || !confirmedEnc) return;
+  for (const l of conds) {
+    const body = condBody(l.materialized, confirmedEnc);
+    if (l.status === "queued" && !l.remote_id) {
+      await step(w, clock, c.id, c.gen, l.id, "create", () => port.create(token, p.environment, body),
+        (r) => ({ remote_id: ok(r)?.id ?? null, remote_version: ok(r)?.versionId ?? null }), body);
+    } else if (l.status === "queued" && l.remote_id) {
+      await step(w, clock, c.id, c.gen, l.id, "update", () => port.update(token, p.environment, l.remote_id!, body),
+        (r) => ({ remote_id: l.remote_id, remote_version: ok(r)?.versionId ?? null }), body);
+    } else if (l.status === "outcome_unknown") {
+      await reconcile(w, clock, c, p, port, token, l, confirmedEnc);
+    }
+  }
+}
+
+// Plan §5: an uncertain create is searched by the exact stable identifier (Encounter?subject, Condition?encounter); an uncertain update is
+// read back by id and the fingerprint of everything read compared (in SQL) with the fingerprint of the body the uncertain write sent.
+async function reconcile(w: Q, clock: () => Date, c: { id: string; gen: number }, p: Packet, port: SatusehatPort, token: string,
+  l: Packet["links"][number], encId?: string): Promise<string | null> {
+  if (new Date(l.check_after ?? 0) > clock()) return null;
+  const m = l.materialized;
+  if (!l.remote_id) {
+    const isEnc = l.fhir_type === "Encounter";
+    const system = isEnc ? encounterSystem(m.organization) : conditionSystem(m.organization);
+    const value = isEnc ? m.visit_id : conditionValue(m.visit_id, m.code!);
+    const s = await step(w, clock, c.id, c.gen, l.id, "search",
+      () => port.search(token, p.environment, l.fhir_type, isEnc ? { subject: m.patient_ihs } : { encounter: encId! }),
+      (r) => {
+        if (r.kind !== "ok") return {};
+        const b = r.value as { total: number; entries: Fhir[]; hasNext: boolean };
+        if (b.hasNext || b.total > b.entries.length) return { outcome: "incomplete" };
+        const hits = b.entries.filter((e) => hasIdentifier(e, system, value));
+        return hits.length === 1 ? { remote_id: hits[0].id, ...(isEnc ? { refs: diagnosisRefs(hits[0]) } : {}) }
+          : { outcome: hits.length ? "many" : "not_found" };
+      });
+    return s?.status === "confirmed" ? (s.r as { value: { entries: Fhir[] } }).value.entries.find((e) => hasIdentifier(e, system, value))?.id ?? null : null;
+  }
+  const s = await step(w, clock, c.id, c.gen, l.id, "read", () => port.read(token, p.environment, l.fhir_type, l.remote_id!), (r) => {
+    if (r.kind !== "ok") return {};
+    const got = r.value as Fhir;
+    return { read_fingerprint: bodyFingerprint(got), ...(l.fhir_type === "Encounter" ? { refs: diagnosisRefs(got) } : {}) };
+  });
+  return s?.status === "confirmed" ? l.remote_id : null;
+}

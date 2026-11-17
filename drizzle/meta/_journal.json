@@ -813,6 +813,13 @@
       "when": 1794855805245,
       "tag": "0115_campaigns",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1794882282224,
+      "tag": "0116_satusehat",
+      "breakpoints": true
     }
   ]
 }

@@ -34,3 +34,4 @@ export * from "../../modules/expenses/schema";
 export * from "../../modules/commission/schema";
 export * from "../../modules/messaging/schema";
 export * from "../../modules/crm/schema";
+export * from "../../modules/integrations/schema";
