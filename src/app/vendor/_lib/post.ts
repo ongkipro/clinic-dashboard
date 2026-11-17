@@ -21,6 +21,12 @@ const COPY: Record<string, string> = {
   dual_identity_not_approved: "Akun ini terhubung ke klinik tanpa persetujuan identitas ganda.",
   ERR_APPROVER_IS_REQUESTER: "Undangan harus disetujui Pemilik Platform lain, bukan yang membuatnya.",
   ERR_INVALID_INPUT: "Periksa kembali isian yang ditandai.",
+  // T-103 Tagihan Server (UX-43)
+  approver_is_requester: "Pengajuan harus disetujui Pemilik Platform lain, bukan yang membuatnya.",
+  effective_month_passed: "Bulan berlaku sudah lewat. Ajukan ulang dengan bulan berikutnya.",
+  requester_inactive: "Pembuat pengajuan sudah tidak aktif. Pengajuan tidak dapat disetujui.",
+  ERR_IDEMPOTENCY_CONFLICT: "Masih ada pengajuan sejenis yang menunggu keputusan.",
+  ERR_VERSION_CONFLICT: "Pengajuan ini sudah diputuskan atau berubah. Muat ulang halaman.",
   ERR_NOT_FOUND: "Data ini sudah tidak ada. Muat ulang halaman.",
   ERR_UNAUTHENTICATED: "Sesi Anda berakhir. Masuk kembali.",
 };

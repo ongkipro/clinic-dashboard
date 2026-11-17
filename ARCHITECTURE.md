@@ -1,7 +1,9 @@
 # Architecture — clinic-dashboard
 
-Updated: 2026-11-06 (after HYG-006, HYG-007, HYG-008a and HYG-008b; M0 29/32 tasks; HYG-009–011 planned from the foundation review)
-Stack: Next.js 16.4.3 (App Router, TypeScript), PostgreSQL 16 + Drizzle, Better Auth 1.7.15, Tailwind v4 + shadcn/ui, Vitest + Playwright, pnpm, Docker (Coolify target).
+Updated: 2026-11-17 (doc audit on the owner's request: M0–M6 complete; M7 open — T-102 integrated, final acceptance OPEN on the owner's TD-31
+decision; T-103 increment 1 integrated, increment 2 implemented and in verification; migrations through 0120 in the T-103 worktree, 0119 on `main`)
+Stack (as installed): Next.js 16.4.5 (App Router, TypeScript; HYG-022), React 19.3.1, PostgreSQL 16.15 + Drizzle ORM 0.45.4, Better Auth 1.7.15,
+Tailwind CSS 4.3.3 + shadcn/ui, Vitest 5.0.5 + playwright-core (browser evidence, run on request), pnpm, Docker (Coolify target).
 
 This file describes only what the code does today. Target design: `docs/spec/03`, `04`; decisions: `DECISIONS.md` (DEC-*), `docs/spec/DECISION-REGISTER.md`.
 
@@ -20,25 +22,49 @@ flowchart LR
   subgraph Hosts["src/proxy.ts host resolver (ARCH-3, SEC-21)"]
     APP["APP_HOST\nclinic app /, /(app), /(auth), /api/auth"]
     VEN["VENDOR_HOST\n/vendor/** (CSP nonce, JSON-only writes)"]
-    BOOK["BOOKING_HOST\n(public site — not built yet)"]
+    BOOK["BOOKING_HOST\nbuilt: /aftercare/[token] (T-096), payment webhook /api/v1/webhooks/payment/mock\nallow-listed, planned: public site /{slug}/... (T-123–T-127), /api/v1/public/"]
   end
-  APP -->|clinic_app login, withTenantContext| DB[(PostgreSQL 16\nRLS on every table)]
-  APP -->|clinic_auth login| DB
-  VEN -->|clinic_vendor login: EXECUTE on vendor_console_* only| DB
-  VEN -->|clinic_auth login, surface=vendor| DB
-  EXEC["workers (clinic_executor)\nconsume approved vendor requests"] --> DB
+  APP -->|"clinic_app login, withTenantContext"| DB[(PostgreSQL 16\nRLS on every table)]
+  BOOK -->|"clinic_app login: aftercare page / OTP definers (app pool);\npayment ingest on the unbound worker pool"| DB
+  APP -->|"clinic_auth login"| DB
+  VEN -->|"clinic_vendor login: EXECUTE on vendor_console_* only"| DB
+  VEN -->|"clinic_auth login, surface=vendor"| DB
+  EXEC["executor jobs (clinic_executor)\nvendor request / lifecycle consume, support expiry,\nserver-fee billing (issue, recover, Advice, apply, reminders)"] --> DB
+  JOBS["unbound clinic_app jobs (no tenant context)\nreminder / follow-up / automation / package / credential scans,\noutbound dispatch, SATUSEHAT sync, webhook ingest"] --> DB
   OPS["pnpm db:migrate / pnpm vendor:bootstrap\n(owner role, server terminal)"] --> DB
+  JOBS -.->|"ports: mock adapters only — no live provider call"| EXT["WhatsApp (Meta) · payment gateway · SATUSEHAT · AutoLaris\n(not connected)"]
+  EXEC -.-> EXT
 ```
+
+### Hosts and routes outside the clinic pages (as built)
+
+| Host | Built | Allow-listed but not built (planned) |
+|---|---|---|
+| `APP_HOST` | clinic pages under `/(app)` and `/(auth)`, `/api/auth/*`, `/api/v1/webhooks/meta` (WhatsApp webhook, T-090), `/layar-antrean/[token]` (queue display, T-048), `/dev/*` (development only; refused in production) | — |
+| `BOOKING_HOST` | `/aftercare/[token]` (T-096), `/api/v1/webhooks/payment/mock` (mock payment webhook, T-073) | `/{slug}/…` public site pages and `/api/v1/public/` (T-123–T-127); the resolver already refuses everything else |
+| `VENDOR_HOST` | `/vendor/**` console pages: `tenant` (list, detail, new), `onboarding` (+ checklist), `tim`, `keamanan`, `undangan/[token]`, sign-in / TOTP pages, server-fee billing `tagihan` (T-103 increment 2, in verification) and `/vendor/api/console/[action]` (JSON writes) | `/api/v1/vendor/`; support-session console pages (the `vendor_console_support_*` functions exist and are tested; no page yet — T-129) |
+
+### Background jobs (as built: functions and their tests; no scheduler process is deployed yet)
+
+| Job | Login | Entry point |
+|---|---|---|
+| Vendor request / lifecycle consume, support expiry | `clinic_executor` | `vendor_request_consume*`, `tenant_lifecycle_apply_request`, `support_session_expire` |
+| Server-fee billing: issue, recover, Advice, fee change / waiver apply, reminders | `clinic_executor` | `src/modules/vendor/billing/billing.ts` (`issue`, `recover`, `runAdvice`, `applyFeeChange`, `applyWaiver`, `reminders`) |
+| Appointment reminders, follow-ups, automation, package expiry, instalment reminders, credential alerts | `clinic_app`, unbound (definers refuse a tenant-bound connection) | `runReminderScan`, `runFollowupScan`, `runAutomationScan`, `runPackageExpiryScan`, `runInstalmentReminderScan`, `runCredentialAlerts` |
+| Outbound WhatsApp dispatch, SATUSEHAT sync, payment / Meta webhook ingest | `clinic_app`, unbound | `runOutboundDispatch`, `runSatusehatSync`, `src/modules/payments/worker-pool.ts` |
+
+Target (not built): one worker container running these on a schedule (`docs/spec/03` §pilot capacity; STATUS T-010 follow-up). Every external
+provider sits behind a port with a mock adapter; no live WhatsApp, payment, SATUSEHAT or AutoLaris call exists.
 
 ### Database roles (no BYPASSRLS anywhere; startup refuses unsafe roles — `src/db/rls/context.ts assertAppRole`)
 
 | Role | Used by | May |
 |---|---|---|
-| `clinic_app` | clinic app pages, Server Actions | RLS-filtered reads/writes bound to `app.tenant_id`, `app.staff_id`, `app.roles`, branch settings (TEN-2); SECURITY DEFINER functions on an allow-list (`tests/rls/rls.test.ts`) |
+| `clinic_app` | clinic app pages, Server Actions; aftercare page/OTP definers (`BOOKING_HOST`); unbound worker/webhook definers | RLS-filtered reads/writes bound to `app.tenant_id`, `app.staff_id`, `app.roles`, branch settings (TEN-2); SECURITY DEFINER functions on an allow-list (`tests/rls/rls.test.ts`) |
 | `clinic_auth` | Better Auth (both surfaces) | auth tables only (`auth_*`) |
 | `clinic_vendor` | vendor console | EXECUTE on the session-token functions pinned in `tests/vendor/team.test.ts`; no table privilege |
 | `clinic_operator` | support-session reads (NOLOGIN group; its logins are members of nothing else) | `support_session_bind` and SELECT through one `<table>_operator_read` policy per readable table, only inside a READ COMMITTED transaction bound with a console-issued ticket for that transaction (T-025, DEC-038) |
-| `clinic_executor` | lifecycle / request workers, support expiry sweep | `vendor_request_consume*`, `tenant_lifecycle_apply_request`, `tenant_lifecycle_lock`, `support_session_expire` |
+| `clinic_executor` | lifecycle / request workers, support expiry sweep, server-fee billing jobs (T-103) | `vendor_request_consume`, `vendor_request_consume_refused`, `tenant_lifecycle_apply_request`, `tenant_lifecycle_lock`, `support_session_expire`, `vendor_billing_issue`, `_recover`, `_advice_due`, `_advice_record`, `_apply_fee_change`, `_apply_waiver`, `_reminders`, `_bayar_finish` (13 functions, from the migration grants) |
 | owner (migration role) | `pnpm db:migrate`, `pnpm vendor:bootstrap` | everything; never used by the running app |
 
 ### Modules (`src/modules`)
@@ -105,7 +131,7 @@ flowchart LR
 | `crm/automation` | Automation scenarios (PR-94, UX-55, DEC-109; migration 0112).<br>**Tables:** `automation_occurrences` (insert-only), `automation_scenario_drafts` (one pending per tenant). **Granted:** `automation_scan` (unbound worker), `automation_draft_propose`, `automation_draft_decide`, `automation_draft_cancel`, `automation_log_list`, `automation_draft_get` and the RLS predicate `automation_occurrences_readable`. **Internal:** `automation_occur`, `automation_cap_count`, `automation_cap_day`, `automation_cap_lock`, `automation_template`. Nothing re-created. TS `src/modules/crm/automation/automation.ts`; page `src/app/(app)/otomasi`. |
 | `crm/surveys` | Satisfaction surveys (PR-78, DEC-110; migration 0113).<br>**Table:** `surveys` (insert-only; score 1–5, review_eligible, the low-score follow-up). **Granted:** `survey_record`, `survey_list`, `survey_summary` and the RLS predicate `surveys_readable`. **Changed:** `followup_list` and `followups_check` (the `survey_low` rule). TS `src/modules/crm/surveys/surveys.ts`. |
 | `crm/campaigns` | Kampanye & Segmen (PR-94, UX-19, DEC-112; migration 0115).<br>**Table:** `campaign_segments` (closed non-clinical rules); `campaigns` workspace columns (segment, template, date, send state). **Granted:** `campaign_segment_save`, `campaign_schedule`, `campaign_unschedule`, `campaign_send` (the Q-15 gate), `campaign_workspace_list`, `campaign_segment_preview` (counts only), `campaign_actor_check` (replay re-check), `campaign_workspace_readable`. **Changed:** `outbound_enqueue` (refuses source campaign), `outbound_claim` (campaign-gate skip; dispatch-time per-patient cap for promos), `campaigns_guard` (send-state edges), `outbound_messages_check` (+ campaign_locked, cap_horizon_exceeded, cap_reached), campaigns column grants. Page `/kampanye`; TS `src/modules/crm/campaigns/campaigns.ts`. |
-| `integrations/satusehat` | SATUSEHAT reporting (PR-35, TD-30–TD-33, DEC-113; migrations 0116–0118; T-102 increments 1–3 — Encounter, Condition, Observation, Procedure, Medication, MedicationRequest, MedicationDispense; the UX-23 page `/satusehat` and `/satusehat/galat/[attempt]`).<br>**Tables:** `satusehat_credentials` (sealed secret), `satusehat_visit_context`, `satusehat_outbox`, `satusehat_links`, `satusehat_link_revisions`, `satusehat_attempts` (append-only), `satusehat_errors` (clinical class), `satusehat_patient_identity`, `satusehat_practitioner_links`, `satusehat_code_systems` (platform), `satusehat_code_maps` — none granted to the app (readers are definers). **Trigger:** `record_versions.satusehat_on_record_version` (insert-only enqueue). **Granted (bound):** `satusehat_credential_set` / `_revoke` / `_status`, `satusehat_practitioner_link_set`, `satusehat_code_map_set`, `satusehat_identity_resolve`, `satusehat_context_room_set`, `satusehat_resend`, `satusehat_monitor`, `satusehat_page` (role projection), `satusehat_error_body` (facility head, audited). **Granted (unbound worker):** `satusehat_claim`, `_prepare`, `_identity_record`, `_begin`, `_finish`, `_refs_check`, `_release`, `_no_search`. TS `src/modules/integrations/satusehat/` (port, mock + guide-shaped fixtures, FHIR builders, `runSatusehatSync`). No live adapter. |
+| `integrations/satusehat` | SATUSEHAT reporting (PR-35, TD-30–TD-33, DEC-113; migrations 0116–0118; T-102 increments 1–3, integrated; final acceptance OPEN on the owner's TD-31 decision — Encounter, Condition, Observation, Procedure, Medication, MedicationRequest, MedicationDispense; the UX-23 page `/satusehat` and `/satusehat/galat/[attempt]`).<br>**Tables:** `satusehat_credentials` (sealed secret), `satusehat_visit_context`, `satusehat_outbox`, `satusehat_links`, `satusehat_link_revisions`, `satusehat_attempts` (append-only), `satusehat_errors` (clinical class), `satusehat_patient_identity`, `satusehat_practitioner_links`, `satusehat_code_systems` (platform), `satusehat_code_maps` — none granted to the app (readers are definers). **Trigger:** `record_versions.satusehat_on_record_version` (insert-only enqueue). **Granted (bound):** `satusehat_credential_set` / `_revoke` / `_status`, `satusehat_practitioner_link_set`, `satusehat_code_map_set`, `satusehat_identity_resolve`, `satusehat_context_room_set`, `satusehat_resend`, `satusehat_monitor`, `satusehat_page` (role projection), `satusehat_error_body` (facility head, audited). **Granted (unbound worker):** `satusehat_claim`, `_prepare`, `_identity_record`, `_begin`, `_finish`, `_refs_check`, `_release`, `_no_search`. TS `src/modules/integrations/satusehat/` (port, mock + guide-shaped fixtures, FHIR builders, `runSatusehatSync`). No live adapter. |
 | `scheduling/rosters` | staff schedules (PR-48, DATA-16): `staff_shifts` and `staff_leave` per branch; `roster_set_week` (listed staff only), `leave_add`, `leave_cancel`; a statement-level check that one person is never in two places; readers `staff_available` and `roster_window` for booking; page `/jadwal-staf` (DEC-053) | T-043 |
 | `scheduling/booking` | booking engine (PR-6, DATA-16): `appointments` and `resource_reservations` with an exclusion constraint (btree_gist); `booking_slots`, `booking_create` (runCommand), `booking_confirm`, holds released at write time; the UX-33 conflict check in the roster writers (DEC-054) | T-044 |
 | `scheduling/appointments` | appointment states (PR-83): confirm, cancel, no-show, reschedule writers through `runCommand`; `appointment_live`; the calendar reader `appointments_window`; page `/jadwal` with Hari Ini, Minggu, filters and Buat Janji (DEC-055) | T-045 |
@@ -118,18 +144,21 @@ flowchart LR
 | `vendor/staff` | vendor staff, roles, IP allowlist, maker-checker requests, `vendor_guard`, `vendor_log` | T-020 |
 | `vendor/profile` | vendor profile + residency gate | T-018 |
 | `vendor/lifecycle` | tenant lifecycle transitions, capabilities | T-022 |
-| `vendor/billing` | server-fee billing (PR-61, DEC-114; migration 0119; T-103 increment 1): fee versions, invoices, AutoLaris attempts and Advice through a port (mock only), credits, reminders. Tables `server_fee_versions`, `vendor_invoices`, `vendor_payment_attempts`, `vendor_advice_observations`, `autolaris_settlement_rules`, `vendor_payments`, `vendor_payment_allocations`, `vendor_credit_notes`, `vendor_credit_allocations`, `vendor_attempt_notes`, `vendor_billing_policy`, `vendor_reminders`, `vendor_billing_reviews` (platform, no table grant). Clinic: `vendor_billing_bayar_begin`, `vendor_billing_tenant_view`. Executor: `vendor_billing_issue`, `_bayar_finish`, `_recover`, `_advice_due`, `_advice_record`, `_apply_fee_change`, `_apply_waiver`, `_reminders`. | T-103 |
+| `vendor/billing` | server-fee billing (PR-61, DEC-114; migrations 0119–0120; T-103 — increment 1 integrated, increment 2 in verification; live payment disabled, owner activation decisions open): fee versions, invoices, AutoLaris attempts and Advice through a port (mock only), credits, reminders. Tables `server_fee_versions`, `vendor_invoices`, `vendor_payment_attempts`, `vendor_advice_observations`, `autolaris_settlement_rules`, `vendor_payments`, `vendor_payment_allocations`, `vendor_credit_notes`, `vendor_credit_allocations`, `vendor_attempt_notes`, `vendor_billing_policy`, `vendor_reminders`, `vendor_billing_reviews` (platform, no table grant). Clinic: `vendor_billing_bayar_begin`, `vendor_billing_tenant_view`. Executor: `vendor_billing_issue` (a loop over the internal per-tenant core `vendor_billing_issue_tenant`; numbers from `vendor_invoice_number_seq`), `_recover`, `_advice_due`, `_advice_record`, `_apply_fee_change`, `_apply_waiver`, `_reminders`. Unbound app pool + executor: `vendor_billing_bayar_finish` (token-fenced, migration 0120). Vendor console (clinic_vendor): `vendor_console_billing_issue` (Terbitkan Tagihan, one tenant), `vendor_console_billing`, `_billing_request`, `_billing_decide`, `_billing_cancel`, `vendor_billing_attempt_note`. Pages: `/saya/tagihan-server` (UX-49), `/vendor/tagihan`, `/vendor/tagihan/[id]` (UX-43); port `server-port.ts` (mock only when DEPLOY_ENV=local). | T-103 |
 | `vendor/tenants` | tenant creation, first-owner invitation (maker-checker) | T-023 |
 | `vendor/team` | Tim Vendor invitations, state changes | HYG-003 |
 | `vendor/onboarding` | onboarding grant, invitation drafts | T-024 |
+| `vendor/checklist` | onboarding checklist and the go-live gate (PR-59, UX-41; migration 0051): console calls by session token, vendor_guard + authority re-check before every exit; go-live through the lifecycle step | T-027, HYG-014 |
 | `vendor/support` | support sessions (open, extend once, end, list), bind tickets, `withSupportSession` reads, Owner end, expiry sweep; operator class per table (`support_object_kinds`), operator policies (`src/db/rls/operator.sql`); Owner approval of personal/clinical scopes and the Akses Vendor data (`scope.ts`: sessions, paginated access log with `row_found`) | T-025, T-026 |
 
 Shared UI: `src/components/shell` (role-filtered navigation), `templates`, `visit-track`, `ui` (DESIGN.md tokens, `src/styles/tokens.css`).
 
-### Pages
+### Pages (as built on disk)
 
-- Clinic app: Masuk / Verifikasi / Aktifkan 2FA / Terkunci / Undangan; Persetujuan; Pengaturan; Kepatuhan; Audit; Staf; Pengguna & Akses; Saya › Peran, Cabang, Klinik, Profil & Keamanan.
-- Vendor console: Masuk / Verifikasi / Aktifkan 2FA; Tenant (list, Buat Tenant, detail); Tim Vendor; Keamanan Akun; Undangan Tim Vendor.
+- Clinic auth (`src/app/(auth)` on `APP_HOST`): `masuk`, `verifikasi`, `aktifkan-2fa`, `terkunci`, `undangan`.
+- Clinic app (`src/app/(app)` on `APP_HOST`, 36 route groups): `antrean`, `apotek`, `audit`, `hari-ini`, `jadwal`, `jadwal-staf`, `kampanye`, `kasir`, `katalog`, `keluhan`, `kepatuhan`, `keuangan`, `komisi`, `layanan`, `lead`, `logbook`, `otomasi`, `pasien`, `pembelian`, `pemeriksaan`, `pendampingan`, `pengaturan`, `pengguna-akses`, `permintaan`, `persetujuan`, `persetujuan-tindakan`, `pesan`, `piutang`, `privasi`, `ruang`, `satusehat` (T-102 OPEN on TD-31), `saya` (`peran`, `cabang`, `klinik`, `keamanan`, `akses-vendor`, `komisi`, `tagihan-server` — T-103 increment 2 in verification), `simulasi`, `staf`, `stok`, `templat`; plus `/layar-antrean/[token]` (queue display).
+- Patient / public routes (`src/app/(public)` on `BOOKING_HOST`): `/aftercare/[token]` (OTP-protected aftercare, T-096). Public clinic site `/{slug}/…` is allow-listed in `src/lib/hosts.ts` and planned for T-123–T-127 (not built yet).
+- Vendor console (`src/app/vendor` on `VENDOR_HOST`): `masuk`, `verifikasi`, `aktifkan-2fa`, `tenant` (list, `baru`, `[id]`), `onboarding` (list, `[id]` checklist), `tim`, `keamanan`, `undangan/[token]`, `tagihan` (list, `[id]` — T-103 increment 2 in verification). Support-session console pages are planned for T-129.
 - Dev only (refused in production): `/dev/galeri`, `/dev/templat`.
 
 ## Boundaries
@@ -170,7 +199,7 @@ Shared UI: `src/components/shell` (role-filtered navigation), `templates`, `visi
 
 ## Data
 
-PostgreSQL 16, 55 migrations (`drizzle/0000`–`0054`), applied migrations immutable (`src/db/migrate.ts` refuses drift). Policy kinds in use: tenant-shared, tenant-ledger, platform (clinical and branch-scoped arrive with their modules). Encryption helpers: `src/lib/keys` (envelope encryption, KEK file). No patient data exists yet.
+PostgreSQL 16.15, 121 migrations (`drizzle/0000_uuid_v7.sql`–`0120_vendor_billing_console.sql` in the T-103 worktree; `0000`–`0119` on `main`), applied migrations immutable (`src/db/migrate.ts` refuses drift). All five `scope_map` policy kinds are active in production migrations: `tenant-shared`, `clinical` (from `0069_intakes.sql`), `branch-scoped` (from `0077_stock.sql`), `tenant-ledger`, and `platform`. Encryption helpers: `src/lib/keys` (envelope encryption, KEK file; patient identity fields sealed under per-tenant DEKs). No real patient data exists (synthetic test fixtures only; residency/real-patient gate planned in T-120).
 
 ## Operations
 
@@ -183,9 +212,11 @@ PostgreSQL 16, 55 migrations (`drizzle/0000`–`0054`), applied migrations immut
 
 `pnpm typecheck`, `pnpm lint`, `pnpm docs:check`, `pnpm test` (real PostgreSQL; the current count is in STATUS.md), `pnpm run build`; browser evidence specs under `tests/ui` (run on request, `RUN_UI=1`); wave gate scripts run the CI order locally plus image migration and restore drill. Integration tests each create a throwaway database through `tests/rls/harness.ts`; its `createTestDatabase` (exclusive advisory lock) and `dropTestDatabase` (shared) are the only way a test creates or drops one, so creates never run beside other database DDL on the shared cluster (HYG-006; a structural test enforces it). Vitest limits (`vitest.config.mts`): hooks 300 s (HYG-004, HYG-016), test bodies 30 s (HYG-006, measured on the shared machine); a test whose timing is its point sets its own limit.
 
-## Planned changes from the foundation review (not built yet; 2026-11-05)
+## Planned changes from the foundation review (2026-11-05) — all built
 
-This section lists decided changes so the map shows where it is going. Each moves into the sections above when its task is committed.
+The last item listed here (HYG-010) was committed as `2549b537` (2026-11-06); the isolation gate now proves a refusal for action and job
+negatives and re-seeds consumable victim state (`docs/tasks/HYG-010.md` "Results"). Kept as the record of what the review decided. Planned
+work now lives in TASKS.md (M7 T-102 acceptance, M8 T-104–T-119, M9 T-120–T-131) and in the "planned" columns above.
 
 - **Isolation gate (HYG-010):**
   - Action and job negatives must prove a refusal, not only the absence of tenant B's secrets.

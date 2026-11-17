@@ -305,6 +305,13 @@ describe("history and privileges", () => {
     expect(fns).toEqual([
       // HYG-008b: the console logs an authority re-check refusal in its own transaction.
       "vendor_authority_refused(text, text, text, text, uuid, uuid, text)",
+      // T-103 (Panel 2 2026-11-17, exact): the support note and the four billing console entry points.
+      "vendor_billing_attempt_note(text, text, uuid, text, text)",
+      "vendor_console_billing(text, text, uuid)",
+      "vendor_console_billing_cancel(text, text, uuid)",
+      "vendor_console_billing_decide(text, text, uuid, boolean, text)",
+      "vendor_console_billing_issue(text, text, uuid)",
+      "vendor_console_billing_request(text, text, uuid, text, jsonb, text)",
       "vendor_console_checklist(text, text, uuid)",
       "vendor_console_checklist_set(text, text, uuid, uuid, text, text, text, uuid)",
       "vendor_console_ip_allowed(text)",

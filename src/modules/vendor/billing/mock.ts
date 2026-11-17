@@ -1,7 +1,7 @@
 // The mock AutoLaris port (T-103): in-process, scripted per call; nothing leaves the server (AGENTS: no live calls). A test scripts what each
 // call returns and may run a hook inside the call (e.g. read the database to prove the reff_id was committed before the request, or pause
 // after the provider "created" the transaction and before the answer is persisted).
-import { advicePending, createVaOk, listPaymentOk, SOURCE } from "./fixtures";
+import { advicePending, createQrisOk, createVaOk, listPaymentOk, SOURCE } from "./fixtures";
 import type { AutolarisPort, CreatePayment, Exchange } from "./port";
 
 type Kind = "list" | "create" | "advice";
@@ -41,7 +41,8 @@ export function mockAutolarisPort(): MockAutolaris {
     },
     async createPayment(req) {
       calls.push({ kind: "create", reffId: req.reff_id });
-      return run("create", req, () => createVaOk(String(++seq), Number(req.amount)));
+      // unscripted: the guide-shaped answer for the chosen channel (QRIS → an EMVCo payload; otherwise a VA)
+      return run("create", req, () => (req.channel_code === "QRIS" ? createQrisOk(String(++seq), Number(req.amount)) : createVaOk(String(++seq), Number(req.amount))));
     },
     async advice(transactionId) {
       calls.push({ kind: "advice", transactionId });

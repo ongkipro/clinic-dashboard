@@ -53,7 +53,7 @@ const GRANTS: Record<string, string | null> = {
   "vendor_billing_bayar_begin(text,uuid,text,text[],timestamp with time zone)": "clinic_app",
   "vendor_billing_tenant_view()": "clinic_app",
   "vendor_billing_issue(timestamp with time zone,text)": "clinic_executor",
-  "vendor_billing_bayar_finish(uuid,integer,text,jsonb,timestamp with time zone,text)": "clinic_executor",
+  "vendor_billing_bayar_finish(uuid,integer,text,jsonb,timestamp with time zone,text)": "clinic_executor", // dropped by 0120
   "vendor_billing_recover(timestamp with time zone,text)": "clinic_executor",
   "vendor_billing_advice_due(timestamp with time zone,integer)": "clinic_executor",
   "vendor_billing_advice_record(uuid,integer,jsonb,timestamp with time zone,text)": "clinic_executor",
@@ -99,5 +99,74 @@ describe("T-103: 0118 → 0119 only adds", () => {
       expect(added.filter((k) => !BILLING.test(k)), x).toEqual([]);
     }
     expect([...snap.after.policies.keys()].filter((k) => !snap.before.policies.has(k))).toEqual([]);
+  });
+});
+
+// Increment 2 (Panel 2 option A; addendum a2): 0119 → 0120 adds exactly the console entry points, the support note, the unbound fence and the
+// constant-time compare; re-creates exactly vendor_billing_bayar_begin (same signature and grants; the guard already freezes the new token-hash
+// column); drops the old
+// executor-only finish and adds the token-fenced finish granted to clinic_app and clinic_executor only. Nothing else changes.
+describe("T-103 increment 2: 0119 → 0120 changes exactly the allowlist", () => {
+  let h2: Harness; let b: Map<string, Fn>; let a: Map<string, Fn>; let dirs2: string[] = [];
+  const s2: Record<"b" | "a", { policies: Map<string, string>; checks: Map<string, string>; triggers: Map<string, string> }> = {} as never;
+  beforeAll(async () => {
+    const toB = migrationsUpTo("0119_vendor_billing"); const toA = migrationsUpTo("0120_vendor_billing_console");
+    dirs2 = [toB, toA];
+    let url = "";
+    h2 = await createHarness({ migrate: async (u) => { url = u; await runMigrations(u, { folder: toB }); } });
+    b = await capture(h2.admin);
+    s2.b = { policies: await policies(h2.admin), checks: await checks(h2.admin), triggers: await triggers(h2.admin) };
+    await runMigrations(url, { folder: toA });
+    a = await capture(h2.admin);
+    s2.a = { policies: await policies(h2.admin), checks: await checks(h2.admin), triggers: await triggers(h2.admin) };
+  }, 300_000);
+  afterAll(async () => {
+    await h2?.close();
+    for (const d of dirs2) rmSync(d, { recursive: true, force: true });
+  });
+  const OLD_FINISH = "vendor_billing_bayar_finish(uuid,integer,text,jsonb,timestamp with time zone,text)";
+  const NEW_FINISH = "vendor_billing_bayar_finish(uuid,text,integer,text,jsonb,timestamp with time zone,text)";
+  const RECREATED = ["vendor_billing_bayar_begin(text,uuid,text,text[],timestamp with time zone)", "vendor_billing_tenant_view()",
+    "vendor_billing_issue(timestamp with time zone,text)"];
+  const ADDED: Record<string, string[]> = {
+    [NEW_FINISH]: ["clinic_app", "clinic_executor"],
+    "vendor_console_billing(text,text,uuid)": ["clinic_vendor"],
+    "vendor_console_billing_request(text,text,uuid,text,jsonb,text)": ["clinic_vendor"],
+    "vendor_console_billing_decide(text,text,uuid,boolean,text)": ["clinic_vendor"],
+    "vendor_console_billing_cancel(text,text,uuid)": ["clinic_vendor"],
+    "vendor_billing_attempt_note(text,text,uuid,text,text)": ["clinic_vendor"],
+    "vendor_billing_unbound()": [],
+    "vendor_billing_hash_eq(text,text)": [],
+    "vendor_billing_issue_tenant(uuid,timestamp with time zone,text)": [],
+    "vendor_console_billing_issue(text,text,uuid)": ["clinic_vendor"],
+  };
+  it("the old finish is dropped; exactly the listed functions are added with exactly these grants; the re-created keep their ACL", () => {
+    expect(b.has(OLD_FINISH)).toBe(true);
+    expect(a.has(OLD_FINISH)).toBe(false);
+    expect([...a.keys()].filter((k) => !b.has(k)).sort()).toEqual(Object.keys(ADDED).sort());
+    expect([...b.keys()].filter((k) => !a.has(k))).toEqual([OLD_FINISH]);
+    for (const [k, roles] of Object.entries(ADDED)) {
+      const acl = a.get(k)!.acl ?? "";
+      expect({ k, explicit: acl !== "" }).toEqual({ k, explicit: true });
+      expect(acl, k).not.toMatch(/(^|[{,])=X/);
+      expect({ k, grantees: [...acl.matchAll(/(clinic_[a-z]+)=X\//g)].map((m) => m[1]).sort() }).toEqual({ k, grantees: [...roles].sort() });
+    }
+    for (const k of RECREATED) {
+      expect({ k, acl: a.get(k)!.acl, secdef: a.get(k)!.secdef, config: a.get(k)!.config }).toEqual({ k, acl: b.get(k)!.acl, secdef: b.get(k)!.secdef, config: b.get(k)!.config });
+    }
+    expect([...a].filter(([k, f]) => b.has(k) && b.get(k)!.def !== f.def).map(([k]) => k).sort()).toEqual([...RECREATED].sort());
+    for (const k of [NEW_FINISH, "vendor_console_billing(text,text,uuid)", "vendor_billing_attempt_note(text,text,uuid,text,text)"]) {
+      expect({ k, secdef: a.get(k)!.secdef, config: a.get(k)!.config }).toEqual({ k, secdef: true, config: "search_path=pg_catalog, pg_temp" });
+    }
+  });
+  it("only the attempts check changes (finish_token_hash); no policy or trigger changed or added", () => {
+    const changed = [...s2.a.checks].filter(([k, v]) => s2.b.checks.has(k) && s2.b.checks.get(k) !== v).map(([k]) => k);
+    expect(changed).toEqual(["vendor_payment_attempts.vendor_payment_attempts_check"]);
+    expect(s2.a.checks.get("vendor_payment_attempts.vendor_payment_attempts_check")).toContain("finish_token_hash");
+    expect([...s2.a.checks.keys()].filter((k) => !s2.b.checks.has(k))).toEqual([]);
+    for (const x of ["policies", "triggers"] as const) {
+      for (const [k, v] of s2.b[x]) expect(s2.a[x].get(k), `${x} ${k}`).toBe(v);
+      expect([...s2.a[x].keys()].filter((k) => !s2.b[x].has(k)), x).toEqual([]);
+    }
   });
 });

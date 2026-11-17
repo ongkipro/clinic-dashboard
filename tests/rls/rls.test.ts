@@ -625,7 +625,7 @@ describe("functions (TEN-16)", () => {
     "vendor_billing_bayar_begin(text,uuid,text,text[],timestamp with time zone)",
     "vendor_billing_tenant_view()",
     "vendor_billing_issue(timestamp with time zone,text)",
-    "vendor_billing_bayar_finish(uuid,integer,text,jsonb,timestamp with time zone,text)",
+    "vendor_billing_bayar_finish(uuid,text,integer,text,jsonb,timestamp with time zone,text)", // 0120: token-fenced, unbound, also clinic_app
     "vendor_billing_recover(timestamp with time zone,text)",
     "vendor_billing_advice_due(timestamp with time zone,integer)",
     "vendor_billing_advice_record(uuid,integer,jsonb,timestamp with time zone,text)",

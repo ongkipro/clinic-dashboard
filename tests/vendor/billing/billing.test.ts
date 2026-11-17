@@ -167,6 +167,9 @@ describe("T-103 Scenarios PR-61", () => {
     expect(await advise(port, later(t0, 30))).toMatchObject({ settled: 1 });
     expect((await invoices(c.tenantId))[0].state).toBe("paid");
     expect(await outstanding(inv.id)).toBe(0);
+    // UX-49 receipt: the paid invoice lists its verified settlement (date, amount applied, reff, channel) — nothing secret
+    const r = (await view(c)).invoices.find((x) => x.id === inv.id)!;
+    expect(r.payments).toEqual([expect.objectContaining({ amount: 333_333, reff_id: expect.stringMatching(/^SF\d+A1$/), channel: "VABNI" })]);
     await dropConfirmedRules();
   });
 
@@ -309,22 +312,14 @@ describe("T-103 attempts: reff_id first, fence, recovery, one open attempt", () 
     const c = await clinic("2026-05-18");
     await issue(exec, WIB("2026-05-18"));
     const [inv] = await invoices(c.tenantId);
-    // the next invoice number of that month after 9999 existing ones (fixture rows by the database owner)
-    await h.admin.query(`alter table vendor_invoices disable trigger vendor_invoices_guard`);
-    try {
-      const t2 = await clinic("2026-05-18");
-      await h.admin.query(`insert into vendor_invoices (tenant_id, number, kind, period, service_from, service_to, issue_date, due_date, fee_source, fee_amount, proration,
-          amount_rupiah, vat_rupiah, total_rupiah, tax_basis, created_by) values ($1, 'VND-202606-9999', 'monthly', '2026-06', '2026-06-01', '2026-06-30', '2026-06-01', '2026-06-10',
-          'default', 1000000, '{"days":30,"days_in_month":30}', 1000000, 0, 1000000, '{}', 'uji')`, [t2.tenantId]);
-    } finally {
-      await h.admin.query(`alter table vendor_invoices enable always trigger vendor_invoices_guard`);
-    }
+    // the internal number continues past 9999 untruncated: the platform sequence is set to 9999 (fixture), the next issue is 10000
+    await h.admin.query(`select setval('vendor_invoice_number_seq', 9999)`);
     await issue(exec, WIB("2026-06-01"));
-    // other tenants of this database are issued June in the same run, so the exact number varies; it must continue past 9999 untruncated
-    const june = (await h.admin.query(`select number from vendor_invoices where number like 'VND-202606-%' order by number`)).rows.map((r) => r.number as string);
-    expect(june).toContain("VND-202606-10000");
-    expect(new Set(june).size).toBe(june.length);
-    expect(june.every((x) => /^VND-202606-\d{4,}$/.test(x))).toBe(true);
+    const june = (await h.admin.query(`select number from vendor_invoices where tenant_id = $1 and period = '2026-06'`, [c.tenantId])).rows.map((r) => r.number as string);
+    expect(june).toHaveLength(1);
+    expect(june[0]).toMatch(/^VND-202606-1\d{4,}$/);
+    const all = (await h.admin.query(`select number from vendor_invoices`)).rows.map((r) => r.number as string);
+    expect(new Set(all).size).toBe(all.length);
     // attempts 1..100 of one invoice: each failed by rc 07 → the 100th attempt's reff_id is distinct from the 10th
     const port = mockAutolarisPort();
     const reffs: string[] = [];
@@ -368,10 +363,10 @@ describe("T-103 attempts: reff_id first, fence, recovery, one open attempt", () 
     expect(await recover(exec, later(t0, 3))).toBe(1);
     expect((await attempts(inv.id))[0]).toMatchObject({ state: "unknown", generation: 2, provider_trx_id: null });
     // the late provider answer (generation 1) still records the id once and returns it to reconciliation
-    expect(await finish(exec, b.attempt_id, 1, createVaOk("777001", b.amount), "billing.bayar", later(t0, 4))).toBe("pending");
+    expect(await finish(exec, b.attempt_id, b.finish_token, 1, createVaOk("777001", b.amount), "billing.bayar", later(t0, 4))).toBe("pending");
     expect((await attempts(inv.id))[0]).toMatchObject({ state: "pending", provider_trx_id: "777001" });
     // a second late answer is evidence only: the id is never replaced
-    expect(await finish(exec, b.attempt_id, 1, createVaOk("777002", b.amount), "billing.bayar")).toBe("stale");
+    expect(await finish(exec, b.attempt_id, b.finish_token, 1, createVaOk("777002", b.amount), "billing.bayar")).toBe("stale");
     expect((await attempts(inv.id))[0].provider_trx_id).toBe("777001");
     await confirmRule("settled", SETTLED_STATUS);
     const port = mockAutolarisPort();
@@ -566,6 +561,18 @@ describe("T-103 fail-closed Bayar gate, reminders, roles", () => {
     expect(k).toContain("due");
     expect((await h.admin.query(`select recipient_role from notifications where tenant_id = $1 and type = 'vendor_invoice_reminder' order by recipient_role`, [c.tenantId])).rows.length)
       .toBe(k.length * 2);
+    // UX-43: the console lists the reminders sent (kind and time only)
+    const fin = await account("finrem");
+    await createVendorStaff(op, caller(PO), fin, "Keuangan Pengingat", ["vendor_finance"]);
+    const tok = `tok${++n}${"z".repeat(30)}`;
+    await h.admin.query(`insert into auth_session (user_id, token, expires_at, surface, second_factor_at) values ($1, $2, now() + interval '8 hours', 'vendor', now())`, [fin, tok]);
+    const vendorPool = testPool({ connectionString: h.urlAs(await h.createLoginRole("", ["clinic_vendor"])), max: 1 });
+    try {
+      const d = (await vendorPool.query(`select vendor_console_billing($1, $2, $3) r`, [tok, IP, c.tenantId])).rows[0].r;
+      expect(d.invoices.flatMap((i: { reminders: { kind: string }[] }) => i.reminders.map((m) => m.kind)).sort()).toEqual([...k].sort());
+    } finally {
+      await vendorPool.end();
+    }
   });
 
   it("roles: owner / finance pay; Admin Pusat / auditor read; a manager is refused; another tenant's invoice is not found", async () => {

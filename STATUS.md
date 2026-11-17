@@ -1,6 +1,6 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-05 (checkpoint ~20:30 WIB)
+Updated: 2026-11-17 (doc audit on the owner's request; the per-task rows below are the history and are unchanged)
 Status: Active
 State: INTEGRATING
 Review-Risk: R4
@@ -23,7 +23,13 @@ Use `BLOCKED` only as an interruption state. Record the blocker and exact state 
 
 ## Current state
 
-**M3 complete** (2026-11-12: T-069 exit evidence `docs/evidence/m3/README.md`, `main` `76e5733`, CI 43194556047 green). **M4 authorized** (DEC-079, 2026-11-12); the whole queue by owner instruction (DEC-082); T-070–T-086, HYG-016, HYG-017 and HYG-018 done. **M4 complete** (2026-11-15: T-086 exit evidence `docs/evidence/m4/README.md`, `main` `66c2a9c7`, CI 43655260091 green). **M5 complete** (2026-11-15: T-087 `5fd45b60`, CI 43672393069 green; T-088 `449599c3`, CI 43677083086 green). M6: T-089 (WABA onboarding) in progress. Earlier: M0 complete (T-032 exit review PASS, 2026-11-07; evidence `docs/evidence/m0/README.md`); M1 and M2 complete (T-049, T-059). Owner instruction 2026-11-02: run tasks in order, independent review after each task, local commit per task. Push: allowed for a task whose ledger finished PASS and whose review approved, CI watched after each push (resolved 2026-11-06, see "Open for the owner"); everything through HYG-014 (`b20f991`) is pushed with CI green. **M2 complete** (T-059 `f52b793`, CI 42898877698 green, 2026-11-10; evidence `docs/evidence/m2/README.md`). **M3 authorized** by the owner on 2026-11-11 (DEC-069): HYG-015 first, then T-060–T-069, stop at the M3 exit.
+**Summary (2026-11-17):** M0–M6 complete (M6 exit T-101 `427f250a`, CI 43976472609). **M7 open:** T-102 SATUSEHAT — increments 1–3
+integrated (`882b2ab3`, CI 44062946402), final acceptance **OPEN / BLOCKED** on the owner's TD-31 practitioner-path decision. T-103 vendor
+server-fee billing (queue exception, Panel 2) — increment 1 integrated (`46c4592e`, CI 44095172936); increment 2 **implemented and in
+verification** (review, gated close, CI pending); live payment disabled; owner activation decisions Q-13, D2, Q-16, BILL-33 OPEN. Next queue:
+M8 (T-104–T-119), M9 (T-120–T-131). Not deployed (no staging, DEC-034); no live provider connected. Main `46c4592e`.
+
+History (earlier summaries, kept as written): **M3 complete** (2026-11-12: T-069 exit evidence `docs/evidence/m3/README.md`, `main` `76e5733`, CI 43194556047 green). **M4 authorized** (DEC-079, 2026-11-12); the whole queue by owner instruction (DEC-082); T-070–T-086, HYG-016, HYG-017 and HYG-018 done. **M4 complete** (2026-11-15: T-086 exit evidence `docs/evidence/m4/README.md`, `main` `66c2a9c7`, CI 43655260091 green). **M5 complete** (2026-11-15: T-087 `5fd45b60`, CI 43672393069 green; T-088 `449599c3`, CI 43677083086 green). M6: T-089 (WABA onboarding) in progress. Earlier: M0 complete (T-032 exit review PASS, 2026-11-07; evidence `docs/evidence/m0/README.md`); M1 and M2 complete (T-049, T-059). Owner instruction 2026-11-02: run tasks in order, independent review after each task, local commit per task. Push: allowed for a task whose ledger finished PASS and whose review approved, CI watched after each push (resolved 2026-11-06, see "Open for the owner"); everything through HYG-014 (`b20f991`) is pushed with CI green. **M2 complete** (T-059 `f52b793`, CI 42898877698 green, 2026-11-10; evidence `docs/evidence/m2/README.md`). **M3 authorized** by the owner on 2026-11-11 (DEC-069): HYG-015 first, then T-060–T-069, stop at the M3 exit.
 
 | Task | Result | Commit |
 |---|---|---|
@@ -117,11 +123,13 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
-Wave plan (owner 2026-11-02): waves 1–9 of M0 run back to back, each task independently reviewed and fixed before the next; after each wave gate the owner allowed commit + push once GitHub CI is green. Wave 1: T-008 ✓, T-012 ✓, T-029 ✓, HYG-002 ✓; gate PASS locally and on GitHub CI (run 41522105266), pushed `d8329ce`. Wave 2: T-009 ✓, T-013 ✓, T-018 ✓; gate PASS locally and on GitHub CI (run 41541975246), pushed `10a307e`. Wave 3: T-010 ✓, T-014 ✓, T-030 ✓; gate PASS locally and on GitHub CI (run 41553096331), pushed `002564c`. Wave 4: T-011 ✓, T-016 ✓, T-031 ✓; gate PASS locally and on GitHub CI (run 41568222746), pushed `0672220`. Wave 5: T-015 ✓, T-017 ✓, T-019 ✓, T-020 ✓.
+**Current (2026-11-17):** T-103 increment 2 (M7, vendor server-fee billing screens + console entrypoints + doc audit) in final verification; T-102 (M7, SATUSEHAT) integrated through increment 3, final acceptance OPEN / BLOCKED on owner TD-31; next queued tasks M8 (`T-104`–`T-119`) and M9 (`T-120`–`T-131`).
+
+Historical M0 wave plan and carried-forward notes (kept as written; superseded items annotated inline): Wave plan (owner 2026-11-02): waves 1–9 of M0 run back to back, each task independently reviewed and fixed before the next; after each wave gate the owner allowed commit + push once GitHub CI is green. Wave 1: T-008 ✓, T-012 ✓, T-029 ✓, HYG-002 ✓; gate PASS locally and on GitHub CI (run 41522105266), pushed `d8329ce`. Wave 2: T-009 ✓, T-013 ✓, T-018 ✓; gate PASS locally and on GitHub CI (run 41541975246), pushed `10a307e`. Wave 3: T-010 ✓, T-014 ✓, T-030 ✓; gate PASS locally and on GitHub CI (run 41553096331), pushed `002564c`. Wave 4: T-011 ✓, T-016 ✓, T-031 ✓; gate PASS locally and on GitHub CI (run 41568222746), pushed `0672220`. Wave 5: T-015 ✓, T-017 ✓, T-019 ✓, T-020 ✓.
 
 Carried forward (outside the owning task's Allowed Paths):
 - Deploy task (HYG-005, DEC-040 K5): on the deployed Coolify database container verify PID 1 is tini (the pgBackRest image provides it; a platform init on top is harmless), the healthcheck (if any) uses `pg_isready -t` below its timeout, the stop grace period lets the archiver push the last WAL (Docker's default 10 s can force crash recovery), and restores run through the image entrypoint or else postgres is not PID 1 (DR runbook note).
-- Copy `public/` into the runtime image once it exists; upgrade Next.js to 16.4.4 after `minimumReleaseAge`.
+- Copy `public/` into the runtime image once it exists; [fulfilled/superseded by HYG-022 → Next.js 16.4.5: upgrade Next.js to 16.4.4 after `minimumReleaseAge`].
 - TEN-4 (tenant keys in caches; lint against tenant-less `"use cache"`, `cacheTag`/`cacheLife`, `unstable_cache`, cached `fetch`; dynamic `(app)`/vendor/API routes): owner Paduka Ongki (DEC-031 D9); the lint lands before the first cached page.
 - Isolation lint gaps to close later: env lookups such as `process.env.<TENANT>`, identity props `tenant.id`/`brand`/`host`, map lookups keyed by tenant, and a grep for tenant literals outside `src/` (scripts, seeds, config).
 - When `src/proxy.ts` starts reading tenant data (e.g. slug → tenant), add it to the isolation gate (DEC-009).
@@ -173,7 +181,9 @@ Carried forward (outside the owning task's Allowed Paths):
 
 ## Blockers
 
-None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, PR-18, PR-71, PR-83), G2 (H-02d, Q-08, Q-10, Q-11, Q-15, Q-17, R-01), G3 (Q-05, Q-06). See `docs/spec/02-PRD.md` §13 and `PLAN.md`.
+**Current owner gates (2026-11-17):** T-102 final acceptance OPEN / BLOCKED on TD-31 practitioner path (`docs/tasks/T-102.md`); T-103 live payment activation gates OPEN on Q-13 (settlement mapping), D2 (manual unlock), Q-16 (channel-fee bearer / PPh 23) and BILL-33 (VAT / vendor tax status) — all fail-closed in code (`docs/tasks/T-103.md`).
+
+Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, PR-18, PR-71, PR-83), G2 (H-02d, Q-08, Q-10, Q-11, Q-15, Q-17, R-01), G3 (Q-05, Q-06). See `docs/spec/02-PRD.md` §13 and `PLAN.md`.
 
 ## Verification evidence
 
@@ -258,6 +268,8 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 - 2026-11-02 closure review and follow-up confirmation: all F1–F9 CLOSED as specification defects; final APPROVE (`docs/research/reviews/round7-closure-final-astra.md`). Generator reproduced byte-for-byte; 131 tasks, no forward dependencies, UI contracts and migration/schema-permission invariants checked. T-001 remains unstarted.
 
 ## Next verified action
+
+**Current (2026-11-17):** finish T-103 increment 2 verification (Sol review on the final freeze, gated close, exact-SHA green CI), then proceed to T-104 (M8). Chronological log below (2026-11-06 through 2026-11-17, kept as history):
 
 ### Now (2026-11-06)
 
@@ -358,7 +370,7 @@ None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, P
 - **T-101 done (M6 exit): messaging end to end with recorded fixtures** (PR-28, R2): `docs/evidence/m6/`; commit `427f250a`, CI 43976472609 green; ledger `RUN-20261116T221603Z-06a5f147` PASS (close 3 on freeze-r3: test-full 2550 passed / 0 failed, scenarios 12 + 6 items, 31 cases). Plan Sol `5e49112a` REVISE, `347f8487` APPROVE; implementation Sol `8a9613de` REVISE (fixed), `1db849ec` APPROVE.
 - **T-102 in progress (M7): SATUSEHAT** (PR-35, R3; DEC-113; migrations 0116–0118) — three increments (Panel 2 A). Increment 1 integrated (`a9ac93e0`, CI 44020055417 green); increment 2 integrated (`1d449ff8`, CI 44040421996 green); increment 3 integrated (`882b2ab3`, CI 44062946402 green) — see docs/tasks/T-102.md. **OPEN / BLOCKED:** final acceptance waits for the owner's decision on the TD-31 practitioner path (manual IHS entry delivered; the NIK lookup named in TD-31's statement is not built; TD-31 and DATA-12 unchanged).
 - **Queue exception (Panel 2, 2026-11-17):** T-103 proceeds while T-102 is open (T-103 depends only on T-027); M7 SATUSEHAT is not complete.
-- **T-103 in progress (M7): vendor server-fee billing** (PR-61, R3; DEC-114; migration 0119) — two increments (Panel 2 A); increment 1 (domain, workers, mock port, tests) in review; increment 2 (UX-43, UX-49) next. Fail-closed until the owner decides Q-13 (settlement mapping), D2 (manual unlock), Q-16 (fee bearer, PPh 23) and BILL-33 (VAT / vendor tax status); no live AutoLaris call. External connectivity unverified (synthetic guide-shaped fixtures; no credentials, no sandbox or live call).
+- **T-103 in verification (M7): vendor server-fee billing** (PR-61, R3; DEC-114; migrations 0119–0120) — increment 1 `46c4592e` (CI 44095172936); increment 2 (UX-43 with Terbitkan Tagihan, UX-49 with the receipt and QRIS code, console entrypoints, the token-fenced finish) implemented, in review / gated close / CI. Panel 2 conditional acceptance (2026-11-17): may be recorded "done — implementation fixture-verified, live payment disabled; owner activation decisions OPEN" only after Sol approval, the gated close and an exact-SHA green CI. Fail-closed until the owner decides Q-13 (settlement mapping), D2 (manual unlock), Q-16 (fee bearer, PPh 23) and BILL-33 (VAT / vendor tax status); no live AutoLaris call. External connectivity unverified (synthetic guide-shaped fixtures; no credentials, no sandbox or live call).
 - **Hygiene candidate (T-085 close run 2, 2026-11-14 22:30 WIB):** `tests/cashier/deposits.test.ts` "6e: applied on arrival > the explicit apply: roles and branches" fails between about 22:15 and 24:00 WIB: `soon(i)` (`:128`) clamps every slot to next midnight − 30 min, so `soon(1)` and `soon(2)` overlap for the same doctor and room (`resource_reservations_no_overlap`). Fixture-only defect (T-077 test; unchanged since T-080); CI runs in that window can hit it. Fix: give each slot its own non-overlapping half hour (or one doctor per slot). Evidence `/data/tmp/clinic-dashboard/t085/failure-close2/`. Owner to schedule as a HYG task (outside T-085's paths).
 - **Hygiene candidate (T-074 close runs 1 and 2):** scheduled as HYG-016 (above).
 - **Hygiene candidate (T-066 close run 1, CI-independent):** the vial use-by flake; scheduled as HYG-016 (above).

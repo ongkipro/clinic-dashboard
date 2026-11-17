@@ -841,6 +841,13 @@
       "when": 1794918787669,
       "tag": "0119_vendor_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1794924339074,
+      "tag": "0120_vendor_billing_console",
+      "breakpoints": true
     }
   ]
 }

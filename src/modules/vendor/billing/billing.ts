@@ -1,7 +1,7 @@
 // Vendor server-fee billing (PR-61, BILL-20, BILL-31–BILL-33, TD-42; T-103 increment 1, migration 0119, DEC-114). The database decides every
 // money rule; this module runs the provider calls between its steps:
-//   Bayar = bayar_begin (tenant transaction, committed: the reff_id exists before the request) → createPayment (outside any transaction) →
-//           bayar_finish (executor, fenced on state and generation).
+//   Bayar = bayar_begin (tenant transaction, committed: the reff_id exists before the request; a one-time finish token) → createPayment
+//           (outside any transaction) → bayar_finish (an unbound connection, the token, fenced on state and generation).
 //   Advice = advice_due (executor) → advice (port, per attempt) → advice_record (executor): success envelope first, then only a CONFIRMED
 //           AutoLaris rule settles, expires or fails (Q-13 fail-closed); a settlement is allocated up to the payable, the rest is a credit.
 // Fail-closed gates (Panel 2, plan addendum a1): Bayar is refused while the channel-fee bearer is undecided (Q-16); no invoice is issued while
@@ -47,30 +47,32 @@ export async function channels(port: AutolarisPort): Promise<Channel[]> {
   return (x.body!.data as Channel[]).filter((c) => typeof c?.channel_code === "string" && /^[A-Z0-9_]{2,20}$/.test(c.channel_code) && c.channel_code !== "COD");
 }
 
-export type BayarResult = { attemptId: string; reffId: string; state: "pending" | "failed" | "unknown" | "stale" | "creating"; replayed: boolean };
+export type BayarResult = { attemptId: string; reffId: string; state: "pending" | "failed" | "unknown" | "stale" | "creating" | "refused"; replayed: boolean };
 export type Payer = { id: string; name: string; phone: string; email: string };
 
-// Bayar (UX-49; owner / finance): begin (committed) → create_payment → finish (fenced). `app` is the clinic pool, `executor` the
-// clinic_executor pool. A replayed key returns the existing attempt without calling the provider again.
-export async function bayar(app: pg.Pool, executor: pg.Pool, ctx: TenantContext, port: AutolarisPort, o: {
+// Bayar (UX-49; owner / finance): begin (committed; returns the one-time finish token) → create_payment → finish (unbound, token-fenced).
+// A replayed key returns the existing attempt without calling the provider again.
+// `unbound`: a pool on which no tenant context is ever set (the finish refuses a bound connection, a2-1) — the app's worker pool in the server.
+export async function bayar(app: pg.Pool, unbound: pg.Pool, ctx: TenantContext, port: AutolarisPort, o: {
   key: string; invoiceId: string; channel: string; payer: Payer; now?: Date; service?: string;
 }): Promise<BayarResult> {
   const now = o.now ?? new Date();
   const offered = (await channels(port)).map((c) => c.channel_code);
   const b = await withTenantContext(app, ctx, (db) => one<{ attempt_id: string; reff_id: string; amount: number; channel: string; expires_at: string;
-    generation: number; state: string; replayed: boolean }>(db, `select vendor_billing_bayar_begin($1, $2, $3, $4, $5)`, [o.key, o.invoiceId, o.channel, offered, now]));
-  if (b.replayed) return { attemptId: b.attempt_id, reffId: b.reff_id, state: b.state as BayarResult["state"], replayed: true };
+    generation: number; state: string; replayed: boolean; finish_token?: string }>(db, `select vendor_billing_bayar_begin($1, $2, $3, $4, $5)`, [o.key, o.invoiceId, o.channel, offered, now]));
+  // a replay never receives the one-time finish token (a2-1): it makes no provider call and cannot finish
+  if (b.replayed || !b.finish_token) return { attemptId: b.attempt_id, reffId: b.reff_id, state: b.state as BayarResult["state"], replayed: true };
   const x = await port.createPayment({
     reff_id: b.reff_id, channel_code: b.channel, customer_id: o.payer.id, customer_name: o.payer.name, customer_phone: o.payer.phone,
     customer_email: o.payer.email, expired: wib(new Date(b.expires_at)), amount: String(b.amount), callback_url: "",
   });
   return { attemptId: b.attempt_id, reffId: b.reff_id, replayed: false,
-    state: await finish(executor, b.attempt_id, b.generation, x, o.service ?? "billing.bayar", now) as BayarResult["state"] };
+    state: await finish(unbound, b.attempt_id, b.finish_token, b.generation, x, o.service ?? "billing.bayar", now) as BayarResult["state"] };
 }
 
 // The provider's create answer → the fenced finish. A 2xx with rc ≠ 00 → failed (no transaction id stored); anything indeterminate → unknown.
-export async function finish(executor: pg.Pool, attemptId: string, generation: number, x: Awaited<ReturnType<AutolarisPort["createPayment"]>>, service: string,
-  now = new Date()) {
+export async function finish(unbound: pg.Pool, attemptId: string, finishToken: string, generation: number, x: Awaited<ReturnType<AutolarisPort["createPayment"]>>,
+  service: string, now = new Date()) {
   const d = (x.body?.data ?? {}) as Record<string, unknown>;
   // Only a 2xx answer with a provider rc other than "00" is a rejection (failed, a new attempt allowed). No answer, a non-2xx status (5xx,
   // 4xx — a gateway may have created the transaction), or a 2xx without a usable rc is indeterminate: unknown, never re-created (BILL-32).
@@ -83,7 +85,7 @@ export async function finish(executor: pg.Pool, attemptId: string, generation: n
   const p = outcome === "ok"
     ? { trx_id: String(d.trx_id ?? ""), admin: int(d.admin), total: int(d.total), instruction, ket: String(x.body?.ket ?? "") }
     : { rc: String(x.body?.rc ?? ""), ket: String(x.body?.ket ?? ""), raw: x.body ? { rc: x.body.rc, ket: x.body.ket } : {} };
-  return one<string>(executor, `select vendor_billing_bayar_finish($1, $2, $3, $4::jsonb, $5, $6)`, [attemptId, generation, outcome, JSON.stringify(p), now, service]);
+  return one<string>(unbound, `select vendor_billing_bayar_finish($1, $2, $3, $4, $5::jsonb, $6, $7)`, [attemptId, finishToken, generation, outcome, JSON.stringify(p), now, service]);
 }
 
 // The Advice worker: every due attempt (pending / unknown / expired with a provider id, inside expires_at + 24 h), one provider read each;
@@ -127,7 +129,8 @@ export type TenantInvoice = {
   fee_amount: number; proration: { days: number; days_in_month: number; formula: string }; amount: number; vat: number; total: number;
   state: "issued" | "paid" | "waived" | "credited"; outstanding: number; credits: { kind: string; amount: number }[];
   attempts: { id: string; reff_id: string; channel: string; amount: number; state: string; expires_at: string; admin: number | null; total: number | null;
-    instruction: Record<string, string> | null }[];
+    instruction: { virtual_account?: string; qr?: string; payment_code?: string; url?: string } | null }[];
+  payments: { settled_at: string; amount: number; reff_id: string; channel: string }[];
 };
 export type TenantView = { role: string; can_pay: boolean; payment_available: boolean; credit_balance: number; invoices: TenantInvoice[] };
 export const tenantView = (db: pg.ClientBase) => one<TenantView>(db, `select vendor_billing_tenant_view()`, []);

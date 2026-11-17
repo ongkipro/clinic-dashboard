@@ -7,6 +7,7 @@ import { ipHeader, vendorAuth, vendorOrigin, vendorPool } from "../../../_lib/se
 import { AccountExistsError, PasswordPolicyError } from "../../../../../auth/server";
 import { acceptMemberWithNewAccount, cancelMemberInvite, inviteMember, setMemberState } from "../../../../../modules/vendor/team/team";
 import { setChecklistItem } from "../../../../../modules/vendor/checklist/checklist";
+import { cancelBilling, decideBilling, issueBilling, noteAttempt, requestBilling } from "../../../../../modules/vendor/billing/console";
 import {
   advanceTenant, approveOwnerInvite, cancelOwnerInvite, type ConsoleCall, createTenant, requestOwnerInvite,
 } from "../../../../../modules/vendor/tenants/tenants";
@@ -91,6 +92,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
       const ended = await (await vendorAuth()).endOwnSession(request.headers, id);
       return ended ? json({ ok: true }) : json({ ok: false, code: "ERR_NOT_FOUND" }, 404);
     }
+    // Konsol Vendor › Tagihan Server (UX-43; T-103; Panel 2 option A). Shape only here; the database restricts the kinds, binds the tenant
+    // from the stored row, enforces requester ≠ approver and never applies a request (the executor worker does).
+    case "billing-request": {
+      const kind = str(body.kind, 32);
+      const amount = typeof body.amountRupiah === "number" && Number.isSafeInteger(body.amountRupiah) ? body.amountRupiah : -1;
+      if (kind === "server_fee_change") {
+        r = await requestBilling(db, c, uuid(body.tenantId), { kind, amountRupiah: amount, effectiveMonth: str(body.effectiveMonth, 7) }, str(body.reason, 500));
+      } else if (kind === "invoice_waiver") {
+        r = await requestBilling(db, c, uuid(body.tenantId), { kind, invoiceId: uuid(body.invoiceId) ?? "", amountRupiah: amount }, str(body.reason, 500));
+      } else {
+        return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
+      }
+      break;
+    }
+    case "billing-decide":
+      if (typeof body.approve !== "boolean") return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
+      r = await decideBilling(db, c, uuid(body.requestId), body.approve, str(body.reason, 500));
+      break;
+    case "billing-cancel":
+      r = await cancelBilling(db, c, uuid(body.requestId));
+      break;
+    case "billing-issue":
+      r = await issueBilling(db, c, uuid(body.tenantId));
+      break;
+    case "billing-note":
+      r = await noteAttempt(db, c, uuid(body.attemptId), str(body.evidenceRef, 120), str(body.reason, 500));
+      break;
     case "staff-invite": {
       const roles = Array.isArray(body.roles) ? body.roles.filter((x): x is string => typeof x === "string").slice(0, 5) : [];
       r = await inviteMember(db, c, str(body.email), str(body.name, 120), roles);

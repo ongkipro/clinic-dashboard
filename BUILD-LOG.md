@@ -819,3 +819,18 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A non-2xx answer to a create is not a provider rejection: only a 2xx with a validated non-success code is; anything else is unknown (review r1).
 - Every worker that takes several tenants' locks takes them in one order (tenant id); prove it with a forced queue order, not a parallel launch.
 - A fixed-width pad truncates in PostgreSQL; identifiers that grow need minimum-width formatting and a boundary test.
+
+## 2026-11-17 — T-103 increment 2: the billing pages and the console entrypoints
+
+- A privilege moved from a worker login to the app (the Bayar finish) needs its own capability: a one-time per-attempt token, hashed at rest,
+  never on a replay, checked in constant time, on an unbound connection only — and the old signature dropped, pinned by the drift test.
+- Pinned inventories exist to force a decision: each new console entrypoint is added by exact name, with the structural re-check rule kept.
+- A role check can hide a missing rule: requester ≠ approver needs a test where one person holds both roles.
+- A shared CSS module's class can be mobile-only (`.cards` hides at ≥ 700 px): look at the desktop screenshot, not only the metrics.
+- Do not invent a provider URL policy the provider never published; render only https and say so.
+- A global lock taken inside per-tenant locks deadlocks as soon as a second caller locks tenants in a different order (the worker loops over
+  tenants; a console issue locks one). Force the interleaving in a test, prove it fails on the old code, then remove the global lock — here a
+  sequence replaced a per-month advisory lock + max().
+- Read the contract's UX rows against the build before calling a task done: three named items (a receipt, a reminders list, a primary action)
+  were missing until the acceptance matrix checked them.
+

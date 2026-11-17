@@ -98,6 +98,8 @@ export const vendorPaymentAttempts = pgTable(
     adviceNextAt: timestamp("advice_next_at", { withTimezone: true }),
     adviceCount: integer("advice_count").notNull().default(0),
     creatingSince: timestamp("creating_since", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    // addendum a2: SHA-256 (hex) of the one-time finish token handed to the server at begin; frozen; the token itself is never stored
+    finishTokenHash: text("finish_token_hash"),
     closedBy: text("closed_by"),
     createdBy: uuid("created_by").notNull(),
     createdAs: text("created_as").notNull(),
@@ -120,7 +122,8 @@ export const vendorPaymentAttempts = pgTable(
       and (${t.providerTotal} is null or ${t.providerTotal} >= ${t.amountRupiah}) and (${t.instruction} is null or jsonb_typeof(${t.instruction}) = 'object')
       and ${t.createdAs} in ('owner','finance') and ${t.adviceCount} >= 0
       and (${t.state} <> 'pending' or ${t.providerTrxId} is not null) and (${t.state} <> 'paid' or ${t.providerTrxId} is not null)
-      and (${t.closedBy} is null or ${t.closedBy} in ('advice','create_rc'))`),
+      and (${t.closedBy} is null or ${t.closedBy} in ('advice','create_rc'))
+      and (${t.finishTokenHash} is null or ${t.finishTokenHash} ~ '^[0-9a-f]{64}$')`),
   ],
 );
 
