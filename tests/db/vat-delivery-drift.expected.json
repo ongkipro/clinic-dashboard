@@ -1,0 +1,17 @@
+{
+  "before": {
+    "consultation_invoice_issue(visits,uuid,bigint,text,uuid,text,timestamp with time zone)": "5d8e6d11930c4a82080710b28050eac9a704b9fbfec21254300f122cfbb78be3",
+    "discount_sync()": "e3958d617edeecb7ded92727ac1126ce341e06536c5aeee4754fbece96857c12",
+    "invoice_issue(text,uuid,jsonb)": "ff1523b84c278c8a3e1b889b329518d1fec679068defe441310dd36c21b8cda0",
+    "invoice_void_sync()": "387597e195b9390bd0e7b632cfda4cf1c8276fc16c85a69f412b7008b879c95b",
+    "treatment_finish(text,uuid,jsonb)": "5afaee457d8b516d0000d8dc325e786308df93903b73e6b5422aece2368a9957"
+  },
+  "after": {
+    "consultation_invoice_issue(visits,uuid,bigint,text,uuid,text,timestamp with time zone)": "d67e425c9d85c24adadee8fe7880ce068b7bb697fb426a7e7f8a5ec7eb5c7072",
+    "discount_sync()": "bd700ca9972cc6f31392c69835beb8ff5e35e4891e2232ed959f0c9eb49b7478",
+    "invoice_issue(text,uuid,jsonb)": "16f1da12128cd6695e58f0b4263c3760b2014aee4ce75c841368d5246be7aa77",
+    "invoice_void_sync()": "11da1c0127383d1d3a07aab0c5f1b860751b842e7b9f6c544013b317862c87b7",
+    "treatment_finish(text,uuid,jsonb)": "ddf7cd75dd6ac0527ef2cee36394ff10112621ed50036fe84a0de2c4bc10e12c",
+    "vat_line_deliver(uuid,uuid,bigint,bigint,timestamp with time zone,uuid)": "c7e086b6c4dda3ba38dcd73088cc448d9e872f65d808f17828f75e88568e9550"
+  }
+}

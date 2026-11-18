@@ -18,7 +18,7 @@ const MONEY = "1000000000000";
 export const VAT_OBJECT_KINDS = ["line", "package", "session", "deposit"] as const;
 export const VAT_EVENT_CAUSES = [
   "session_delivery", "receivable_convert", "interrupted", "package_close_line", "package_close_package", "package_sync_reversal", "deposit_apply",
-  "session_attribution",
+  "session_attribution", "line_delivery", "line_void",
 ] as const;
 const inList = (xs: readonly string[]) => sql.raw(xs.map((x) => `'${x}'`).join(","));
 

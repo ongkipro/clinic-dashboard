@@ -855,6 +855,13 @@
       "when": 1795004980051,
       "tag": "0121_subledgers",
       "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1795017840464,
+      "tag": "0122_vat_delivery",
+      "breakpoints": true
     }
   ]
 }

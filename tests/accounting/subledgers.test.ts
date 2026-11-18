@@ -728,9 +728,12 @@ describe("VAT (PKP tenant): seams S1, S4, S5, S6 signed; scenario 16, 19; cutove
     const { invoiceId } = await as(CFO, (db) => openKasirInvoice(db, key(), { patientId: pid, visitId: v }));
     await as(CFO, (db) => issueKasirInvoice(db, key(), invoiceId, [{ itemId: svcItem, quantity: 1, planItemId: addItem }]));
     const line = (await h.admin.query(`select id from invoice_lines where invoice_id = $1`, [invoiceId])).rows[0].id as string;
-    expect(await objSum(C, "paid_not_delivered", line)).toBe(-600_000); // delivered before payment: contractual net
+    // HYG-023 (A-12): the addition was delivered before its line was issued: its VAT is recognised at the issue (tax point finished_at),
+    // so the line's paid-not-delivered is the gross −666,000 (−600,000 net − 66,000 VAT) and the conversion records no further VAT.
+    expect((await h.admin.query(`select cause, delta::int d from vat_events where object_id = $1`, [line])).rows).toEqual([{ cause: "line_delivery", d: 66_000 }]);
+    expect(await objSum(C, "paid_not_delivered", line)).toBe(-666_000);
     const rc = await as(CFO, (db) => convertToReceivable(db, key(), v));
-    expect((await h.admin.query(`select delta::int d from vat_events where cause = 'receivable_convert' and object_id = $1`, [line])).rows).toEqual([{ d: 66_000 }]);
+    expect((await h.admin.query(`select delta::int d from vat_events where cause = 'receivable_convert' and object_id = $1`, [line])).rows).toEqual([]);
     expect(await objSum(C, "paid_not_delivered", line)).toBe(0);
     expect(await objSum(C, "receivables", rc.receivable_id)).toBe(666_000);
     // S3: a paid taxable single treatment medically stopped, moved to balance

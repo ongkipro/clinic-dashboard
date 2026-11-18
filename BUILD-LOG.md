@@ -857,3 +857,21 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A comparator that did not run is not a pass; return a status, and let the UI say "not checked".
 - A comparator of a writer's rule must restate that rule (state filters, exceptions) exactly; a stricter guess reports valid data as wrong.
 
+## 2026-11-18 — HYG-023 A-12: VAT at delivery when delivery precedes payment
+
+- A tax point that is "the earlier of two events" needs a writer at both events. Recording only the money event dates the VAT late
+  whenever service comes first; share the payment writer's rounding and keep both monotone so the second event adds only the remainder.
+- When a delivery is recognised at a later instant (the line is issued after the work), store the true tax point on the line but date the
+  ledger event no earlier than the cutover the readers start from; otherwise a pre-cutover delivery billed later vanishes from both the
+  event stream and the cutover residue.
+- Before adding a recognition point, list every writer that later rewrites or refuses the same field: a pending manual discount rewrites
+  `vat_amount` and refuses a line with recognised VAT; a void of an unpaid invoice keeps it. Skip or settle those first.
+- A stated limit is a test too: the case that stays at payment (a visit product with no stored line key) is asserted, not just written.
+- A mutant that survives is a finding, not noise: `share-ignored` survived because no call site delivers a partial share, so the approved
+  share rule was untested — prove it on the helper. `not-pkp-at-issue` survived because it is equivalent (`vat_amount > 0` only on a
+  PKP-at-issue invoice): record why and replace it with a mutant that can fail.
+- A new recognition point needs its reversal path: a void of an unpaid invoice is allowed, so once VAT is recognised before payment the void
+  must reverse it (`line_void`), or void-then-rebill counts the VAT twice and strands −VAT in the liability.
+- Mutation anchors must stay unique as the file grows: two writers sharing a lateral subquery made two earlier anchors match twice; widen
+  the anchor, never the mutation, and re-check every anchor with `DRY=1` before running only the delta mutants.
+

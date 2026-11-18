@@ -1,6 +1,6 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-18 (T-104 in verification; T-103 recorded DONE — fixture-verified, live payment disabled; the per-task rows below are the history and are unchanged)
+Updated: 2026-11-18 (T-104 DONE `1e54042a`, CI 44335438904; HYG-023 in verification; Fast-Track Careful mode with the end-of-development `cx/gpt-6.2-sol` review; the per-task rows below are the history and are unchanged)
 Status: Active
 State: INTEGRATING
 Review-Risk: R4
@@ -27,10 +27,14 @@ Use `BLOCKED` only as an interruption state. Record the blocker and exact state 
 integrated (`882b2ab3`, CI 44062946402), final acceptance **OPEN / BLOCKED** on the owner's TD-31 practitioner-path decision. T-103 vendor
 server-fee billing (queue exception, Panel 2) — **DONE: implementation fixture-verified, live payment disabled** (`46c4592e`, CI
 44095172936; `7c56843b`, CI 44143966634; Sol r3 `a96ba6f9`); owner activation decisions Q-13, D2, Q-16, BILL-33 OPEN. **M8 started:** T-104
-accounting step 1 (sub-ledgers, roll-forwards, exports; owner D-A1 / D-B2 / D-C1) in verification: implementation r1 Sol `083d9445` REVISE,
-r2 (Panel 2 R1 / R1-C7) → Sol `a802e285` REVISE (2 P1, 3 P2); r3 repairs done, gated close and Sol r3 pending, then exact-SHA CI. After T-104: Fast-Track Careful Delivery Mode
-(owner 2026-11-18). Next queue: HYG-023 candidate (A-12 VAT at delivery; plan review before T-105), M8
-(T-105–T-119), M9 (T-120–T-131). Not deployed (no staging, DEC-034); no live provider connected. Main `7c56843b`.
+accounting step 1 (sub-ledgers, roll-forwards, exports; owner D-A1 / D-B2 / D-C1) — **DONE** (`1e54042a`, CI 44335438904; Sol r3
+`b5a5cf8b` APPROVE; ledger PASS). **Review policy (owner 2026-11-18, Fast-Track Careful Delivery Mode):** no per-task subagent reviewer; an R3/R4 or
+expanded boundary stops at `REVIEW_REQUIRED` on the frozen surface and Panel 2 (`cx/gpt-6.1-sol`, separate agent) inspects it and
+records `review-boundary`; the comprehensive independent review runs once, **after the queue through T-131 is integrated**, on
+`9router-fantastico/cx/gpt-6.2-sol` (never Carbon or Argon; a failure is reported, not substituted), and every valid finding is fixed with a
+regression test before release readiness. **HYG-023** (A-12 VAT at delivery; R3; DEC-116; migration 0122; Panel 2 Q1–Q5, S7, S8) implemented, in
+verification (gated close, Panel 2 boundary, exact-SHA CI pending). Next queue: M8 (T-105–T-119), M9 (T-120–T-131). Not deployed (no
+staging, DEC-034); no live provider connected. Main `1e54042a`.
 
 Previous summary (2026-11-17, kept): M0–M6 complete (M6 exit T-101 `427f250a`, CI 43976472609). **M7 open:** T-102 SATUSEHAT — increments 1–3
 integrated (`882b2ab3`, CI 44062946402), final acceptance **OPEN / BLOCKED** on the owner's TD-31 practitioner-path decision. T-103 vendor
@@ -132,7 +136,9 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
-**Current (2026-11-18):** T-104 (M8, accounting step 1; R3; ledger `RUN-20261117T183923Z-0e92614b`) implemented, in verification; T-103 DONE (fixture-verified, live payment disabled, owner activation decisions open); T-102 (M7, SATUSEHAT) final acceptance OPEN / BLOCKED on owner TD-31; next: HYG-023 candidate (A-12), then M8 (`T-105`–`T-119`) and M9 (`T-120`–`T-131`).
+**Current (2026-11-18, later):** HYG-023 (A-12 VAT at delivery; R3; ledger `RUN-20261118T155153Z-98a816e3`) implemented, in verification; T-104 DONE (`1e54042a`, CI 44335438904); T-102 OPEN / BLOCKED on owner TD-31; next: T-105.
+
+(2026-11-18, kept) T-104 (M8, accounting step 1; R3; ledger `RUN-20261117T183923Z-0e92614b`) implemented, in verification; T-103 DONE (fixture-verified, live payment disabled, owner activation decisions open); T-102 (M7, SATUSEHAT) final acceptance OPEN / BLOCKED on owner TD-31; next: HYG-023 candidate (A-12), then M8 (`T-105`–`T-119`) and M9 (`T-120`–`T-131`).
 
 (2026-11-17, kept) T-103 increment 2 (M7, vendor server-fee billing screens + console entrypoints + doc audit) in final verification; T-102 (M7, SATUSEHAT) integrated through increment 3, final acceptance OPEN / BLOCKED on owner TD-31; next queued tasks M8 (`T-104`–`T-119`) and M9 (`T-120`–`T-131`).
 
@@ -280,7 +286,12 @@ Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job v
 
 ## Next verified action
 
-**Current (2026-11-18):** finish T-104 verification (final freeze, gated close, Sol implementation review, ledger PASS, exact-SHA green CI), then the HYG-023 plan review (A-12, proposal `HYG-A12-PROPOSAL.md` in the T-104 notes) before T-105. Chronological log below (2026-11-06 through 2026-11-18, kept as history):
+**Current (2026-11-18, later):** finish HYG-023 (freeze, gated close, Panel 2 boundary inspection, ledger PASS, exact-SHA green CI), then T-105 in Fast-Track mode.
+
+- **T-104 DONE (M8): accounting step 1** — `1e54042a` (ff from `7c56843b`), CI 44335438904 green; gated close 4 all 9 PASS (freeze r3); Sol r3 `b5a5cf8b` APPROVE; ledger `RUN-20261117T183923Z-0e92614b` PASS.
+- **HYG-023 in verification: A-12 VAT at delivery** (BILL-6, R3; DEC-116; migration 0122; Panel 2 Q1–Q5) — see docs/tasks/HYG-023.md.
+
+(2026-11-18, kept) finish T-104 verification (final freeze, gated close, Sol implementation review, ledger PASS, exact-SHA green CI), then the HYG-023 plan review (A-12, proposal `HYG-A12-PROPOSAL.md` in the T-104 notes) before T-105. Chronological log below (2026-11-06 through 2026-11-18, kept as history):
 
 - **T-104 in verification (M8): accounting step 1** (PR-25, R3; DEC-115; migration 0121) — plan r5 Sol `41cccdf2`, addendum a1 r2 Sol `e647eb18`; owner D-A1 (finance VAT facts), D-B2 (FIFO origin branch), D-C1 (VAT cutover); Panel 2 C-5 / C-6 / C-7 (S1–S6). See docs/tasks/T-104.md.
 
@@ -407,7 +418,11 @@ Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job v
 
 - **Order:** one task at a time, finished before the next; focus on M0 until it is done.
 - **Plan first:** write `docs/tasks/<TASK>.md` before starting, and keep it updated with what was built and every review round.
-- **Review:** every task and every HYG gets an independent review, is fixed, and is re-reviewed until APPROVE.
+- **Review (current, owner 2026-11-18 — supersedes the per-task rule below from HYG-023 on):** Fast-Track Careful Delivery Mode. Per task:
+  a 1-page plan brief, Panel 2 one-pass scope decisions, a frozen gated close; an R3/R4 or expanded boundary stops at `REVIEW_REQUIRED` for
+  Panel 2's separate-agent boundary inspection (`review-boundary`). The comprehensive independent review runs at the end of development
+  (after T-131) on `9router-fantastico/cx/gpt-6.2-sol`; every valid finding fixed with a regression test. Milestone exit audits at T-119, T-131.
+- **Review (history, until T-104):** every task and every HYG gets an independent review, is fixed, and is re-reviewed until APPROVE.
   - R3 needs one reviewer (codex).
   - Reviewer fallback (owner 2026-11-08, "untuk review gunakan argon dengan kondisi jika gpt sedang terkena limit"): the reviewer is GPT-6.1 Sol; while it is rate-limited (429), the review runs on Argon (`9router-fantastico/ag/gemini-4-argon-high`, `pi -p --no-tools` with the material inlined, read-only), recorded as such in the task's ledger and Results.
   - R4 needs claude AND codex. Claude runs through 9Router (`pi -p --model 9router-fantastico/cc/claude-opus-5-5:medium`, with the files inlined in the prompt, which must stay ≤ 60 KB); codex runs through `ai-ask codex --attach` (≤ 60 KB).

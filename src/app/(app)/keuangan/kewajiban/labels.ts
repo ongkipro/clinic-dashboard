@@ -25,7 +25,7 @@ export const TERM: Record<string, string> = {
   session_delivery: "PPN saat sesi diberikan", package_sync_reversal: "Pembalikan PPN paket", package_close_line: "Pembalikan PPN selisih (paket ditutup)",
   package_close_package: "Pembalikan PPN paket ditutup", deposit_apply: "PPN DP diterapkan", cutover_residue: "Selisih sebelum cutover",
   session_attribution: "PPN paket ke sesi yang diberikan", refund_reversal_delivered: "Pembalikan PPN refund (sudah diberikan)",
-  input_credited: "PPN masukan dikreditkan",
+  input_credited: "PPN masukan dikreditkan", line_delivery: "PPN saat layanan diberikan (sebelum bayar)", line_void: "Pembalikan PPN invoice dibatalkan",
   top_up: "Isi saldo", use: "Dipakai", from_expiry: "Dari paket kedaluwarsa", from_cancel: "Dari paket dibatalkan", from_interrupted_treatment: "Dari tindakan terhenti",
   from_substitution: "Dari substitusi", from_refund: "Dari refund", dp_transfer: "Dari DP", cash_refund: "Refund tunai", opening_balance: "Saldo awal",
 };
