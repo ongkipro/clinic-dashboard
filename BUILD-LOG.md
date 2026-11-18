@@ -834,3 +834,26 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Read the contract's UX rows against the build before calling a task done: three named items (a receipt, a reminders list, a primary action)
   were missing until the acceptance matrix checked them.
 
+## 2026-11-18 — T-104 accounting step 1: sub-ledgers, roll-forwards, exports
+
+- A derived ledger is only as good as the dates its facts carry: a cumulative column ("VAT recognised so far", first timestamp kept) cannot
+  be split by month. Record the delta where the writer computes it (six INSERT-only seams), and give history before that a single honest
+  residue at a stated cutover instead of a guessed date.
+- Signs are a contract, not a detail: a reversal counter going up is the VAT position going down. State the sign rule once and assert the
+  signed delta and the resulting closing in every seam test (a sign-flip mutant must fail).
+- "Known" means stored. An application whose transferred amount was never written is not a known movement, however tempting the deposit's own
+  figure is; leave both legs in the residues.
+- Prove an INSERT-only re-creation mechanically: the new function body minus the added statements equals the old body line for line.
+- A test fixture that flips a shared tenant setting (PKP) leaks into every later isolation case of that tenant; scope it to the call.
+- A net-of-VAT liability computed from its own VAT *estimate* drifts as soon as a mutable field changes (a substituted session's tax
+  category). Compute it as money minus the VAT movements of its objects — the same rows the VAT ledger sums — so the two cannot disagree.
+- A mirror field (a redeemed session's VAT recognition) is not a fact until something records its changes: record the value at the moment it
+  leaves the liability and every later change (S1b before the sync, S5b in the sync loop), net zero in the VAT ledger.
+- An object-level comparator must read stored state the movement reader does not use; a check that recomputes the reader's own formula
+  cannot fail. Prove each comparator with a fixture that corrupts one stored fact.
+- A reconstruction of history must be a function of the history: any "only one such event" or "no deposit applied" test that counts rows
+  without bounding them to before the cutover lets a later fact silently rewrite a closed month.
+- "Complete from date X" must use the date each residue row is actually reported on (its branch's time zone), not one tenant-wide day.
+- A comparator that did not run is not a pass; return a status, and let the UI say "not checked".
+- A comparator of a writer's rule must restate that rule (state filters, exceptions) exactly; a stricter guess reports valid data as wrong.
+

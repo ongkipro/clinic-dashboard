@@ -1,6 +1,6 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-17 (doc audit on the owner's request; the per-task rows below are the history and are unchanged)
+Updated: 2026-11-18 (T-104 in verification; T-103 recorded DONE — fixture-verified, live payment disabled; the per-task rows below are the history and are unchanged)
 Status: Active
 State: INTEGRATING
 Review-Risk: R4
@@ -23,7 +23,16 @@ Use `BLOCKED` only as an interruption state. Record the blocker and exact state 
 
 ## Current state
 
-**Summary (2026-11-17):** M0–M6 complete (M6 exit T-101 `427f250a`, CI 43976472609). **M7 open:** T-102 SATUSEHAT — increments 1–3
+**Summary (2026-11-18):** M0–M6 complete (M6 exit T-101 `427f250a`, CI 43976472609). **M7 open:** T-102 SATUSEHAT — increments 1–3
+integrated (`882b2ab3`, CI 44062946402), final acceptance **OPEN / BLOCKED** on the owner's TD-31 practitioner-path decision. T-103 vendor
+server-fee billing (queue exception, Panel 2) — **DONE: implementation fixture-verified, live payment disabled** (`46c4592e`, CI
+44095172936; `7c56843b`, CI 44143966634; Sol r3 `a96ba6f9`); owner activation decisions Q-13, D2, Q-16, BILL-33 OPEN. **M8 started:** T-104
+accounting step 1 (sub-ledgers, roll-forwards, exports; owner D-A1 / D-B2 / D-C1) in verification: implementation r1 Sol `083d9445` REVISE,
+r2 (Panel 2 R1 / R1-C7) → Sol `a802e285` REVISE (2 P1, 3 P2); r3 repairs done, gated close and Sol r3 pending, then exact-SHA CI. After T-104: Fast-Track Careful Delivery Mode
+(owner 2026-11-18). Next queue: HYG-023 candidate (A-12 VAT at delivery; plan review before T-105), M8
+(T-105–T-119), M9 (T-120–T-131). Not deployed (no staging, DEC-034); no live provider connected. Main `7c56843b`.
+
+Previous summary (2026-11-17, kept): M0–M6 complete (M6 exit T-101 `427f250a`, CI 43976472609). **M7 open:** T-102 SATUSEHAT — increments 1–3
 integrated (`882b2ab3`, CI 44062946402), final acceptance **OPEN / BLOCKED** on the owner's TD-31 practitioner-path decision. T-103 vendor
 server-fee billing (queue exception, Panel 2) — increment 1 integrated (`46c4592e`, CI 44095172936); increment 2 **implemented and in
 verification** (review, gated close, CI pending); live payment disabled; owner activation decisions Q-13, D2, Q-16, BILL-33 OPEN. Next queue:
@@ -123,7 +132,9 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
-**Current (2026-11-17):** T-103 increment 2 (M7, vendor server-fee billing screens + console entrypoints + doc audit) in final verification; T-102 (M7, SATUSEHAT) integrated through increment 3, final acceptance OPEN / BLOCKED on owner TD-31; next queued tasks M8 (`T-104`–`T-119`) and M9 (`T-120`–`T-131`).
+**Current (2026-11-18):** T-104 (M8, accounting step 1; R3; ledger `RUN-20261117T183923Z-0e92614b`) implemented, in verification; T-103 DONE (fixture-verified, live payment disabled, owner activation decisions open); T-102 (M7, SATUSEHAT) final acceptance OPEN / BLOCKED on owner TD-31; next: HYG-023 candidate (A-12), then M8 (`T-105`–`T-119`) and M9 (`T-120`–`T-131`).
+
+(2026-11-17, kept) T-103 increment 2 (M7, vendor server-fee billing screens + console entrypoints + doc audit) in final verification; T-102 (M7, SATUSEHAT) integrated through increment 3, final acceptance OPEN / BLOCKED on owner TD-31; next queued tasks M8 (`T-104`–`T-119`) and M9 (`T-120`–`T-131`).
 
 Historical M0 wave plan and carried-forward notes (kept as written; superseded items annotated inline): Wave plan (owner 2026-11-02): waves 1–9 of M0 run back to back, each task independently reviewed and fixed before the next; after each wave gate the owner allowed commit + push once GitHub CI is green. Wave 1: T-008 ✓, T-012 ✓, T-029 ✓, HYG-002 ✓; gate PASS locally and on GitHub CI (run 41522105266), pushed `d8329ce`. Wave 2: T-009 ✓, T-013 ✓, T-018 ✓; gate PASS locally and on GitHub CI (run 41541975246), pushed `10a307e`. Wave 3: T-010 ✓, T-014 ✓, T-030 ✓; gate PASS locally and on GitHub CI (run 41553096331), pushed `002564c`. Wave 4: T-011 ✓, T-016 ✓, T-031 ✓; gate PASS locally and on GitHub CI (run 41568222746), pushed `0672220`. Wave 5: T-015 ✓, T-017 ✓, T-019 ✓, T-020 ✓.
 
@@ -181,7 +192,7 @@ Carried forward (outside the owning task's Allowed Paths):
 
 ## Blockers
 
-**Current owner gates (2026-11-17):** T-102 final acceptance OPEN / BLOCKED on TD-31 practitioner path (`docs/tasks/T-102.md`); T-103 live payment activation gates OPEN on Q-13 (settlement mapping), D2 (manual unlock), Q-16 (channel-fee bearer / PPh 23) and BILL-33 (VAT / vendor tax status) — all fail-closed in code (`docs/tasks/T-103.md`).
+**Current owner gates (2026-11-18, unchanged since 2026-11-17):** T-102 final acceptance OPEN / BLOCKED on TD-31 practitioner path (`docs/tasks/T-102.md`); T-103 live payment activation gates OPEN on Q-13 (settlement mapping), D2 (manual unlock), Q-16 (channel-fee bearer / PPh 23) and BILL-33 (VAT / vendor tax status) — all fail-closed in code (`docs/tasks/T-103.md`).
 
 Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, PR-18, PR-71, PR-83), G2 (H-02d, Q-08, Q-10, Q-11, Q-15, Q-17, R-01), G3 (Q-05, Q-06). See `docs/spec/02-PRD.md` §13 and `PLAN.md`.
 
@@ -269,7 +280,11 @@ Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job v
 
 ## Next verified action
 
-**Current (2026-11-17):** finish T-103 increment 2 verification (Sol review on the final freeze, gated close, exact-SHA green CI), then proceed to T-104 (M8). Chronological log below (2026-11-06 through 2026-11-17, kept as history):
+**Current (2026-11-18):** finish T-104 verification (final freeze, gated close, Sol implementation review, ledger PASS, exact-SHA green CI), then the HYG-023 plan review (A-12, proposal `HYG-A12-PROPOSAL.md` in the T-104 notes) before T-105. Chronological log below (2026-11-06 through 2026-11-18, kept as history):
+
+- **T-104 in verification (M8): accounting step 1** (PR-25, R3; DEC-115; migration 0121) — plan r5 Sol `41cccdf2`, addendum a1 r2 Sol `e647eb18`; owner D-A1 (finance VAT facts), D-B2 (FIFO origin branch), D-C1 (VAT cutover); Panel 2 C-5 / C-6 / C-7 (S1–S6). See docs/tasks/T-104.md.
+
+(2026-11-17, kept) finish T-103 increment 2 verification (Sol review on the final freeze, gated close, exact-SHA green CI), then proceed to T-104 (M8).
 
 ### Now (2026-11-06)
 
@@ -370,7 +385,7 @@ Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job v
 - **T-101 done (M6 exit): messaging end to end with recorded fixtures** (PR-28, R2): `docs/evidence/m6/`; commit `427f250a`, CI 43976472609 green; ledger `RUN-20261116T221603Z-06a5f147` PASS (close 3 on freeze-r3: test-full 2550 passed / 0 failed, scenarios 12 + 6 items, 31 cases). Plan Sol `5e49112a` REVISE, `347f8487` APPROVE; implementation Sol `8a9613de` REVISE (fixed), `1db849ec` APPROVE.
 - **T-102 in progress (M7): SATUSEHAT** (PR-35, R3; DEC-113; migrations 0116–0118) — three increments (Panel 2 A). Increment 1 integrated (`a9ac93e0`, CI 44020055417 green); increment 2 integrated (`1d449ff8`, CI 44040421996 green); increment 3 integrated (`882b2ab3`, CI 44062946402 green) — see docs/tasks/T-102.md. **OPEN / BLOCKED:** final acceptance waits for the owner's decision on the TD-31 practitioner path (manual IHS entry delivered; the NIK lookup named in TD-31's statement is not built; TD-31 and DATA-12 unchanged).
 - **Queue exception (Panel 2, 2026-11-17):** T-103 proceeds while T-102 is open (T-103 depends only on T-027); M7 SATUSEHAT is not complete.
-- **T-103 in verification (M7): vendor server-fee billing** (PR-61, R3; DEC-114; migrations 0119–0120) — increment 1 `46c4592e` (CI 44095172936); increment 2 (UX-43 with Terbitkan Tagihan, UX-49 with the receipt and QRIS code, console entrypoints, the token-fenced finish) implemented, in review / gated close / CI. Panel 2 conditional acceptance (2026-11-17): may be recorded "done — implementation fixture-verified, live payment disabled; owner activation decisions OPEN" only after Sol approval, the gated close and an exact-SHA green CI. Fail-closed until the owner decides Q-13 (settlement mapping), D2 (manual unlock), Q-16 (fee bearer, PPh 23) and BILL-33 (VAT / vendor tax status); no live AutoLaris call. External connectivity unverified (synthetic guide-shaped fixtures; no credentials, no sandbox or live call).
+- **T-103 DONE (M7): vendor server-fee billing — implementation fixture-verified, live payment disabled; owner activation decisions OPEN** (recorded 2026-11-18 by T-104: Sol r3 `a96ba6f9`, `7c56843b`, CI 44143966634). History: (PR-61, R3; DEC-114; migrations 0119–0120) — increment 1 `46c4592e` (CI 44095172936); increment 2 (UX-43 with Terbitkan Tagihan, UX-49 with the receipt and QRIS code, console entrypoints, the token-fenced finish) implemented, in review / gated close / CI. Panel 2 conditional acceptance (2026-11-17): may be recorded "done — implementation fixture-verified, live payment disabled; owner activation decisions OPEN" only after Sol approval, the gated close and an exact-SHA green CI. Fail-closed until the owner decides Q-13 (settlement mapping), D2 (manual unlock), Q-16 (fee bearer, PPh 23) and BILL-33 (VAT / vendor tax status); no live AutoLaris call. External connectivity unverified (synthetic guide-shaped fixtures; no credentials, no sandbox or live call).
 - **Hygiene candidate (T-085 close run 2, 2026-11-14 22:30 WIB):** `tests/cashier/deposits.test.ts` "6e: applied on arrival > the explicit apply: roles and branches" fails between about 22:15 and 24:00 WIB: `soon(i)` (`:128`) clamps every slot to next midnight − 30 min, so `soon(1)` and `soon(2)` overlap for the same doctor and room (`resource_reservations_no_overlap`). Fixture-only defect (T-077 test; unchanged since T-080); CI runs in that window can hit it. Fix: give each slot its own non-overlapping half hour (or one doctor per slot). Evidence `/data/tmp/clinic-dashboard/t085/failure-close2/`. Owner to schedule as a HYG task (outside T-085's paths).
 - **Hygiene candidate (T-074 close runs 1 and 2):** scheduled as HYG-016 (above).
 - **Hygiene candidate (T-066 close run 1, CI-independent):** the vial use-by flake; scheduled as HYG-016 (above).

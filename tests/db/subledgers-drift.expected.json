@@ -1,0 +1,18 @@
+{
+  "before": {
+    "deposit_apply_do(invoices,booking_deposits,uuid,text)": "d05ca256b5a48f33d2811e8157617e40c615e9fd7dc4b3cc5bfb5f76775f71eb",
+    "interrupted_to_balance(text,uuid)": "976e6cb3b3949c32ac1a5311d11e77936bdf63aa41b8be23f536cb45050ff851",
+    "package_close_do(packages,text,text,uuid,text,timestamp with time zone)": "d726c1fa452bb560f506eb6b9e96d8e6a9b2e39775973707231217fb524495be",
+    "package_execution_finish()": "e217989c21723d3c16d9eca6ab7c859196ad564c81e418bc0e2a40618bcef7ad",
+    "package_sync_vat(uuid,uuid,timestamp with time zone)": "053b4f05c8520ea39c770ba8e205a35982ce97f855948ac97f6d274df39ea834",
+    "receivable_convert(text,uuid)": "faa4045f4b6f30b1fd6a70c58cc187e0f65d25db4523161ff73fa079d79dfa63"
+  },
+  "after": {
+    "deposit_apply_do(invoices,booking_deposits,uuid,text)": "063502c1f537eae4b0b83ceb34eb9835a8ee9d20179b3820f661074d65f03300",
+    "interrupted_to_balance(text,uuid)": "94c813de79921289f2cddd32a8ef45b3e5a352b92e7d78790375b2eab697b8e0",
+    "package_close_do(packages,text,text,uuid,text,timestamp with time zone)": "eca3a9b1ccfae8bcff9fab64463f8106f97ebc219b669545fe5c75b0cc36ec72",
+    "package_execution_finish()": "c65c69f5251afc2289ac8f39aad02f232a3c9b2224de8e6a4b835684e950fc9d",
+    "package_sync_vat(uuid,uuid,timestamp with time zone)": "0409ac2f7bf8cf1a4cc46ba24ca69fc77a2a79f92a86d3710b22d82dfd76f1d1",
+    "receivable_convert(text,uuid)": "65c566adcd8367c0e93eaed587e909a107064ee15244c841ee73ee248360e5bf"
+  }
+}

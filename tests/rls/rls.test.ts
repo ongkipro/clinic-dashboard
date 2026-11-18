@@ -621,6 +621,11 @@ describe("functions (TEN-16)", () => {
     // T-102 increment 3: the UX-23 page reader and the facility head's error-body reader (the actor lock first).
     "satusehat_page(uuid)",
     "satusehat_error_body(uuid)",
+    // T-104 (PR-25): the sub-ledger readers and export (the actor lock first), the RLS predicate, and the finance VAT facts (owner D-A1).
+    "subledger_rollforward(date,date,uuid)",
+    "subledger_export(text,date,date,uuid,uuid)",
+    "vat_input_credit_record(text,jsonb)",
+    "vat_payment_record(text,jsonb)",
     // T-103 (PR-61): vendor server-fee billing — the clinic's Bayar and reader (the actor lock first) and the executor workers (issuer, fenced finish, recovery, Advice, approved requests, reminders).
     "vendor_billing_bayar_begin(text,uuid,text,text[],timestamp with time zone)",
     "vendor_billing_tenant_view()",
