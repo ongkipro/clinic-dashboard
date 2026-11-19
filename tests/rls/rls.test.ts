@@ -623,6 +623,18 @@ describe("functions (TEN-16)", () => {
     "satusehat_error_body(uuid)",
     // T-104 (PR-25): the sub-ledger readers and export (the actor lock first), the RLS predicate, and the finance VAT facts (owner D-A1).
     "subledger_rollforward(date,date,uuid)",
+    // T-105 (PR-26): the posting entry point (one domain event → its matrix rule; refuses an event of another tenant; the consumer
+    // ledger.posting calls it in the event's tenant context).
+    "ledger_post_event(uuid)",
+    // T-105: the finance commands (manual journal, Kunci Periode) and the readers / export (owner, finance, auditor; the actor lock first;
+    // the export refuses unless the map is signed AND the books are activated).
+    "ledger_manual_post(text,jsonb)",
+    "ledger_period_lock(text,text)",
+    "ledger_report(date,date,uuid)",
+    "ledger_journal(date,date,uuid,timestamp with time zone)",
+    "ledger_journal_export(date,date)",
+    // T-105 G-Q4 U1–U4 (Panel 2): the read-only "Selisih penyerahan produk" counts (owner, finance, auditor; the actor lock first).
+    "ledger_handover_exceptions(date,date,uuid)",
     "subledger_export(text,date,date,uuid,uuid)",
     "vat_input_credit_record(text,jsonb)",
     "vat_payment_record(text,jsonb)",

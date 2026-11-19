@@ -31,12 +31,13 @@ function Key() {
 }
 
 // ── Buat Tagihan / Jual Cepat: lines (item, quantity), removable; issue in one step ──────────────────────────────
-type LineOpt = { item_id: string; name: string; price: number | null };
+type LineOpt = { item_id: string; name: string; price: number | null; selection_item_id?: string | null };
 export function IssueForm({ ctx, branch, visit, patient, initial, options, label }: {
   ctx: RenderedContext; branch: string | null; visit?: string; patient?: string | null; initial: (LineOpt & { quantity: number })[]; options?: CounterItem[]; label: string;
 }) {
   const [s, act, pending] = useActionState<KasirFormState, FormData>(issueAction, {});
-  const [rows, setRows] = useState(() => initial.map((l, i) => ({ ...l, k: i })));
+  // a selection row keeps its link only at its selected quantity (T-105 G-Q4 S1); an edited quantity bills the row unlinked
+  const [rows, setRows] = useState(() => initial.map((l, i) => ({ ...l, k: i, sq: l.quantity })));
   const [pickId, setPick] = useState("");
   const id = useId();
   const total = rows.reduce((t, r) => t + (r.price ?? 0) * r.quantity, 0);
@@ -59,6 +60,7 @@ export function IssueForm({ ctx, branch, visit, patient, initial, options, label
           {rows.map((r, i) => (
             <li key={r.k} className="flex min-w-0 flex-wrap items-end gap-2 border-b border-[var(--separator)] pb-2">
               <input type="hidden" name={`item:${i}`} value={r.item_id} />
+              {r.selection_item_id && r.quantity === r.sq && <input type="hidden" name={`sel:${i}`} value={r.selection_item_id} />}
               {/* wraps the quantity below the name when the name needs the width (390 px, 200 % text) */}
               <div className="grid min-w-[min(100%,14rem)] flex-1 gap-1">
                 <span className="font-semibold [overflow-wrap:anywhere]">{r.name}</span>
@@ -90,7 +92,7 @@ export function IssueForm({ ctx, branch, visit, patient, initial, options, label
             const o = options.find((x) => x.item_id === pickId);
             if (!o) return;
             setRows((x) => (x.some((y) => y.item_id === o.item_id) ? x.map((y) => (y.item_id === o.item_id ? { ...y, quantity: y.quantity + 1 } : y))
-              : [...x, { item_id: o.item_id, name: o.name, price: o.price, quantity: 1, k: Date.now() }]));
+              : [...x, { item_id: o.item_id, name: o.name, price: o.price, quantity: 1, k: Date.now(), sq: 1 }]));
             setPick("");
           }}>Tambah</Button>
         </div>

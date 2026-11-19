@@ -133,3 +133,132 @@ export const vatCutoverOpenings = pgTable(
     check("vat_cutover_openings_check", sql`${t.amount} <> 0 and ${t.objectKind} in (${inList(VAT_OBJECT_KINDS)})`),
   ],
 );
+
+// ── Accounting step 2 (PR-26, A-01, A-02; T-105, DATA-37). Posting rules are code (the migration's posting definers, one per TD-50 event
+// of the canonical matrix in docs/spec/11), versioned by LEDGER_MAP_VERSION. Every automatic entry records the map version it was posted
+// under; an entry is official only while approved posting_map_signoff evidence covers that exact version (Panel 2 G4, T-105) — until
+// then the books are a preview. Accounts carry stable keys and Indonesian labels, no numeric codes (G3); statements are generic by class,
+// not labelled SAK-compliant (G2).
+export const LEDGER_MAP_VERSION = "draft-11-2026-11-19";
+export const ACCOUNT_CLASSES = ["asset", "liability", "equity", "revenue", "expense"] as const;
+export const ENTRY_KINDS = ["auto", "manual", "reversal"] as const;
+
+export const ledgerAccounts = pgTable(
+  "ledger_accounts",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    class: text("class", { enum: ACCOUNT_CLASSES }).notNull(),
+    system: text("system").notNull(),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "ledger_accounts_created_by_fk", columns: [t.tenantId, t.createdBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("ledger_accounts_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("ledger_accounts_key").on(t.tenantId, t.key),
+    check("ledger_accounts_check", sql`${t.key} ~ '^[a-z][a-z0-9_]{2,40}$' and length(btrim(${t.label})) between 2 and 80
+      and ${t.class} in (${inList(ACCOUNT_CLASSES)}) and ${t.system} in ('system','manual') and ((${t.system} = 'system') = (${t.createdBy} is null))`),
+  ],
+);
+
+export const ledgerPeriods = pgTable(
+  "ledger_periods",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    period: text("period").notNull(),
+    lockedBy: uuid("locked_by").notNull(),
+    lockedAt: timestamp("locked_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    commandKey: text("command_key").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "ledger_periods_locked_by_fk", columns: [t.tenantId, t.lockedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("ledger_periods_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("ledger_periods_key").on(t.tenantId, t.period),
+    unique("ledger_periods_command_key").on(t.tenantId, t.commandKey),
+    check("ledger_periods_check", sql`${PERIOD(t.period)} and ${KEY(t.commandKey)}`),
+  ],
+);
+
+export const journalEntries = pgTable(
+  "journal_entries",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    kind: text("kind", { enum: ENTRY_KINDS }).notNull(),
+    postingKey: text("posting_key").notNull(),
+    event: text("event").notNull(),
+    sourceKind: text("source_kind").notNull(),
+    sourceId: uuid("source_id").notNull(),
+    sourceEventId: uuid("source_event_id"),
+    businessDate: date("business_date", { mode: "string" }).notNull(),
+    period: text("period").notNull(),
+    originalPeriod: text("original_period").notNull(),
+    mapVersion: text("map_version"),
+    reversesEntryId: uuid("reverses_entry_id"),
+    memo: text("memo"),
+    postedBy: uuid("posted_by"),
+    postedAt: timestamp("posted_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "journal_entries_reverses_fk", columns: [t.tenantId, t.reversesEntryId], foreignColumns: [t.tenantId, t.id] }).onDelete("restrict"),
+    foreignKey({ name: "journal_entries_posted_by_fk", columns: [t.tenantId, t.postedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("journal_entries_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("journal_entries_posting_key").on(t.tenantId, t.postingKey),
+    index("journal_entries_period_idx").on(t.tenantId, t.period),
+    index("journal_entries_source_idx").on(t.tenantId, t.sourceKind, t.sourceId),
+    check("journal_entries_check", sql`${t.kind} in (${inList(ENTRY_KINDS)}) and length(${t.postingKey}) between 3 and 200
+      and ${t.event} ~ '^[A-Z][A-Za-z]{2,60}$' and ${t.sourceKind} ~ '^[a-z][a-z_]{2,40}$' and ${PERIOD(t.period)} and ${PERIOD(t.originalPeriod)}
+      and ${t.period} >= ${t.originalPeriod} and ((${t.kind} = 'auto') = (${t.mapVersion} is not null))
+      and ((${t.kind} = 'manual') = (${t.postedBy} is not null)) and (${t.kind} <> 'manual' or length(btrim(${t.memo})) between 10 and 500)
+      and (${t.memo} is null or length(${t.memo}) <= 500)`),
+  ],
+);
+
+export const journalLines = pgTable(
+  "journal_lines",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    entryId: uuid("entry_id").notNull(),
+    accountId: uuid("account_id").notNull(),
+    branchId: uuid("branch_id"),
+    debit: bigint("debit", { mode: "number" }).notNull(),
+    credit: bigint("credit", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    foreignKey({ name: "journal_lines_entry_fk", columns: [t.tenantId, t.entryId], foreignColumns: [journalEntries.tenantId, journalEntries.id] }).onDelete("restrict"),
+    foreignKey({ name: "journal_lines_account_fk", columns: [t.tenantId, t.accountId], foreignColumns: [ledgerAccounts.tenantId, ledgerAccounts.id] }).onDelete("restrict"),
+    foreignKey({ name: "journal_lines_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    unique("journal_lines_tenant_id_id_key").on(t.tenantId, t.id),
+    index("journal_lines_entry_idx").on(t.tenantId, t.entryId),
+    index("journal_lines_account_idx").on(t.tenantId, t.accountId),
+    check("journal_lines_check", sql`${t.debit} between 0 and ${sql.raw(MONEY)} and ${t.credit} between 0 and ${sql.raw(MONEY)}
+      and (${t.debit} = 0) <> (${t.credit} = 0)`),
+  ],
+);
+
+// The tenant's decision that automatic posting under one map version is its official books (Panel 2 E1/E2: authority and retroactivity are
+// undecided). T-105 ships NO writer for this table (no definer, no grant, no page action): with no row every automatic entry is a preview,
+// and journal export stays refused even when posting_map_signoff evidence is approved — evidence alone activates and promotes nothing.
+export const ledgerActivations = pgTable(
+  "ledger_activations",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    mapVersion: text("map_version").notNull(),
+    activatedAt: timestamp("activated_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    unique("ledger_activations_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("ledger_activations_tenant_key").on(t.tenantId),
+    check("ledger_activations_check", sql`length(btrim(${t.mapVersion})) between 1 and 80`),
+  ],
+);

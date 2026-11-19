@@ -136,7 +136,8 @@ describe("workers and consumers (TEN-5)", () => {
   it("an event opens one receipt per subscribed consumer, in its own transaction", async () => {
     const id = await as(A, (db) => emit(db, { type: "StockConsumed", aggregateKind: "stock_move", aggregateId: uuid() }));
     const { rows } = await h.admin.query(`select consumer from event_receipts where event_id = $1 order by consumer`, [id]);
-    expect(rows.map((r) => r.consumer)).toEqual(["test.ids", "test.other", "test.race"]);
+    // ledger.posting is registered by the T-105 migration (StockConsumed posts materials cost)
+    expect(rows.map((r) => r.consumer)).toEqual(["ledger.posting", "test.ids", "test.other", "test.race"]);
   });
 
   it("a claim returns ids only, across tenants", async () => {

@@ -24,7 +24,7 @@ async function Body({ params }: { params: Promise<{ visitId: string }> }) {
         : !PAYERS.has(d.role) ? <BlockedState reason="Peran ini hanya dapat melihat" unblock="Kasir, manajer, finance, atau owner dapat menerbitkan tagihan" />
         : (
           <IssueForm ctx={d.ctx} branch={wide(d.role) ? v.branch_id : null} visit={v.visit_id} patient={v.patient?.id ?? null} label="Buat tagihan kunjungan"
-            initial={v.lines.map((l) => ({ item_id: l.item_id, name: l.name, price: l.price, quantity: Math.max(1, l.quantity) }))} />
+            initial={v.lines.filter((l) => !l.billed).map((l) => ({ item_id: l.item_id, name: l.name, price: l.price, quantity: Math.max(1, l.quantity), selection_item_id: l.selection_item_id }))} />
         )}
     </>
   );

@@ -1,6 +1,6 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-18 (T-104 DONE `1e54042a`, CI 44335438904; HYG-023 in verification; Fast-Track Careful mode with the end-of-development `cx/gpt-6.2-sol` review; the per-task rows below are the history and are unchanged)
+Updated: 2026-11-19 (HYG-023 DONE `14c99035`, CI 44369421813; T-105 in progress (general ledger, preview); T-104 DONE `1e54042a`, CI 44335438904; Fast-Track Careful mode with the end-of-development `cx/gpt-6.2-sol` review; the per-task rows below are the history and are unchanged)
 Status: Active
 State: INTEGRATING
 Review-Risk: R4
@@ -32,9 +32,10 @@ accounting step 1 (sub-ledgers, roll-forwards, exports; owner D-A1 / D-B2 / D-C1
 expanded boundary stops at `REVIEW_REQUIRED` on the frozen surface and Panel 2 (`cx/gpt-6.1-sol`, separate agent) inspects it and
 records `review-boundary`; the comprehensive independent review runs once, **after the queue through T-131 is integrated**, on
 `9router-fantastico/cx/gpt-6.2-sol` (never Carbon or Argon; a failure is reported, not substituted), and every valid finding is fixed with a
-regression test before release readiness. **HYG-023** (A-12 VAT at delivery; R3; DEC-116; migration 0122; Panel 2 Q1–Q5, S7, S8) implemented, in
-verification (gated close, Panel 2 boundary, exact-SHA CI pending). Next queue: M8 (T-105–T-119), M9 (T-120–T-131). Not deployed (no
-staging, DEC-034); no live provider connected. Main `1e54042a`.
+regression test before release readiness. **HYG-023** (A-12 VAT at delivery; R3; DEC-116; migration 0122; Panel 2 Q1–Q5, S7, S8) — **DONE** (`14c99035`, CI 44369421813; Panel 2
+boundary APPROVED). **T-105** (accounting step 2: general ledger; R3; DEC-118, DEC-119; migrations 0123, 0124) in progress, not integrated (G-Q4 U1–U4 OPEN) — a PREVIEW of the books: official
+activation, retroactivity, pending map rules and journal export are open gates (fail-closed). Next queue: M8 (T-106–T-119), M9 (T-120–T-131).
+Not deployed (no staging, DEC-034); no live provider connected. Main `14c99035`.
 
 Previous summary (2026-11-17, kept): M0–M6 complete (M6 exit T-101 `427f250a`, CI 43976472609). **M7 open:** T-102 SATUSEHAT — increments 1–3
 integrated (`882b2ab3`, CI 44062946402), final acceptance **OPEN / BLOCKED** on the owner's TD-31 practitioner-path decision. T-103 vendor
@@ -136,7 +137,9 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
-**Current (2026-11-18, later):** HYG-023 (A-12 VAT at delivery; R3; ledger `RUN-20261118T155153Z-98a816e3`) implemented, in verification; T-104 DONE (`1e54042a`, CI 44335438904); T-102 OPEN / BLOCKED on owner TD-31; next: T-105.
+**Current (2026-11-19):** T-105 (M8, accounting step 2 general ledger, preview; R3; ledger `RUN-20261118T185528Z-bf4c3710`) in progress; HYG-023 DONE (`14c99035`, CI 44369421813); T-104 DONE; T-102 OPEN / BLOCKED on owner TD-31.
+
+(2026-11-18, later, kept) HYG-023 (A-12 VAT at delivery; R3; ledger `RUN-20261118T155153Z-98a816e3`) implemented, in verification; T-104 DONE (`1e54042a`, CI 44335438904); T-102 OPEN / BLOCKED on owner TD-31; next: T-105.
 
 (2026-11-18, kept) T-104 (M8, accounting step 1; R3; ledger `RUN-20261117T183923Z-0e92614b`) implemented, in verification; T-103 DONE (fixture-verified, live payment disabled, owner activation decisions open); T-102 (M7, SATUSEHAT) final acceptance OPEN / BLOCKED on owner TD-31; next: HYG-023 candidate (A-12), then M8 (`T-105`–`T-119`) and M9 (`T-120`–`T-131`).
 
@@ -286,7 +289,12 @@ Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job v
 
 ## Next verified action
 
-**Current (2026-11-18, later):** finish HYG-023 (freeze, gated close, Panel 2 boundary inspection, ledger PASS, exact-SHA green CI), then T-105 in Fast-Track mode.
+**Current (2026-11-19):** finish T-105 (freeze, gated close, Panel 2 boundary inspection, ledger PASS, exact-SHA green CI), then T-106.
+
+- **HYG-023 DONE: A-12 VAT at delivery** — `14c99035` (ff from `1e54042a`), CI 44369421813 green; gated close on freeze-r3; Panel 2 boundary APPROVED; ledger `RUN-20261118T155153Z-98a816e3` PASS.
+- **T-105 in progress (M8): accounting step 2 general ledger** (PR-26, R3; DEC-118, DEC-119; migrations 0123, 0124) — a preview, not integrated; G-Q4 S1 (owner-approved explicit selection → invoice line link, one coordinated ProductHandedOver journal) built and verified; acceptance OPEN on G-Q4 U1–U4 (owner / accountant); open gates G-ACT, G-RETRO, G-PENDING, G-EXPORT, G-SETTLE (T-105 notes `OPEN-GATES.md`). See docs/tasks/T-105.md.
+
+(2026-11-18, later, kept) finish HYG-023 (freeze, gated close, Panel 2 boundary inspection, ledger PASS, exact-SHA green CI), then T-105 in Fast-Track mode.
 
 - **T-104 DONE (M8): accounting step 1** — `1e54042a` (ff from `7c56843b`), CI 44335438904 green; gated close 4 all 9 PASS (freeze r3); Sol r3 `b5a5cf8b` APPROVE; ledger `RUN-20261117T183923Z-0e92614b` PASS.
 - **HYG-023 in verification: A-12 VAT at delivery** (BILL-6, R3; DEC-116; migration 0122; Panel 2 Q1–Q5) — see docs/tasks/HYG-023.md.

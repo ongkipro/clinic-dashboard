@@ -43,6 +43,11 @@ const REASON: Record<string, string> = {
   patient_merged: "Pasien ini sudah digabung. Pilih rekam utama.",
   reason: "Tulis alasan void (3–500 karakter).",
   discount: "Diskon melebihi harga.",
+  selection_item_or_quantity: "Produk pilihan pasien ditagih dengan jumlah yang dipilih. Muat ulang halaman.",
+  selection_already_invoiced: "Produk pilihan ini sudah ditagih. Muat ulang halaman.",
+  selection_link: "Produk pilihan hanya ditagih di tagihan kunjungan.",
+  selection_link_repeated: "Produk pilihan yang sama tercantum dua kali. Muat ulang halaman.",
+  "selection item not found": "Produk pilihan tidak ditemukan di kunjungan ini. Muat ulang halaman.",
   "only the owner may decide this void": "Hanya owner yang dapat memutuskan void ini.",
   "charge pending": "Tagihan port sudah berubah. Muat ulang halaman.",
   mock_in_production: "Simulasi tidak tersedia di produksi.",
@@ -78,15 +83,17 @@ async function run<R>(p: KasirFormState, f: FormData, fn: (db: Db, key: string) 
 }
 const branchOf = (f: FormData) => (UUID.test(str(f, "branch")) ? str(f, "branch") : null);
 
-// Lines arrive as item:<n> and qty:<n> (1–20 rows; a removed row is absent).
+// Lines arrive as item:<n>, qty:<n> and, for a visit selection product billed at its exact quantity, sel:<n> (1–20 rows; a removed
+// row is absent). The server checks the link (tenant, branch, visit, product, exact quantity, one live line) — T-105 G-Q4 S1.
 function lines(f: FormData): KasirLine[] | null {
   const out: KasirLine[] = [];
   for (let i = 0; i < 40; i++) {
     const item = str(f, `item:${i}`);
     if (!item) continue;
     const q = str(f, `qty:${i}`);
-    if (!UUID.test(item) || !/^\d{1,5}$/.test(q) || Number(q) < 1) return null;
-    out.push({ itemId: item, quantity: Number(q) });
+    const sel = str(f, `sel:${i}`);
+    if (!UUID.test(item) || !/^\d{1,5}$/.test(q) || Number(q) < 1 || (sel && !UUID.test(sel))) return null;
+    out.push({ itemId: item, quantity: Number(q), ...(sel ? { selectionItemId: sel } : {}) });
   }
   return out.length ? out : null;
 }

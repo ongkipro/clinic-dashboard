@@ -49,14 +49,14 @@ export async function openKasirInvoice(db: pg.ClientBase, key: string, o: OpenIn
 }
 
 // planItemId: an addition line (T-074, PR-15); an invoice is all addition lines or all ordinary ones.
-export type KasirLine = { itemId: string; quantity: number; discount?: number; planItemId?: string; substitutionId?: string; promoCode?: string }; // substitutionId: T-076; promoCode: T-081
+export type KasirLine = { itemId: string; quantity: number; discount?: number; planItemId?: string; substitutionId?: string; promoCode?: string; selectionItemId?: string }; // substitutionId: T-076; promoCode: T-081; selectionItemId: T-105 G-Q4 S1 (the visit selection row this line bills, exact quantity)
 // discount_pending (T-080): lines whose manual discount waits in Persetujuan (issued at full price, not payable yet).
 // promo_lines (T-081): lines carrying a promo code (its use reserved).
 export type Issued = { invoice_id: string; number: string; issued_at: string; is_pkp_at_issue: boolean; total: number; discount_pending: number; promo_lines: number };
 export async function issueKasirInvoice(db: pg.ClientBase, key: string, invoiceId: string, lines: KasirLine[]) {
   const p = { lines: lines.map((l) => ({ item_id: l.itemId, quantity: l.quantity, ...(l.discount !== undefined ? { discount: l.discount } : {}),
     ...(l.planItemId ? { plan_item_id: l.planItemId } : {}), ...(l.substitutionId ? { substitution_id: l.substitutionId } : {}),
-    ...(l.promoCode ? { promo_code: l.promoCode } : {}) })) };
+    ...(l.promoCode ? { promo_code: l.promoCode } : {}), ...(l.selectionItemId ? { selection_item_id: l.selectionItemId } : {}) })) };
   const out = await command<Issued>(db, "invoice_issue", key, { invoice_id: invoiceId, issue: p }, `select invoice_issue($1, $2, $3::jsonb) as r`,
     [key, invoiceId, JSON.stringify(p)]);
   return { ...out.result, replayed: out.replayed };
@@ -133,7 +133,8 @@ export const kasirInvoice = (db: pg.ClientBase, invoiceId: string) =>
 
 export type VisitLines = {
   visit_id: string; branch_id: string; closed: boolean; patient: PatientRef;
-  lines: { item_id: string; name: string; kind: "service" | "product"; quantity: number; price: number | null }[];
+  // selection_item_id (T-105 G-Q4 S1): set for a product row a line can link exactly (integer quantity); billed: a live line bills it
+  lines: { item_id: string; name: string; kind: "service" | "product"; quantity: number; price: number | null; selection_item_id: string | null; billed: boolean }[];
 };
 export const kasirVisitLines = (db: pg.ClientBase, visitId: string) =>
   call(async () => (await db.query(`select kasir_visit_lines($1) as r`, [visitId])).rows[0].r as VisitLines);

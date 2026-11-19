@@ -114,10 +114,15 @@ export const invoiceLines = pgTable(
     discountKind: text("discount_kind"),
     discountApprovalId: uuid("discount_approval_id"),
     taxDocumentRef: text("tax_document_ref"),
+    // T-105 G-Q4 S1 (owner 2026-11-19): the visit selection row (product) this line bills, captured at billing; set once at insert
+    // on a visit invoice, immutable; never inferred or backfilled (FK in migration 0124: the table is in the pharmacy module).
+    selectionItemId: uuid("selection_item_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
   },
   (t) => [
     foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    unique("invoice_lines_selection_key").on(t.tenantId, t.invoiceId, t.selectionItemId),
+    index("invoice_lines_selection_idx").on(t.tenantId, t.selectionItemId),
     foreignKey({ name: "invoice_lines_invoice_fk", columns: [t.tenantId, t.branchId, t.invoiceId], foreignColumns: [invoices.tenantId, invoices.branchId, invoices.id] }).onDelete("restrict"),
     foreignKey({ name: "invoice_lines_item_fk", columns: [t.tenantId, t.itemId], foreignColumns: [catalogItems.tenantId, catalogItems.id] }).onDelete("restrict"),
     foreignKey({ name: "invoice_lines_version_fk", columns: [t.tenantId, t.catalogVersionId], foreignColumns: [catalogVersions.tenantId, catalogVersions.id] }).onDelete("restrict"),

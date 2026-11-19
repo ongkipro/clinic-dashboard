@@ -875,3 +875,51 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - Mutation anchors must stay unique as the file grows: two writers sharing a lateral subquery made two earlier anchors match twice; widen
   the anchor, never the mutation, and re-check every anchor with `DRY=1` before running only the delta mutants.
 
+## 2026-11-19 — T-105 accounting step 2: general ledger (preview)
+
+- A posting consumer runs in a service context with no role, so RLS hides the rows a plain function reads: the balance check saw an empty
+  entry and refused every posting (23514). Read-your-own-writes checks and the posting rules run as SECURITY DEFINER, granted to nobody, behind
+  one granted entry point that refuses another tenant's event.
+- A deferred constraint trigger is the right place for "every entry balances": rows are inserted one by one, the check runs once at COMMIT.
+  Pair it with a guard that lets lines be written only by the transaction that created their entry.
+- Do not write configuration rows that tests or other modules own at migration time for every tenant (the posting-map version): record it at
+  first use and never overwrite a recorded one.
+- "Blocked export" is not "official books". When the books are not authorised, keep the authorisation state explicit (an activation table
+  with no writer) and make every view say preview; evidence alone must promote nothing.
+- A refusal that must be audited cannot raise: the raise rolls the audit row back. Return the refusal and let the caller map it.
+- Shared lateral subqueries make mutation anchors match twice; scenario tests on the real writers find the joins a hand-built fixture hides
+  (an anonymous counter sale cannot be refunded to balance; purchasing is tenant-wide; a rejection needs a reason).
+- Reconcile scenario tests against the fixture journal by journal (S1-J1…S20-J2), not scenario by scenario: "scenario 12a covered" hid that a
+  package session's difference line was never recognised. A fixture row marked PENDING still has signed amounts to assert; assert those and
+  name the unsigned part as the acceptance gap.
+- An outbox claim that skips leased or locked rows gives no ordering between events. A rule that reads another entry (a mirror) instead of an
+  immutable fact is order-dependent: returning "nothing to post" when the original entry is missing acks the receipt and loses the reversal.
+  Post the original from its fact first (same posting key), then mirror; date the mirror at the domain reversal, never at the worker's clock.
+  Reproduce with the real worker by holding the original's receipt under another worker's live lease.
+- A posting rule that reads a mutable fact (a line whose discount is still pending) freezes whatever it saw first. Wait while the fact is
+  not final and wake on the event that finalizes it (subscribe the consumer to that event) instead of raising for a retry: a retry budget
+  is finite, a pending approval is not. Then test early and late consumption for every decision outcome, and exhaust the retry budget in
+  the test to prove the wait does not depend on it.
+- Key a derived entry by the exact facts it values: an entry keyed per execution froze whichever line it saw first, so a void and a re-bill
+  at another price diverged with the consumption order. Keyed per (execution, line), the void mirrors its own line's entry and the re-bill
+  posts its own — assert every order, including the reversed one, and the GL against the sub-ledger.
+- An identity the UI knows but the database drops (the selection row behind an invoice line) cannot be recovered later without guessing.
+  Capture it at the writer that creates the line, validate it server-side under the same lock as the uniqueness rule, make it immutable,
+  and leave every row without it explicitly open instead of backfilling by a heuristic.
+- An unresolved accounting case that must not be guessed can still be made visible: count it from business facts with the reader roles
+  and window of the page it lives on, state its semantics (event date, link state as of now), and never derive it from event receipts or
+  show a cause the facts cannot prove.
+- uuid v7 ids generated in the same millisecond do not keep insertion order: order test rows by a business column, not by id.
+- A new link (selection → line) can re-open a tax limit that was justified by the missing link (HYG-023 Q4): when a key is added, re-check
+  every rule that was "out of scope because no key" — here delivery VAT for products, closed by reusing the existing seam, not a new one.
+- A join from one line to every counter-line multiplies the line's amount by the number of counters: attribute per entry, by weight, and
+  assert the attributed parts sum to the original (a PKP payment has two liability counters).
+- In PostgreSQL `sum()` of bigint returns numeric: integer division and remainder over it need a cast back to bigint, or the "integer"
+  split silently becomes fractional.
+- A flag that is forced true for a filter (`OR p_branch IS NOT NULL`) hides the very case the filter exists to show; report the fact.
+- Moving a late fact to the next open period must move it in the readers too, or the locked month still changes.
+- Size intermediate products by the column bounds, not by typical amounts: two bigint money values multiply past bigint; compute the
+  product in numeric with integer div / mod and cast only the bounded results.
+- A drift proof by "body minus marked blocks = old body" needs whole-line blocks: change a statement by adding a marked block next to it,
+  not by editing inside a shared expression.
+
