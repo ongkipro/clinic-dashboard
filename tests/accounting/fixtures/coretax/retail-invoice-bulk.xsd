@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="">
+			<xs:element name="RetailInvoiceBulk">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element type="xs:string" name="TIN"/>
+						<xs:element type="xs:byte" name="TaxPeriodMonth"/>
+						<xs:element type="xs:short" name="TaxPeriodYear"/>
+						<xs:element name="ListOfRetailInvoice">
+							<xs:complexType>
+								<xs:sequence>
+									<xs:element name="RetailInvoice" maxOccurs="unbounded">
+										<xs:complexType>
+											<xs:sequence>
+												<xs:element type="xs:string" name="TrxCode"/>
+												<xs:element type="xs:string" name="BuyerName">
+													<xs:annotation>
+														<xs:documentation>NoVAT = field IB</xs:documentation>
+													</xs:annotation>
+												</xs:element>
+												<xs:element type="xs:string" name="BuyerIdOpt"/>
+												<xs:element type="xs:string" name="BuyerIdNumber"/>
+												<xs:element type="xs:string" name="GoodServiceOpt"/>
+												<xs:element type="xs:long" name="SerialNo"/>
+												<xs:element type="xs:date" name="TransactionDate"/>
+												<xs:element type="xs:int" name="TaxBaseSellingPrice"/>
+												<xs:element type="xs:int" name="OtherTaxBaseSellingPrice"/>
+												<xs:element type="xs:byte" name="VAT"/>
+												<xs:element type="xs:byte" name="STLG"/>
+												<xs:element type="xs:string" name="Info"/>
+											</xs:sequence>
+										</xs:complexType>
+									</xs:element>
+								</xs:sequence>
+							</xs:complexType>
+						</xs:element>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+		</xs:schema>

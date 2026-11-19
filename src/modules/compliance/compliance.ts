@@ -23,6 +23,7 @@ async function call<T>(fn: () => Promise<T>): Promise<T> {
 export const GATE_LABEL: Record<string, string> = {
   vat_on_invoices: "PPN pada invoice",
   journal_export: "Ekspor jurnal",
+  coretax_export: "Ekspor Coretax",
   public_site_publish: "Terbitkan situs klinik",
   campaign_sending: "Pengiriman kampanye",
   clinical_go_live: "Layanan klinis",

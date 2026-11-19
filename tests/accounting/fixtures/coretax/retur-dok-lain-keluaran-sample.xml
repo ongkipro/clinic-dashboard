@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<OutputSpecialDocReturn xsi:noNamespaceSchemaLocation="schema.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<TIN>741342560415159</TIN>
+	<OutputReturnDataList>
+		<OutputReturnData>
+			<DocumentNumber>string</DocumentNumber>
+			<ReturnDocumentNumber>string</ReturnDocumentNumber>
+			<TransactionType>string</TransactionType>
+			<DocumentType>string</DocumentType>
+			<TransactionDetail>string</TransactionDetail>
+			<TransactionDocument>string</TransactionDocument>
+			<DocumentDate>DD-MM-YYYY</DocumentDate>
+			<BuyerTIN>string</BuyerTIN>
+			<BuyerTaxpayerName>string</BuyerTaxpayerName>
+			<BuyerAddress>string</BuyerAddress>
+			<ReturnTaxBase>0</ReturnTaxBase>
+			<ReturnVAT>0</ReturnVAT>
+			<ReturnSTLG>0</ReturnSTLG>
+		</OutputReturnData>
+	</OutputReturnDataList>
+</OutputSpecialDocReturn>

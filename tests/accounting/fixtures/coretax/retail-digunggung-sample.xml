@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<RetailInvoiceBulk xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="schema.xsd">
+	<TIN>xxxxxxxxxxxxxxxx</TIN>
+	<TaxPeriodMonth>7</TaxPeriodMonth>
+	<TaxPeriodYear>2023</TaxPeriodYear>
+	<ListOfRetailInvoice>
+		<RetailInvoice>
+			<TrxCode>Normal</TrxCode>
+			<!--Normal = field IA5-->
+			<BuyerName>Lian</BuyerName>
+			<BuyerIdOpt>NPWP</BuyerIdOpt>
+			<BuyerIdNumber>xxxxxxxxxxxxxxxx</BuyerIdNumber>
+			<GoodServiceOpt>A</GoodServiceOpt>
+			<SerialNo>0101010101</SerialNo>
+			<TransactionDate>2023-03-20</TransactionDate>
+			<TaxBaseSellingPrice>2000000</TaxBaseSellingPrice>
+			<OtherTaxBaseSellingPrice>2000000</OtherTaxBaseSellingPrice>
+			<VAT>200000</VAT>
+			<STLG>0</STLG>
+			<Info/>
+		</RetailInvoice>
+	</ListOfRetailInvoice>
+</RetailInvoiceBulk>

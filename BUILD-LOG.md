@@ -923,3 +923,24 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - A drift proof by "body minus marked blocks = old body" needs whole-line blocks: change a statement by adding a marked block next to it,
   not by editing inside a shared expression.
 
+## 2026-11-19 — T-106 Coretax XML export for PKP tenants (gated)
+
+- Build tax documents from the frozen invoice-line snapshot (`vat_base`, `vat_amount`, `tax_category`) and the refunds' `vat_reversed`, never
+  from the catalog or today's settings; produce the XML in the database (`xmlelement` escapes text; strip control characters first) and log
+  the SHA-256 of the exact UTF-8 bytes in the same transaction that serves them.
+- A published template outranks a brief's paraphrase of it: DJP's retur `TransactionDocument` is a code (`01`–`10`), not a document
+  number, and `SerialNo` is `xs:long`. Vendor the official samples and the XSD embedded in the converter workbook (`xl/xmlMaps.xml`) with
+  their SHA-256 and check element order against them; Excel-inferred XSD numeric types (`xs:byte` for VAT) are not real limits.
+- The clinic's VAT split (amount − ROUND(amount × 100/111)) and DJP's retail formula ROUND(12 % × ROUND(11/12 × DPP)) disagree by ±1 rupiah
+  on about 10 % of amounts. Export the frozen value and count the differences; never silently recompute a frozen tax.
+- A serial derived from a month's ordering must only use facts that never change after the month (issue time, ids), so a later void never
+  renumbers a document already uploaded.
+- Two feature gates on the same obligation cannot be told apart by any fixture: a mutant that swaps them is equivalent; record it as dropped.
+- A same-day void may be decided by the manager (SET-43); a void of an earlier invoice is the owner's — test fixtures that backdate an
+  invoice must use the owner.
+- Isolation cases that make a shared tenant PKP or approve its evidence must undo it afterwards (later cases see tenant B as non-PKP).
+- An "empty" document can still be a required artifact (DJP's TaxInvoiceBulk envelope with an empty list): do not let a zero-row guard turn a
+  structural deliverable into a refusal. And state a numeric ceiling explicitly before a table check or a JSON number does it for you: a
+  check violation is not a named refusal, and a sum above 2^53 is not an exact JavaScript number. When a reader withholds totals, check every
+  place that renders them (cards AND the headline KPI): a placeholder 0 must never reach the screen as "Rp0".
+

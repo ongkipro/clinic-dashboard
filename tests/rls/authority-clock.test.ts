@@ -424,6 +424,9 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["waba_status", async () => ["select waba_status()", []], ["manager"]],
     ["waba_sealed_token", async () => ["select * from waba_sealed_token($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["waba_sealed_pin", async () => ["select * from waba_sealed_pin($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    // T-106 (PR-98): the Coretax status reader and export take the actor lock first (ledger_actor → tenant_actor_lock).
+    ["coretax_status", async () => ["select coretax_status('2026-01')", []], ["owner"]],
+    ["coretax_export", async () => ["select coretax_export('2026-01', 'retail')", []], ["finance"]],
     // T-088: the target writer and readers take the actor lock first.
     ["staff_target_set", async () => ["select staff_target_set('k-0000000102', $1, '2026-01', '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["target_mine", async () => ["select target_mine(null)", []], ["bc"]],

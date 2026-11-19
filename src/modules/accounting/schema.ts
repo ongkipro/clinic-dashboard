@@ -262,3 +262,37 @@ export const ledgerActivations = pgTable(
     check("ledger_activations_check", sql`length(btrim(${t.mapVersion})) between 1 and 80`),
   ],
 );
+
+// Coretax XML export log (PR-98, A-08, A-15; T-106, migration 0125, Panel 2 decision 5). One append-only row per document a PKP tenant's
+// owner or finance downloaded: the month, the document kind, the SHA-256 of the exact bytes served and their totals. The export itself is
+// built in the database from frozen invoice and refund facts (drizzle/0125 coretax_export); nothing here writes invoice_lines.tax_document_ref
+// (the NSFP is assigned by DJP after upload).
+export const CORETAX_DOC_KINDS = ["retail", "faktur", "retur", "pembatalan"] as const;
+export const coretaxExports = pgTable(
+  "coretax_exports",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    period: text("period").notNull(),
+    docKind: text("doc_kind", { enum: CORETAX_DOC_KINDS }).notNull(),
+    sha256: text("sha256").notNull(),
+    rowCount: bigint("row_count", { mode: "number" }).notNull(),
+    taxBaseTotal: bigint("tax_base_total", { mode: "number" }).notNull(),
+    vatTotal: bigint("vat_total", { mode: "number" }).notNull(),
+    exportedBy: uuid("exported_by").notNull(),
+    exportedAs: text("exported_as").notNull(),
+    exportedAt: timestamp("exported_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "coretax_exports_exported_by_fk", columns: [t.tenantId, t.exportedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("coretax_exports_tenant_id_id_key").on(t.tenantId, t.id),
+    index("coretax_exports_period_idx").on(t.tenantId, t.period, t.exportedAt),
+    // supported ceiling (T-106 r2, Panel 2 P2): 10^6 rows and Rp10^15 totals — all within Number.MAX_SAFE_INTEGER; the export refuses above it
+    // (bounds_exceeded) before this row is written. A zero-row row only for the structural named-buyer faktur (empty ListOfTaxInvoice, r2 P1).
+    check("coretax_exports_check", sql`${PERIOD(t.period)} and ${t.docKind} in (${inList(CORETAX_DOC_KINDS)}) and ${t.sha256} ~ '^[0-9a-f]{64}$'
+      and (${t.docKind} = 'faktur' and ${t.rowCount} = 0 and ${t.taxBaseTotal} = 0 and ${t.vatTotal} = 0 or ${t.rowCount} between 1 and 1000000)
+      and ${t.taxBaseTotal} between 0 and 1000000000000000 and ${t.vatTotal} between 0 and 1000000000000000
+      and ${t.exportedAs} in ('owner','finance')`),
+  ],
+);

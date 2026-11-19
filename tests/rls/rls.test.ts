@@ -635,6 +635,10 @@ describe("functions (TEN-16)", () => {
     "ledger_journal_export(date,date)",
     // T-105 G-Q4 U1–U4 (Panel 2): the read-only "Selisih penyerahan produk" counts (owner, finance, auditor; the actor lock first).
     "ledger_handover_exceptions(date,date,uuid)",
+    // T-106 (PR-98): the Coretax status reader (owner, finance, auditor) and the gated export (owner, finance; feature_gate_lock first, refusals
+    // returned and audited, the served document logged with its SHA-256). The document builders are internal (never granted).
+    "coretax_status(text)",
+    "coretax_export(text,text)",
     "subledger_export(text,date,date,uuid,uuid)",
     "vat_input_credit_record(text,jsonb)",
     "vat_payment_record(text,jsonb)",

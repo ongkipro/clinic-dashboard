@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="">
+			<xs:element name="OutputSpecialDocReturn">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element type="xs:long" name="TIN"/>
+						<xs:element name="OutputReturnDataList">
+							<xs:complexType>
+								<xs:sequence>
+									<xs:element name="OutputReturnData" minOccurs="1" maxOccurs="unbounded">
+										<xs:complexType>
+											<xs:sequence>
+												<xs:element type="xs:string" name="DocumentNumber"/>
+												<xs:element type="xs:string" name="ReturnDocumentNumber"/>
+												<xs:element type="xs:string" name="TransactionType"/>
+												<xs:element type="xs:string" name="DocumentType"/>
+												<xs:element type="xs:string" name="TransactionDetail"/>
+												<xs:element type="xs:string" name="TransactionDocument"/>
+												<xs:element type="xs:string" name="DocumentDate"/>
+												<xs:element type="xs:string" name="BuyerTIN"/>
+												<xs:element type="xs:string" name="BuyerTaxpayerName"/>
+												<xs:element type="xs:string" name="BuyerAddress"/>
+												<xs:element type="xs:byte" name="ReturnTaxBase"/>
+												<xs:element type="xs:byte" name="ReturnVAT"/>
+												<xs:element type="xs:byte" name="ReturnSTLG"/>
+											</xs:sequence>
+										</xs:complexType>
+									</xs:element>
+								</xs:sequence>
+							</xs:complexType>
+						</xs:element>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+		</xs:schema>
