@@ -701,8 +701,14 @@ describe("T-105 posting rules — booking DP (scenarios 6, 17) and PKP VAT (16, 
     expect((await h.admin.query(`select memo, map_version from journal_entries where posting_key = $1`, [`deposit_forfeited:${d2.deposit_id}`])).rows[0])
       .toEqual({ memo: "PENDING A-10 / Q-05 (draft)", map_version: "draft-11-2026-11-19" });
     const p3 = await patient(A, A.b1, "Pasien DP 6e");
+    // the DP is received on a future slot, then the start is moved to now (fixture surgery, as 6c above): quarter(1 h) lands on
+    // tomorrow's WIB date after 23:00 WIB and visit_check_in refuses a visit that is not today (T-107 gated close 1)
     const a3 = await appointment(p3, quarter(1 * H));
     const d3 = await as(FO, (db) => receiveDeposit(db, key(), a3, { method: "cash", cashTendered: 200_000 }));
+    for (const t of ["appointments", "resource_reservations"]) await h.admin.query(`alter table ${t} disable trigger ${t}_guard`);
+    await h.admin.query(`update appointments set starts_at = now(), ends_at = now() + interval '30 minutes' where id = $1`, [a3]);
+    await h.admin.query(`update resource_reservations set starts_at = now(), ends_at = now() + interval '30 minutes' where appointment_id = $1`, [a3]);
+    for (const t of ["appointments", "resource_reservations"]) await h.admin.query(`alter table ${t} enable always trigger ${t}_guard`);
     const { visitId } = await as(FO, (db) => checkIn(db, key(), a3));
     // the plan is signed and selected before the bill (as at the clinic), so the counted treatment can start after payment (S6e-J4)
     const { examId } = await as(DOC, (db) => openExam(db, key(), visitId));

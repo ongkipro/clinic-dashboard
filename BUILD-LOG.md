@@ -944,3 +944,42 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   check violation is not a named refusal, and a sum above 2^53 is not an exact JavaScript number. When a reader withholds totals, check every
   place that renders them (cards AND the headline KPI): a placeholder 0 must never reach the screen as "Rp0".
 
+
+## 2026-11-19 — T-107 dashboard read models and the UX-60 role homes
+
+- A KPI reader that returns fact rows (branch, local day, part, amount, source record) and sums them in one place gives the total, the
+  branch view and the drill-down from the same rows: the drill-down sum equals the total by construction, and a test can assert it.
+- Prove a KPI with one fresh tenant per KPI on facts written by the real writers; a shared tenant lets an earlier test's facts leak into a
+  later total (a K12 booking widened K15's covered minutes until the K15 test used its own days).
+- When the writers stamp the wall clock, a dated option (K4's aging anchor, K12's 24 h window, K15's intervals) needs seeded dates that tell
+  the options apart; keep those seeds in one block with the triggers off only for the insert, and test the rest through the writers.
+- A UNION's untyped `NULL` takes the type of the other branch only in its first SELECT; cast it (`NULL::uuid`) in every later branch, or
+  PostgreSQL types the column as text and the insert fails.
+- An alias named like a record variable in PL/pgSQL (`a` for both the actor and a table) is ambiguous at run time, not at create time: the
+  migration applies and the reader fails on first call. Give table aliases names the function never declares.
+- A browser check at 200 % text on a 390 px phone finds what a 1440 px screenshot cannot: a status badge beside a name squeezed the name to
+  one letter per line; put secondary badges under the link. Read the screenshots, not only the assertions (a lower-cased label lost
+  "SATUSEHAT" to "satusehat").
+- A mutant that survives because the fixture lacks the case it changes (a void, a count line counted exactly) is a missing fixture, not an
+  equivalent mutant: add the case through the real writer and re-run the mutant.
+- A test that builds "a slot one hour from now" fails after 23:00 local time whenever the code under test checks "today": round the slot
+  and move it to now with fixture surgery, or pin the clock. A late-evening full suite is a test in itself — keep the failure, find the date
+  arithmetic, and fix the fixture rather than re-running in the morning.
+
+## 2026-11-20 — T-107 r3: historical KPIs from dated facts (review 3ba1bf52)
+
+- A period-end KPI must subtract only facts dated up to that end. A helper that sums "everything so far" (here `kasir_line_paid`) makes
+  a historical report change when later activity happens. A stored current-state column (`cancelled_amount`) is history only if a dated
+  fact proves when it happened. Otherwise report the figure as incomplete, never a guess.
+- Owed balances (commission) come from dated movements: accruals, adjustments, and the net actually paid at `paid_at`. Do not use the
+  payout batch's current state, which is not history (a rejected batch loses its items), and do not let a carried-forward negative be
+  subtracted twice.
+- A utilisation denominator must be the population that can produce the numerator (eligible performers), including idle members.
+- Compare SLA thresholds on exact seconds; round only for display.
+- Branch-scoped permits and branch-independent registrations need different branch rules. Reuse the existing readable-predicate's rule
+  rather than "any staff_branches row".
+- r4 (re-review 3dcdb005): "eligible" must reuse the authoritative predicate (`booking_eligible`, with its named `assists` demotion)
+  per version in effect, not a look-alike over all eligibility rows. Lossless comparison means the stored unit carries the source
+  precision (microseconds for timestamptz); converting to a public unit happens once, at serialization. A count computed against a
+  per-row historical threshold must not be labelled with today's threshold; return the mix.
+

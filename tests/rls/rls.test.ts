@@ -642,6 +642,9 @@ describe("functions (TEN-16)", () => {
     "subledger_export(text,date,date,uuid,uuid)",
     "vat_input_credit_record(text,jsonb)",
     "vat_payment_record(text,jsonb)",
+    // T-107 (PR-33, UX-60): the dashboard readers (the actor lock first; on read, no table).
+    "dashboard_kpi(text,date,date,uuid,boolean)",
+    "dashboard_home(uuid)",
     // T-103 (PR-61): vendor server-fee billing — the clinic's Bayar and reader (the actor lock first) and the executor workers (issuer, fenced finish, recovery, Advice, approved requests, reminders).
     "vendor_billing_bayar_begin(text,uuid,text,text[],timestamp with time zone)",
     "vendor_billing_tenant_view()",

@@ -431,6 +431,9 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["staff_target_set", async () => ["select staff_target_set('k-0000000102', $1, '2026-01', '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["target_mine", async () => ["select target_mine(null)", []], ["bc"]],
     ["target_list", async () => ["select target_list(null, null)", []], ["owner"]],
+    // T-107 (PR-33): the dashboard readers take the actor lock first.
+    ["dashboard_kpi", async () => ["select dashboard_kpi('k1', current_date, current_date, null, false)", []], ["owner"]],
+    ["dashboard_home", async () => ["select dashboard_home(null)", []], ["facility_head"]], // a branch role: person() assigns the branch
     // T-087: the commission writers and readers take the actor lock first.
     ["commission_rule_create", async () => ["select commission_rule_create('k-0000000097', '{}'::jsonb)", []], ["finance"]],
     ["commission_rule_version", async () => ["select commission_rule_version('k-0000000098', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["finance"]],
