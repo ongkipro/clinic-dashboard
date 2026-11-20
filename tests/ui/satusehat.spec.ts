@@ -41,6 +41,7 @@ type Locator = {
   first(): Locator; filter(o: object): Locator; locator(s: string): Locator; getByRole(r: string, o?: object): Locator; getByLabel(t: string | RegExp, o?: { exact?: boolean }): Locator;
   waitFor(o?: object): Promise<void>; click(): Promise<void>; fill(v: string): Promise<void>; innerText(): Promise<string>; textContent(): Promise<string | null>; count(): Promise<number>;
   selectOption(v: string | object): Promise<unknown>; focus(): Promise<void>; getAttribute(n: string): Promise<string | null>; getByText(t: string | RegExp, o?: { exact?: boolean }): Locator;
+  inputValue(): Promise<string>; evaluate<A>(f: (e: HTMLInputElement, a: A) => void, a: A): Promise<void>;
   check(): Promise<void>;
 };
 type Page = {
@@ -89,12 +90,13 @@ async function measure(page: Page, key: string, shot?: string) {
   });
   if (shot) await page.screenshot({ path: `${OUT}/${shot}.png`, fullPage: true });
 }
-async function layouts(page: Page, path: string, name: string) {
+async function layouts(page: Page, path: string, name: string, prep?: () => Promise<void>) {
   for (const w of [390, 820, 1180, 1440]) {
     for (const zoom of [1, 2]) {
       await page.setViewportSize({ width: w, height: 900 });
       await page.goto(`${BASE}${path}`);
       await page.getByRole("heading", { level: 1 }).waitFor();
+      if (prep) await prep();
       if (zoom === 2) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
       await page.waitForTimeout(150);
       const shoot = (zoom === 1 && (w === 390 || w === 1440)) || (zoom === 2 && w === 390);
@@ -182,8 +184,38 @@ try {
   await fh.p.getByText("Ruang periksa disimpan.").first().waitFor();
   flow.push(["success: the reporting room set; the no-room section is gone", !/Ruang Periksa Belum Dipilih/.test(await main(fh.p))]);
   const nur = list(fh.p, "Tenaga kesehatan").locator("li").filter({ hasText: "Ners Dita" });
-  flow.push(["the nurse without an IHS number shows Belum diisi; the NIK lookup is named as unavailable",
-    /Belum diisi/.test(await nur.innerText()) && /Pencarian otomatis lewat NIK belum tersedia/.test(await main(fh.p))]);
+  flow.push(["the nurse without an IHS number shows Belum diisi; the section offers manual entry or a one-off NIK lookup (NIK deleted after use)",
+    /Belum diisi/.test(await nur.innerText()) && /atau cari sekali lewat NIK tenaga kesehatan/.test(await main(fh.p)) && /lalu dihapus/.test(await main(fh.p))]);
+  // T-102 increment 4 (TD-31): the NIK lookup for the nurse — a malformed NIK refused with fixed copy (never echoed), then a valid one sent;
+  // the field is a password input, empty again after the answer; the status shows the outcome words only (the worker is not run here)
+  await nur.getByText("Cari lewat NIK").click();
+  const nikField = nur.getByLabel("NIK tenaga kesehatan");
+  flow.push(["TD-31 lookup form: the NIK field is a password input with autocomplete off and empty",
+    (await nikField.getAttribute("type")) === "password" && (await nikField.getAttribute("autocomplete")) === "off" && (await nikField.inputValue()) === ""]);
+  await layouts(fh.p, "/satusehat", "nik-lookup", async () => { await list(fh.p, "Tenaga kesehatan").locator("li").filter({ hasText: "Ners Dita" }).getByText("Cari lewat NIK").click(); });
+  await fh.p.goto(`${BASE}/satusehat`);
+  const nur2 = list(fh.p, "Tenaga kesehatan").locator("li").filter({ hasText: "Ners Dita" });
+  await nur2.getByText("Cari lewat NIK").click();
+  const BAD = "3171-0112-0389-00X1";
+  await nur2.getByLabel("NIK tenaga kesehatan").evaluate((e: HTMLInputElement, v: string) => { e.removeAttribute("pattern"); e.value = v; }, BAD);
+  await nur2.getByRole("button", { name: "Cari Nomor IHS" }).click();
+  await nur2.getByRole("alert").waitFor();
+  const err = await nur2.innerText();
+  flow.push(["TD-31 lookup: a malformed NIK is refused with fixed copy (NIK harus 16 angka.) and never echoed", /NIK harus 16 angka\./.test(err) && !err.includes("00X1")
+    && (await nur2.getByLabel("NIK tenaga kesehatan").inputValue()) === ""]);
+  const GOOD = "3171011203890077"; // synthetic
+  await nur2.getByLabel("NIK tenaga kesehatan").fill(GOOD);
+  await nur2.getByRole("button", { name: "Cari Nomor IHS" }).click();
+  await fh.p.waitForURL(/\/satusehat\?ok=cari-nakes/);
+  await fh.p.getByText("Pencarian nomor IHS lewat NIK dikirim.").first().waitFor();
+  const sent = list(fh.p, "Tenaga kesehatan").locator("li").filter({ hasText: "Ners Dita" });
+  const html = await fh.p.content();
+  flow.push(["TD-31 lookup sent: Pencarian dikirim on the nurse's card; the NIK appears nowhere in the page (text or markup)",
+    /Pencarian dikirim/.test(await sent.innerText()) && !html.includes(GOOD) && !html.includes(GOOD.slice(0, 10))]);
+  // the recorded outcome of an earlier lookup (seeded through the worker with the mock port): not found → the words, no IHS
+  const rina = list(fh.p, "Tenaga kesehatan").locator("li").filter({ hasText: "Terapis Rina" });
+  flow.push(["TD-31 status: a finished lookup shows its outcome words (NIK tidak ditemukan di SATUSEHAT) and the card stays Belum diisi",
+    /NIK tidak ditemukan di SATUSEHAT/.test(await rina.innerText()) && /Belum diisi/.test(await rina.innerText())]);
   await nur.getByLabel("Nomor IHS tenaga kesehatan").fill("N10000009");
   await nur.getByRole("button", { name: "Simpan Nomor" }).click();
   await fh.p.waitForURL(/\/satusehat\?ok=nakes/);

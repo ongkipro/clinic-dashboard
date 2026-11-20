@@ -1,6 +1,6 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-20 (T-118 r2 after independent review 1d2a370d: CHANGES REQUIRED, two telemetry findings fixed (WhatsApp due by branch-local day; outbox dead letters, 24-hour failures not measured); T-118 in verification: vendor platform health, rebased on `f0bd3c44`, candidate migration 0127 (not on `main`); T-107 DONE `f0bd3c44`, CI 44610920846 (dashboard read models + UX-60 role homes, migration 0126 on `main`; r3/r4 after independent reviews 3ba1bf52 / 3dcdb005); T-106 DONE `c7f29c4e`, CI 44551597530; T-105 DONE as a PREVIEW `af295ec1`, CI 44509284530; HYG-023 DONE `14c99035`; T-104 DONE `1e54042a`; Fast-Track Careful mode with the end-of-development `cx/gpt-6.2-sol` review; the per-task rows below are the history and are unchanged)
+Updated: 2026-11-20 (T-102 increment 4 in verification: TD-31 practitioner NIK lookup, rebased onto `9de482f0` per DEC-049, candidate migration 0128 (not on `main`), DEC-123; T-118 r2 after independent review 1d2a370d: CHANGES REQUIRED, two telemetry findings fixed (WhatsApp due by branch-local day; outbox dead letters, 24-hour failures not measured); T-118 in verification: vendor platform health, rebased on `f0bd3c44`, candidate migration 0127 (not on `main`); T-107 DONE `f0bd3c44`, CI 44610920846 (dashboard read models + UX-60 role homes, migration 0126 on `main`; r3/r4 after independent reviews 3ba1bf52 / 3dcdb005); T-106 DONE `c7f29c4e`, CI 44551597530; T-105 DONE as a PREVIEW `af295ec1`, CI 44509284530; HYG-023 DONE `14c99035`; T-104 DONE `1e54042a`; Fast-Track Careful mode with the end-of-development `cx/gpt-6.2-sol` review; the per-task rows below are the history and are unchanged)
 Status: Active
 State: INTEGRATING
 Review-Risk: R4
@@ -39,8 +39,8 @@ U1–U4 (handover exception visible, not resolved), G-ACT (activation), G-RETRO 
 (journal export, fail-closed), G-SETTLE (production gateway settlement). **T-106** (Coretax XML export for PKP tenants, gated; R3; DEC-120;
 migration 0125) — **DONE** (`c7f29c4e`, CI 44551597530). **T-107** (dashboard read models K1–K18 + the six UX-60 role homes; R3;
 DEC-121; migration 0126) — **DONE** (`f0bd3c44`, CI 44610920846). **T-118** (vendor platform health, UX-45; R3; DEC-122) rebased on
-`f0bd3c44` (DEC-049), candidate migration 0127 (not on `main`), in verification. Parallel lanes (DEC-049): T-102 increment 4 parked
-(provisional migration, renumbers after T-118), T-122 slice 1 checkpointed, T-109–T-115 UI slices on the T-107 readers. Next queue:
+`f0bd3c44` (DEC-049), candidate migration 0127 (not on `main`), in verification. Parallel lanes (DEC-049): T-102 increment 4
+(TD-31 NIK lookup; DEC-123; candidate migration 0128, not on `main`) in verification in `t102-inc4` on base `9de482f0`, T-122 slice 1 checkpointed, T-109–T-115 UI slices on the T-107 readers. Next queue:
 M8 (T-108–T-119), M9 (T-120–T-131). Not deployed (no staging, DEC-034); no live provider connected. Main `f0bd3c44`.
 
 Previous summary (2026-11-17, kept): M0–M6 complete (M6 exit T-101 `427f250a`, CI 43976472609). **M7 open:** T-102 SATUSEHAT — increments 1–3
@@ -143,7 +143,9 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
-**Current (2026-11-20, latest):** T-118 (M8, vendor platform health; R3; DEC-122; candidate migration 0127, not on `main`) rebased on `f0bd3c44` (DEC-049), in verification (P1, `t118`, ledger `RUN-20261119T205209Z-85ac45a3`): freeze, gated close, then the independent R3 review; T-107 DONE (`f0bd3c44`, CI 44610920846).
+**Current (2026-11-20, latest):** T-102 increment 4 (M7, TD-31 practitioner NIK lookup; R3; DEC-123; candidate migration 0128, not on `main`) rebased onto `9de482f0` (DEC-049), in verification (P1, `t102-inc4`, ledger `RUN-20261120T072539Z-c404bfa5`; superseded run `RUN-20261119T152539Z-8203d6ee` finished BLOCKED: close 1 8/9, test-full never completed): freeze, gated close of all nine checks, then a new independent R3 review. TD-31 final acceptance and every external SATUSEHAT acceptance stay OPEN; mock adapter only.
+
+(2026-11-20, earlier, kept) T-118 (M8, vendor platform health; R3; DEC-122; candidate migration 0127, not on `main`) rebased on `f0bd3c44` (DEC-049), in verification (P1, `t118`, ledger `RUN-20261119T205209Z-85ac45a3`): freeze, gated close, then the independent R3 review; T-107 DONE (`f0bd3c44`, CI 44610920846).
 
 (2026-11-19, latest, kept) **Current (2026-11-19, latest):** T-107 (M8, dashboard read models + UX-60 role homes; R3; DEC-121; migration 0126) rebased on `c7f29c4e`, in verification (Lane B, `t107`): freeze-r1, gated close, then Panel 2 boundary review; T-106 DONE (`c7f29c4e`, CI 44551597530).
 
@@ -301,10 +303,13 @@ Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job v
 
 ## Next verified action
 
-**Current (2026-11-20, latest):** finish T-118 (freeze, gated close 9/9, independent R3 review, ledger PASS, exact-SHA green CI); then T-102 increment 4 renumbers after 0127.
+**Current (2026-11-20, latest):** finish T-102 increment 4 on `9de482f0` (freeze, gated close 9/9 incl. the first completed full suite, new independent R3 review); integration needs owner Git authorization; TD-31 final acceptance stays OPEN.
+
+(2026-11-20, earlier, kept) finish T-118 (freeze, gated close 9/9, independent R3 review, ledger PASS, exact-SHA green CI); then T-102 increment 4 renumbers after 0127.
 
 - **T-107 DONE (M8): dashboard read models and the UX-60 role homes** (PR-33, R3; DEC-121; migration 0126) — `f0bd3c44`, CI 44610920846 green. Follow-up for T-113: label the K14 SLA share from `sla_mix`, never `sla_minutes`.
 - **T-118 in verification (M8): vendor platform health** (PR-62, R3; DEC-122; candidate migration 0127) — see docs/tasks/T-118.md.
+- **T-102 increment 4 in verification (M7): TD-31 practitioner NIK lookup** (PR-35, R3; DEC-123; candidate migration 0128) — see docs/tasks/T-102.md §Increment 4.
 
 (2026-11-19, latest, kept) **Current (2026-11-19, latest):** finish T-107 (freeze-r1, gated close 9/9, Panel 2 boundary inspection, ledger PASS, exact-SHA green CI); then T-118 (Lane D) takes the next migration number.
 

@@ -580,7 +580,7 @@ describe("T-102 pinning, transitions, guards, isolation and the vendor", () => {
     for (const t of ["satusehat_outbox", "satusehat_links", "satusehat_errors", "satusehat_patient_identity", "satusehat_credentials", "satusehat_visit_context"]) {
       expect(await code(as(OWN, (db) => db.query(`select 1 from ${t} limit 1`))), t).toBe("raw:42501");
     }
-    expect((await h.admin.query(`select count(*)::int c from support_object_kinds where table_name like 'public.satusehat_%' and support_class = 'never'`)).rows[0].c).toBe(11);
+    expect((await h.admin.query(`select count(*)::int c from support_object_kinds where table_name like 'public.satusehat_%' and support_class = 'never'`)).rows[0].c).toBe(12); // + satusehat_practitioner_lookups (inc4)
     const vendor = await openAppPool({ connectionString: h.urlAs(await h.createLoginRole("", [VENDOR_GROUP_ROLE])), max: 1 }, VENDOR_GROUP_ROLE);
     try {
       const acc = async () => (await h.admin.query(`insert into auth_user (name, email, two_factor_enabled) values ('V', $1, true) returning id`, [`ssv${++n}@vendor-sintetis.test`])).rows[0].id as string;

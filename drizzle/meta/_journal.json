@@ -897,6 +897,13 @@
       "when": 1795121547664,
       "tag": "0127_vendor_health",
       "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1795159586633,
+      "tag": "0128_satusehat_lookup",
+      "breakpoints": true
     }
   ]
 }

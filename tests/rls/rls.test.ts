@@ -621,6 +621,12 @@ describe("functions (TEN-16)", () => {
     // T-102 increment 3: the UX-23 page reader and the facility head's error-body reader (the actor lock first).
     "satusehat_page(uuid)",
     "satusehat_error_body(uuid)",
+    // T-102 increment 4 (TD-31): the NIK lookup — the bound request and status reader (the actor lock first) and the unbound worker claim / record
+    // (refuse a bound connection). The table itself is never granted.
+    "satusehat_practitioner_lookup_request(uuid,text,uuid,uuid,text)",
+    "satusehat_practitioner_lookup_status(uuid)",
+    "satusehat_practitioner_lookup_claim(timestamp with time zone,integer)",
+    "satusehat_practitioner_lookup_record(uuid,integer,jsonb,timestamp with time zone)",
     // T-104 (PR-25): the sub-ledger readers and export (the actor lock first), the RLS predicate, and the finance VAT facts (owner D-A1).
     "subledger_rollforward(date,date,uuid)",
     // T-105 (PR-26): the posting entry point (one domain event → its matrix rule; refuses an event of another tenant; the consumer

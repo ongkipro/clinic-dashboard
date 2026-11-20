@@ -9,7 +9,7 @@ import { CommandError } from "../../../src/lib/command";
 import { setKekRingForTests } from "../../../src/lib/keys/runtime";
 import { openExam, saveExam } from "../../../src/modules/clinical/exam/exam";
 import { signRecord } from "../../../src/modules/clinical/records/records";
-import { errorBody, linkPractitioner, resend, resolveIdentity, revokeCredentials, satusehatPage, setCodeMap, setContextRoom, setCredentials }
+import { errorBody, linkPractitioner, requestPractitionerLookup, resend, resolveIdentity, revokeCredentials, satusehatPage, setCodeMap, setContextRoom, setCredentials }
   from "../../../src/modules/integrations/satusehat/satusehat";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { defineCases, expectLive, type IsolationEnv } from "../case";
@@ -134,12 +134,15 @@ export default defineCases(
       const identity = await outcome(mine(env, "records_officer", (db) => resolveIdentity(db, v.patient, null, "Dicek di portal")));
       const room = await outcome(mine(env, "facility_head", (db) => setContextRoom(db, v.visit, v.room)));
       const practitioner = await outcome(mine(env, "owner", (db) => linkPractitioner(db, k(), { staffId: v.doctor, ihs: `N7${String(runs).padStart(7, "0")}` })));
+      // T-102 inc4 (TD-31): a NIK lookup for B's doctor at B's branch (before the credential is revoked: B itself needs an active one)
+      const lookup = await outcome(mine(env, "owner", (db) => requestPractitionerLookup(db, k(), { staffId: v.doctor, branchId: env.victim.branchId,
+        nik: `3171${String(runs).padStart(12, "0")}` })));
       const map = await outcome(mine(env, "owner", (db) => setCodeMap(db, k(), { itemId: v.service, code: "99.29", display: "Injeksi terapi lain" })));
       // revoke B's live credential first (a later set would revoke it itself and the revoke would prove nothing)
       const revoke = await outcome(mine(env, "owner", (db) => revokeCredentials(db, v.credential)));
       const credential = await outcome(mine(env, "owner", (db) => setCredentials(db, k(), { branchId: env.victim.branchId, environment: "sandbox",
         organizationId: v.org, clientId: "client-asing", clientSecret: "rahasia-asing-iso" })));
-      const attempts = { resent, identity, room, practitioner, map, revoke, credential };
+      const attempts = { resent, identity, room, practitioner, lookup, map, revoke, credential };
       return { attempts, body: { ...attempts, patient: own && identity === "done" ? v.name : null } };
     },
   },

@@ -16,6 +16,7 @@ import { condition, conditionSystem, conditionValue, diagnosisRefs, dispenseSyst
   medicationRequest, medicationSystem, observation, observationSystem, prescriptionItemSystem, procedure, procedureSystem } from "./fhir";
 import { mockSatusehatPort } from "./mock";
 import type { Auth, CallResult, Fhir, SatusehatPort } from "./port";
+import { type LookupOutcome, parseNik, runPractitionerLookup, sealLookupNik } from "./practitioner-lookup";
 
 export const SECRET_PURPOSE = "satusehat.secret";
 
@@ -73,11 +74,37 @@ export type CredentialStatus = { id: string; branch_id: string; environment: str
 export const credentialStatus = (db: pg.ClientBase) =>
   call(async () => (await db.query(`select satusehat_credential_status() r`)).rows[0].r as CredentialStatus[]);
 
-// The practitioner IHS id (DEC-113 (6)), entered by hand by the owner or a facility head. A NIK lookup would need the branch secret in a bound
-// staff session; increment 1 keeps the secret worker-only and records the id manually (the lookup is a Panel 2 question for increment 3).
+// The practitioner IHS id (DEC-113 (6)), entered by hand by the owner or a facility head. The NIK lookup (below, increment 4) is the other
+// way in; the branch secret stays worker-only for both.
 export async function linkPractitioner(db: pg.ClientBase, key: string, i: { staffId: string; ihs: string }) {
   await assertProductionGoLive(db);
   return call(async () => (await db.query(`select satusehat_practitioner_link_set($1, $2, $3, 'manual') r`, [key, i.staffId, i.ihs])).rows[0].r as string);
+}
+
+// TD-31 practitioner NIK lookup (T-102 increment 4; Panel 2 T102-TD31-DECISION; DEC-123): the owner or a facility head types the NIK once.
+// It is validated and sealed HERE (tenant DEK, purpose satusehat.lookup_nik, bound to the staff member and this lookup's id, generated here),
+// so SQL only ever stores ciphertext for at most 15 minutes; the worker opens it, searches, records and the row's nik_enc is cleared by the
+// same terminal transition. The NIK is never returned, logged or put in an event or audit row.
+export async function requestPractitionerLookup(db: pg.ClientBase, key: string, i: { staffId: string; branchId: string; nik: string }) {
+  await assertProductionGoLive(db);
+  await bindDeployEnv(db); // the lookup's environment (satusehat_env): sandbox outside production, as the page and the worker
+  const nik = parseNik(i.nik); // a format error never carries the value
+  const tenantId = (await db.query(`select app_tenant_id() t`)).rows[0].t as string;
+  // the tenant's DEK: the existing one (any member reads the wrapped keys); the owner may create the first one (waba_data_key_ensure, owner /
+  // admin_pusat). A facility head with no DEK yet is refused: the branch credential (set by the owner) always created one, so in practice
+  // a tenant with an active credential has a DEK.
+  const keys = keysOf(tenantId, (await db.query(`select version, wrapped, is_current from tenant_data_keys_for()`)).rows)
+    ?? await ensureWabaTenantKeys(db, ring(), tenantId);
+  const lookupId = (await db.query(`select uuid_generate_v7() id`)).rows[0].id as string;
+  const sealed = sealLookupNik(ring(), keys, { staffId: i.staffId, lookupId }, nik);
+  return call(async () => (await db.query(`select satusehat_practitioner_lookup_request($1, $2, $3, $4, $5) r`,
+    [lookupId, key, i.staffId, i.branchId, sealed])).rows[0].r as string);
+}
+export type LookupStatusRow = { staff_id: string; state: "pending" | "leased" | "matched" | "not_found" | "ambiguous" | "failed" | "expired";
+  reason: string | null; requested_at: string };
+export async function practitionerLookupStatus(db: pg.ClientBase, branchId: string) {
+  await bindDeployEnv(db);
+  return call(async () => (await db.query(`select satusehat_practitioner_lookup_status($1) r`, [branchId])).rows[0].r as LookupStatusRow[]);
 }
 
 // The tenant's ICD-9 CM map for a service (owner / facility head; increment 2): a new row ends the current one; unvalidated until the
@@ -254,7 +281,7 @@ async function step<T>(w: Q, clock: () => Date, item: string, gen: number, link:
   return { r, status: st };
 }
 
-export type SyncResult = { leased: number; held: number; done: number; queued: number; stale: number; identity: number };
+export type SyncResult = { leased: number; held: number; done: number; queued: number; stale: number; identity: number; lookups: number };
 
 // One worker statement in its own short transaction with the deploy environment bound (DEL-3): no transaction ever stays open across a
 // remote call, so a slow SATUSEHAT never holds a row lock or the signing path.
@@ -284,8 +311,9 @@ function workerQ(worker: pg.Pool | pg.ClientBase): Q {
 export async function runSatusehatSync(worker: pg.Pool | pg.ClientBase, o: { now?: Date; clock?: () => Date; port?: SatusehatPort } = {}): Promise<SyncResult> {
   const port = o.port ?? mockSatusehatPort();
   const clock = o.clock ?? (o.now ? (() => o.now!) : () => new Date());
-  const res: SyncResult = { leased: 0, held: 0, done: 0, queued: 0, stale: 0, identity: 0 };
+  const res: SyncResult = { leased: 0, held: 0, done: 0, queued: 0, stale: 0, identity: 0, lookups: 0 };
   const w = workerQ(worker);
+  res.lookups = await runPractitionerLookups(w, port, clock, o.clock !== undefined || o.now !== undefined);
   const prepare = (c: { id: string; gen: number }) => w<Packet & IdentityPacket & { held?: string; stale?: boolean }>(`select satusehat_prepare($1, $2, $3) r`, [c.id, c.gen, clock()]);
   const release = async (c: { id: string; gen: number }) => {
     const st = await w<string>(`select satusehat_release($1, $2, $3) s`, [c.id, c.gen, clock()]);
@@ -321,6 +349,33 @@ export async function runSatusehatSync(worker: pg.Pool | pg.ClientBase, o: { now
     await release(c);
   }
   return res;
+}
+
+// TD-31: the practitioner NIK lookups (before the outbox, so a fresh link can unblock this pass's practitioner_unresolved work next pass).
+// Claim (the sweep expires and clears overdue rows first) → per row: open the NIK in this process, search through the port, record the
+// outcome (fenced; clears nik_enc). The branch secret and the NIK never leave this function.
+type LookupClaim = { id: string; gen: number; tenant_id: string; branch_id: string; staff_id: string; nik_enc: string | null; expires_at: string;
+  environment: Auth["environment"]; credential: Packet["credential"] | null; keys: Packet["keys"] };
+async function runPractitionerLookups(w: Q, port: SatusehatPort, clock: () => Date, injected: boolean): Promise<number> {
+  const claimed = await w<LookupClaim[]>(`select satusehat_practitioner_lookup_claim($1) r`, [clock()]);
+  for (const l of claimed) {
+    let outcome: LookupOutcome;
+    if (!l.credential) outcome = { state: "failed", reason: "token" };
+    else {
+      const cred = l.credential;
+      outcome = await runPractitionerLookup(
+        { lookupId: l.id, staffId: l.staff_id, nikEnc: l.nik_enc, expiresAt: l.expires_at, environment: l.environment },
+        { port, ring: ring(), keys: keysOf(l.tenant_id, l.keys), clock,
+          token: () => tokenFor({ tenant_id: l.tenant_id, branch_id: l.branch_id, environment: l.environment, credential: cred, keys: l.keys }, port, clock()) });
+    }
+    // only the outcome crosses into SQL: never the NIK (the ambiguous count stays here)
+    const p = outcome.state === "matched" ? { state: "matched", ihs: outcome.ihs } : outcome.state === "failed" ? { state: "failed", reason: outcome.reason }
+      : { state: outcome.state };
+    // review 44a609f4: production passes no instant — the record fences on the database clock after its locks; an injected test clock is
+    // passed and the definer advances it by the time it waited
+    await w(`select satusehat_practitioner_lookup_record($1, $2, $3::jsonb, $4) r`, [l.id, l.gen, JSON.stringify(p), injected ? clock() : null]);
+  }
+  return claimed.length;
 }
 
 async function identityLookup(p: IdentityPacket, port: SatusehatPort, now: Date) {

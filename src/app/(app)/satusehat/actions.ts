@@ -1,12 +1,13 @@
 "use server";
-// SATUSEHAT actions (UX-23; T-102 increment 3): Kirim Ulang, identity resolve / unresolvable, the reporting room, the practitioner IHS id (by
-// hand — the NIK lookup is not built), the ICD-9 CM map, and the branch credentials (owner / Admin Pusat; the secret is sealed on the server
+// SATUSEHAT actions (UX-23; T-102 increments 3–4): Kirim Ulang, identity resolve / unresolvable, the reporting room, the practitioner IHS id (by
+// hand, or by a one-off NIK lookup — TD-31, increment 4: the NIK is sealed in the module, never echoed), the ICD-9 CM map, and the branch credentials (owner / Admin Pusat; the secret is sealed on the server
 // and never shown back). Each refuses a form rendered in another context first (HYG-009 B2-1); the database decides authority and scope.
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { withTenantContext } from "../../../db/rls/context";
 import { CommandError } from "../../../lib/command";
-import { linkPractitioner, resend, RESEND_REASONS, resolveIdentity, revokeCredentials, setCodeMap, setContextRoom, setCredentials }
+import { LookupInputError } from "../../../modules/integrations/satusehat/practitioner-lookup";
+import { linkPractitioner, requestPractitionerLookup, resend, RESEND_REASONS, resolveIdentity, revokeCredentials, setCodeMap, setContextRoom, setCredentials }
   from "../../../modules/integrations/satusehat/satusehat";
 import { STALE_CONTEXT, staleContext } from "../../../modules/org/context/context";
 import { appPool, requestContext } from "../../../modules/org/context/store";
@@ -77,6 +78,20 @@ export async function practitionerAction(p: SatusehatState, f: FormData): Promis
   if (!UUID.test(key) || !UUID.test(staff)) return next(p, { error: COPY.ERR_INVALID_INPUT });
   if (!IHS.test(ihs)) return next(p, { error: "Isi nomor IHS tenaga kesehatan (3–64 huruf, angka atau tanda hubung)." });
   return run(p, f, (db) => linkPractitioner(db, key, { staffId: staff, ihs }), "nakes");
+}
+// TD-31 lookup: the NIK is read once from the form, validated and sealed by the module; on any refusal the state carries a fixed message,
+// never the value. The form is remounted after every answer, so the field is empty again.
+export async function lookupAction(p: SatusehatState, f: FormData): Promise<SatusehatState> {
+  const key = str(f, "key");
+  const staff = str(f, "staff");
+  const branch = str(f, "cabang");
+  const nik = typeof f.get("nik") === "string" ? (f.get("nik") as string) : "";
+  if (!UUID.test(key) || !UUID.test(staff) || !UUID.test(branch)) return next(p, { error: COPY.ERR_INVALID_INPUT });
+  if (!/^[0-9]{16}$/.test(nik.replace(/[\s-]/g, ""))) return next(p, { error: "NIK harus 16 angka." });
+  return run(p, f, (db) => requestPractitionerLookup(db, key, { staffId: staff, branchId: branch, nik }).catch((e) => {
+    if (e instanceof LookupInputError) throw new CommandError("ERR_INVALID_INPUT");
+    throw e;
+  }), "cari-nakes");
 }
 export async function codeMapAction(p: SatusehatState, f: FormData): Promise<SatusehatState> {
   const key = str(f, "key");

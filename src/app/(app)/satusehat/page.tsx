@@ -1,5 +1,6 @@
 // SATUSEHAT (UX-23, 17:62 / :174, 19:222, 07:63; T-102 increment 3): per branch, the queue and the resources sent, confirmed or rejected
-// (codes only), the identity queue, the reporting room, the practitioner IHS numbers (entered by hand), the ICD-9 CM map and the branch
+// (codes only), the identity queue, the reporting room, the practitioner IHS numbers (entered by hand or found once by NIK — TD-31,
+// increment 4), the ICD-9 CM map and the branch
 // credentials (the secret is never shown). The database projects per role: owner, manager, facility head, records officer see the monitor;
 // Admin Pusat sees counts and credentials; a doctor sees only his own signed visits. A rejected item opens the record for the facility head
 // only (the clinical role here). States: loading, empty, error, success (?ok=), blocked ("Kredensial cabang belum aktif"), permission.
@@ -11,7 +12,8 @@ import { ListPage } from "../../../components/templates/templates";
 import { LoadingList } from "../../../components/ui/states";
 import { StatusBadge, type StatusTone } from "../../../components/ui/status-badge";
 import { loadSatusehat, type SatusehatData } from "./data";
-import { CodeMapForm, CredentialForm, IdentityForm, PractitionerForm, ResendForm, RevokeForm, RoomForm } from "./forms";
+import { CodeMapForm, CredentialForm, IdentityForm, LookupForm, PractitionerForm, ResendForm, RevokeForm, RoomForm } from "./forms";
+import { type LookupState, NikLookupStatus } from "./nik-lookup";
 import { counter, LINK, OUTBOX, reason, resendable, shortId, TYPE, when } from "./labels";
 
 export const metadata: Metadata = { title: "SATUSEHAT — Clinic Dashboard" };
@@ -25,7 +27,7 @@ type SP = Record<string, string | string[] | undefined>;
 const DONE: Record<string, string> = {
   "dikirim-ulang": "Item dimasukkan lagi ke antrean.", identitas: "Identitas pasien disimpan.", "tidak-terselesaikan": "Identitas ditandai tidak dapat diselesaikan.",
   ruang: "Ruang periksa disimpan.", nakes: "Nomor IHS tenaga kesehatan disimpan.", peta: "Kode ICD-9 CM disimpan.", kredensial: "Kredensial cabang disimpan.",
-  dicabut: "Kredensial cabang dicabut.",
+  dicabut: "Kredensial cabang dicabut.", "cari-nakes": "Pencarian nomor IHS lewat NIK dikirim. NIK tidak disimpan setelah pencarian selesai.",
 };
 const TONE: Record<string, StatusTone> = { confirmed: "success", queued: "neutral", sending: "warning", outcome_unknown: "warning", held: "locked",
   failed: "danger", exception: "danger", withdrawal_pending: "blocked" };
@@ -36,6 +38,12 @@ const FIXED_BELOW: Record<string, [string, string]> = { // [for the roles that f
   identity_review: ["Tinjau identitas pasien di bagian Identitas Perlu Ditinjau.", "Identitas pasien ditinjau oleh petugas rekam medis atau penanggung jawab klinik."],
 };
 const title = (type: string, visit: string) => (type === "Encounter" ? `Kunjungan …${shortId(visit)}` : `${TYPE[type] ?? type} · kunjungan …${shortId(visit)}`);
+
+// The latest NIK lookup of a staff member (TD-31): a leased row shows as pending; the status never carries the NIK or an IHS id.
+function lookupOf(d: SatusehatData, staff: string) {
+  const r = d.lookups?.find((x) => x.staff_id === staff);
+  return r ? { state: (r.state === "leased" ? "pending" : r.state) as LookupState, requestedAt: r.requested_at } : null;
+}
 
 function Counts({ d }: { d: SatusehatData }) {
   const c = d.page.counts;
@@ -205,7 +213,7 @@ async function Content({ sp }: { sp: SP }) {
       {p.practitioners && (
         <section aria-labelledby="nakes" className={panel}>
           <h2 id="nakes" className={h2}>Nomor IHS Tenaga Kesehatan</h2>
-          <p className={muted}>Isi nomor IHS dari portal SATUSEHAT. Pencarian otomatis lewat NIK belum tersedia.</p>
+          <p className={muted}>Isi nomor IHS dari portal SATUSEHAT, atau cari sekali lewat NIK tenaga kesehatan. NIK hanya dipakai untuk satu pencarian (paling lama 15 menit), lalu dihapus.</p>
           {p.practitioners.length === 0 ? <p className="m-0">Belum ada tenaga kesehatan di cabang ini.</p> : (
             <ul className="m-0 grid list-none gap-2 p-0" aria-label="Tenaga kesehatan">
               {p.practitioners.map((s) => (
@@ -214,10 +222,17 @@ async function Content({ sp }: { sp: SP }) {
                     <span className="font-semibold [overflow-wrap:anywhere]">{s.name}</span>
                     <StatusBadge tone={s.ihs ? "success" : "warning"}>{s.ihs ? `IHS ${s.ihs}` : "Belum diisi"}</StatusBadge>
                   </div>
+                  <NikLookupStatus status={lookupOf(d, s.staff_id)} />
                   <details className="min-w-0" open={!s.ihs}>
                     <summary className={`${link} cursor-pointer`}>{s.ihs ? "Ganti nomor" : "Isi nomor"}</summary>
                     <PractitionerForm {...base} staff={s.staff_id} name={s.name} ihs={s.ihs} />
                   </details>
+                  {d.page.credential_active && (
+                    <details className="min-w-0">
+                      <summary className={`${link} cursor-pointer`}>Cari lewat NIK</summary>
+                      <LookupForm {...base} staff={s.staff_id} name={s.name} />
+                    </details>
+                  )}
                 </li>
               ))}
             </ul>

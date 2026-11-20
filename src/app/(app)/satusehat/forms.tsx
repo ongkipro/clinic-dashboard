@@ -6,7 +6,8 @@ import { useActionState, useState } from "react";
 import { ContextFields } from "../../../components/context-fields";
 import { Button } from "../../../components/ui/button";
 import type { RenderedContext } from "../../../modules/org/context/context";
-import { codeMapAction, credentialAction, practitionerAction, resendAction, resolveAction, revokeAction, roomAction, type SatusehatState } from "./actions";
+import { codeMapAction, credentialAction, lookupAction, practitionerAction, resendAction, resolveAction, revokeAction, roomAction, type SatusehatState } from "./actions";
+import { NikLookupForm } from "./nik-lookup";
 import { RESEND } from "./labels";
 
 const input = "min-h-[var(--target)] w-full min-w-0 rounded-[var(--radius-field)] border border-[var(--control-border)] bg-white px-3";
@@ -92,6 +93,22 @@ export function PractitionerForm({ ctx, cabang, staff, name, ihs }: Base & { sta
       <Button type="submit" variant="secondary" aria-disabled={pending}>{ihs ? "Ganti Nomor" : "Simpan Nomor"}</Button>
       <div className="min-[700px]:col-span-2"><Notice s={s} /></div>
     </form>
+  );
+}
+
+// TD-31 (increment 4): the one-off NIK lookup beside the manual entry. Remounted after every answer (the NIK field empties); the error is a
+// fixed message (never the value). Presentation: NikLookupForm (nik-lookup.tsx).
+function LookupFields({ act, ctx, cabang, staff, name, pending }: Base & { act: (f: FormData) => void; staff: string; name: string; pending: boolean }) {
+  const [k] = useState(() => crypto.randomUUID()); // a fresh key per mount; the parent remounts this after every answer
+  return <NikLookupForm action={act} ctx={ctx} cabang={cabang} staff={staff} name={name} idempotencyKey={k} pending={pending} />;
+}
+export function LookupForm({ ctx, cabang, staff, name }: Base & { staff: string; name: string }) {
+  const [s, act, pending] = useActionState<SatusehatState, FormData>(lookupAction, {});
+  return (
+    <div className="grid min-w-0 gap-2">
+      <LookupFields key={`l${staff}${s.n ?? 0}`} act={act} ctx={ctx} cabang={cabang} staff={staff} name={name} pending={pending} />
+      <Notice s={s} />
+    </div>
   );
 }
 

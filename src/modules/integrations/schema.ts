@@ -368,3 +368,52 @@ export const satusehatCodeMaps = pgTable(
       and ${KEY(t.commandKey)} and ${t.mappedAs} in ('owner','facility_head') and (${t.effectiveTo} is null or ${t.effectiveTo} > ${t.effectiveFrom})`),
   ],
 );
+
+// TD-31 practitioner NIK lookup (T-102 increment 4; Panel 2 T102-TD31-DECISION; DEC-123): a one-off request by the owner or a facility head.
+// The NIK is sealed in the server action (purpose `satusehat.lookup_nik`, bound to staff + lookup id) and kept at most 15 minutes; the
+// unbound worker opens it in memory only, searches Practitioner by NIK through the port and records the outcome. Erasure is a CONSTRAINT:
+// nik_enc is present exactly while the row is open (pending / leased) and NULL in every terminal state. No blind index; never granted.
+export const LOOKUP_STATES = ["pending", "leased", "matched", "not_found", "ambiguous", "failed", "expired"] as const;
+export const LOOKUP_FAIL_REASONS = ["http_4xx", "http_5xx", "timeout", "lost", "malformed", "token", "binding", "keys", "expired", "authority"] as const;
+export const satusehatPractitionerLookups = pgTable(
+  "satusehat_practitioner_lookups",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    environment: text("environment", { enum: SATUSEHAT_ENVIRONMENTS }).notNull(),
+    nikEnc: text("nik_enc"),
+    state: text("state", { enum: LOOKUP_STATES }).notNull().default("pending"),
+    reason: text("reason"),
+    linkId: uuid("link_id"),
+    leaseGen: integer("lease_gen").notNull().default(0),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    commandKey: text("command_key").notNull(),
+    requestedBy: uuid("requested_by").notNull(),
+    requestedAs: text("requested_as").notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [
+    unique("satusehat_practitioner_lookups_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("satusehat_practitioner_lookups_command_key").on(t.tenantId, t.commandKey),
+    uniqueIndex("satusehat_practitioner_lookups_one_open").on(t.tenantId, t.staffId).where(sql`${t.state} in ('pending','leased')`),
+    index("satusehat_practitioner_lookups_open_idx").on(t.state, t.expiresAt).where(sql`${t.state} in ('pending','leased')`),
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "satusehat_practitioner_lookups_staff_fk", columns: [t.tenantId, t.staffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "satusehat_practitioner_lookups_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "satusehat_practitioner_lookups_by_fk", columns: [t.tenantId, t.requestedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "satusehat_practitioner_lookups_link_fk", columns: [t.tenantId, t.linkId], foreignColumns: [satusehatPractitionerLinks.tenantId, satusehatPractitionerLinks.id] }).onDelete("restrict"),
+    check("satusehat_practitioner_lookups_check", sql`${t.state} in (${inList(LOOKUP_STATES)}) and ${t.environment} in (${inList(SATUSEHAT_ENVIRONMENTS)})
+      and ((${t.state} in ('pending','leased')) = (${t.nikEnc} is not null))
+      and (${t.nikEnc} is null or ${CIPHER(t.nikEnc)})
+      and ((${t.state} = 'matched') = (${t.linkId} is not null))
+      and ((${t.state} = 'failed') = (${t.reason} is not null)) and (${t.reason} is null or ${t.reason} in (${inList(LOOKUP_FAIL_REASONS)}))
+      and ((${t.state} = 'leased') = (${t.leaseUntil} is not null)) and ${t.leaseGen} >= 0
+      and ((${t.state} in ('pending','leased')) = (${t.finishedAt} is null))
+      and ${KEY(t.commandKey)} and ${t.requestedAs} in ('owner','facility_head')
+      and ${t.expiresAt} > ${t.requestedAt} and ${t.expiresAt} <= ${t.requestedAt} + interval '15 minutes'`),
+  ],
+);

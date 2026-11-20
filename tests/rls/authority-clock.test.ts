@@ -357,6 +357,9 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     ["satusehat_credential_revoke", async () => ["select satusehat_credential_revoke($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["satusehat_credential_status", async () => ["select satusehat_credential_status()", []], ["owner"]],
     ["satusehat_practitioner_link_set", async () => ["select satusehat_practitioner_link_set('k-0000000117', $1, 'N1', 'manual')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    // T-102 increment 4 (TD-31): the NIK lookup request and status take the actor lock first.
+    ["satusehat_practitioner_lookup_request", async () => ["select satusehat_practitioner_lookup_request($1, 'k-0000000126', $1, $1, 'v1.1.a.b.c')", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
+    ["satusehat_practitioner_lookup_status", async () => ["select satusehat_practitioner_lookup_status($1)", ["00000000-0000-7000-8000-000000000000"]], ["owner"]],
     ["satusehat_identity_resolve", async () => ["select satusehat_identity_resolve($1, null, 'bukti')", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["satusehat_context_room_set", async () => ["select satusehat_context_room_set($1, $1)", ["00000000-0000-7000-8000-000000000000"]], ["facility_head"]],
     ["satusehat_resend", async () => ["select satusehat_resend($1, 'remote_checked')", ["00000000-0000-7000-8000-000000000000"]], ["manager"]],

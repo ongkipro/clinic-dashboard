@@ -4,14 +4,15 @@
 import "server-only";
 import { withTenantContext } from "../../../db/rls/context";
 import { CommandError } from "../../../lib/command";
-import { credentialStatus, type CredentialStatus, errorBody, satusehatPage, type SatusehatPage } from "../../../modules/integrations/satusehat/satusehat";
+import { credentialStatus, type CredentialStatus, errorBody, type LookupStatusRow, practitionerLookupStatus, satusehatPage, type SatusehatPage }
+  from "../../../modules/integrations/satusehat/satusehat";
 import { type RenderedContext, renderedContext } from "../../../modules/org/context/context";
 import { appPool, requestContext } from "../../../modules/org/context/store";
 
 export const PAGE_ROLES = new Set(["owner", "admin_pusat", "manager", "facility_head", "records_officer", "doctor"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export type SatusehatData = { page: SatusehatPage; ctx: RenderedContext; branches: { id: string; name: string }[]; branchId: string;
-  credentials: CredentialStatus[] | null };
+  credentials: CredentialStatus[] | null; lookups: LookupStatusRow[] | null };
 
 export async function loadSatusehat(cabang: string | undefined) {
   const rc = await requestContext();
@@ -25,7 +26,9 @@ export async function loadSatusehat(cabang: string | undefined) {
       if (!pick) return { kind: "empty" as const };
       const page = await satusehatPage(db, pick);
       const credentials = c.actingRole === "owner" || c.actingRole === "admin_pusat" ? (await credentialStatus(db)).filter((x) => x.branch_id === pick) : null;
-      return { kind: "ok" as const, d: { page, ctx: renderedContext(c), branches: c.activeBranchId ? [] : branches, branchId: pick, credentials } satisfies SatusehatData };
+      // TD-31 (increment 4): the latest NIK lookup per staff member (state and reason code only) for those who may request one
+      const lookups = page.practitioners ? await practitionerLookupStatus(db, pick) : null;
+      return { kind: "ok" as const, d: { page, ctx: renderedContext(c), branches: c.activeBranchId ? [] : branches, branchId: pick, credentials, lookups } satisfies SatusehatData };
     });
   } catch (e) {
     if (e instanceof CommandError && (e.code === "ERR_FORBIDDEN" || e.code === "ERR_NOT_FOUND")) return { kind: "forbidden" as const };

@@ -998,3 +998,21 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   `p_now`, so a test can pin the instant without a clock override. A current stock (dead letters) is not a flow: if no event time is
   recorded, report the flow as not measured rather than relabelling the stock or borrowing another timestamp.
 
+## 2026-11-19 — T-102 increment 4: TD-31 practitioner NIK lookup (ephemeral, worker-run)
+
+- Make erasure a constraint, not a convention: `CHECK ((state IN ('pending','leased')) = (nik_enc IS NOT NULL))` refuses a terminal row that
+  keeps a NIK and an open row without one; the record step then cannot "forget" to clear it.
+- Seal a secret bound to the row it belongs to (staff + lookup id inside the AEAD plaintext) and generate that id in the server before the
+  INSERT, so a ciphertext moved to another row or tenant cannot be opened as the wrong person's NIK.
+- Re-check authority at the moment the effect happens (the worker's record), not only at request time: a facility head who loses the role
+  between request and record must not create a link.
+- `domain_events` payloads may not carry JSON nulls: build them with `jsonb_strip_nulls`.
+- A worker audit row has no staff: use a service identity (`satusehat.worker`) with a reason code only.
+- Bound definers that depend on `satusehat_env()` need the deploy env bound in the module call (`bindDeployEnv`), or a test tenant reads as
+  production and every sandbox credential check fails.
+- r3 (review b62a4c56): a worker that writes on a user's behalf must join the same tenant serialization as that user's writers and the
+  authority changes (here the `staff_access` advisory lock), taken before any row lock in the same order as the bound path, and judge
+  authority after the wait. Re-read the clock after every await that precedes disclosing a secret; acquire tokens before opening the secret.
+- r4 (review 44a609f4): a fence time captured before a lock wait is stale after it. Read the clock after the last lock; if a test clock is
+  injected, advance it by the measured wait instead of trusting the caller's instant.
+
