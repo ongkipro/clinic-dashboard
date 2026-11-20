@@ -983,3 +983,18 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   precision (microseconds for timestamptz); converting to a public unit happens once, at serialization. A count computed against a
   per-row historical threshold must not be labelled with today's threshold; return the mix.
 
+## 2026-11-20 — T-118 vendor platform health (UX-45), rebased onto T-107
+
+- A page-level CSP with a style nonce refuses inline `style` attributes, even on a loading skeleton. Use classes; the browser console is
+  the only place it shows (24 violations in the first run).
+- `overflow-wrap: anywhere` lets the browser shrink a table column below its longest word and split it mid-letter ("WhatsAp p"). Numbers
+  get `whitespace-nowrap`; text columns use `overflow-wrap: break-word`.
+- Integer `ORDER BY 1` with a `COLLATE` clause is a column position, not an expression; write the expression.
+- Renumbering a parked migration after another lane lands: move aside the untracked snapshot that the new base now tracks, fast-forward,
+  open the fresh ledger, then run `drizzle-kit generate --custom` against the real journal and copy the body in. Check that the journal
+  is the base plus one entry, the snapshot body equals the base's last one, and prevId equals its id.
+- r2 (review 1d2a370d): a monitoring reader must reuse the worker's own eligibility rule (here `outbound_claim`'s branch-local day), not a
+  simpler look-alike, or eastern-timezone work hides until Jakarta midnight. Put the aggregate in a small internal function that takes
+  `p_now`, so a test can pin the instant without a clock override. A current stock (dead letters) is not a flow: if no event time is
+  recorded, report the flow as not measured rather than relabelling the stock or borrowing another timestamp.
+

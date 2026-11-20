@@ -1,6 +1,6 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-20 (T-107 r4 after re-review 3dcdb005: CHANGES REQUIRED, three findings fixed (K15 booking_eligible per version, K14 lossless, Marketing SLA label); r3 after review 3ba1bf52; T-107 in verification (dashboard read models + UX-60 role homes, migration 0126, rebased on `c7f29c4e`); T-106 DONE `c7f29c4e`, CI 44551597530; T-105 DONE as a PREVIEW `af295ec1`, CI 44509284530; HYG-023 DONE `14c99035`; T-104 DONE `1e54042a`; Fast-Track Careful mode with the end-of-development `cx/gpt-6.2-sol` review; the per-task rows below are the history and are unchanged)
+Updated: 2026-11-20 (T-118 r2 after independent review 1d2a370d: CHANGES REQUIRED, two telemetry findings fixed (WhatsApp due by branch-local day; outbox dead letters, 24-hour failures not measured); T-118 in verification: vendor platform health, rebased on `f0bd3c44`, candidate migration 0127 (not on `main`); T-107 DONE `f0bd3c44`, CI 44610920846 (dashboard read models + UX-60 role homes, migration 0126 on `main`; r3/r4 after independent reviews 3ba1bf52 / 3dcdb005); T-106 DONE `c7f29c4e`, CI 44551597530; T-105 DONE as a PREVIEW `af295ec1`, CI 44509284530; HYG-023 DONE `14c99035`; T-104 DONE `1e54042a`; Fast-Track Careful mode with the end-of-development `cx/gpt-6.2-sol` review; the per-task rows below are the history and are unchanged)
 Status: Active
 State: INTEGRATING
 Review-Risk: R4
@@ -38,9 +38,10 @@ green on attempt 2; Panel 2 boundary APPROVED, Sol r10 `9c6b2e8a`; ledger PASS):
 U1–U4 (handover exception visible, not resolved), G-ACT (activation), G-RETRO (retroactivity), G-PENDING (pending map rules), G-EXPORT
 (journal export, fail-closed), G-SETTLE (production gateway settlement). **T-106** (Coretax XML export for PKP tenants, gated; R3; DEC-120;
 migration 0125) — **DONE** (`c7f29c4e`, CI 44551597530). **T-107** (dashboard read models K1–K18 + the six UX-60 role homes; R3;
-DEC-121; migration 0126) rebased on `c7f29c4e` (DEC-049), in verification (gated close on freeze-r1, then Panel 2 boundary). Parallel lanes
-(DEC-049): T-118 slice 2 (Lane D, provisional 0127), T-122 slice 1 checkpointed, T-109–T-115 UI slices on the T-107 readers. Next queue:
-M8 (T-108–T-119), M9 (T-120–T-131). Not deployed (no staging, DEC-034); no live provider connected. Main `c7f29c4e`.
+DEC-121; migration 0126) — **DONE** (`f0bd3c44`, CI 44610920846). **T-118** (vendor platform health, UX-45; R3; DEC-122) rebased on
+`f0bd3c44` (DEC-049), candidate migration 0127 (not on `main`), in verification. Parallel lanes (DEC-049): T-102 increment 4 parked
+(provisional migration, renumbers after T-118), T-122 slice 1 checkpointed, T-109–T-115 UI slices on the T-107 readers. Next queue:
+M8 (T-108–T-119), M9 (T-120–T-131). Not deployed (no staging, DEC-034); no live provider connected. Main `f0bd3c44`.
 
 Previous summary (2026-11-17, kept): M0–M6 complete (M6 exit T-101 `427f250a`, CI 43976472609). **M7 open:** T-102 SATUSEHAT — increments 1–3
 integrated (`882b2ab3`, CI 44062946402), final acceptance **OPEN / BLOCKED** on the owner's TD-31 practitioner-path decision. T-103 vendor
@@ -142,7 +143,9 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
-**Current (2026-11-19, latest):** T-107 (M8, dashboard read models + UX-60 role homes; R3; DEC-121; migration 0126) rebased on `c7f29c4e`, in verification (Lane B, `t107`): freeze-r1, gated close, then Panel 2 boundary review; T-106 DONE (`c7f29c4e`, CI 44551597530).
+**Current (2026-11-20, latest):** T-118 (M8, vendor platform health; R3; DEC-122; candidate migration 0127, not on `main`) rebased on `f0bd3c44` (DEC-049), in verification (P1, `t118`, ledger `RUN-20261119T205209Z-85ac45a3`): freeze, gated close, then the independent R3 review; T-107 DONE (`f0bd3c44`, CI 44610920846).
+
+(2026-11-19, latest, kept) **Current (2026-11-19, latest):** T-107 (M8, dashboard read models + UX-60 role homes; R3; DEC-121; migration 0126) rebased on `c7f29c4e`, in verification (Lane B, `t107`): freeze-r1, gated close, then Panel 2 boundary review; T-106 DONE (`c7f29c4e`, CI 44551597530).
 
 (2026-11-19, later, kept) **Current (2026-11-19, later):** T-106 (M8, Coretax XML export for PKP tenants, gated; R3; ledger `RUN-20261119T105103Z-90e64025`) in progress (Lane A); T-105 DONE as a PREVIEW (`af295ec1`, CI 44509284530; gates U1–U4, G-ACT, G-RETRO, G-PENDING, G-EXPORT, G-SETTLE open); HYG-023 DONE; T-104 DONE; T-102 OPEN / BLOCKED on owner TD-31.
 
@@ -298,10 +301,14 @@ Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job v
 
 ## Next verified action
 
-**Current (2026-11-19, latest):** finish T-107 (freeze-r1, gated close 9/9, Panel 2 boundary inspection, ledger PASS, exact-SHA green CI); then T-118 (Lane D) takes the next migration number.
+**Current (2026-11-20, latest):** finish T-118 (freeze, gated close 9/9, independent R3 review, ledger PASS, exact-SHA green CI); then T-102 increment 4 renumbers after 0127.
+
+- **T-107 DONE (M8): dashboard read models and the UX-60 role homes** (PR-33, R3; DEC-121; migration 0126) — `f0bd3c44`, CI 44610920846 green. Follow-up for T-113: label the K14 SLA share from `sla_mix`, never `sla_minutes`.
+- **T-118 in verification (M8): vendor platform health** (PR-62, R3; DEC-122; candidate migration 0127) — see docs/tasks/T-118.md.
+
+(2026-11-19, latest, kept) **Current (2026-11-19, latest):** finish T-107 (freeze-r1, gated close 9/9, Panel 2 boundary inspection, ledger PASS, exact-SHA green CI); then T-118 (Lane D) takes the next migration number.
 
 - **T-106 DONE (M8): Coretax XML export for PKP tenants, gated** — `c7f29c4e`, CI 44551597530 green.
-- **T-107 in verification (M8): dashboard read models and the UX-60 role homes** (PR-33, R3; DEC-121; migration 0126) — see docs/tasks/T-107.md.
 
 (2026-11-19, later, kept) **Current (2026-11-19, later):** finish T-106 (freeze, gated close, Panel 2 boundary inspection, ledger PASS, exact-SHA green CI); T-107 integrates from Lane B.
 

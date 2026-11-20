@@ -1,10 +1,11 @@
 # Architecture — clinic-dashboard
 
-Updated: 2026-11-19 (T-107 dashboard read models and the six UX-60 role homes: migration 0126 — in the T-107 worktree; T-106 Coretax XML
+Updated: 2026-11-20 (T-118 vendor platform health: candidate migration 0127 — in verification in the T-118 worktree, not on `main`; T-107
+dashboard read models and the six UX-60 role homes DONE `f0bd3c44`, CI 44610920846: migration 0126 on `main`; T-106 Coretax XML
 export for PKP tenants, gated: migration 0125 DONE `c7f29c4e`, CI 44551597530; T-105 accounting step 2 DONE as a PREVIEW (`af295ec1`: migrations 0123 general
 ledger and 0124 selection link; official activation, journal export and U1–U4 resolution open gates); HYG-023 DONE (A-12 VAT at delivery,
 migration 0122); T-104 DONE; T-103 DONE — fixture-verified, live payment disabled, owner activation decisions open; M7 open — T-102 final
-acceptance OPEN on the owner's TD-31 decision; migrations through 0125 on `main`, 0126 in the T-107 worktree)
+acceptance OPEN on the owner's TD-31 decision; migrations through 0126 on `main`, candidate 0127 in the T-118 worktree)
 Stack (as installed): Next.js 16.4.5 (App Router, TypeScript; HYG-022), React 19.3.1, PostgreSQL 16.15 + Drizzle ORM 0.45.4, Better Auth 1.7.15,
 Tailwind CSS 4.3.3 + shadcn/ui, Vitest 5.0.5 + playwright-core (browser evidence, run on request), pnpm, Docker (Coolify target).
 
@@ -30,7 +31,7 @@ flowchart LR
   APP -->|"clinic_app login, withTenantContext"| DB[(PostgreSQL 16\nRLS on every table)]
   BOOK -->|"clinic_app login: aftercare page / OTP definers (app pool);\npayment ingest on the unbound worker pool"| DB
   APP -->|"clinic_auth login"| DB
-  VEN -->|"clinic_vendor login: EXECUTE on vendor_console_* only"| DB
+  VEN -->|"clinic_vendor login: EXECUTE on vendor_console_* only\n(T-118 candidate 0127: vendor_console_health — aggregates only;\noutbox dead letters now, WhatsApp due by branch-local day)"| DB
   VEN -->|"clinic_auth login, surface=vendor"| DB
   EXEC["executor jobs (clinic_executor)\nvendor request / lifecycle consume, support expiry,\nserver-fee billing (issue, recover, Advice, apply, reminders)"] --> DB
   JOBS["unbound clinic_app jobs (no tenant context)\nreminder / follow-up / automation / package / credential scans,\noutbound dispatch, SATUSEHAT sync, webhook ingest"] --> DB
@@ -104,7 +105,7 @@ Rp10^15 DPP / PPN — exact in JavaScript) is refused by name (`bounds_exceeded`
 download audited; a download is
 logged in `coretax_exports` (append-only) with the SHA-256 of its exact bytes; `invoice_lines.tax_document_ref` is never written (DJP assigns
 the NSFP after upload). Not built: buyer tax identity / named-buyer faktur rows, PJAP or host-to-host upload (A-08: XML first).
-Built (T-107, DEC-121; migration 0126, in the T-107 worktree): dashboard read models computed on read (PR-33, Appendix A) — no table, no
+Built (T-107, DEC-121; migration 0126; `f0bd3c44`, CI 44610920846): dashboard read models computed on read (PR-33, Appendix A) — no table, no
 stored aggregate, no refresh job. `dashboard_kpi` returns K1–K18 as fact rows (branch, local day, part, amount, source record) with the total of
 the money parts, per-branch / per-part sums and the drill-down rows; K2 and K5 reuse `subledger_movements`, K19 stays `target_mine` /
 `target_list` (0103). The five KPIs the PRD left open follow Panel 2's decisions (K4 ages from `invoices.issued_at`; K12's denominator
@@ -121,7 +122,7 @@ partial total).
 |---|---|---|
 | `APP_HOST` | clinic pages under `/(app)` and `/(auth)`, `/api/auth/*`, `/api/v1/webhooks/meta` (WhatsApp webhook, T-090), `/layar-antrean/[token]` (queue display, T-048), `/dev/*` (development only; refused in production) | — |
 | `BOOKING_HOST` | `/aftercare/[token]` (T-096), `/api/v1/webhooks/payment/mock` (mock payment webhook, T-073) | `/{slug}/…` public site pages and `/api/v1/public/` (T-123–T-127); the resolver already refuses everything else |
-| `VENDOR_HOST` | `/vendor/**` console pages: `tenant` (list, detail, new), `onboarding` (+ checklist), `tim`, `keamanan`, `undangan/[token]`, sign-in / TOTP pages, server-fee billing `tagihan` (T-103), `/vendor/api/auth/[...all]` (Better Auth, surface=vendor; `src/proxy.ts` allows non-GET there except form posts) and `/vendor/api/console/[action]` (JSON writes) | `/api/v1/vendor/`; support-session console pages (the `vendor_console_support_*` functions exist and are tested; no page yet — T-129) |
+| `VENDOR_HOST` | `/vendor/**` console pages: `tenant` (list, detail, new), `onboarding` (+ checklist), `tim`, `keamanan`, `undangan/[token]`, sign-in / TOTP pages, server-fee billing `tagihan` (T-103), platform health `kesehatan` (T-118, candidate 0127 — in verification), `/vendor/api/auth/[...all]` (Better Auth, surface=vendor; `src/proxy.ts` allows non-GET there except form posts) and `/vendor/api/console/[action]` (JSON writes) | `/api/v1/vendor/`; support-session console pages (the `vendor_console_support_*` functions exist and are tested; no page yet — T-129) |
 
 ### Background jobs (as built: functions and their tests; no scheduler process is deployed yet)
 
@@ -234,6 +235,7 @@ provider sits behind a port with a mock adapter; no live WhatsApp, payment, SATU
 | `vendor/team` | Tim Vendor invitations, state changes | HYG-003 |
 | `vendor/onboarding` | onboarding grant, invitation drafts | T-024 |
 | `vendor/checklist` | onboarding checklist and the go-live gate (PR-59, UX-41; migration 0051): console calls by session token, vendor_guard + authority re-check before every exit; go-live through the lifecycle step | T-027, HYG-014 |
+| `vendor/health` (page-only: `src/app/vendor/kesehatan`) | Konsol Vendor › Kesehatan Platform (PR-62, UX-45, OBS-2–OBS-4; DEC-122; **candidate migration 0127, in verification in the T-118 worktree — not on `main`**): `vendor_console_health(text,text)` SECURITY DEFINER to `clinic_vendor` (platform_owner, support; 12-hour second factor; `vendor_log` + authority re-check before the exit) — per tenant and provider (outbox, WhatsApp, SATUSEHAT, payment and Meta webhooks) counts, ages, instants and sanitised codes only — outbox exhausted receipts as a current dead-letter count with its 24-hour failures not measured, WhatsApp due backlog by `outbound_claim`'s branch-local day (internal `vendor_health_whatsapp`) — WAL archive only while `archive_mode` is on; internal `vendor_health_code(s)`, `vendor_health_whatsapp`; no table. Uptime, worker heartbeat, backup age and the app error rate are "Belum terpantau" (Option A) | T-118 |
 | `vendor/support` | support sessions (open, extend once, end, list), bind tickets, `withSupportSession` reads, Owner end, expiry sweep; operator class per table (`support_object_kinds`), operator policies (`src/db/rls/operator.sql`); Owner approval of personal/clinical scopes and the Akses Vendor data (`scope.ts`: sessions, paginated access log with `row_found`) | T-025, T-026 |
 
 Shared UI: `src/components/shell` (role-filtered navigation), `templates`, `visit-track`, `ui` (DESIGN.md tokens, `src/styles/tokens.css`).
@@ -284,7 +286,7 @@ Shared UI: `src/components/shell` (role-filtered navigation), `templates`, `visi
 
 ## Data
 
-PostgreSQL 16.15, 127 migrations (`drizzle/0000_uuid_v7.sql`–`0126_dashboards.sql` in the T-107 worktree; `0000`–`0125` on `main`), applied migrations immutable (`src/db/migrate.ts` refuses drift). All five `scope_map` policy kinds are active in production migrations: `tenant-shared`, `clinical` (from `0069_intakes.sql`), `branch-scoped` (from `0077_stock.sql`), `tenant-ledger`, and `platform`. Encryption helpers: `src/lib/keys` (envelope encryption, KEK file; patient identity fields sealed under per-tenant DEKs). No real patient data exists (synthetic test fixtures only; residency/real-patient gate planned in T-120).
+PostgreSQL 16.15, 127 migrations on `main` (`drizzle/0000_uuid_v7.sql`–`0126_dashboards.sql`; candidate `0127_vendor_health.sql` in the T-118 worktree, not on `main`), applied migrations immutable (`src/db/migrate.ts` refuses drift). All five `scope_map` policy kinds are active in production migrations: `tenant-shared`, `clinical` (from `0069_intakes.sql`), `branch-scoped` (from `0077_stock.sql`), `tenant-ledger`, and `platform`. Encryption helpers: `src/lib/keys` (envelope encryption, KEK file; patient identity fields sealed under per-tenant DEKs). No real patient data exists (synthetic test fixtures only; residency/real-patient gate planned in T-120).
 
 ## Operations
 

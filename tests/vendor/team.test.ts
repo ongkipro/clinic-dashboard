@@ -314,6 +314,8 @@ describe("history and privileges", () => {
       "vendor_console_billing_request(text, text, uuid, text, jsonb, text)",
       "vendor_console_checklist(text, text, uuid)",
       "vendor_console_checklist_set(text, text, uuid, uuid, text, text, text, uuid)",
+      // T-118 (Panel 2 pre-approved): the Kesehatan Platform reader (platform_owner, support; read-only).
+      "vendor_console_health(text, text)",
       "vendor_console_ip_allowed(text)",
       "vendor_console_me(text, text)",
       "vendor_console_onboarding_access(text, text, uuid, text)",
