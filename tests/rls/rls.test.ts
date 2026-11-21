@@ -652,6 +652,15 @@ describe("functions (TEN-16)", () => {
     "dashboard_kpi(text,date,date,uuid,boolean)",
     "dashboard_home(uuid)",
     "recon_report(date,date,uuid)", // T-108 (PR-34): the Rekon reader (owner, finance, auditor; the actor lock first; read only, no table)
+    // T-116 (PR-95, 0130): the K20–K27 report readers (dashboard_actor guard: the actor lock first; facts only, no table).
+    "report_k20(date,date,uuid)",
+    "report_k21(date,uuid)",
+    "report_k22(date,uuid,integer)",
+    "report_k23(date,date,uuid)",
+    "report_k24(date,date,uuid)",
+    "report_k25(date,date,uuid)",
+    "report_k26(date,date,uuid)",
+    "report_k27(date,date,uuid)",
     // T-103 (PR-61): vendor server-fee billing — the clinic's Bayar and reader (the actor lock first) and the executor workers (issuer, fenced finish, recovery, Advice, approved requests, reminders).
     "vendor_billing_bayar_begin(text,uuid,text,text[],timestamp with time zone)",
     "vendor_billing_tenant_view()",

@@ -437,6 +437,17 @@ describe("2.1 an actor ended after its transaction started is refused by every c
     // T-107 (PR-33): the dashboard readers take the actor lock first.
     ["dashboard_kpi", async () => ["select dashboard_kpi('k1', current_date, current_date, null, false)", []], ["owner"]],
     ["dashboard_home", async () => ["select dashboard_home(null)", []], ["facility_head"]], // a branch role: person() assigns the branch
+    // T-116 (PR-95, 0130): the K20–K27 report readers take the actor lock first (dashboard_actor → tenant_actor_lock). Each case uses a role the
+    // reader admits AND this harness can bind (person() gives non-owner/admin/finance roles a branch, which the level-3 check refuses for
+    // marketing / central_cs / auditor); the role lists themselves are tested in tests/reporting/reports.test.ts.
+    ["report_k20", async () => ["select report_k20(current_date, current_date, null)", []], ["owner"]],
+    ["report_k21", async () => ["select report_k21(current_date, null)", []], ["finance"]],
+    ["report_k22", async () => ["select report_k22(current_date, null, 10)", []], ["owner"]],
+    ["report_k23", async () => ["select report_k23(current_date, current_date, null)", []], ["manager"]],
+    ["report_k24", async () => ["select report_k24(current_date, current_date, null)", []], ["pharmacist"]],
+    ["report_k25", async () => ["select report_k25(current_date, current_date, null)", []], ["manager"]],
+    ["report_k26", async () => ["select report_k26(current_date, current_date, null)", []], ["finance"]],
+    ["report_k27", async () => ["select report_k27(current_date, current_date, null)", []], ["manager"]],
     // T-087: the commission writers and readers take the actor lock first.
     ["commission_rule_create", async () => ["select commission_rule_create('k-0000000097', '{}'::jsonb)", []], ["finance"]],
     ["commission_rule_version", async () => ["select commission_rule_version('k-0000000098', $1, '{}'::jsonb)", ["00000000-0000-7000-8000-000000000000"]], ["finance"]],
