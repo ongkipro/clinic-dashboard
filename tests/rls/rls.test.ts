@@ -651,6 +651,7 @@ describe("functions (TEN-16)", () => {
     // T-107 (PR-33, UX-60): the dashboard readers (the actor lock first; on read, no table).
     "dashboard_kpi(text,date,date,uuid,boolean)",
     "dashboard_home(uuid)",
+    "recon_report(date,date,uuid)", // T-108 (PR-34): the Rekon reader (owner, finance, auditor; the actor lock first; read only, no table)
     // T-103 (PR-61): vendor server-fee billing — the clinic's Bayar and reader (the actor lock first) and the executor workers (issuer, fenced finish, recovery, Advice, approved requests, reminders).
     "vendor_billing_bayar_begin(text,uuid,text,text[],timestamp with time zone)",
     "vendor_billing_tenant_view()",
