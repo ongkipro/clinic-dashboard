@@ -15,6 +15,7 @@ import { BLOCKER_COPY, closeBlocker, trackStates, unpaid, type Visit } from "../
 import { loadHariIni } from "./data";
 import { CheckIn, CloseVisit } from "./forms";
 import { dayLabel, time, type View, VIEWS, ZONE } from "./labels";
+import { READERS } from "./ringkasan/load";
 
 export const metadata: Metadata = { title: "Hari Ini — Clinic Dashboard" };
 type Q = { cabang?: string; tampilan?: string };
@@ -43,6 +44,8 @@ async function Body({ searchParams }: { searchParams: Promise<Q> }) {
   const tz = p.board.timezone;
   const zone = ZONE[tz] ?? "";
   const view: View = q.tampilan === "menunggu" || q.tampilan === "belum-bayar" ? q.tampilan : "semua";
+  // Ringkasan Shift (PR-33c, T-111): the roles its readers admit (kasir_reader and visits_today: Admin Pusat reads this board but not the cashier), the owner naming the branch it looks at.
+  const summary = (READERS as readonly string[]).includes(p.ctx.r) ? { label: "Ringkasan Shift", href: `/hari-ini/ringkasan${p.ctx.r === "owner" ? `?${new URLSearchParams({ cabang: p.branch.id })}` : ""}` } : undefined;
   const href = (v: View) => `/hari-ini?${new URLSearchParams({ cabang: p.branch.id, ...(v === "semua" ? {} : { tampilan: v }) })}`;
   const now = p.board.now.getTime();
   const { visits, arrivals } = p.board;
@@ -75,7 +78,7 @@ async function Body({ searchParams }: { searchParams: Promise<Q> }) {
 
   return (
     <Shell>
-      <PageTitle title="Hari Ini" />
+      <PageTitle title="Hari Ini" action={summary} />
       <nav aria-label="Cabang dan tampilan" className="grid min-w-0 gap-2">
         <p className="m-0 font-semibold">{p.branch.name} · {dayLabel(p.board.today)} · {zone}</p>
         {p.branches.length > 1 && (
