@@ -1,7 +1,8 @@
 // Rekonsiliasi (UX-22 ▸ Rekon, PR-34; T-108). Presentational server component: the engine's report in, markup out; no data access
 // (page.tsx and the `recon_report` reader land after T-107). Verdict first, then every difference with its document reference (worst
 // first), inter-branch clearing per day, handover exceptions, and the day × branch table of KPI vs ledger per metric. Days without
-// activity and without differences collapse into one line so the table stays readable. Compact (< 700 px): cards; regular: table.
+// activity and without differences collapse into one line so the table stays readable. Cards below a 48 em CONTAINER (so 200 % text
+// reflows to cards, WCAG 1.4.10, as Ringkasan Shift), table at or above it.
 // One state per screen via ListPage; unavailable reads "Belum tersedia", never Rp0. No clinical content.
 import { cn } from "cn";
 import { ChevronRight } from "lucide-react";
@@ -59,12 +60,12 @@ function Table({ d, p }: { d: ReconReport; p: RekonProps }) {
   const rows = d.rows.filter(active);
   const quiet = d.rows.length - rows.length;
   return (
-    <section aria-labelledby="harian" className="grid min-w-0 gap-2">
+    <section aria-labelledby="harian" className="@container grid min-w-0 gap-2">
       <h2 id="harian" className={h2}>Per hari dan cabang</h2>
       <p className={muted}>Angka operasional / buku besar; satu angka berarti keduanya sama.</p>
       {rows.length === 0 ? <p role="status" className={cn(panel, "text-[var(--label-2)]")}>Belum ada transaksi pada periode ini.</p> : (
         <>
-          <div tabIndex={0} role="region" aria-label="Rekonsiliasi per hari dan cabang" className="hidden min-w-0 overflow-x-auto rounded-[var(--radius-group)] bg-[var(--surface)] focus-visible:outline focus-visible:outline-3 focus-visible:outline-[var(--tint)] min-[700px]:block">
+          <div tabIndex={0} role="region" aria-label="Rekonsiliasi per hari dan cabang" className="hidden min-w-0 overflow-x-auto rounded-[var(--radius-group)] @min-[48em]:block bg-[var(--surface)] focus-visible:outline focus-visible:outline-3 focus-visible:outline-[var(--tint)]">
             <table className="w-full border-collapse text-left">
               <caption className="sr-only">KPI operasional dibanding buku besar per hari dan cabang</caption>
               <thead><tr>
@@ -83,7 +84,7 @@ function Table({ d, p }: { d: ReconReport; p: RekonProps }) {
               </tbody>
             </table>
           </div>
-          <ul aria-label="Rekonsiliasi per hari dan cabang" className="m-0 grid list-none gap-3 p-0 min-[700px]:hidden">
+          <ul aria-label="Rekonsiliasi per hari dan cabang" className="m-0 grid list-none gap-3 p-0 @min-[48em]:hidden">
             {rows.map((r) => (
               <li key={`${r.day}-${r.branchId}`} className={panel}>
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">

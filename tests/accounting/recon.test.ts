@@ -22,6 +22,7 @@ import { createHarness, type Harness, testPool } from "../rls/harness";
 process.env.DEPLOY_ENV = "local";
 import { days, type Fact, type Posting, type ReconInput, reconcile, type Ref } from "../../src/modules/accounting/recon/recon";
 import { readRecon, toReconInput } from "../../src/modules/accounting/recon/report";
+import { filters as rekonFilters, PATH as REKON, periodLabel, READ_FAILED, READERS as REKON_READERS, rekonIn } from "../../src/app/(app)/keuangan/rekon/load";
 import { explain, type RekonProps } from "../../src/app/(app)/keuangan/rekon/model";
 import { Rekon } from "../../src/app/(app)/keuangan/rekon/view";
 
@@ -239,8 +240,8 @@ describe("clean days and view layout", () => {
   });
   it("table on regular, cards on compact; branch segments keep the period", () => {
     const out = html(props(r));
-    expect(out).toContain("min-[700px]:block");
-    expect(out).toContain("min-[700px]:hidden");
+    expect(out).toContain("@min-[48em]:block"); // container query: 200 % text reflows to cards (WCAG 1.4.10)
+    expect(out).toContain("@min-[48em]:hidden");
     expect(out).toContain('href="/keuangan/rekon?dari=2026-11-01&amp;sampai=2026-11-03&amp;cabang=branch-b"');
     expect(out).toContain('href="/keuangan/buku-besar"');
   });
@@ -335,6 +336,32 @@ describe("Panel 2 invariant: a receipt paid on several lines reconciles 1-to-1 p
     expect(reconcile(input({ facts: [f], postings: two })).items).toEqual([]);
     const one = reconcile(input({ facts: [f], postings: [two[0]] }));
     expect(one.items).toEqual([expect.objectContaining({ kind: "amount", ref: pay("p9", "KW-0009"), fact: 500_000, ledger: 300_000, difference: 200_000 })]);
+  });
+});
+
+describe("Rekon page filters (load.ts; T-108 route slice)", () => {
+  const now = new Date("2026-11-21T03:00:00Z"); // 10:00 WIB
+  it("defaults to this month up to today (Asia/Jakarta)", () => {
+    expect(rekonFilters({}, now)).toEqual({ from: "2026-11-01", to: "2026-11-21", branch: null });
+  });
+  it("keeps a valid period and a well-formed branch id", () => {
+    expect(rekonFilters({ dari: "2026-10-01", sampai: "2026-10-31", cabang: "0190a3f2-0000-7000-8000-000000000001" }, now))
+      .toEqual({ from: "2026-10-01", to: "2026-10-31", branch: "0190a3f2-0000-7000-8000-000000000001" });
+  });
+  it.each([
+    ["reversed", { dari: "2026-11-10", sampai: "2026-11-01" }],
+    ["longer than 366 days", { dari: "2025-01-01", sampai: "2026-11-01" }],
+    ["not a calendar day", { dari: "2026-02-30", sampai: "2026-03-01" }],
+  ])("a %s period falls back to this month", (_, q) => {
+    expect(rekonFilters(q, now)).toMatchObject({ from: "2026-11-01", to: "2026-11-21" });
+  });
+  it("a malformed ?cabang is ignored (all branches), never sent to the reader", () => {
+    expect(rekonFilters({ cabang: "x' or 1=1" }, now).branch).toBeNull();
+  });
+  it("the period label and the readers", () => {
+    expect(periodLabel({ from: "2026-11-01", to: "2026-11-03", branch: null })).toBe("1 November 2026 – 3 November 2026");
+    expect(periodLabel({ from: "2026-11-02", to: "2026-11-02", branch: null })).toBe("2 November 2026");
+    expect([...REKON_READERS]).toEqual(["owner", "finance", "auditor"]);
   });
 });
 
@@ -600,6 +627,76 @@ describe("recon_report on PostgreSQL (PR-34; owner, finance, auditor; tenant-sco
     expect(x.items.filter((i) => i.ref.id === cross.src).map((i) => [i.kind, i.day, i.entryId, i.difference]))
       .toEqual([["orphan", dB, cross.orig, -400_000], ["orphan", dC, cross.rev, 400_000]]);
     expect(x.verdict).toBe("ada_selisih");
+  });
+
+  it("route slice: the page-data core renders the PR-34 difference with a drill-down to the receipt; scope and links keep the period", async () => {
+    const d = await today();
+    const lost = await sale(400_000);
+    await hx.admin.query(`update event_receipts r set done_at = now() from domain_events e
+                           where e.id = r.event_id and r.consumer = $1 and e.type = 'PaymentAllocated' and e.payload ->> 'payment_id' = $2`, [LEDGER_CONSUMER, lost.id]);
+    const receipt = (await hx.admin.query(`select receipt_id from payments where id = $1`, [lost.id])).rows[0].receipt_id as string;
+    const x = await as(FIN, (db) => rekonIn(db, { dari: d, sampai: d, cabang: A.b1 }));
+    if (x.kind !== "ok" || x.props.state.kind !== "ready") throw new Error(`unexpected ${x.kind}`);
+    const item = x.props.state.data.items.find((i) => i.ref.id === lost.id)!;
+    expect(item).toMatchObject({ kind: "missing", ref: { label: lost.number } });
+    expect(x.props.hrefFor(item.ref)).toBe(`/kasir/struk/${receipt}`);
+    expect(x.props.hrefFor({ kind: "package_session", id: lost.id, label: "x" })).toBeUndefined();
+    expect(x.props.scope).toMatchObject({ branch: A.b1, from: d, to: d, action: REKON });
+    expect(x.props.scope.branches.map((b) => b.id).sort()).toEqual([A.b1, A.b2].sort());
+    const out = text(html(x.props));
+    expect(out).toContain(lost.number);
+    expect(out).toContain("Belum diposting ke buku besar");
+    expect(html(x.props)).toContain(`href="/kasir/struk/${receipt}"`);
+  });
+
+  it("route slice: another tenant's branch is not found (TEN-1); a foreign receipt never gets a link; a reader fault is an error state, not an empty report", async () => {
+    const d = await today();
+    expect(await as(BFIN, (db) => rekonIn(db, { dari: d, sampai: d, cabang: A.b1 }))).toEqual({ kind: "not-found" });
+    // B's own page carries nothing of A (branches, items, links)
+    const b = await as(BFIN, (db) => rekonIn(db, { dari: d, sampai: d }));
+    if (b.kind !== "ok" || b.props.state.kind !== "ready") throw new Error("unexpected");
+    expect(JSON.stringify(b.props.scope)).not.toContain(A.b1);
+    expect(b.props.state.data.items).toEqual([]);
+    // a role outside the reader's actor set is refused by the database (data.ts gates it earlier)
+    expect(await as(MGR, (db) => rekonIn(db, { dari: d, sampai: d }))).toEqual({ kind: "forbidden" });
+    // a decoder fault (the reader answers a shape the boundary refuses) is the error state with a retry link that keeps the period
+    await as(FIN, async (db) => {
+      const faulty = { query: (sql: string, args?: unknown[]) => (/recon_report/.test(sql) ? Promise.resolve({ rows: [{ r: { from: "x" } }] }) : db.query(sql, args)) } as unknown as typeof db;
+      const err = console.error; console.error = () => {};
+      try {
+        const r = await rekonIn(faulty, { dari: d, sampai: d });
+        expect(r).toMatchObject({ kind: "ok", props: { state: { kind: "error", message: READ_FAILED } } });
+        if (r.kind === "ok" && r.props.state.kind === "error") expect(r.props.state.retryHref).toBe(`${REKON}?dari=${d}&sampai=${d}`);
+      } finally { console.error = err; }
+      expect((await db.query(`select 1 as ok`)).rows[0].ok).toBe(1);
+      // a database-level fault inside the read (the statement errors, the transaction would abort): the savepoint rollback keeps it usable
+      const broken = { query: (sql: string, args?: unknown[]) => db.query(/recon_report/.test(sql) ? "select 1 / 0 as r" : sql, /recon_report/.test(sql) ? [] : args) } as unknown as typeof db;
+      console.error = () => {};
+      try {
+        expect(await rekonIn(broken, { dari: d, sampai: d })).toMatchObject({ kind: "ok", props: { state: { kind: "error", message: READ_FAILED } } });
+      } finally { console.error = err; }
+      expect((await db.query(`select 1 as ok`)).rows[0].ok).toBe(1); // the savepoint left the transaction usable
+    });
+  });
+
+  it("R3 e4444cef P2: a receipt-link lookup failure rolls back inside the read savepoint: sanitized, period-preserving error state, transaction usable", async () => {
+    const d = await today();
+    const lost = await sale(300_000);
+    await hx.admin.query(`update event_receipts r set done_at = now() from domain_events e
+                           where e.id = r.event_id and r.consumer = $1 and e.type = 'PaymentAllocated' and e.payload ->> 'payment_id' = $2`, [LEDGER_CONSUMER, lost.id]);
+    await as(FIN, async (db) => {
+      // the payments → receipt lookup fails at the database (the statement errors after the reader succeeded)
+      const failing = { query: (sql: string, args?: unknown[]) => (/from payments where id = any/.test(sql) ? db.query("select 1 / 0 as r") : db.query(sql, args)) } as unknown as typeof db;
+      const logged: unknown[] = [];
+      const err = console.error; console.error = (...a: unknown[]) => { logged.push(a); };
+      let r;
+      try { r = await rekonIn(failing, { dari: d, sampai: d, cabang: A.b1 }); } finally { console.error = err; }
+      expect(r).toMatchObject({ kind: "ok", props: { state: { kind: "error", message: READ_FAILED } } });
+      if (r?.kind === "ok" && r.props.state.kind === "error") expect(r.props.state.retryHref).toBe(`${REKON}?dari=${d}&sampai=${d}&cabang=${A.b1}`);
+      expect(JSON.stringify(r)).not.toContain(lost.number); // no partial report leaks into the error state
+      expect(JSON.stringify(logged)).not.toMatch(/division|KW-|Rp|[0-9a-f]{8}-[0-9a-f]{4}/i); // sanitized: the error class only
+      expect((await db.query(`select 1 as ok`)).rows[0].ok).toBe(1); // rolled back to the savepoint: the transaction is still usable
+    });
   });
 
   it("authority: owner, finance and the auditor read; a manager and FO are refused; another tenant sees none of A; a bad period or foreign branch is refused", async () => {
