@@ -5,7 +5,8 @@
 // - a KPI the acting role may not read (07 Dashboards) → `forbidden` for that KPI only; the other KPIs of the report still show;
 // - K4 with an undated cancellation (extra.complete = false), K5 with pre-cutover residue rows, K7 with an uncosted movement → `incomplete`;
 // - a ratio with an empty denominator → no data; K19 for a period that is not one calendar month → `period_unsupported`;
-// - K20–K27 → `reader_pending` (their readers need a migration; the pure calculators stay the fixture-only reference);
+// - K20–K27 → the 0130 readers (report_k20 … report_k27 via readers.ts: decode → calculators.ts); K21 / K22 are read "as of" the period's
+//   last day; K22 / K23 / K25 / K27 also give a table (rows the page shows under the header). Their roles are the readers' own;
 // - K17 in a branch view → `branch_unattributed` (slice 3, K17 preflight 2026-11-20): dashboard_kpi drops branch-less rows under a branch
 //   scope (0126:434) and the net actually paid sits on the payout line with no branch, so a branch-scoped total is accrued + adjusted
 //   only — the gross, not what is owed. Same conservative rule as T-114: decided on the scope the reader APPLIED (r.branch_id: an explicit
@@ -17,10 +18,13 @@ import { CommandError } from "../../../lib/command";
 import { kpi, type Kpi, type KpiResult, type K12Extra, type K14Extra, type K15Extra, type K4Extra } from "../dashboards/dashboards";
 import { listTargets, type TargetList } from "../../commission/targets/targets";
 import { BY_ID, type KpiId, REPORTS, type ReportId } from "./dictionary";
-import { count, duration, type Metric, money, noData, pending, ratio, type Unavailable } from "./metrics";
+import { count, duration, type Metric, money, noData, pending, ratio, show, type Unavailable } from "./metrics";
+import { read } from "./readers";
 
 export type LiveKpi = { id: KpiId; label?: string; metric: Metric; basis: string };
-export type LiveReport = { report: ReportId; from: string; to: string; branchId: string | null; kpis: LiveKpi[]; allForbidden: boolean };
+export type LiveCell = string | Metric;
+export type LiveTable = { kpi: KpiId; caption: string; columns: { id: string; label: string; numeric?: boolean }[]; rows: Record<string, LiveCell>[] };
+export type LiveReport = { report: ReportId; from: string; to: string; branchId: string | null; kpis: LiveKpi[]; tables: LiveTable[]; allForbidden: boolean };
 
 const off = (reason: Unavailable): Metric => ({ kind: "unavailable", reason });
 const n = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && /^-?\d+$/.test(v) ? Number(v) : 0);
@@ -107,6 +111,71 @@ export function fromTargets(t: TargetList): LiveKpi[] {
   ];
 }
 
+// K20–K27 from their reader (0130) through the calculator: the KPI header rows and, where the KPI is a list, its table. Ids only — a
+// patient appears by MRN (and by name only when the reader sends it: owner / manager), a doctor by display name, a promo by code + version.
+const branchName = (names: ReadonlyMap<string, string>, id: string) => names.get(id) ?? "Cabang";
+export async function readKpi(db: pg.ClientBase, id: KpiId, o: { from: string; to: string; branchId?: string | null }, branches: ReadonlyMap<string, string>)
+  : Promise<{ kpis: LiveKpi[]; table?: LiveTable }> {
+  const q = { from: o.from, to: o.to, branchId: o.branchId ?? null };
+  switch (id) {
+    case "K20": {
+      const r = await read.k20(db, q);
+      return { kpis: [{ id, metric: r.average, basis: basis(id, `${show(r.invoices)} tagihan · K3 ${show(r.k3)}`) }] };
+    }
+    case "K21": {
+      const r = await read.k21(db, { asOf: o.to, branchId: q.branchId });
+      return { kpis: [{ id, metric: r.churn, basis: basis(id, `per ${o.to} · ${show(r.churned)} dari ${show(r.active)} pasien aktif · batas ${r.dormantDays} hari (SET-22)`) }] };
+    }
+    case "K22": {
+      const rows = await read.k22(db, { asOf: o.to, branchId: q.branchId, limit: 10 });
+      return {
+        kpis: [{ id, label: "Pasien teratas (LTV)", metric: count(rows.length), basis: basis(id, `sejak kunjungan pertama s.d. ${o.to}`) }],
+        table: { kpi: id, caption: "Pasien teratas", columns: [{ id: "mrn", label: "No. RM" }, ...(rows.some((x) => x.name !== null) ? [{ id: "name", label: "Nama" }] : []),
+          { id: "ltv", label: "LTV (K22)", numeric: true }],
+          rows: rows.map((x) => ({ mrn: x.mrn, ...(x.name !== null ? { name: x.name } : {}), ltv: money(x.ltv) })) },
+      };
+    }
+    case "K23": {
+      const r = await read.k23(db, q);
+      return {
+        // every shift row of the period (an opened shift without a transaction counts too — R3 7ea04efd), Tanpa shift excluded
+        kpis: [{ id, label: "Jumlah shift", metric: count(r.rows.filter((x) => x.shift !== null).length), basis: basis(id) }],
+        table: { kpi: id, caption: "Penjualan dan uang masuk per shift", columns: [{ id: "shift", label: "Shift" }, { id: "branch", label: "Cabang" },
+          { id: "k3", label: "Penjualan (K3)", numeric: true }, { id: "k1", label: "Uang masuk (K1)", numeric: true }],
+          rows: r.rows.map((x, i) => ({ shift: x.shift === null ? "Tanpa shift" : `Shift ${r.rows.slice(0, i + 1).filter((y) => y.shift !== null).length}`, branch: branchName(branches, x.branch), k3: x.k3, k1: x.k1 })) },
+      };
+    }
+    case "K24": return { kpis: [{ id, metric: await read.k24(db, q), basis: basis(id, "median") }] };
+    case "K25": {
+      const r = await read.k25(db, q);
+      return {
+        kpis: [{ id, label: "Pemakaian kode promo", metric: count(r.rows.reduce((s, x) => s + (x.uses.kind === "count" ? x.uses.value : 0), 0)), basis: basis(id) }],
+        table: { kpi: id, caption: "Performa kode promo", columns: [{ id: "code", label: "Kode" }, { id: "uses", label: "Pemakaian", numeric: true },
+          { id: "discount", label: "Diskon", numeric: true }, { id: "k3", label: "Penjualan (K3)", numeric: true }],
+          rows: r.rows.map((x) => ({ code: r.labels.get(x.version) ?? x.version, uses: x.uses, discount: x.discount, k3: x.k3 })) },
+      };
+    }
+    case "K26": {
+      const r = await read.k26(db, q);
+      return { kpis: [
+        { id, label: "Kepuasan rata-rata", metric: r.average, basis: basis(id, `${show(r.responses)} survei`) },
+        { id, label: "Skor ≤ 2", metric: r.low, basis: basis(id) },
+      ] };
+    }
+    case "K27": {
+      const r = await read.k27(db, q);
+      return {
+        kpis: [{ id, label: "Dokter aktif", metric: count(r.rows.length), basis: basis(id) }],
+        table: { kpi: id, caption: "Aktivitas dokter", columns: [{ id: "doctor", label: "Dokter" }, { id: "signed", label: "Ditandatangani", numeric: true },
+          { id: "unsigned", label: "Belum ditandatangani > 24 jam", numeric: true }, { id: "decided", label: "Permintaan diputuskan", numeric: true },
+          { id: "median", label: "Check-in → tanda tangan", numeric: true }],
+          rows: r.rows.map((x) => ({ doctor: r.names.get(x.doctor) ?? "Dokter", signed: x.signed, unsigned: x.unsignedOver24h, decided: x.requestsDecided, median: x.checkInToSignature })) },
+      };
+    }
+    default: return { kpis: [{ id, metric: pending, basis: basis(id) }] };
+  }
+}
+
 // One calendar month exactly (YYYY-MM-01 .. its last day) → `YYYY-MM`, else null.
 export function wholeMonth(from: string, to: string): string | null {
   if (!/^\d{4}-\d{2}-01$/.test(from)) return null;
@@ -131,11 +200,19 @@ async function guarded<T>(db: pg.ClientBase, fn: () => Promise<T>): Promise<T | 
 
 export async function loadReport(db: pg.ClientBase, report: ReportId, o: { from: string; to: string; branchId?: string | null }): Promise<LiveReport> {
   const kpis: LiveKpi[] = [];
+  const tables: LiveTable[] = [];
   let readable = 0, asked = 0;
+  let branches: Map<string, string> | null = null;
   for (const id of REPORTS[report].kpis) {
     const k = Number(id.slice(1));
-    if (k >= 20) { kpis.push({ id, metric: pending, basis: basis(id) }); continue; }
     asked++;
+    if (k >= 20) {
+      branches ??= new Map((await db.query<{ id: string; name: string }>(`select id, name from branches`)).rows.map((b) => [b.id, b.name]));
+      const r = await guarded(db, () => readKpi(db, id, o, branches!));
+      if (r === "forbidden") kpis.push({ id, metric: off("forbidden"), basis: basis(id) });
+      else { readable++; kpis.push(...r.kpis); if (r.table) tables.push(r.table); }
+      continue;
+    }
     if (k === 19) {
       const month = wholeMonth(o.from, o.to);
       if (!month) { readable++; kpis.push({ id, metric: off("period_unsupported"), basis: basis(id) }); continue; }
@@ -148,5 +225,5 @@ export async function loadReport(db: pg.ClientBase, report: ReportId, o: { from:
     if (r === "forbidden") kpis.push({ id, metric: off("forbidden"), basis: basis(id) });
     else { readable++; kpis.push(...fromKpi(id, r)); }
   }
-  return { report, from: o.from, to: o.to, branchId: o.branchId ?? null, kpis, allForbidden: asked > 0 && readable === 0 };
+  return { report, from: o.from, to: o.to, branchId: o.branchId ?? null, kpis, tables, allForbidden: asked > 0 && readable === 0 };
 }

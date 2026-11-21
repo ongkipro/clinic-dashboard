@@ -5,7 +5,7 @@
 import type pg from "pg";
 import { call } from "../../accounting/subledgers/subledgers";
 import {
-  type CashRefundFact, type DispensingFact, type ExamFact, type Invoice, k20, k21, k22, k23, k24, k25, k26, k27, type PaymentFact, type Period,
+  type CashRefundFact, type DispensingFact, type ExamFact, type Invoice, k20, k21, k23, k24, k25, k26, k27, type PaymentFact, type Period,
   type PromoUsageFact, type RequestFact, type SaleReduction, type ShiftFact, type SurveyFact, type VisitFact,
 } from "./calculators";
 

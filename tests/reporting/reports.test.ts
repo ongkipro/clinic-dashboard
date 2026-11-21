@@ -6,7 +6,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+// The report page gate (laporan/_components/data.ts) reads the request context; here it is a controllable stand-in (as other route tests do).
+const gate = vi.hoisted(() => ({ rc: null as unknown, pool: null as unknown }));
+vi.mock("server-only", () => ({}));
+vi.mock("../../src/modules/org/context/store", () => ({ requestContext: async () => gate.rc, appPool: async () => gate.pool }));
 import { KamusKpiView, parseReport } from "../../src/app/(app)/laporan/kamus-kpi/view";
 import { type ReportKpi, type ReportProps, ReportView, reportState } from "../../src/app/(app)/laporan/_components/report-view";
 import {
@@ -29,8 +33,10 @@ import { setStaffTarget } from "../../src/modules/commission/targets/targets";
 import { saveItem } from "../../src/modules/inventory/stock";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { kpi, type KpiResult } from "../../src/modules/reporting/dashboards/dashboards";
-import { fromKpi, fromTargets, loadReport, wholeMonth } from "../../src/modules/reporting/reports/live";
+import { fromKpi, fromTargets, loadReport, readKpi, wholeMonth } from "../../src/modules/reporting/reports/live";
 import { decode, read, ReaderShapeError } from "../../src/modules/reporting/reports/readers";
+import { filters as reportFilters, periodLabel as reportPeriod, readersOf, REPORT_IDS, reportIn } from "../../src/app/(app)/laporan/_components/load";
+import { loadReportPage } from "../../src/app/(app)/laporan/_components/data";
 import { openShift } from "../../src/modules/cashier/shifts/shifts";
 import { setKekRingForTests } from "../../src/lib/keys/runtime";
 import { createHarness, type Harness, testPool } from "../rls/harness";
@@ -370,6 +376,22 @@ describe("K20–K27 reader boundary (decode → calculator = fixture)", () => {
   });
 });
 
+describe("report page filters (laporan/_components/load.ts)", () => {
+  const now = new Date("2026-11-21T03:00:00Z"); // 10:00 WIB
+  it("this month by default; last month; a valid range; anything else falls back to this month; malformed ?cabang ignored", () => {
+    expect(reportFilters({}, now)).toEqual({ from: "2026-11-01", to: "2026-11-21", branch: null, preset: "bulan-ini" });
+    expect(reportFilters({ periode: "bulan-lalu" }, now)).toEqual({ from: "2026-10-01", to: "2026-10-31", branch: null, preset: "bulan-lalu" });
+    expect(reportFilters({ periode: "bulan-lalu" }, new Date("2026-01-10T03:00:00Z"))).toMatchObject({ from: "2025-12-01", to: "2025-12-31" });
+    expect(reportFilters({ dari: "2026-10-01", sampai: "2026-10-15", cabang: "0190a3f2-0000-7000-8000-000000000001" }, now))
+      .toEqual({ from: "2026-10-01", to: "2026-10-15", branch: "0190a3f2-0000-7000-8000-000000000001", preset: "rentang" });
+    for (const q of [{ dari: "2026-10-15", sampai: "2026-10-01" }, { dari: "2025-01-01", sampai: "2026-10-01" }, { dari: "2026-02-30", sampai: "2026-03-01" }, { dari: "2026-10-01" }]) {
+      expect(reportFilters(q, now), JSON.stringify(q)).toMatchObject({ from: "2026-11-01", to: "2026-11-21", preset: "bulan-ini" });
+    }
+    expect(reportFilters({ cabang: "x' or 1=1" }, now).branch).toBeNull();
+    expect(reportPeriod({ from: "2026-10-01", to: "2026-10-31" })).toBe("1 Oktober 2026 – 31 Oktober 2026");
+  });
+});
+
 // ── views ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const SENTINEL = ["Pasien Sentinel", "081299990000", "Diagnosis Sentinel L70.0", "Catatan klinis sentinel"];
 const props = (kpis: ReportKpi[], rows: Record<string, string | Metric>[] = []): ReportProps => ({
@@ -601,10 +623,12 @@ describe("loadReport on the real readers (PostgreSQL; role scoping, branch scope
     expect(await code(as(MGRB, (db) => loadReport(db, "penjualan", { ...month(), branchId: A.b1 })))).toBe("ERR_NOT_FOUND");
     expect(await code(as(MGR, (db) => loadReport(db, "penjualan", { ...month(), branchId: A.b2 })))).toBe("ERR_NOT_FOUND");
   });
-  it("role scoping per KPI (07 Dashboards): marketing reads K13/K14 in Laporan Marketing, K20–K27 stay 'Belum tersedia'; Laporan Penjualan is all forbidden", async () => {
+  it("role scoping per KPI (07 Dashboards): marketing reads K13/K14 and, through the 0130 readers, K25/K26 in Laporan Marketing; Laporan Penjualan is all forbidden", async () => {
     const m = await as(MK, (db) => loadReport(db, "marketing", month()));
     expect(m.kpis.filter((k) => k.id === "K13" || k.id === "K14").every((k) => k.metric.kind !== "unavailable" || k.metric.reason === "no_data")).toBe(true);
-    expect(m.kpis.filter((k) => k.id === "K25" || k.id === "K26").map((k) => k.metric)).toEqual([pending, pending]);
+    // no promo use and no survey in this fixture: a real 0 uses, and no data (never Rp0) for the satisfaction average / share
+    expect(m.kpis.filter((k) => k.id === "K25" || k.id === "K26").map((k) => k.metric)).toEqual([C(0), NONE, NONE]);
+    expect(m.kpis.some((k) => k.metric === pending)).toBe(false);
     const p = await as(MK, (db) => loadReport(db, "penjualan", month()));
     expect(p.kpis.map((k) => k.metric)).toEqual([0, 1, 2].map(() => ({ kind: "unavailable", reason: "forbidden" })));
     expect(p.allForbidden).toBe(true);
@@ -615,7 +639,7 @@ describe("loadReport on the real readers (PostgreSQL; role scoping, branch scope
     const by = Object.fromEntries(r.kpis.map((k) => [`${k.id}${k.label ? `:${k.label}` : ""}`, k.metric]));
     expect(by.K19).toEqual({ kind: "unavailable", reason: "forbidden" });
     expect(by.K17).toEqual(M(0));
-    expect(by.K27).toEqual(pending);
+    expect(by["K27:Dokter aktif"]).toEqual(C(0)); // the 0130 reader: finance reads K27; no examination in this fixture
     expect(r.allForbidden).toBe(false);
   });
   it("K19 from target_list for the owner (whole month); another period shape is 'Hanya per bulan penuh', not 0", async () => {
@@ -899,6 +923,114 @@ describe("report_k20 … report_k27 on PostgreSQL (0130)", () => {
       const n = await as(w.own, async (db) => { await db.query(`select set_config('timezone', $1, true)`, [tz]); return read.k21(db, { asOf: "2026-10-02" }); });
       expect([n.dormantDays, n.churn], tz).toEqual([30, R(1, 1)]); // 2026-10-02: in force → 30 days, the 2026-08-31 visit is dormant
     }
+  });
+
+  // ── report page-data core (src/app/(app)/laporan/_components/load.ts): the loader the parked /laporan/* pages will call ──
+  it("page core: Laporan Operasional for the manager shows K20 (bound to its branch), the K23 shift table and K24; filters and chips keep the period", async () => {
+    const d = today();
+    const pg1 = await as(MGR, (db) => reportIn(db, "operasional", "manager", { dari: d, sampai: d }, new Date()));
+    if (pg1.kind !== "ok") throw new Error(pg1.kind);
+    expect(pg1.state).toEqual({ kind: "ok" });
+    expect(pg1.props.title).toBe("Laporan Operasional");
+    expect(pg1.props.kpis.find((k) => k.id === "K20")!.metric).toEqual(M(400_000)); // 800,000 / 2 at the manager's branch
+    expect(pg1.props.kpis.find((k) => k.id === "K24")!.metric).toEqual(NONE);
+    expect(pg1.props.table?.caption).toBe("Penjualan dan uang masuk per shift");
+    expect(pg1.props.table?.rows.reduce((x, y) => x + ((y.k3 as { rupiah: number }).rupiah ?? 0), 0)).toBe(800_000);
+    expect(pg1.props.branches).toBeUndefined(); // a branch role has no branch chips
+    expect(pg1.props.period.chips.map((c) => [c.label, c.href])).toEqual([["Bulan ini", "/laporan/operasional"], ["Bulan lalu", "/laporan/operasional?periode=bulan-lalu"]]);
+  });
+  it("page core: Laporan Pasien for marketing lists K22 by MRN only and K10/K11/K21 as not for this role; the owner sees names; branch chips for tenant-wide roles", async () => {
+    const d = today();
+    const mk = await as(MK, (db) => reportIn(db, "pasien", "marketing", { dari: d, sampai: d }, new Date()));
+    if (mk.kind !== "ok") throw new Error(mk.kind);
+    expect(mk.props.table?.columns.map((c) => c.id)).toEqual(["mrn", "ltv"]);
+    expect(mk.props.table?.rows.every((x) => !("name" in x))).toBe(true); // never filled in when the reader withheld the name
+    expect(JSON.stringify(mk.props)).not.toContain("Pasien Laporan Rahasia");
+    expect(mk.props.kpis.filter((k) => ["K10", "K11", "K21"].includes(k.id)).every((k) => k.metric.kind === "unavailable" && k.metric.reason === "forbidden")).toBe(true);
+    expect(mk.props.branches?.map((c) => c.label)).toEqual(["Semua Cabang", "RP-A", "RP-B"]);
+    const ow = await as(OWN, (db) => reportIn(db, "pasien", "owner", { dari: d, sampai: d }, new Date()));
+    if (ow.kind !== "ok") throw new Error(ow.kind);
+    expect(ow.props.table?.columns.map((c) => c.id)).toEqual(["mrn", "name", "ltv"]);
+    expect(ow.props.table?.rows[0]).toMatchObject({ name: "Pasien Laporan Rahasia", ltv: M(800_000) });
+    // K21 / K22 are "as of" the period's LAST day (the basis names it)
+    expect(ow.props.kpis.find((k) => k.id === "K21")!.basis).toContain(`per ${d}`);
+    const range = await as(OWN, (db) => reportIn(db, "pasien", "owner", { dari: "2026-01-01", sampai: d }, new Date()));
+    if (range.kind !== "ok") throw new Error(range.kind);
+    expect(range.props.kpis.find((k) => k.id === "K21")!.basis).toContain(`per ${d}`);
+    expect(range.props.kpis.find((k) => k.id === "K22")!.basis).toContain(`s.d. ${d}`);
+  });
+  it("page core: a foreign branch is not found (TEN-1); a reader fault is the error state with a period-keeping retry link, never an empty report", async () => {
+    const d = today();
+    expect(await as(BOWN, (db) => reportIn(db, "penjualan", "owner", { cabang: A.b1 }, new Date()))).toEqual({ kind: "not-found" });
+    expect(await as(MGR, (db) => reportIn(db, "operasional", "manager", { cabang: A.b2 }, new Date()))).toEqual({ kind: "not-found" });
+    await as(OWN, async (db) => {
+      const faulty = { query: (sql: string, args?: unknown[]) => (/report_k20/.test(sql) ? Promise.resolve({ rows: [{ r: { from: "x" } }] }) : db.query(sql, args)) } as unknown as typeof db;
+      const err = console.error; console.error = () => {};
+      let r;
+      try { r = await reportIn(faulty, "operasional", "owner", { dari: d, sampai: d }, new Date()); } finally { console.error = err; }
+      expect(r).toMatchObject({ kind: "ok", state: { kind: "error", retryHref: `/laporan/operasional?dari=${d}&sampai=${d}` } });
+      expect((await db.query(`select 1 as ok`)).rows[0].ok).toBe(1); // the savepoint kept the transaction usable
+      // a database statement fault OUTSIDE the per-KPI savepoint (loadReport's branch-name query before the K20–K27 reads): only the page's
+      // own savepoint can roll it back, so the transaction stays usable
+      const broken = { query: (sql: string, args?: unknown[]) => db.query(/^select id, name from branches$/.test(sql) ? "select 1 / 0 as r" : sql, /^select id, name from branches$/.test(sql) ? [] : args) } as unknown as typeof db;
+      console.error = () => {};
+      try { expect(await reportIn(broken, "operasional", "owner", { dari: d, sampai: d }, new Date())).toMatchObject({ kind: "ok", state: { kind: "error" } }); }
+      finally { console.error = err; }
+      expect((await db.query(`select 1 as ok`)).rows[0].ok).toBe(1);
+    });
+  });
+  it("wiring: every K20–K27 reader is asked with the page's period and branch filter (K21 / K22 as of the last day)", async () => {
+    const seen: { sql: string; args: unknown[] }[] = [];
+    const spy = { query: async (sql: string, args: unknown[] = []) => { seen.push({ sql, args }); return { rows: [{ r: null }] }; } } as unknown as pg.PoolClient;
+    for (const id of ["K20", "K21", "K22", "K23", "K24", "K25", "K26", "K27"] as const) {
+      seen.length = 0;
+      await readKpi(spy, id, { from: "2026-10-01", to: "2026-10-31", branchId: A.b1 }, new Map()).catch(() => undefined); // null payload: decode refuses after the call
+      const c = seen.find((x) => /report_k2\d/.test(x.sql))!;
+      expect(c.args, id).toEqual(id === "K21" ? ["2026-10-31", A.b1] : id === "K22" ? ["2026-10-31", A.b1, 10] : ["2026-10-01", "2026-10-31", A.b1]);
+    }
+  });
+  it("R3 7ea04efd: K23's header is \"Jumlah shift\" and counts every shift row, an idle one included (opened in the period, no transaction)", async () => {
+    const w = await world(); // the separate shift tenant: 2026-10-03 has one idle shift and nothing else
+    const idle = await shiftAt(w, "2026-10-03 08:00", "2026-10-03 16:00");
+    const r = await as(w.own, (db) => readKpi(db, "K23", { from: "2026-10-03", to: "2026-10-03" }, new Map([[w.t.b1, "Cabang A"]])));
+    expect(r.kpis).toEqual([{ id: "K23", label: "Jumlah shift", metric: C(1), basis: expect.any(String) }]);
+    expect(r.table?.rows).toEqual([{ shift: "Shift 1", branch: "Cabang A", k3: M(0), k1: M(0) }]);
+    expect(idle).toBeTruthy();
+  });
+  it("R3 7ea04efd: a failure of the page's initial branch lookup is the sanitized error state with a period- and branch-keeping retry; the transaction stays usable", async () => {
+    await as(OWN, async (db) => {
+      const broken = { query: (sql: string, args?: unknown[]) => db.query(/order by created_at, id$/.test(sql) ? "select 1 / 0 as r" : sql, /order by created_at, id$/.test(sql) ? [] : args) } as unknown as typeof db;
+      const logged: unknown[] = [];
+      const err = console.error; console.error = (...a: unknown[]) => { logged.push(a); };
+      let r;
+      try { r = await reportIn(broken, "penjualan", "owner", { dari: "2026-10-01", sampai: "2026-10-31", cabang: A.b1 }, new Date()); } finally { console.error = err; }
+      expect(r).toMatchObject({ kind: "ok", state: { kind: "error", retryHref: `/laporan/penjualan?dari=2026-10-01&sampai=2026-10-31&cabang=${A.b1}` },
+        props: { title: "Laporan Penjualan & Uang", period: { label: "1 Oktober 2026 – 31 Oktober 2026" }, kpis: [] } });
+      expect(JSON.stringify(logged)).not.toMatch(/division|RP-A|Rp|[0-9a-f]{8}-[0-9a-f]{4}-/i); // the error class and report id only
+      expect((await db.query(`select 1 as ok`)).rows[0].ok).toBe(1);
+    });
+    // scope unchanged: a foreign branch is still not found
+    expect(await as(BOWN, (db) => reportIn(db, "penjualan", "owner", { cabang: A.b1 }, new Date()))).toEqual({ kind: "not-found" });
+  });
+  it("page gate (data.ts): a role outside the report's nav row is refused before any read; a listed role reaches the core", async () => {
+    const ctx = async (p: P) => resolveContext(app, p.acc, { tenantId: p.tenantId, actingRole: p.role, activeBranchId: p.branch });
+    gate.pool = app;
+    gate.rc = { kind: "ok", active: { context: await ctx(FIN) } }; // finance is not in Laporan Operasional's row (M)
+    expect(await loadReportPage("operasional", {})).toEqual({ kind: "forbidden" });
+    gate.rc = { kind: "ok", active: { context: await ctx(MK) } }; // marketing is in Laporan Pasien's row (O MK)
+    expect(await loadReportPage("pasien", {})).toMatchObject({ kind: "ok", props: { title: "Laporan Pasien" } });
+    gate.rc = { kind: "redirect", to: "/masuk" };
+    expect(await loadReportPage("pasien", {})).toEqual({ kind: "redirect", to: "/masuk" });
+    gate.rc = { kind: "blocked", accountId: "x" };
+    expect(await loadReportPage("pasien", {})).toEqual({ kind: "forbidden" });
+  });
+  it("page core: an all-forbidden report is the permission state; the page roles are the nav rows (no new authority)", async () => {
+    const r = await as(MK, (db) => reportIn(db, "penjualan", "marketing", {}, new Date()));
+    expect(r).toMatchObject({ kind: "ok", state: { kind: "permission" } });
+    expect(Object.fromEntries(REPORT_IDS.map((id) => [id, [...readersOf(id)]]))).toEqual({
+      penjualan: ["owner", "finance", "manager"], perawatan: ["owner", "manager"], pasien: ["owner", "marketing"], staf: ["owner", "manager"],
+      operasional: ["manager"], stok: ["pharmacist", "purchasing", "auditor"], marketing: ["marketing", "central_cs"],
+    });
   });
 
   it("authority: roles per K; a manager's other branch and a foreign branch are not found; another tenant sees none of A", async () => {
