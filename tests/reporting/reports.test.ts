@@ -699,9 +699,13 @@ describe("fromKpi: units, ratios and unavailable semantics (crafted reader paylo
     const row = (is_bc: boolean, target: number | null, actual: number) => ({ staff_id: "s", staff: "x", is_bc, target: target === null ? null : { id: "t", closing_value_target: target, plans_target: null, set_at: "" },
       closing_value_actual: actual, branch_closing_value: null, plans_actual: 0, attainment_bps: null,
       scorecard: { completed_services: 0, executed_minutes: 0, rostered_minutes: 0, utilization_bps: null, commission_gross: 0, commission_adjustments: 0, commission_net: 0 } });
+    // the T-107 D-07 example (tests/reporting/dashboards.test.ts K19): BC1 closed 5,122,000 of 6,000,000 (the S4a consultation is not
+    // closing value), BC3 0 of 2,000,000; a BC without a target and a non-BC with one stay out of both the sum and the count
     const t = fromTargets({ role: "owner", period: "2026-10", period_kind: "bulanan", branch_id: null, can_set: true,
-      rows: [row(true, 6_000_000, 5_272_000), row(true, 2_000_000, 0), row(true, null, 900_000), row(false, 1_000_000, 1)] });
-    expect(t.map((k) => k.metric)).toEqual([R(5_272_000, 8_000_000), M(5_272_000)]);
+      rows: [row(true, 6_000_000, 5_122_000), row(true, 2_000_000, 0), row(true, null, 900_000), row(false, 1_000_000, 1)] });
+    expect(t.map((k) => k.metric)).toEqual([R(5_122_000, 8_000_000), M(5_122_000)]);
+    expect(t.map((k) => show(k.metric))).toEqual(["64,0%", "Rp5.122.000"]);
+    expect(t[0].basis).toContain("2 BC dengan target · 2026-10");
     expect(fromTargets({ role: "owner", period: "2026-10", period_kind: "bulanan", branch_id: null, can_set: true, rows: [] })[0].metric).toEqual(NONE);
   });
   it("wholeMonth: only a full calendar month maps to a target period", () => {
