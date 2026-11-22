@@ -1,0 +1,19 @@
+{
+  "capability": "unattributed",
+  "head": "82340dfada42d301fb25918e378bdd33be06af03",
+  "job": "T-112 rebaseline of the mounted r2 candidate (MANIFEST-mounted-r2) from 2b0d5a8c to green 82340dfa (CI 45040497301; delta = T-115 mount with the RAP2 isolation case); no candidate byte change; combined full isolation + required checks once, in an allowed window. Five acceptance gaps stay OPEN; no role/nav/SQL change.",
+  "model": "claude-opus-5-5",
+  "provider": "9router-fantastico",
+  "reasoningEffort": "medium",
+  "recordedAt": "2026-11-22T16:21:12Z",
+  "result": "PASS",
+  "risk": "R2",
+  "runId": "RUN-20261122T161628Z-0f9f5ff5",
+  "schemaVersion": 1,
+  "skillsUsed": [
+    "ui-validation"
+  ],
+  "usageHash": "b95de8768209d159f6655a2f60c961780032dd4a1f55668bbff5b9546f0ddf4d",
+  "verificationFailed": false,
+  "worker": "pi"
+}
