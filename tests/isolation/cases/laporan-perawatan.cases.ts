@@ -6,11 +6,16 @@
 // price and K7 (contribution = K2 − the product's moving-average cost) is price − cost, a unique figure no total of another case can equal. K7 is the page's ONE figure (a money total, no table), so the
 // marker is that figure's digits as the page's props carry it (`{"kind":"money","rupiah":N}`), and the case THROWS if B's own K7 is not exactly that figure — a case that silently exercised nothing
 // (a sale that never reached K2, a cost that made K7 incomplete) must fail here, not pass:
-//   - positive control (as B's owner): B's own report shows B's K7;
-//   - negative (as A's owner): B's branch id as ?cabang= is NOT FOUND (TEN-1, never forbidden, never data); A's own report (no delivered product) carries nothing of B (K7, branch id and name, tenant
-//     id, legal name). Both answers are returned in the body.
+//   - positive control (as B's owner): B's own report for ITS BRANCH OF THIS CASE shows B's K7;
+//   - negative (as A's owner): BOTH of B's branch ids as ?cabang= are NOT FOUND (TEN-1, never forbidden, never data); A's own report (no delivered product) carries nothing of B (K7, branch ids and
+//     names, tenant id, legal name). The answers are returned in the body.
 // LIMIT, stated plainly: K7 is a SINGLE SUM, so a cross-tenant leak that happened to add up to the marker's value is conceivable only by coincidence; the strong guarantees here are the not-found for a
 // foreign branch and the reader's own tenant scope, which tests/reporting/dashboards.test.ts (T-107) proves for K7 on two tenants.
+// WHERE THE SALE LIVES (main CI 44997538283, pnpm test on 6785e0c7): the sale is seeded at a branch of B that only this case uses ("LPR2", created once, as pembelian.cases.ts does for its second
+// branch) and the case reads THAT branch (?cabang=), never B's first branch. In the full isolation order apotek.cases.ts (4th of 60) hands over stock of B that was received WITHOUT a unit cost: the
+// costing trigger (0080) values that dispense at 0 with uncosted_qty = -1, the K7 reader (0126) adds one "uncosted" fact for it and the page turns that into "incomplete" (A-13, "biaya belum
+// lengkap", never a zero cost) — correctly. Seeded at B's first branch this case could not read price - cost in the CI order; it passed only under a -t selector, where apotek never ran. The KPI,
+// the reader and the other case are untouched, and the positive control is exactly as strict (to the rupiah).
 // route kind "not-found": the by-id selector (?cabang=) answers 404 for another tenant's branch.
 import { reportIn } from "../../../src/app/(app)/laporan/_components/load";
 import { withTenantContext } from "../../../src/db/rls/context";
@@ -28,10 +33,10 @@ process.env.DEPLOY_ENV = "local";
 type CaseRole = "fo_cashier" | "owner" | "pharmacist";
 const accOf = new Map<string, string>();
 async function member(env: IsolationEnv, tenantId: string, branchId: string, role: CaseRole): Promise<string> {
-  const k = `${tenantId}:${role}`;
+  const k = role === "owner" ? `${tenantId}:owner` : `${tenantId}:${branchId}:${role}`;
   const known = accOf.get(k);
   if (known) return known;
-  const acc = (await env.owner.query(`insert into auth_user (name, email, two_factor_enabled) values ('Staf', $1, true) returning id`, [`${role}.lpr116.${tenantId}@klinik-sintetis.test`])).rows[0].id as string;
+  const acc = (await env.owner.query(`insert into auth_user (name, email, two_factor_enabled) values ('Staf', $1, true) returning id`, [`${role}.lpr116.${role === "owner" ? tenantId : `${tenantId}.${branchId}`}@klinik-sintetis.test`])).rows[0].id as string;
   const { staffId } = await createMembership(env.owner, { tenantId, accountId: acc, displayName: `Staf Laporan Perawatan ${role}` });
   const c = await env.owner.connect();
   try {
@@ -53,13 +58,24 @@ async function as<T>(env: IsolationEnv, tenantId: string, branchId: string, role
 const ALL = Object.fromEntries(CHECKS.map((c) => [c, true])) as Record<(typeof CHECKS)[number], boolean>;
 const day = (n: number) => new Date(Date.now() + n * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 // One delivered product per tenant (the report is a total, so the fact is seeded once and the figure is stable across the positive and negative runs).
-type Seed = { price: number; cost: number; k7: number };
+type Seed = { price: number; cost: number; k7: number; branchId: string };
 const seeded = new Map<string, Seed>();
+// B's branch of this case, created once per tenant (the branch trigger seeds its default depot, 0078): no other case seeds stock, sales or hand-overs here.
+const ownBranch = new Map<string, { id: string; name: string }>();
+async function branchOf(env: IsolationEnv, tenantId: string): Promise<{ id: string; name: string }> {
+  const known = ownBranch.get(tenantId);
+  if (known) return known;
+  const name = "Cabang Rahasia Perawatan";
+  const id = (await env.owner.query(`insert into branches (tenant_id, code, name, timezone) values ($1, 'LPR2', $2, 'Asia/Jakarta') returning id`, [tenantId, name])).rows[0].id as string;
+  ownBranch.set(tenantId, { id, name });
+  return { id, name };
+}
 async function victim(env: IsolationEnv): Promise<Seed> {
   const t = env.victim.tenantId;
-  const b = env.victim.branchId;
   const known = seeded.get(t);
   if (known) return known;
+  const branch = await branchOf(env, t);
+  const b = branch.id;
   const k = () => crypto.randomUUID();
   const price = 10_007 * (3000 + (Math.floor(Math.random() * 900) + 1)); // unique 8-digit price, a multiple of 10.007
   const cost = 5_003 * (1000 + (Math.floor(Math.random() * 900) + 1)); // unique 7-digit moving-average cost
@@ -76,8 +92,10 @@ async function victim(env: IsolationEnv): Promise<Seed> {
   const d = (await env.owner.query(`select d.id from dispensings d join invoice_lines l on l.id = d.invoice_line_id where l.invoice_id = $1`, [invoiceId])).rows[0].id as string;
   await as(env, t, b, "pharmacist", (db) => prepareDispensing(db, k(), d, apt));
   await as(env, t, b, "pharmacist", (db) => handOver(db, k(), d, { checks: ALL }));
-  const s = { price, cost, k7: price - cost };
+  const s = { price, cost, k7: price - cost, branchId: b };
   env.victimSecret(String(s.k7));
+  env.victimSecret(b);
+  env.victimSecret(branch.name);
   seeded.set(t, s);
   return s;
 }
@@ -91,17 +109,18 @@ export default defineCases({
   async run(env) {
     const v = await victim(env);
     return as(env, env.actor.tenantId, env.actor.branchId, "owner", async (db) => {
-      // B's branch asked by the caller: the readers answer not-found for another tenant's branch (TEN-1)
-      const byBranch = await reportIn(db, "perawatan", "owner", { cabang: env.victim.branchId });
+      // B's branches asked by the caller: the readers answer not-found for another tenant's branch (TEN-1)
+      const first = await reportIn(db, "perawatan", "owner", { cabang: env.victim.branchId }); // B's first branch
+      const mine = await reportIn(db, "perawatan", "owner", { cabang: v.branchId }); // B's branch of this case: where the delivered sale lives
       const all = await reportIn(db, "perawatan", "owner", {});
       if (env.actor.tenantId === env.victim.tenantId) {
-        // the positive control is B itself: its own K7 must be exactly the delivered sale (price − cost), or the case exercised nothing
-        const k7 = all.kind === "ok" ? all.props.kpis.find((x) => x.id === "K7")?.metric : undefined;
-        if (!k7 || k7.kind !== "money" || k7.rupiah !== v.k7) throw new Error(`isolation case: as B, K7 is ${JSON.stringify(k7)}, not ${v.k7} (price ${v.price} − cost ${v.cost}) — the sale never reached K7`);
+        // the positive control is B itself: its own K7 at the branch of this case must be exactly the delivered sale (price − cost), or the case exercised nothing
+        const k7 = mine.kind === "ok" ? mine.props.kpis.find((x) => x.id === "K7")?.metric : undefined;
+        if (!k7 || k7.kind !== "money" || k7.rupiah !== v.k7) throw new Error(`isolation case: as B, K7 at its own branch is ${JSON.stringify(k7)}, not ${v.k7} (price ${v.price} − cost ${v.cost}) — the sale never reached K7`);
       }
       // the caller's own unfiltered report is returned in both outcomes: it must carry nothing of B (the harness checks every registered secret in the whole body)
-      if (byBranch.kind === "not-found") return { status: 404, body: JSON.parse(JSON.stringify({ all })) };
-      return { status: 200, body: JSON.parse(JSON.stringify({ byBranch, all })) };
+      if (first.kind === "not-found" && mine.kind === "not-found") return { status: 404, body: JSON.parse(JSON.stringify({ all })) };
+      return { status: 200, body: JSON.parse(JSON.stringify({ first, mine, all })) };
     });
   },
 });
