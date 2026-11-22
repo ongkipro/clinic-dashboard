@@ -1,0 +1,19 @@
+{
+  "capability": "unattributed",
+  "head": "68573cee3cf93df26efbcccdd9b676cd970dbcbb",
+  "job": "T-116 report route mounts on 68573cee (P2, per Sol and P1-ROUTE-HANDOFF-P2-4f685eda): page.tsx (+error.tsx) for /laporan/{penjualan,perawatan,pasien,staf,operasional,stok,marketing} and a page for /laporan/kamus-kpi over the INTEGRATED P1 loader (laporan/_components/{data,load}.ts, ReportView, KamusKpiView); the exact eight DEL-2 isolation cases tests/isolation/cases/laporan-*.cases.ts (scope recorded before any edit). First Penjualan, Pasien, Kamus KPI to prove Scenario PR-95, then the other five after focused verification. No SQL, grant, nav, export, shared doc, Git or deploy; the readers and live.ts stay byte-identical.",
+  "model": "cc/claude-sonnet-5-5",
+  "provider": "9router-fantastico",
+  "reasoningEffort": "max",
+  "recordedAt": "2026-11-22T07:16:56Z",
+  "result": "PASS",
+  "risk": "R3",
+  "runId": "RUN-20261121T125831Z-e159ba43",
+  "schemaVersion": 1,
+  "skillsUsed": [
+    "ui-validation"
+  ],
+  "usageHash": "70df94953e9bbf77ff595cb53ffbf00f2251edea48692180e7c50d44fde39e51",
+  "verificationFailed": false,
+  "worker": "pi"
+}

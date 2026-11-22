@@ -77,8 +77,8 @@ export function KpiHeader({ items }: { items: ReportKpi[] }) {
 function Table({ t }: { t: ReportTableData }) {
   const [first, ...rest] = t.columns;
   return (
-    <section aria-label={t.caption} className="grid min-w-0 gap-3">
-      <div tabIndex={0} role="region" aria-label={t.caption} className="hidden min-w-0 overflow-x-auto rounded-[var(--radius-group)] bg-[var(--surface)] focus-visible:outline focus-visible:outline-3 focus-visible:outline-[var(--tint)] min-[700px]:block">
+    <section aria-label={t.caption} className="@container grid min-w-0 gap-3">
+      <div tabIndex={0} role="region" aria-label={t.caption} className="hidden min-w-0 overflow-x-auto rounded-[var(--radius-group)] bg-[var(--surface)] focus-visible:outline focus-visible:outline-3 focus-visible:outline-[var(--tint)] @min-[48em]:block">
         <table className="w-full border-collapse text-left">
           <caption className="sr-only">{t.caption}</caption>
           <thead>
@@ -96,7 +96,7 @@ function Table({ t }: { t: ReportTableData }) {
           </tbody>
         </table>
       </div>
-      <ul aria-label={t.caption} className="m-0 grid list-none gap-3 p-0 min-[700px]:hidden">
+      <ul aria-label={t.caption} className="m-0 grid list-none gap-3 p-0 @min-[48em]:hidden">
         {t.rows.map((r, i) => (
           <li key={i} className="grid gap-2 rounded-[var(--radius-group)] bg-[var(--surface)] p-4">
             <p className="m-0 font-semibold [overflow-wrap:anywhere]">{cell(r[first.id])}</p>

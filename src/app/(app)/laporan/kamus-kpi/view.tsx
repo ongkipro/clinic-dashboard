@@ -15,7 +15,7 @@ export const MARKER_LABEL = { draf: "Draf definisi", estimasi: "Estimasi" } as c
 function Entry({ k }: { k: KpiEntry }) {
   const used = reportsOf(k.id);
   return (
-    <article id={anchor(k.id)} aria-labelledby={`${anchor(k.id)}-h`} data-kpi={k.id} className="grid min-w-0 gap-2 scroll-mt-24 rounded-[var(--radius-group)] bg-[var(--surface)] p-4">
+    <article id={anchor(k.id)} aria-labelledby={`${anchor(k.id)}-h`} data-kpi={k.id} className="@container grid min-w-0 gap-2 scroll-mt-24 rounded-[var(--radius-group)] bg-[var(--surface)] p-4">
       <header className="flex min-w-0 flex-wrap items-baseline justify-between gap-2">
         <h2 id={`${anchor(k.id)}-h`} className="m-0 text-[1.18rem] font-semibold [overflow-wrap:anywhere]">
           <span className="tabular text-[var(--label-2)]">{k.id}</span> {k.label}
@@ -32,7 +32,7 @@ function Entry({ k }: { k: KpiEntry }) {
           ))}
         </ul>
       )}
-      <dl className="m-0 grid min-w-0 gap-x-4 gap-y-1 min-[700px]:grid-cols-[10rem_minmax(0,1fr)]">
+      <dl className="m-0 grid min-w-0 gap-x-4 gap-y-1 @min-[30em]:grid-cols-[10rem_minmax(0,1fr)]">
         <dt className="text-[0.88rem] text-[var(--label-2)]">Rumus</dt>
         <dd className="m-0 [overflow-wrap:anywhere]">{k.definition}</dd>
         <dt className="text-[0.88rem] text-[var(--label-2)]">Atribusi cabang</dt>
@@ -77,9 +77,11 @@ export function KamusKpiView({ state }: { state: KamusState }) {
           </Link>
         ))}
       </div>
-      {/* Compact: one column; regular: two columns from 1180 px. */}
-      <div className="grid min-w-0 gap-3 min-[1180px]:grid-cols-2">
-        {shown.map((k) => <Entry key={k.id} k={k} />)}
+      {/* One column; two when the page's own text column holds them (a container query: 200 % text at 1180 px must not squeeze two columns, WCAG 1.4.10). */}
+      <div className="@container grid min-w-0 gap-3">
+        <div className="grid min-w-0 gap-3 @min-[48em]:grid-cols-2">
+          {shown.map((k) => <Entry key={k.id} k={k} />)}
+        </div>
       </div>
     </main>
   );

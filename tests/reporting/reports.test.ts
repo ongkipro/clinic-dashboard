@@ -3,13 +3,18 @@
 // Proves: the dictionary has K1–K27 and each entry's `spec` equals the 02-PRD.md Appendix A row; K20–K27 equal their fixtures;
 // unavailable is never 0 / Rp0; Scenario PR-95 (Laporan Pasien → definition of churn → the dictionary entry); the views render every
 // state without patient names or clinical text. The SQL readers (next slice) must return these numbers on the same facts.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 // The report page gate (laporan/_components/data.ts) reads the request context; here it is a controllable stand-in (as other route tests do).
 const gate = vi.hoisted(() => ({ rc: null as unknown, pool: null as unknown }));
 vi.mock("server-only", () => ({}));
+// redirect() / notFound() throw Next's control-flow errors in a request; here they throw a plain, recognisable error (as tests/context/stale-context.test.ts stands redirect in).
+vi.mock("next/navigation", () => ({
+  redirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); },
+  notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+}));
 vi.mock("../../src/modules/org/context/store", () => ({ requestContext: async () => gate.rc, appPool: async () => gate.pool }));
 import { KamusKpiView, parseReport } from "../../src/app/(app)/laporan/kamus-kpi/view";
 import { type ReportKpi, type ReportProps, ReportView, reportState } from "../../src/app/(app)/laporan/_components/report-view";
@@ -30,13 +35,21 @@ import { issueKasirInvoice, openKasirInvoice, receivePayment, requestVoid } from
 import { decideApproval } from "../../src/modules/approvals/approvals";
 import { publish } from "../../src/modules/catalog/catalog";
 import { setStaffTarget } from "../../src/modules/commission/targets/targets";
-import { saveItem } from "../../src/modules/inventory/stock";
+import { createLead } from "../../src/modules/crm/leads/leads";
+import { receiveCosted } from "../../src/modules/inventory/costing/costing";
+import { createDepot, transferBetweenDepots } from "../../src/modules/inventory/depots/depots";
+import { receiveStock, saveItem, setLevel } from "../../src/modules/inventory/stock";
+import { CHECKS, handOver, prepareDispensing } from "../../src/modules/pharmacy/pharmacy";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { kpi, type KpiResult } from "../../src/modules/reporting/dashboards/dashboards";
 import { fromKpi, fromTargets, loadReport, readKpi, wholeMonth } from "../../src/modules/reporting/reports/live";
 import { decode, read, ReaderShapeError } from "../../src/modules/reporting/reports/readers";
 import { filters as reportFilters, periodLabel as reportPeriod, readersOf, REPORT_IDS, reportIn } from "../../src/app/(app)/laporan/_components/load";
 import { loadReportPage } from "../../src/app/(app)/laporan/_components/data";
+import { ReportPage, reportBody } from "../../src/app/(app)/laporan/_components/report-page";
+import { kamusBody } from "../../src/app/(app)/laporan/kamus-kpi/body";
+import { KAMUS_ROLES } from "../../src/app/(app)/laporan/kamus-kpi/data";
+import type { ReportId } from "../../src/modules/reporting/reports/dictionary";
 import { openShift } from "../../src/modules/cashier/shifts/shifts";
 import { setKekRingForTests } from "../../src/lib/keys/runtime";
 import { createHarness, type Harness, testPool } from "../rls/harness";
@@ -432,7 +445,11 @@ describe("Kamus KPI view (UX-59)", () => {
     expect(h).toContain("Draf definisi");
     expect(h).toContain("Estimasi");
     expect(h.match(/<main/g)).toHaveLength(1);
-    expect(h).toContain("min-[1180px]:grid-cols-2");
+    // T-116 mount (browser run, 200 % text): the columns follow the page's own text column (a container query), never the viewport — a viewport switch put two columns at 1180 px with 200 % text
+    // and the entries overflowed by 139 px (WCAG 1.4.10). The viewport breakpoints of this view are gone.
+    expect(h).toContain("@min-[48em]:grid-cols-2");
+    expect(h).toContain("@min-[30em]:grid-cols-[10rem_minmax(0,1fr)]");
+    expect(h).not.toMatch(/min-\[(700|1180)px\]/);
   });
   it("filters by report; loading and permission states", () => {
     const f = renderToStaticMarkup(KamusKpiView({ state: { kind: "ok", report: parseReport("operasional") } }));
@@ -442,6 +459,138 @@ describe("Kamus KPI view (UX-59)", () => {
     const l = renderToStaticMarkup(KamusKpiView({ state: { kind: "loading" } }));
     expect(l).toContain('aria-busy="true"');
     expect(renderToStaticMarkup(KamusKpiView({ state: { kind: "permission" } }))).toContain("Anda tidak memiliki akses ke Kamus KPI.");
+  });
+});
+
+// ── T-116 route mounts (UX-38, UX-59, PR-95): the page files, their error boundaries and the page BODIES they run. No database: the role gate refuses before any read, and `next/navigation` is
+// stood in for. The eight routes of the report family: Penjualan, Perawatan, Pasien, Staf, Operasional, Stok, Marketing and the Kamus KPI (Scenario PR-95). ──
+const MOUNTED: ReportId[] = ["penjualan", "perawatan", "pasien", "staf", "operasional", "stok", "marketing"]; // every report of the dictionary: a missing route fails the first test below
+const ctxOf = (role: Role) => ({ kind: "ok", active: { context: { actingRole: role } } });
+describe("T-116 route mounts: pages, error boundaries and page bodies (no database)", () => {
+  it("each mounted route names its own report and exports only a default page and metadata (a Next page file may export nothing else); the title is the report's", async () => {
+    for (const id of MOUNTED) {
+      const m = await import(`../../src/app/(app)/laporan/${id}/page`);
+      expect(Object.keys(m).sort(), id).toEqual(["default", "metadata"]);
+      expect(m.metadata.title, id).toBe(`${REPORTS[id].title} — Clinic Dashboard`);
+      const el = m.default({ searchParams: Promise.resolve({}) });
+      expect([el.type, el.props.report], id).toEqual([ReportPage, id]); // a copy-pasted route would name another report
+    }
+    const k = await import("../../src/app/(app)/laporan/kamus-kpi/page");
+    expect(Object.keys(k).sort()).toEqual(["default", "metadata"]);
+    expect(k.metadata.title).toBe("Kamus KPI — Clinic Dashboard");
+  });
+
+  it("the family of routes is exactly the dictionary's: one page and one error boundary per report, a page for the Kamus KPI (static, no boundary) and nothing else under laporan/ (audit and terjadwal are other tasks)", () => {
+    const dir = join(__dirname, "../../src/app/(app)/laporan");
+    const all = readdirSync(dir, { recursive: true }) as string[];
+    const folders = (file: string) => all.filter((f) => new RegExp(`(^|/)${file}\\.tsx$`).test(f)).map((f) => f.replace(new RegExp(`/${file}\\.tsx$`), "")).sort();
+    const reports = (Object.keys(REPORTS) as ReportId[]).sort();
+    expect(folders("page")).toEqual([...reports, "kamus-kpi"].sort());
+    expect(folders("error")).toEqual(reports);
+    for (const id of reports) expect(REPORTS[id].href, id).toBe(`/laporan/${id}`); // the nav row and the dictionary name the same path as the folder
+  });
+
+  it("loading: while the body streams, the page shows the report's title with a busy skeleton (Suspense fallback), never a figure", () => {
+    for (const id of MOUNTED) {
+      const el = ReportPage({ report: id, searchParams: Promise.resolve({}) });
+      const out = renderToStaticMarkup(el.props.fallback);
+      expect(out, id).toContain('aria-busy="true"');
+      expect(out, id).toContain(REPORTS[id].title.replaceAll("&", "&amp;"));
+      expect(out, id).not.toMatch(/Rp\s?\d|data-kpi/);
+    }
+  });
+
+  it("error boundary: each mounted route shows its report's title, the 'Coba Lagi' recovery wired to retry, and never the error's own text", async () => {
+    for (const id of MOUNTED) {
+      const e = await import(`../../src/app/(app)/laporan/${id}/error`);
+      const retry = vi.fn();
+      const el = e.default({ error: new Error("rahasia: koneksi basis data putus"), retry });
+      expect(el.props.retry, id).toBe(retry);
+      const out = renderToStaticMarkup(el);
+      expect(out, id).toContain(`<h1 class="m-0 text-[2rem] font-bold leading-tight">${REPORTS[id].title.replaceAll("&", "&amp;")}</h1>`);
+      expect(out, id).toContain("Laporan belum bisa dimuat. Tidak ada yang berubah.");
+      expect(out, id).toContain('role="alert"');
+      expect(out, id).toContain("Coba Lagi");
+      expect(out, id).not.toContain("rahasia");
+    }
+  });
+
+  it("reportBody gate: a role outside the report's nav row gets the permission state (title and message only: no figure, no definition link) BEFORE any read — there is no pool to read from", async () => {
+    gate.pool = null;
+    for (const id of MOUNTED) {
+      gate.rc = ctxOf("fo_cashier"); // in no report's nav row
+      const out = renderToStaticMarkup(await reportBody(id, Promise.resolve({})));
+      expect(out, id).toContain(`Anda tidak memiliki akses ke ${REPORTS[id].title.toLowerCase().replaceAll("&", "&amp;")}.`);
+      expect(out, id).toContain(REPORTS[id].title.replaceAll("&", "&amp;"));
+      expect(out, id).not.toMatch(/Rp\s?\d|data-kpi|Definisi|Unduh/);
+    }
+  });
+
+  it("reportBody: a signed-out request is redirected; an account with no context gets the permission state", async () => {
+    gate.pool = null;
+    gate.rc = { kind: "redirect", to: "/masuk" };
+    await expect(reportBody("penjualan", Promise.resolve({}))).rejects.toThrow("NEXT_REDIRECT /masuk");
+    gate.rc = { kind: "blocked", accountId: "x" };
+    expect(renderToStaticMarkup(await reportBody("penjualan", Promise.resolve({})))).toContain("Anda tidak memiliki akses");
+  });
+
+  it("kamusBody: the static dictionary needs no pool — every role of its nav row reads all 27 entries, another role gets the permission state; ?laporan= filters, an unknown one shows all", async () => {
+    gate.pool = null;
+    expect([...KAMUS_ROLES].sort()).toEqual(["auditor", "central_cs", "finance", "manager", "marketing", "owner", "pharmacist", "purchasing"]); // the nav row "O F M MK CS PH PU AU"
+    for (const r of KAMUS_ROLES) {
+      gate.rc = ctxOf(r);
+      expect(renderToStaticMarkup(await kamusBody(Promise.resolve({}))).match(/<article /g), r).toHaveLength(27);
+    }
+    gate.rc = ctxOf("fo_cashier");
+    const no = renderToStaticMarkup(await kamusBody(Promise.resolve({})));
+    expect(no).toContain("Anda tidak memiliki akses ke Kamus KPI.");
+    expect(no).not.toMatch(/<article|data-kpi/);
+    gate.rc = ctxOf("owner");
+    const f = renderToStaticMarkup(await kamusBody(Promise.resolve({ laporan: "pasien" })));
+    expect([...f.matchAll(/data-kpi="(K\d+)"/g)].map((m) => m[1])).toEqual(["K10", "K11", "K21", "K22"]);
+    expect(renderToStaticMarkup(await kamusBody(Promise.resolve({ laporan: "tidak-ada" }))).match(/<article /g)).toHaveLength(27);
+    gate.rc = { kind: "redirect", to: "/masuk" };
+    await expect(kamusBody(Promise.resolve({}))).rejects.toThrow("NEXT_REDIRECT /masuk");
+    gate.rc = { kind: "blocked", accountId: "x" };
+    expect(renderToStaticMarkup(await kamusBody(Promise.resolve({})))).toContain("Anda tidak memiliki akses ke Kamus KPI.");
+  });
+
+  it("Scenario PR-95 anchor: the dictionary body mounts the hash scroller in the ok state only (a permission state has no entry to scroll to); the effect itself is proved in the browser, not here (no DOM)", async () => {
+    gate.pool = null;
+    gate.rc = ctxOf("owner");
+    const ok = await kamusBody(Promise.resolve({}));
+    const kids = (ok as { props: { children: { type: unknown }[] } }).props.children;
+    expect(kids.map((c) => (c.type as { name?: string }).name)).toEqual(["ScrollToHash", "KamusKpiView"]);
+    gate.rc = ctxOf("fo_cashier");
+    const no = await kamusBody(Promise.resolve({}));
+    expect((no as { type: { name?: string } }).type.name).toBe("KamusKpiView"); // permission: the view alone, no scroller
+    // the scroller reads only the URL's hash and renders nothing
+    const src = readFileSync(join(__dirname, "../../src/app/(app)/laporan/kamus-kpi/scroll-to-hash.tsx"), "utf8");
+    expect(src).toMatch(/^"use client";/);
+    expect(src).toContain("window.location.hash");
+    expect(src).toContain("return null;");
+    expect(src).not.toMatch(/fetch\(|document\.cookie|localStorage|sessionStorage/);
+  });
+
+  it("no mounted file sets an export link: exportHref is the view's own prop (Unduh is a later task, RATE-5); only report-view.tsx names it", () => {
+    const dir = join(__dirname, "../../src/app/(app)/laporan");
+    const files = (readdirSync(dir, { recursive: true }) as string[]).filter((f) => /\.(ts|tsx)$/.test(f));
+    expect(files.length).toBeGreaterThan(8);
+    for (const f of files.filter((x) => !x.endsWith("report-view.tsx"))) expect(readFileSync(join(dir, f), "utf8"), f).not.toMatch(/exportHref|\/ekspor/);
+  });
+});
+
+describe("Laporan route group: layout follows the container, never the viewport (WCAG 1.4.10)", () => {
+  it("no file under src/app/(app)/laporan carries a viewport breakpoint (sm: md: lg: xl: 2xl: min-[..]: max-[..]:)", () => {
+    const dir = join(__dirname, "../../src/app/(app)/laporan");
+    const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
+    const files = walk(dir).filter((f) => /\.(tsx|ts|css)$/.test(f));
+    expect(files.length).toBeGreaterThan(20);
+    const VIEWPORT = /(^|[\s"'`])((sm|md|lg|xl|2xl|max-sm|max-md|max-lg|max-xl):|min-\[[0-9.]+(px|rem|em)\]:|max-\[[0-9.]+(px|rem|em)\]:)/;
+    for (const f of files) expect(readFileSync(f, "utf8").split("\n").filter((l) => !l.trimStart().startsWith("//") && VIEWPORT.test(l)), f).toEqual([]);
+    // the guard bites: the two lines P1 shipped would have matched it
+    expect(VIEWPORT.test('className="hidden min-w-0 overflow-x-auto min-[700px]:block"')).toBe(true);
+    expect(VIEWPORT.test('className="grid min-w-0 gap-3 @min-[48em]:grid-cols-2"')).toBe(false);
   });
 });
 
@@ -463,8 +612,11 @@ describe("Report view (UX-38): states, unavailable ≠ 0, no clinical content", 
     expect(h).toContain("Periode Oktober 2026");
     expect(h).toContain('dateTime="2026-10-31T17:00:00Z"');
     for (const id of ["k20", "k22", "k26"]) expect(h).toContain(`href="/laporan/kamus-kpi#${id}"`);
-    expect(h).toContain("min-[700px]:block");
-    expect(h).toContain("min-[700px]:hidden");
+    // the table/list switch follows the CONTAINER's text size, never the viewport (WCAG 1.4.10: no sideways scroll at 200 % text)
+    expect(h).toContain("@container");
+    expect(h).toContain("@min-[48em]:block");
+    expect(h).toContain("@min-[48em]:hidden");
+    expect(h).not.toContain("min-[700px]");
   });
   it("omits Unduh when the role may not export", () => {
     expect(html({ ...props(kpis), exportHref: undefined }, { kind: "ok" })).not.toContain("Unduh");
@@ -1033,6 +1185,128 @@ describe("report_k20 … report_k27 on PostgreSQL (0130)", () => {
     });
   });
 
+  // ── T-116 route mounts on the REAL readers: the page bodies the routes run (reportBody / kamusBody), as each role, through the same gate and loader the requests use ──
+  const bodyAs = async (p: P, run: () => Promise<unknown>) => {
+    gate.pool = app;
+    gate.rc = { kind: "ok", active: { context: await resolveContext(app, p.acc, { tenantId: p.tenantId, actingRole: p.role, activeBranchId: p.branch }) } };
+    return run();
+  };
+  const page = async (p: P, id: ReportId, q: Record<string, string> = {}) => renderToStaticMarkup(await bodyAs(p, () => reportBody(id, Promise.resolve(q))) as never);
+  const text = (s: string) => s.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  it("Scenario PR-95 through the mounted pages: owner → Laporan Pasien → 'Definisi Churn (K21)' → the Kamus KPI page shows entry k21, which links back to Laporan Pasien", async () => {
+    const d = today();
+    const pasien = await page(OWN, "pasien", { dari: d, sampai: d });
+    const link = pasien.match(/href="([^"]+)"[^>]*aria-label="Definisi Churn \(K21\)"|aria-label="Definisi Churn \(K21\)"[^>]*href="([^"]+)"/);
+    expect(link?.[1] ?? link?.[2]).toBe("/laporan/kamus-kpi#k21");
+    const kamus = renderToStaticMarkup(await bodyAs(OWN, () => kamusBody(Promise.resolve({}))) as never);
+    const entry = kamus.split('id="k21"')[1].split("</article>")[0];
+    expect(entry).toContain("Churn");
+    expect(entry).toContain(BY_ID.get("K21")!.definition.replaceAll('"', "&quot;"));
+    expect(entry).toContain('href="/laporan/pasien"'); // the dictionary names the report that uses it
+  });
+  it("Laporan Penjualan body for the owner: K1 and K3 are the fixture's Rp1.000.000 with a definition link per KPI, period and branch chips, no export link; a branch role sees no branch chips", async () => {
+    const out = await page(OWN, "penjualan");
+    expect([...out.matchAll(/data-kpi="(K\d+)"/g)].map((m) => m[1])).toEqual(["K1", "K2", "K3"]);
+    for (const k of ["K1", "K3"]) expect(text(out.split(`data-kpi="${k}"`)[1].split("</li>")[0]), k).toContain("Rp1.000.000");
+    for (const k of ["K1", "K2", "K3"]) expect(out).toContain(`href="/laporan/kamus-kpi#${k.toLowerCase()}"`);
+    expect(out).toContain('aria-label="Periode"');
+    expect(out).toContain('aria-label="Cabang"'); // tenant-wide role: Semua Cabang + each branch
+    expect(out).not.toMatch(/Unduh|\/ekspor/);
+    const mgr = await page(MGR, "operasional");
+    expect(mgr).toContain("Laporan Operasional");
+    expect(mgr).not.toContain('aria-label="Cabang"'); // a branch role has its own branch only
+  });
+  const NEEDS_FACTS = new Set<ReportId>(["perawatan", "stok", "marketing"]); // pages that are the honest EMPTY state until their own fact exists (reportState: every KPI a real zero or "no data")
+  it("a mounted page names every KPI of its report, for the first role of its nav row: nothing silently missing", async () => {
+    // the first role of each report's nav row (O F M · O M · O MK · O M · M · PH PU AU · MK CS): the pharmacist reads Laporan Stok, the manager Laporan Operasional, marketing its own
+    const first: Record<string, P> = { penjualan: OWN, perawatan: OWN, pasien: OWN, staf: OWN, operasional: MGR, stok: PH, marketing: MK };
+    for (const id of MOUNTED) {
+      if (NEEDS_FACTS.has(id)) continue; // K7 needs a DELIVERED product, K18 an item below its minimum, K13 a lead: this clinic has none of them (those pages are the empty state here); a test below seeds real facts for each, in a clinic of its own
+      const out = await page(first[id], id);
+      const seen = new Set([...out.matchAll(/data-kpi="(K\d+)"/g)].map((m) => m[1]));
+      for (const k of REPORTS[id].kpis) expect(seen.has(k), `${id} ${k}`).toBe(true);
+      expect(out, id).toContain("<h1");
+      expect((out.match(/<main/g) ?? []).length, id).toBe(1); // a page owns one <main>
+    }
+  });
+  it("Laporan Perawatan through the page body with a real DELIVERED product sale (a clinic of its own, so the fixture totals above stay put): K7 = price − moving-average cost, with its definition link; the page is no longer the empty state", async () => {
+    const t = await tenant("PT Laporan Perawatan Sintetis");
+    const owner = await person(t, "owner"); const phm = await person(t, "pharmacist", t.b1); const fo = await person(t, "fo_cashier", t.b1);
+    const price = 150_000; const cost = 55_000;
+    const catalog = (await as(owner, (db) => publish(db, { kind: "product", code: "RP-DLV" }, { name: "Produk Diserahkan Laporan", tax_category: "non_object", tax_basis: "Barang", normal_price: price } as never, "Produk"))).itemId;
+    const { itemId } = await as(phm, (db) => saveItem(db, key(), null, { catalogItemId: catalog, unit: "pcs", storage: "ruang", highValue: false, active: true }));
+    const g1 = (await h.admin.query(`select id from depots where tenant_id = $1 and branch_id = $2 and is_default`, [t.tenantId, t.b1])).rows[0].id as string;
+    const apt = (await as(phm, (db) => createDepot(db, key(), { branchId: null, name: "Apotek Laporan", kind: "apotek" }))).depotId;
+    const expiry = new Date(Date.now() + 300 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+    const batch = (await as(phm, (db) => receiveCosted(db, key(), null, { itemId, batchNo: "RP-DLV-1", expiry, quantity: "5", reason: "penerimaan", unitCost: cost }))).batchId;
+    await as(phm, (db) => transferBetweenDepots(db, key(), { fromDepotId: g1, toDepotId: apt, lines: [{ batchId: batch, quantity: "5" }] }));
+    const { invoiceId } = await as(fo, (db) => openKasirInvoice(db, key(), { counter: true }));
+    await as(fo, (db) => issueKasirInvoice(db, key(), invoiceId, [{ itemId: catalog, quantity: 1 }]));
+    await as(fo, (db) => receivePayment(db, key(), invoiceId, [{ method: "cash", amount: price, cashTendered: price }]));
+    const d = (await h.admin.query(`select d.id from dispensings d join invoice_lines l on l.id = d.invoice_line_id where l.invoice_id = $1`, [invoiceId])).rows[0].id as string;
+    await as(phm, (db) => prepareDispensing(db, key(), d, apt));
+    await as(phm, (db) => handOver(db, key(), d, { checks: Object.fromEntries(CHECKS.map((c) => [c, true])) as Record<(typeof CHECKS)[number], boolean> }));
+    const out = await page(owner, "perawatan");
+    expect([...out.matchAll(/data-kpi="(K\d+)"/g)].map((m) => m[1])).toEqual(["K7"]);
+    expect(text(out.split('data-kpi="K7"')[1].split("</li>")[0])).toContain("Rp95.000"); // 150.000 − 55.000
+    expect(out).toContain('href="/laporan/kamus-kpi#k7"');
+    expect(out).not.toContain("Belum ada data untuk periode ini.");
+    expect((out.match(/<main/g) ?? []).length).toBe(1);
+  }, 120_000);
+  it("Laporan Stok through the page body with real stock below its minimum (a clinic of its own): K18 is three counts for the pharmacist's branch — 2 below minimum, 0 expiring, 0 count variance — each with its definition link; a sibling branch's items are not in it", async () => {
+    const t = await tenant("PT Laporan Stok Sintetis");
+    const owner = await person(t, "owner"); const phm = await person(t, "pharmacist", t.b1); const phmB = await person(t, "pharmacist", t.b2);
+    const far = new Date(Date.now() + 400 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); // far enough not to count as "expiring"
+    const stocked = async (p: P, code: string, n: number) => {
+      const cat = (await as(owner, (db) => publish(db, { kind: "material", code }, { name: `Bahan ${code}`, tax_category: "taxable_goods", tax_basis: "Barang", normal_price: 1_000 } as never, "Bahan"))).itemId;
+      const { itemId } = await as(p, (db) => saveItem(db, key(), null, { catalogItemId: cat, unit: "pcs", storage: "ruang", highValue: false, active: true }));
+      await as(p, (db) => receiveStock(db, key(), null, { itemId, batchNo: `${code}-1`, expiry: far, quantity: String(n), reason: "stok_awal" }));
+      await as(p, (db) => setLevel(db, key(), null, itemId, "5", "10"));
+    };
+    await stocked(phm, "RP-STK-1", 1); await stocked(phm, "RP-STK-2", 2); // two items below their minimum of 5 at the pharmacist's branch
+    await stocked(phm, "RP-STK-3", 9); // above its minimum: not counted
+    await stocked(phmB, "RP-STK-4", 1); // below its minimum at the OTHER branch: not in the pharmacist's report
+    const out = await page(phm, "stok");
+    expect([...out.matchAll(/data-kpi="(K\d+)"/g)].map((m) => m[1])).toEqual(["K18", "K18", "K18"]);
+    const k18 = text(out);
+    expect(k18).toMatch(/Di bawah minimum\D*2\b/);
+    expect(k18).toMatch(/Kedaluwarsa dekat\D*0\b/);
+    expect(k18).toMatch(/Selisih hitung\D*0\b/);
+    expect(out).toContain('href="/laporan/kamus-kpi#k18"');
+    expect(out).not.toContain("Belum ada data untuk periode ini.");
+    expect(out).not.toContain('aria-label="Cabang"'); // a branch role has no branch chips
+  }, 120_000);
+  it("Laporan Marketing through the page body with a real lead (a clinic of its own): K13 is a real 0% (one lead, none paid), K14, K25 and K26 say 'Belum ada data' or a real zero — five cards, each with its definition link, a tenant-wide role gets the branch chips", async () => {
+    const t = await tenant("PT Laporan Marketing Sintetis");
+    const mk = await person(t, "marketing"); const cs = await person(t, "central_cs");
+    const pid = await patient(t, t.b1);
+    await as(cs, (db) => createLead(db, key(), { source: "instagram", patientId: pid, branchId: t.b1 } as never));
+    const out = await page(mk, "marketing");
+    expect([...out.matchAll(/data-kpi="(K\d+)"/g)].map((m) => m[1])).toEqual(["K13", "K14", "K25", "K26", "K26"]);
+    expect(text(out.split('data-kpi="K13"')[1].split("</li>")[0])).toMatch(/0,0%/);
+    expect(text(out.split('data-kpi="K13"')[1].split("</li>")[0])).toContain("1 lead");
+    for (const k of ["k13", "k14", "k25", "k26"]) expect(out).toContain(`href="/laporan/kamus-kpi#${k}"`);
+    expect(out).toContain('aria-label="Cabang"'); // marketing is tenant-wide: Semua Cabang + each branch
+    expect(out).not.toContain("Belum ada data untuk periode ini.");
+    expect(out).not.toMatch(/Unduh|\/ekspor/);
+  }, 120_000);
+  it("TEN-1 through the page body: another tenant's branch, a manager's other branch and a branch of another clinic are NOT FOUND; a malformed ?cabang= is ignored; a role outside the row is refused", async () => {
+    await expect(page(OWN, "penjualan", { cabang: B.b1 })).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(page(BOWN, "pasien", { cabang: A.b1 })).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(page(MGR, "operasional", { cabang: A.b2 })).rejects.toThrow("NEXT_NOT_FOUND");
+    const ignored = await page(OWN, "penjualan", { cabang: "x' or 1=1" });
+    expect(text(ignored.split('data-kpi="K1"')[1].split("</li>")[0])).toContain("Rp1.000.000"); // all the role may see
+    expect(await page(FIN, "operasional")).toContain("Anda tidak memiliki akses ke laporan operasional."); // finance is not in Laporan Operasional's row
+  });
+  it("empty and filtered-empty through the page: a clinic with no data says so; a branch filter without data offers 'Hapus Filter' back to the unfiltered report; neither shows Rp0 as a finding", async () => {
+    const none = await page(BOWN, "perawatan");
+    expect(none).toContain("Belum ada data untuk periode ini.");
+    expect(none).not.toContain("data-kpi");
+    const filtered = await page(OWN, "perawatan", { cabang: A.b2 });
+    expect(filtered).toContain("Tidak ada data untuk filter ini.");
+    expect(filtered).toMatch(/href="\/laporan\/perawatan"[^>]*>Hapus Filter/);
+    expect(filtered).not.toContain("data-kpi");
+  });
   it("authority: roles per K; a manager's other branch and a foreign branch are not found; another tenant sees none of A", async () => {
     const d = today();
     for (const [p, k] of [[MK, "k20"], [MK, "k21"], [FO, "k23"], [DOC, "k27"], [FIN, "k22"], [PH, "k26"], [FO, "k24"]] as const) {
