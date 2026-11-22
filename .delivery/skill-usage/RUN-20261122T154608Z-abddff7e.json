@@ -1,0 +1,19 @@
+{
+  "capability": "unattributed",
+  "head": "2b0d5a8c59a4c036ee1effb6c854e15a607010fa",
+  "job": "T-115 rebaseline to green 2b0d5a8c (CI 45038330642; main delta = T-110 mount): the mount candidate (manifest d1685cfab361) carried byte-identical; affected/mandatory gates: typecheck, lint, admin-pusat tests, full isolation together with T-110's case, browser UX-57 (reuse only where still valid). No main writes, policy, grants or deploy.",
+  "model": "claude-opus-5-5",
+  "provider": "9router-fantastico",
+  "reasoningEffort": "medium",
+  "recordedAt": "2026-11-22T15:50:16Z",
+  "result": "PASS",
+  "risk": "R2",
+  "runId": "RUN-20261122T154608Z-abddff7e",
+  "schemaVersion": 1,
+  "skillsUsed": [
+    "ui-validation"
+  ],
+  "usageHash": "9a26c9f4c9cefcd07c7b50efa7baa8596f1fb4752e6cff2d998e736e1b4f689e",
+  "verificationFailed": false,
+  "worker": "pi"
+}
