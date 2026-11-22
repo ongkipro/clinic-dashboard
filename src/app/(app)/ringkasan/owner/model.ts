@@ -16,8 +16,9 @@ export const K9_WINDOWS: readonly K9Window[] = [30, 60, 90];
 export type K9Windows = Record<K9Window, { count: Ratio; value: Ratio }>;
 export type K9Detail = { state: "value"; windows: K9Windows } | { state: "unavailable"; reason: string };
 
-// K7 provenance (T-107 reader note): estimated bulk consumption, uncosted stock, or materials never recorded.
-export type K7Note = "estimasi" | "biaya_belum_lengkap" | "bahan_belum_dicatat";
+// K7 provenance (T-107 reader dims): estimated bulk consumption or uncosted stock. No reader fact says materials were expected but never
+// recorded, so there is no such note (add one only with a reader dim for it).
+export type K7Note = "estimasi" | "biaya_belum_lengkap";
 export type Contribution = { amount: Amount; note?: K7Note };
 
 export type AttentionKey = "persetujuan" | "belum_bayar" | "stok_klinis" | "lead_sla" | "satusehat" | "kepatuhan";
@@ -91,7 +92,7 @@ export const ATTENTION_LABEL: Record<AttentionKey, string> = {
   // kepatuhan counts only evidence already EXPIRED: the register has no "expiring soon" window and the spec defines none, so "hampir habis" is not counted
   lead_sla: "lead melewati batas respons", satusehat: "kiriman SATUSEHAT gagal", kepatuhan: "bukti kepatuhan sudah kedaluwarsa",
 };
-export const K7_NOTE: Record<K7Note, string> = { estimasi: "Estimasi", biaya_belum_lengkap: "Biaya belum lengkap", bahan_belum_dicatat: "Bahan belum dicatat" };
+export const K7_NOTE: Record<K7Note, string> = { estimasi: "Estimasi", biaya_belum_lengkap: "Biaya belum lengkap" };
 export const UNAVAILABLE = "Belum tersedia";
 export const NO_DATA = "Belum ada data pada periode ini";
 export const NO_RECOMMENDATION = "Belum ada rencana yang disarankan pada periode ini";
