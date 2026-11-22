@@ -446,13 +446,37 @@ describe("readBranchSummary on the real readers (PostgreSQL, synthetic)", () => 
     await as(PH, (db) => setLevel(db, key(), null, okItem, "5", "10"));
     // K19: the BC's target this month
     await as(OWN, (db) => setStaffTarget(db, key(), BC.staffId, t0.slice(0, 7), { closingValueTarget: 50_000_000 }));
+    // Menunggu pembayaran (visits_today + unpaid(), DEC-057): visits with their payment step, which kasir_visit_payment derives from the
+    // visit's issued invoices in production (in_progress while one owes, done when none owes, not_started without one). The step is the
+    // fact the predicate reads, so it is seeded directly (visits_guard off for the seed only), one patient per open visit (one open visit
+    // per patient and branch). At A: today in_progress (counts), YESTERDAY in_progress (counts: the tile is "waiting now", older ones
+    // included, the same population as /hari-ini?tampilan=belum-bayar), blocked (counts), done but open (no), not_started (no: no bill
+    // yet), and an in_progress visit already CLOSED today (no: unpaid() needs an open visit). At B: one in_progress (only B's count).
+    const wpPatient = async (b: string) => (await h.admin.query(
+      `insert into patients (tenant_id, mrn, full_name, birth_date, sex, identity_type, identity_enc, identity_bidx, religion, occupation, education, marital_status, registered_branch_id, created_by, created_as)
+       values ($1, 'RM-' || (1000000000000 + floor(random() * 8999999999999))::bigint::text, 'Pasien Sentinel Rahasia', '1990-01-01', 'female', 'nik', $3, $4, 'islam', 'Karyawan', 's1', 'kawin', $2, $5, 'fo_cashier') returning id`,
+      [A.tenantId, b, `v1.1.${key().replace(/-/g, "")}.b.c`, key().replace(/-/g, "").padEnd(43, "x").slice(0, 43), FO.staffId])).rows[0].id as string;
+    const wp: [string, string, string, boolean][] = [ // branch, payment step, check-in day, closed
+      [A.b1, "in_progress", t0, false], [A.b1, "in_progress", plusDay(t0, -1), false], [A.b1, "blocked", t0, false],
+      [A.b1, "done", t0, false], [A.b1, "not_started", t0, false], [A.b1, "in_progress", t0, true], [A.b2, "in_progress", t0, false]];
+    const wpPids: string[] = [];
+    for (const [b] of wp) wpPids.push(await wpPatient(b));
+    await seedRaw(["visits"], async () => {
+      for (const [i, [b, pay, day, closed]] of wp.entries()) await h.admin.query(
+        `insert into visits (tenant_id, branch_id, patient_id, kind, checked_in_by, checked_in_at, payment, blocker, closed_at, closed_by)
+         values ($1, $2, $3, 'walk_in', $4, $5, $6, case when $6 = 'blocked' then 'Menunggu konfirmasi pembayaran' end,
+                 case when $7 then now() end, case when $7 then $4::uuid end)`,
+        [A.tenantId, b, wpPids[i], FO.staffId, at(day, "09:00"), pay, closed]);
+    });
   }, 300_000);
   afterAll(async () => { await app?.end(); await owner?.end(); await h?.close(); });
 
   it("manager of A: today's counts and hours from appointments_window at A only; tomorrow's K15 gap; open complaints only; Scenario PR-33b below minimum", async () => {
     const raw = await as(MGR, (db) => readBranchSummary(db, A.b1)) as Raw;
     expect(raw.branch_id).toBe(A.b1);
-    expect(raw.today_counts).toEqual({ appointments: 3, arrived: 1, no_shows: 1 }); // the cancelled and B's appointment are not on A's book
+    // waiting_payment 3 = A's open visits whose payment step is in_progress (today and an older one) or blocked; not done, not not_started,
+    // not the in_progress visit closed today, not B's (the cancelled and B's appointment are not on A's book either)
+    expect(raw.today_counts).toEqual({ appointments: 3, arrived: 1, no_shows: 1, waiting_payment: 3 });
     expect(raw.hours).toEqual([{ hour: 10, booked: 2, arrived: 1 }, { hour: 14, booked: 1, arrived: 0 }]);
     expect(raw.tomorrow.appointments).toBe(1);
     expect(raw.tomorrow.gaps).toEqual([{ staff_id: DOC.staffId, name: expect.any(String), booked_minutes: 60, rostered_minutes: 480 }]);
@@ -473,6 +497,8 @@ describe("readBranchSummary on the real readers (PostgreSQL, synthetic)", () => 
     const s = (v as Extract<typeof v, { kind: "ok" }>).summary;
     const tile = (k: string) => [...s.chase, ...s.todayTiles, ...s.tomorrowTiles, ...s.stockTiles].find((x) => x.key === k)!.metric;
     expect(tile("unpaid_bills")).toEqual({ kind: "unavailable", reason: "reader_pending" });
+    expect(tile("waiting_payment")).toEqual({ kind: "count", value: 3 });
+    expect(out).toMatch(/Menunggu pembayaran[\s\S]{0,400}?>3</); // the UX-21 tile shows the number, not "Belum tersedia"
     expect(tile("staff_on_duty")).toEqual({ kind: "unavailable", reason: "reader_pending" });
     expect(tile("variance")).toEqual({ kind: "count", value: 0 }); // a real zero stays 0
     const bc = s.staff.kind === "rows" ? s.staff.rows.find((r) => r.staffId === BC.staffId)! : null;
@@ -484,6 +510,7 @@ describe("readBranchSummary on the real readers (PostgreSQL, synthetic)", () => 
     expect(await code(as(MGR, (db) => readBranchSummary(db, A.b2)))).toBe("ERR_NOT_FOUND");
     const rb = await as(MGRB, (db) => readBranchSummary(db, A.b2)) as Raw;
     expect([rb.branch_id, rb.today_counts.appointments, rb.chase.complaints, rb.stock.below_min]).toEqual([A.b2, 1, 1, []]);
+    expect(rb.today_counts.waiting_payment).toBe(1); // B's one in_progress visit; none of A's
     // a payload of B offered to A's manager view is refused by the model too
     expect(resolveView({ viewer: viewer(MGR, "RC-A"), filter: "semua", read: { ok: true, raw: rb } })).toEqual({ kind: "permission" });
   });
@@ -597,10 +624,36 @@ describe("readBranchSummary on the real readers (PostgreSQL, synthetic)", () => 
     expect(out).not.toContain("/staf/target");
     expect(out).not.toContain("Target &amp; Scorecard");
   });
+  it("Menunggu pembayaran (UX-21): today's AND older unpaid open visits count (the tile's /hari-ini?tampilan=belum-bayar population), a failed board read stays 'Belum tersedia', a successful empty read is a real 0", async () => {
+    // the older (yesterday) in_progress visit is in the 3; without it the count would be 2 — the tile is "waiting now", not T-109's
+    // "older than today" attention row, and not today's check-ins only (no not_started, no done, no closed)
+    const raw = await as(MGR, (db) => readBranchSummary(db, A.b1)) as Raw;
+    expect(raw.today_counts.waiting_payment).toBe(3);
+    // the board read refused / failed → the field is absent → "Belum tersedia", never 0 (the part() savepoint; the others still read)
+    await as(MGR, async (db) => {
+      const refusing = { query: (sql: string, args?: unknown[]) => (/visits_today/.test(sql)
+        ? Promise.reject(new CommandError("ERR_FORBIDDEN")) : db.query(sql, args)) } as unknown as typeof db;
+      const r = await readBranchSummary(refusing, A.b1) as Raw;
+      expect("waiting_payment" in r.today_counts).toBe(false);
+      expect(r.today_counts.appointments).toBe(3);
+      const v = resolveView({ viewer: viewer(MGR, "RC-A"), filter: "semua", read: { ok: true, raw: r } });
+      const s = (v as Extract<typeof v, { kind: "ok" }>).summary;
+      const m = s.todayTiles.find((x) => x.key === "waiting_payment")!.metric;
+      expect(m).toEqual({ kind: "unavailable", reason: "reader_pending" });
+      expect(show(m)).toBe("Belum tersedia");
+    });
+    // a branch with no unpaid visit: a successful read gives a real 0 (shown as 0)
+    const E = await tenant("PT Cabang Kosong");
+    const mgrE = await person(E, "manager", E.b1);
+    const re = await as(mgrE, (db) => readBranchSummary(db, E.b1)) as Raw;
+    expect(re.today_counts.waiting_payment).toBe(0);
+    // aggregate only: no patient name of the seeded visits leaves the reader
+    expect(JSON.stringify(raw)).not.toContain("Pasien Sentinel Rahasia");
+  });
   it("MISSING names exactly the payload fields left for the next reader scope", () => {
     expect(MISSING).toEqual([
       "chase.unpaid_bills", "chase.unpaid_additions", "chase.receivables_due", "chase.no_shows_to_rebook", "chase.waiting_long", "chase.approvals",
-      "today_counts.in_treatment", "today_counts.waiting_payment", "today_counts.rooms_in_use", "today_counts.devices_in_use", "today_counts.staff_on_duty",
+      "today_counts.in_treatment", "today_counts.rooms_in_use", "today_counts.devices_in_use", "today_counts.staff_on_duty",
       "tomorrow.leave_conflicts", "wait_minutes", "staff[].k17_rupiah",
     ]);
   });

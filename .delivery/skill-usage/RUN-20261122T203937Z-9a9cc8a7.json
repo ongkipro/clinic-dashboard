@@ -1,0 +1,19 @@
+{
+  "capability": "unattributed",
+  "head": "6c00bf4ca305226c8211fd3f210c431585feacbf",
+  "job": "T-110 waiting_payment exact 2-file rebaseline onto green 6c00bf4c (CI 45066187931): apply only the PASS candidate of run 3f6328ed (reader.ts 04ef38cbb854, pr-33b.test.ts f9e31fcd859c; diff ad323cb0deb5). a3414213..6c00bf4c changes only ringkasan/owner/model.ts (T-109 K7Note); both slice files are unchanged on the base. Recheck only affected/mandatory evidence: typecheck, lint, pr-33b PG, isolation, and the UX-21 browser check (its owner redirect renders /ringkasan/owner/cabang, which uses the changed model). Mutation evidence reused (same product bytes).",
+  "model": "claude-opus-5-5",
+  "provider": "9router-fantastico",
+  "reasoningEffort": "medium",
+  "recordedAt": "2026-11-22T20:44:47Z",
+  "result": "PASS",
+  "risk": "R2",
+  "runId": "RUN-20261122T203937Z-9a9cc8a7",
+  "schemaVersion": 1,
+  "skillsUsed": [
+    "ui-validation"
+  ],
+  "usageHash": "f92d617818c64b2eb2fca6fd9100c8702a567d03732799e1a0edb864c6e503c1",
+  "verificationFailed": false,
+  "worker": "pi"
+}

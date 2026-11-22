@@ -7,6 +7,9 @@
 //   po_list (0084)               → POs sent but not fully received
 //   complaint_list (0074)        → open complaints the manager handles (layanan, by complaint_readable; a count only)
 //   target_list (0103)           → staff of the branch: completions, K19 for BCs with a target (branch closing value)
+//   visits_today (0067, via the Hari Ini board's today()) → Menunggu pembayaran: a COUNT of the branch's visits waiting for payment now
+//                                  (unpaid(): open, payment in progress or blocked; DEC-057), today's and older ones alike — the same
+//                                  population as the tile's link /hari-ini?tampilan=belum-bayar. Only the count leaves this function.
 // Every reader enforces the actor's own scope: a manager naming a branch other than its active one is refused by the reader
 // (ERR_NOT_FOUND / ERR_FORBIDDEN) and the refusal propagates — no payload is ever built for another branch. A field no existing reader
 // gives is left out, so the view shows "Belum tersedia", never 0 / Rp0 (see MISSING). A reader that refuses this role for one widget
@@ -19,11 +22,12 @@ import { listItems } from "../../../../modules/inventory/stock";
 import { listPurchaseOrders } from "../../../../modules/purchasing/payables/payables";
 import { listComplaints } from "../../../../modules/clinical/complaints/complaints";
 import { calendar } from "../../../../modules/scheduling/appointments/appointments";
+import { today as visitsToday, unpaid } from "../../../../modules/visits/visits";
 
 // Fields with no existing reader for one branch today (the exact next scope; left absent → "Belum tersedia").
 export const MISSING = [
   "chase.unpaid_bills", "chase.unpaid_additions", "chase.receivables_due", "chase.no_shows_to_rebook", "chase.waiting_long", "chase.approvals",
-  "today_counts.in_treatment", "today_counts.waiting_payment", "today_counts.rooms_in_use", "today_counts.devices_in_use", "today_counts.staff_on_duty",
+  "today_counts.in_treatment", "today_counts.rooms_in_use", "today_counts.devices_in_use", "today_counts.staff_on_duty",
   "tomorrow.leave_conflicts", "wait_minutes", "staff[].k17_rupiah",
 ] as const;
 
@@ -62,6 +66,7 @@ export async function readBranchSummary(db: pg.ClientBase, branchId: string): Pr
   const pos = await part(db, () => listPurchaseOrders(db, branchId));
   const complaints = await part(db, () => listComplaints(db, branchId, null));
   const targets = await part(db, () => listTargets(db, { period: today.slice(0, 7), branchId }));
+  const board = await part(db, () => visitsToday(db, branchId));
 
   const out: Raw = { branch_id: branchId, today };
   const chase: Raw = {};
@@ -86,6 +91,8 @@ export async function readBranchSummary(db: pg.ClientBase, branchId: string): Pr
     out.hours = [...hours.entries()].sort(([a], [c]) => a - c).map(([hour, x]) => ({ hour, ...x }));
     tm.appointments = win.appointments.filter((a) => (a.state === "booked" || a.state === "confirmed") && day(a.startsAt) === tomorrow).length;
   }
+  // a refused / failed board read leaves the tile out (Belum tersedia); a successful read with none waiting is a real 0
+  if (board) todayCounts.waiting_payment = board.visits.filter(unpaid).length;
   out.today_counts = todayCounts;
 
   if (k15) {
