@@ -64,9 +64,11 @@ export type RegisterRow = {
 
 export async function register(db: pg.ClientBase): Promise<RegisterRow[]> {
   return call(async () =>
-    (await db.query(`select * from compliance_register()`)).rows.map((r) => ({
+    // valid_until is a SQL date: read it as text (as itemDetail does). node-postgres parses a date into a Date at LOCAL midnight, so
+    // toISOString() gave the previous day on any host east of UTC (Asia/Jakarta).
+    (await db.query(`select r.*, r.valid_until::text valid_until_text from compliance_register() r`)).rows.map((r) => ({
       obligationKey: r.obligation_key, scope: r.scope, label: r.label, area: r.area, itemId: r.item_id, status: r.status,
-      validUntil: r.valid_until ? String(r.valid_until instanceof Date ? r.valid_until.toISOString().slice(0, 10) : r.valid_until) : null,
+      validUntil: r.valid_until_text ?? null,
       gates: r.gates, latestVersion: r.latest_version, mayAct: r.may_act, mayRead: r.may_read, mayDecide: r.may_decide, latestFileId: r.latest_file,
     })),
   );
