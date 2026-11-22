@@ -1,0 +1,19 @@
+{
+  "capability": "unattributed",
+  "head": "e5670c2d1cf0ab7bcf6b6eb08225c5b2a04c7a5c",
+  "job": "T-113 nav fix before integration (Sol): low-survey and K13 values kept, rendered as plain text where the destination is unbuilt (/lead/tindak-lanjut) or ignores the filters (/lead?sumber=&cabang=); N8B structural test replacement applied; no /lead, nav, grant or other gap change; affected/mandatory gates on final bytes.",
+  "model": "claude-opus-5-5",
+  "provider": "9router-fantastico",
+  "reasoningEffort": "medium",
+  "recordedAt": "2026-11-22T12:54:14Z",
+  "result": "PASS",
+  "risk": "R2",
+  "runId": "RUN-20261122T124102Z-87bfe631",
+  "schemaVersion": 1,
+  "skillsUsed": [
+    "ui-validation"
+  ],
+  "usageHash": "7d94fa36a1c5f3d08dbcf25810012f4ed58544973e83decb7a89d316217595f5",
+  "verificationFailed": true,
+  "worker": "pi"
+}
