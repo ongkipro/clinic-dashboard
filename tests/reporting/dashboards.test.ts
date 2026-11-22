@@ -26,7 +26,8 @@ import { receiveCosted } from "../../src/modules/inventory/costing/costing";
 import { getCount, recordCount, saveItem, setLevel, startCount, submitCount } from "../../src/modules/inventory/stock";
 import { runPackageExpiryScan } from "../../src/modules/packages/expiry";
 import { closeVisit } from "../../src/modules/visits/visits";
-import { createRule, decideRuleVersion } from "../../src/modules/commission/commission";
+import { attributeSale, createRule, decideRuleVersion } from "../../src/modules/commission/commission";
+import { listTargets, myTarget, setStaffTarget } from "../../src/modules/commission/targets/targets";
 import { changeSetting } from "../../src/modules/settings/settings";
 import { decideApproval } from "../../src/modules/approvals/approvals";
 import { publish } from "../../src/modules/catalog/catalog";
@@ -54,12 +55,13 @@ type Branch = "A" | "B";
 type Method = "cash" | "transfer" | "qris" | "edc" | "balance";
 type Payment = { id: string; branch: Branch; day: string; amount: number; method: Method; simulated?: boolean };
 type CashRefund = { id: string; branch: Branch; day: string; amount: number }; // a refund paid in cash (BILL-25 exception)
-type Sale = { id: string; branch: Branch; day: string; kind: "line" | "package"; value: number; vat: number; visit?: string; voided?: boolean };
+type Sale = { id: string; branch: Branch; day: string; kind: "line" | "package"; value: number; vat: number; visit?: string; voided?: boolean;
+  closingBc?: string; consultation?: boolean };
 type SaleReduction = { sale: string; branch: Branch; day: string; amount: number; why: "refund" | "cancelled_unpaid_package" };
 type Performance = { id: string; branch: Branch; day: string; kind: "treatment" | "session" | "product" | "consultation"; value: number;
   materialCost: number; productCost: number; performerCommission: number; standardConsumption?: boolean };
 type Receivable = { id: string; branch: Branch; openedDay: string; amount: number; collected: number; writtenOff: number };
-type UnpaidClosedLine = { id: string; branch: Branch; closedDay: string; amount: number };
+type UnpaidClosedLine = { id: string; branch: Branch; issuedDay: string; closedDay: string; amount: number };
 type Liability = { branch: Branch; kind: "paid_not_delivered" | "packages" | "balance" | "booking_dp"; amount: number; expiresWithin30?: boolean };
 type ExpiryToBalance = { package: string; branch: Branch; day: string; amount: number };
 type Visit = { id: string; patient: string; branch: Branch; day: string; consultation: boolean; qualifyingPurchase: boolean; treatment: boolean;
@@ -68,10 +70,11 @@ type PlanItem = { visit: string; branch: Branch; recommendedDay: string; value: 
 type Appointment = { id: string; branch: Branch; day: string; state: "arrived" | "no_show" | "cancelled_late" | "cancelled_early" | "booked" };
 type Lead = { id: string; branch: Branch; source: string; assignee: string; createdAt: string; firstResponseAt?: string; inOpeningHours: boolean;
   booked: boolean; arrived: boolean; paid: boolean };
-type Roster = { staff: string; branch: Branch; day: string; minutes: number; bookedMinutes: number; executedMinutes: number };
+type Span = [string, string]; // local "HH:MM" start, end (same day)
+type Roster = { staff: string; branch: Branch; day: string; work: Span[]; breaks: Span[]; booked: Span[]; executed: Span[] };
 type StockItem = { item: string; branch: Branch; onHand: number; minQty: number; batchesExpiring30: number; countVariance: number };
 type Commission = { staff: string; role: string; branch: Branch; entitlement: number; adjustment: number; state: "accrued" | "approved" | "paid" };
-type Target = { bc: string; branch: Branch; month: string; target: number; closingValue: number; plansFullySelected: number };
+type Target = { bc: string; branch: Branch; month: string; target: number };
 
 const MONTH = { from: "2026-10-01", to: "2026-10-31" };
 const inMonth = (d: string) => d >= MONTH.from && d <= MONTH.to;
@@ -81,7 +84,7 @@ const F = {
   // 120,000, performer 50,000), S3a (A, EDC 400,000, counted, performer 50,000), S4a (A, cash consultation 150,000), S11 (package 3,000,000
   // cash at A; one session 600,000 counted at B, performer 50,000 at B), S15b (the serum returned, cash refund exception 333,000 at A),
   // S8 (package 5,000,000 at A, 3,000,000 paid, 2 sessions counted earlier; expiry moves 1,000,000 to balance), S3b (receivable 400,000
-  // at A, opened 2026-10-05, collected later — open at month end), S14 (receivable 400,000 written off), S18 (a simulated payment: never K1).
+  // at A, opened 2026-08-20, collected later — open at month end), S14 (receivable 400,000 written off), S18 (a simulated payment: never K1).
   payments: [
     { id: "S1", branch: "A", day: "2026-10-02", amount: 555_000, method: "cash" },
     { id: "S2", branch: "A", day: "2026-10-03", amount: 1_500_000, method: "qris" },
@@ -93,12 +96,14 @@ const F = {
   ] as Payment[],
   cashRefunds: [{ id: "S15b", branch: "A", day: "2026-10-09", amount: 333_000 }] as CashRefund[],
   sales: [
-    { id: "S1-serum", branch: "A", day: "2026-10-02", kind: "line", value: 333_000, vat: 0, visit: "V1" },
-    { id: "S1-sun", branch: "A", day: "2026-10-02", kind: "line", value: 222_000, vat: 0, visit: "V1" },
-    { id: "S2", branch: "A", day: "2026-10-03", kind: "line", value: 1_500_000, vat: 0, visit: "V2" },
-    { id: "S3a", branch: "A", day: "2026-10-04", kind: "line", value: 400_000, vat: 0, visit: "V2" },
-    { id: "S4a", branch: "A", day: "2026-10-06", kind: "line", value: 150_000, vat: 0, visit: "V4" },
-    { id: "S11", branch: "A", day: "2026-10-07", kind: "package", value: 3_000_000, vat: 0 },
+    // closingBc: the closing BC of each sale (the money fixture: "every sale has a closing BC"; BC1's closing commission at 5 % is
+    // 27,750 + 75,000 + 20,000 + 150,000 = S1 + S2 + S3a + S11, the commissions facts below); S4a is a consultation invoice (no consultation commission)
+    { id: "S1-serum", branch: "A", day: "2026-10-02", kind: "line", value: 333_000, vat: 0, visit: "V1", closingBc: "BC1" },
+    { id: "S1-sun", branch: "A", day: "2026-10-02", kind: "line", value: 222_000, vat: 0, visit: "V1", closingBc: "BC1" },
+    { id: "S2", branch: "A", day: "2026-10-03", kind: "line", value: 1_500_000, vat: 0, visit: "V2", closingBc: "BC1" },
+    { id: "S3a", branch: "A", day: "2026-10-04", kind: "line", value: 400_000, vat: 0, visit: "V2", closingBc: "BC1" },
+    { id: "S4a", branch: "A", day: "2026-10-06", kind: "line", value: 150_000, vat: 0, visit: "V4", closingBc: "BC1", consultation: true },
+    { id: "S11", branch: "A", day: "2026-10-07", kind: "package", value: 3_000_000, vat: 0, closingBc: "BC1" },
     { id: "S8", branch: "A", day: "2026-09-01", kind: "package", value: 5_000_000, vat: 0 }, // sold before the month
     { id: "VOID", branch: "A", day: "2026-10-08", kind: "line", value: 666_000, vat: 0, voided: true },
   ] as Sale[],
@@ -118,7 +123,8 @@ const F = {
     { id: "S3b", branch: "A", openedDay: "2026-08-20", amount: 400_000, collected: 0, writtenOff: 0 },
     { id: "S14", branch: "A", openedDay: "2026-07-01", amount: 400_000, collected: 0, writtenOff: 400_000 },
   ] as Receivable[],
-  unpaidClosedLines: [{ id: "L-closed", branch: "B", closedDay: "2026-10-25", amount: 222_000 }] as UnpaidClosedLine[],
+  // invoice issued 2026-09-10, visit closed 2026-10-25: more than 30 days apart, so the issue-day and close-day readings bucket differently
+  unpaidClosedLines: [{ id: "L-closed", branch: "B", issuedDay: "2026-09-10", closedDay: "2026-10-25", amount: 222_000 }] as UnpaidClosedLine[],
   liabilities: [
     { branch: "A", kind: "packages", amount: 2_400_000 }, // S11: 3,000,000 − the session counted at B (600,000), liability arose at A
     { branch: "A", kind: "packages", amount: 300_000, expiresWithin30: true },
@@ -153,8 +159,11 @@ const F = {
     { id: "L4", branch: "A", source: "google", assignee: "CS2", createdAt: "2026-10-03T22:00", firstResponseAt: "2026-10-04T08:30", inOpeningHours: false, booked: false, arrived: false, paid: false },
   ] as Lead[],
   rosters: [
-    { staff: "D1", branch: "A", day: "2026-10-03", minutes: 480, bookedMinutes: 300, executedMinutes: 240 },
-    { staff: "D1", branch: "A", day: "2026-10-04", minutes: 480, bookedMinutes: 120, executedMinutes: 180 },
+    // booked 300 / executed 240 and 120 / 180 minutes as before, now as intervals that overlap partly (so union ≠ max, ≠ sum)
+    { staff: "D1", branch: "A", day: "2026-10-03", work: [["09:00", "17:00"]], breaks: [["12:00", "13:00"]],
+      booked: [["09:00", "11:00"], ["14:00", "17:00"]], executed: [["10:30", "12:00"], ["14:30", "17:00"]] },
+    { staff: "D1", branch: "A", day: "2026-10-04", work: [["09:00", "17:00"]], breaks: [["12:00", "13:00"]],
+      booked: [["09:00", "11:00"]], executed: [["10:00", "12:00"], ["13:00", "14:00"]] },
   ] as Roster[],
   stock: [
     { item: "serum", branch: "A", onHand: 3, minQty: 5, batchesExpiring30: 1, countVariance: 0 },
@@ -169,8 +178,8 @@ const F = {
     { staff: "D2", role: "performer", branch: "B", entitlement: 50_000, adjustment: 0, state: "accrued" },
   ] as Commission[],
   targets: [
-    { bc: "BC1", branch: "A", month: "2026-10", target: 6_000_000, closingValue: 5_272_000, plansFullySelected: 1 },
-    { bc: "BC3", branch: "B", month: "2026-10", target: 2_000_000, closingValue: 0, plansFullySelected: 0 },
+    { bc: "BC1", branch: "A", month: "2026-10", target: 6_000_000 },
+    { bc: "BC3", branch: "B", month: "2026-10", target: 2_000_000 },
   ] as Target[],
 };
 
@@ -202,12 +211,13 @@ const K3 = () => {
   return { A: base.A - red.A, B: base.B - red.B };
 };
 // K4 — patient receivables + unpaid lines of closed visits, aged 0–30/31–60/61–90/>90 at the period end; excludes unpaid package
-// remainders and in-progress visits. A written-off receivable is not owed (B-14). AMBIGUITY (K4 row): the aging anchor of an unpaid
-// closed-visit line — drafted as the visit close day; alternatives are the invoice issue day or the line's due day.
+// remainders and in-progress visits. A written-off receivable is not owed (B-14). An unpaid line counts once its visit is closed by the
+// period end and ages from its invoice's issue day (DEC-121, Panel 2 slice 4 option (b); the reader test "K4 (decision 1 (b))" below).
+// Still a DRAFT calculator check: the finance sign-off is not recorded here.
 const K4 = (asOf = MONTH.to) => {
   const items = [
     ...F.receivables.map((r) => ({ branch: r.branch, from: r.openedDay, amount: r.amount - r.collected - r.writtenOff })),
-    ...F.unpaidClosedLines.map((l) => ({ branch: l.branch, from: l.closedDay, amount: l.amount })),
+    ...F.unpaidClosedLines.filter((l) => l.closedDay <= asOf).map((l) => ({ branch: l.branch, from: l.issuedDay, amount: l.amount })),
   ].filter((x) => x.amount > 0);
   const bucket = (d: number) => (d <= 30 ? "0-30" : d <= 60 ? "31-60" : d <= 90 ? "61-90" : ">90");
   const out: Record<string, number> = { "0-30": 0, "31-60": 0, "61-90": 0, ">90": 0 };
@@ -245,9 +255,13 @@ const K11 = () => {
   const second = first.filter((f) => F.visits.some((v) => v.patient === f.patient && v.id !== f.id && v.completed && v.day > f.day && days(f.day, v.day) <= 60));
   return { num: second.length, den: first.length };
 };
-// K12 — no-shows + late cancels ÷ booked; booking branch. OWNER-SIGNOFF: "booked" = every appointment of the period (arrived, no-show,
-// cancelled late or early), as the denominator; an early cancel is booked but not counted in the numerator.
-const K12 = () => { const b = F.appointments.filter((a) => inMonth(a.day)); return { num: b.filter((a) => a.state === "no_show" || a.state === "cancelled_late").length, den: b.length }; };
+// K12 — no-shows + late cancels ÷ booked; booking branch. OWNER-SIGNOFF: "booked" = the appointments of the period that stayed on the
+// book — an early cancel (≥ 24 h before the start) leaves the denominator, as a reschedule would (DEC-121, Panel 2 slice 4 option (b); the
+// reader test "K12 (decision 2 (b))" below). Still a DRAFT calculator check: the finance sign-off is not recorded here.
+const K12 = () => {
+  const b = F.appointments.filter((a) => inMonth(a.day) && a.state !== "cancelled_early");
+  return { num: b.filter((a) => a.state === "no_show" || a.state === "cancelled_late").length, den: b.length };
+};
 // K13 — lead → booked → arrived → paid, by source, branch, assignee.
 const K13 = () => {
   const by = (k: "source" | "assignee") => Object.fromEntries([...new Set(F.leads.map((l) => l[k]))].map((s) => {
@@ -263,9 +277,19 @@ const K14 = () => {
   const median = mins.length % 2 ? mins[(mins.length - 1) / 2] : (mins[mins.length / 2 - 1] + mins[mins.length / 2]) / 2;
   return { medianMinutes: median, within15: [mins.filter((m) => m <= 15).length, mins.length] };
 };
-// K15 — booked or executed minutes ÷ rostered minutes; branch. OWNER-SIGNOFF: per roster day, the larger of booked and executed minutes
-// (never both counted), so an executed walk-in fills the day as a booking would.
-const K15 = () => ({ num: sum(F.rosters.map((r) => Math.max(r.bookedMinutes, r.executedMinutes))), den: sum(F.rosters.map((r) => r.minutes)) });
+// K15 — booked or executed minutes ÷ rostered minutes; branch. Per performer-day the union of booked and executed intervals (an overlap
+// counted once) over the rostered work less breaks (DEC-121, Panel 2 slice 4 option (b); the reader test "K15 (decision 4 (b))" below).
+// Still a DRAFT calculator check: the finance sign-off is not recorded here.
+const hm = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+const spanMin = (xs: Span[]) => sum(xs.map(([a, b]) => hm(b) - hm(a)));
+const unionMin = (xs: Span[]) => {
+  let total = 0; let end = -1;
+  for (const [a, b] of xs.map(([x, y]) => [hm(x), hm(y)]).sort((p, q) => p[0] - q[0])) {
+    if (b > end) { total += b - Math.max(a, end); end = b; }
+  }
+  return total;
+};
+const K15 = () => ({ num: sum(F.rosters.map((r) => unionMin([...r.booked, ...r.executed]))), den: sum(F.rosters.map((r) => spanMin(r.work) - spanMin(r.breaks))) });
 // K16 — treatment visits with a product sale ÷ treatment visits; visit branch.
 const K16 = () => { const t = F.visits.filter((v) => inMonth(v.day) && v.treatment); return { num: t.filter((v) => v.productSale).length, den: t.length }; };
 // K17 — entitlements − adjustments by staff, role, contribution, with approval state; branch of contribution. A paid entitlement is not
@@ -274,8 +298,16 @@ const K17 = () => F.commissions.filter((c) => c.state !== "paid").map((c) => ({ 
 // K18 — items below minimum; batches expiring within 30 days; count variance; branch.
 const K18 = () => ({ belowMin: F.stock.filter((s) => s.onHand < s.minQty).map((s) => `${s.branch}:${s.item}`),
   expiring30: sum(F.stock.map((s) => s.batchesExpiring30)), varianceItems: F.stock.filter((s) => s.countVariance !== 0).map((s) => `${s.branch}:${s.item}`) });
-// K19 — closing value per month vs target; plans fully selected (D-07); BC's branch.
-const K19 = () => F.targets.map((t) => ({ bc: t.bc, branch: t.branch, closing: t.closingValue, target: t.target, pct: Math.round((t.closingValue / t.target) * 1000) / 10, plans: t.plansFullySelected }));
+// K19 — closing value per month vs target (D-07; target_closing_value, 0103:151): the month's real (non-simulated) payments on the
+// non-consultation lines the BC closed, net of VAT, less the month's paid refunds on those lines; attainment in basis points, truncated
+// (target_row). "Plans fully selected" is not claimed here: the fixture's plans carry no closing BC (it is proved in the reader tests).
+const closingLines = (bc: string) => F.sales.filter((x) => x.closingBc === bc && inMonth(x.day) && !x.voided && !x.consultation
+  && F.payments.some((p) => p.id === x.id.split("-")[0] && inMonth(p.day) && !p.simulated));
+const K19 = () => F.targets.map((t) => {
+  const lines = closingLines(t.bc); const ids = new Set(lines.map((x) => x.id));
+  const closing = Math.max(0, sum(lines.map((x) => x.value - x.vat)) - sum(F.saleReductions.filter((r) => r.why === "refund" && inMonth(r.day) && ids.has(r.sale)).map((r) => r.amount)));
+  return { bc: t.bc, branch: t.branch, closing, target: t.target, bps: Math.trunc((closing * 10_000) / t.target) };
+});
 
 // ── expected values (the fixture) ──────────────────────────────────────────────────────────────────────────────────────────────────
 describe("T-107 K1–K19 fixture (synthetic month 2026-10, branches A and B; formulas of 02-PRD Appendix A; money facts from DEC-080)", () => {
@@ -289,8 +321,10 @@ describe("T-107 K1–K19 fixture (synthetic month 2026-10, branches A and B; for
     expect(K3()).toEqual({ A: 3_272_000, B: 0 });
   });
   // DRAFT (owner / finance pending; not an acceptance assertion): K4, K12, K14, K15, K17 are calculator checks of the drafted readings only.
-  it("DRAFT K4 Piutang at 2026-10-31: S3b 400,000 (72 days → 61–90), the closed-visit line 222,000 (6 days → 0–30); S14 written off excluded", () => {
-    expect(K4()).toEqual({ buckets: { "0-30": 222_000, "31-60": 0, "61-90": 400_000, ">90": 0 }, total: 622_000, byBranch: { A: 400_000, B: 222_000 } });
+  it("DRAFT K4 Piutang at 2026-10-31: S3b 400,000 (72 days → 61–90), the closed-visit line 222,000 aged from its invoice issue day (51 days → 31–60); S14 written off excluded", () => {
+    expect(K4()).toEqual({ buckets: { "0-30": 0, "31-60": 222_000, "61-90": 400_000, ">90": 0 }, total: 622_000, byBranch: { A: 400_000, B: 222_000 } });
+    // before its visit closed (2026-10-25) the line is not yet a closed-visit receivable: at 2026-10-20 only S3b (61 days → 61–90)
+    expect(K4("2026-10-20")).toEqual({ buckets: { "0-30": 0, "31-60": 0, "61-90": 400_000, ">90": 0 }, total: 400_000, byBranch: { A: 400_000, B: 0 } });
   });
   it("K5 Kewajiban prabayar: packages 2,700,000 (300,000 expiring within 30 days) + balance 1,000,000 + DP 200,000 = 3,900,000", () => {
     expect(K5()).toEqual({ total: 3_900_000, packages: 2_700_000, packagesExpiring30: 300_000 });
@@ -315,8 +349,8 @@ describe("T-107 K1–K19 fixture (synthetic month 2026-10, branches A and B; for
   it("K11 Kunjungan kedua: 1 of 4 new patients came back within 60 days (P2: 21 days)", () => {
     expect(K11()).toEqual({ num: 1, den: 4 });
   });
-  it("DRAFT K12 Tidak datang / batal < 24 jam: 2 of 6 booked (one no-show, one late cancel; the early cancel is not counted)", () => {
-    expect(K12()).toEqual({ num: 2, den: 6 });
+  it("DRAFT K12 Tidak datang / batal < 24 jam: 2 of 5 on the book (one no-show, one late cancel; the early cancel leaves the denominator)", () => {
+    expect(K12()).toEqual({ num: 2, den: 5 });
   });
   it("K13 Konversi lead by source and assignee: instagram 2 → 2 → 1 → 1; google 2 → 0 → 0 → 0", () => {
     expect(K13()).toEqual({ source: { instagram: [2, 2, 1, 1], google: [2, 0, 0, 0] }, assignee: { CS1: [2, 2, 1, 1], CS2: [2, 0, 0, 0] } });
@@ -324,8 +358,8 @@ describe("T-107 K1–K19 fixture (synthetic month 2026-10, branches A and B; for
   it("DRAFT K14 Respons lead (opening-hours leads): median 10 minutes; 2 of 3 within 15 minutes", () => {
     expect(K14()).toEqual({ medianMinutes: 10, within15: [2, 3] });
   });
-  it("DRAFT K15 Utilisasi performer: (300 + 180) ÷ 960 rostered minutes", () => {
-    expect(K15()).toEqual({ num: 480, den: 960 });
+  it("DRAFT K15 Utilisasi performer: booked ∪ executed (360 + 240) ÷ rostered work less breaks (420 + 420) — not the larger of the two (300 + 180)", () => {
+    expect(K15()).toEqual({ num: 600, den: 840 });
   });
   it("K16 Lampiran produk: 2 of 4 treatment visits had a product sale", () => {
     expect(K16()).toEqual({ num: 2, den: 4 });
@@ -341,11 +375,14 @@ describe("T-107 K1–K19 fixture (synthetic month 2026-10, branches A and B; for
   it("K18 Risiko stok: serum at A below minimum; 1 batch expiring within 30 days; sunscreen at A has a count variance", () => {
     expect(K18()).toEqual({ belowMin: ["A:serum"], expiring30: 1, varianceItems: ["A:sunscreen"] });
   });
-  it("K19 Target BC: BC1 5,272,000 of 6,000,000 (87.9 %), 1 plan fully selected; BC3 0 of 2,000,000", () => {
+  it("K19 Target BC (D-07): BC1 closed S1 + S2 + S3a + S11 = 5,455,000 − the S15b serum refund 333,000 = 5,122,000 of 6,000,000 (8,536 bps); the S4a consultation is not closing value; BC3 0 of 2,000,000", () => {
     expect(K19()).toEqual([
-      { bc: "BC1", branch: "A", closing: 5_272_000, target: 6_000_000, pct: 87.9, plans: 1 },
-      { bc: "BC3", branch: "B", closing: 0, target: 2_000_000, pct: 0, plans: 0 },
+      { bc: "BC1", branch: "A", closing: 5_122_000, target: 6_000_000, bps: 8_536 },
+      { bc: "BC3", branch: "B", closing: 0, target: 2_000_000, bps: 0 },
     ]);
+    // the inputs that decide it: the consultation would add 150,000 (5,272,000 = K1), the refund would add 333,000
+    expect(sum(closingLines("BC1").map((x) => x.value))).toBe(5_455_000);
+    expect(F.sales.filter((x) => x.closingBc === "BC1" && x.consultation).map((x) => x.value)).toEqual([150_000]);
   });
   it("PR-33a: a package sold at A and a session counted at B — K3 counts at A, K2 at B", () => {
     expect([K3().A > 0, K2().B]).toEqual([true, 600_000]);
@@ -1398,6 +1435,219 @@ describe("T-107 r3: review 3ba1bf52 findings", () => {
     expect(html).toMatch(/Dijawab ≤ 15 menit 1 dari 4 lead/);
     // the empty state is kept
     expect(text({ leads: 0, answered: 0, median_minutes: null, within_15m: 0, within_sla: 0, sla_minutes: 30, sla_mix: [] } as K14Extra)).toMatch(/Belum ada lead pada jam buka di periode ini/);
+  });
+});
+
+// ── K9 windows / value and K10 returning on the reader (dashboard_kpi, 0126 settled semantics; no DRAFT KPI): the fixture's own facts
+// (F.visits, F.plans, month 2026-10) persisted as dated rows with seedRaw (the writers stamp clock_timestamp()), one fresh tenant, every
+// value priced at the fixture's value as the catalog normal price (qty 1). The reader must equal the reference calculator K9 / K10. ──
+describe("T-107 K9 windows and K10 returning on the reader (fixture facts, real PostgreSQL)", () => {
+  const MONTH_P = { from: "2026-10-01", to: "2026-10-31" };
+  const at = (local: string) => `${local}+07`; // Asia/Jakarta
+  async function seedRaw(tables: string[], fn: () => Promise<void>) {
+    const off: [string, string][] = [];
+    for (const tb of tables) for (const r of (await h.admin.query(`select tgname from pg_trigger where tgrelid = $1::regclass and not tgisinternal and tgenabled <> 'D'`, [tb])).rows) off.push([tb, r.tgname]);
+    for (const [tb, tg] of off) await h.admin.query(`alter table ${tb} disable trigger ${tg}`);
+    try { await fn(); } finally { for (const [tb, tg] of off) await h.admin.query(`alter table ${tb} enable always trigger ${tg}`); }
+  }
+  let W: { t: T; own: P; mgr: P } | undefined;
+  let seeding: Promise<{ t: T; own: P; mgr: P }> | undefined;
+  const fixtureWorld = () => (seeding ??= seedWorld()); // seeded once, also when the first test fails after seeding
+  async function seedWorld() {
+    if (W) return W;
+    const t = await tenant();
+    const own = await person(t, "owner"); const mgr = await person(t, "manager", t.b1); const doc = await person(t, "doctor", t.b1, t.b2);
+    const br = (b: Branch) => (b === "A" ? t.b1 : t.b2);
+    const pids = new Map<string, string>();
+    for (const p of [...new Set(F.visits.map((v) => v.patient))]) pids.set(p, await patient(t, t.b1));
+    const version = async (price: number) => {
+      const item = (await h.admin.query(`insert into catalog_items (tenant_id, kind, code, created_by) values ($1, 'service', $2, $3) returning id`,
+        [t.tenantId, `K9-${String(++n).padStart(4, "0")}`, own.staffId])).rows[0].id as string;
+      return (await h.admin.query(`insert into catalog_versions (tenant_id, item_id, version, state, name, tax_category, tax_basis, normal_price, reason, created_by, created_as, created_at)
+        values ($1, $2, 1, 'active', 'Layanan K9', 'exempt_medical', 'Jasa medis', $3, 'Layanan baru', $4, 'owner', $5) returning id`,
+        [t.tenantId, item, price, own.staffId, at("2026-01-01 00:00")])).rows[0].id as string;
+    };
+    await seedRaw(["visits", "examinations", "care_plans", "plan_items", "selections", "selection_items"], async () => {
+      // every fixture visit, closed the same day (K10 counts visits by check-in day; P5's June visit makes October's V7 returning)
+      const visits = new Map<string, string>();
+      for (const v of F.visits) visits.set(v.id, (await h.admin.query(`insert into visits (tenant_id, branch_id, patient_id, kind, checked_in_by, checked_in_at, closed_at, closed_by)
+        values ($1, $2, $3, 'walk_in', $4, $5, $6, $4) returning id`, [t.tenantId, br(v.branch), pids.get(v.patient), own.staffId, at(`${v.day} 09:00`), at(`${v.day} 17:00`)])).rows[0].id as string);
+      // the plan items of the fixture, recommended on their day at their visit; a selection confirmed on a later day sits on a later visit of
+      // the same patient (one selection per visit, selections_visit_key), checked in that day — outside October, so K10 is unchanged
+      const exams = new Map<string, { ex: string; cp: string }>(); // one examination per visit (examinations_tenant_visit_key), one plan
+      for (const p of F.plans) {
+        const v = F.visits.find((x) => x.id === p.visit)!;
+        if (!exams.has(v.id)) {
+          const ex = (await h.admin.query(`insert into examinations (tenant_id, branch_id, visit_id, patient_id, author_id, created_at) values ($1, $2, $3, $4, $5, $6) returning id`,
+            [t.tenantId, br(p.branch), visits.get(v.id), pids.get(v.patient), doc.staffId, at(`${p.recommendedDay} 10:00`)])).rows[0].id as string;
+          const cp = (await h.admin.query(`insert into care_plans (tenant_id, branch_id, patient_id, title, condition, created_exam_id, created_by) values ($1, $2, $3, 'Program K9', 'Kondisi rahasia', $4, $5) returning id`,
+            [t.tenantId, br(p.branch), pids.get(v.patient), ex, doc.staffId])).rows[0].id as string;
+          exams.set(v.id, { ex, cp });
+        }
+        const { ex, cp } = exams.get(v.id)!;
+        const cv = await version(p.value);
+        const pi = (await h.admin.query(`insert into plan_items (tenant_id, branch_id, plan_id, examination_id, stage, catalog_version_id, qty, created_at) values ($1, $2, $3, $4, 1, $5, 1, $6) returning id`,
+          [t.tenantId, br(p.branch), cp, ex, cv, at(`${p.recommendedDay} 10:30`)])).rows[0].id;
+        if (!p.selectedDay) continue;
+        const sv = p.selectedDay === p.recommendedDay ? visits.get(v.id)! : (await h.admin.query(`insert into visits (tenant_id, branch_id, patient_id, kind, checked_in_by, checked_in_at, closed_at, closed_by)
+          values ($1, $2, $3, 'walk_in', $4, $5, $6, $4) returning id`, [t.tenantId, br(p.branch), pids.get(v.patient), own.staffId, at(`${p.selectedDay} 09:00`), at(`${p.selectedDay} 17:00`)])).rows[0].id as string;
+        const s = (await h.admin.query(`insert into selections (tenant_id, branch_id, visit_id, patient_id, command_key, confirmed_at, confirmed_by, confirmed_as)
+          values ($1, $2, $3, $4, $5, $6, $7, 'doctor') returning id`, [t.tenantId, br(p.branch), sv, pids.get(v.patient), `k9-${key()}`, at(`${p.selectedDay} 11:00`), doc.staffId])).rows[0].id;
+        await h.admin.query(`insert into selection_items (tenant_id, branch_id, visit_id, selection_id, kind, plan_item_id, catalog_version_id, quantity) values ($1, $2, $3, $4, 'service', $5, $6, 1)`,
+          [t.tenantId, br(p.branch), sv, s, pi, cv]);
+      }
+    });
+    W = { t, own, mgr };
+    return W;
+  }
+
+  it("K9 on the reader equals the fixture: within 30 days 1 of 3 (1,500,000 of 2,566,000), within 60 and 90 days 2 of 3 (2,166,000)", async () => {
+    const { own } = await fixtureWorld();
+    const r = await as(own, (db) => kpi(db, { kpi: "k9", ...MONTH_P }));
+    const [c30, c60, c90] = [K9(30), K9(60), K9(90)];
+    expect(r.by_dim).toEqual({
+      recommended_count: c30.count[1], recommended_value: c30.value[1],
+      selected_30_count: c30.count[0], selected_30_value: c30.value[0],
+      selected_60_count: c60.count[0], selected_60_value: c60.value[0],
+      selected_90_count: c90.count[0], selected_90_value: c90.value[0],
+    });
+    // the literal fixture numbers, so a calculator change cannot silently move both sides
+    expect(r.by_dim).toMatchObject({ recommended_count: 3, recommended_value: 2_566_000, selected_30_count: 1, selected_30_value: 1_500_000, selected_60_value: 2_166_000 });
+    expect(r.total).toBeNull(); // counts and values read through by_dim; no money total
+  });
+
+  it("K10 on the reader equals the fixture: 4 new (P1–P4) and 2 returning (P2's second visit; P5 first seen in June) in October", async () => {
+    const { own, mgr, t } = await fixtureWorld();
+    const r = await as(own, (db) => kpi(db, { kpi: "k10", ...MONTH_P }));
+    expect(r.by_dim).toEqual(K10());
+    expect(r.by_dim).toEqual({ new: 4, returning: 2 });
+    // per visit branch: V7 (P5's October visit) is returning at B; the manager of A sees only A's 4 new + 1 returning
+    expect(r.by_branch).toEqual({ [t.b1]: { new: 4, returning: 1 }, [t.b2]: { returning: 1 } });
+    expect((await as(mgr, (db) => kpi(db, { kpi: "k10", ...MONTH_P }))).by_dim).toEqual({ new: 4, returning: 1 });
+  });
+});
+
+// ── K19 reader parity (D-07, target_closing_value 0103:151; T-107 fixture correction): the fixture's BC1 October money month through the
+// real writers — four sales BC1 closes (S1 serum 333,000 + sunscreen 222,000, S2 1,500,000, S3a 400,000, S11 package 3,000,000), the S15b
+// serum refund 333,000 (a paid cash refund exception) and the S4a consultation 150,000 BC1 is attributed on — then target_list (owner) and
+// target_mine (BC1) for the current WIB month equal the reference calculator K19 above (5,122,000 of 6,000,000 = 8,536 bps). Every
+// inclusion input is a real row: the active attribution names BC1, the line scope has closing_bc, the consultation invoice is flagged, the
+// refund is paid. plans_actual is not asserted (no grounded fixture fact). ──
+describe("T-107 K19 reader parity: target_list / target_mine equal the D-07 closing value of the fixture month", () => {
+  // R3 a95ae3d1: the writers stamp the database clock and the readers window one WIB month, so a month turn during the seed would split the
+  // facts. The authoritative WIB month is read from PostgreSQL right before the first money write and again after the last one; a change
+  // is retried ONCE on a fresh synthetic tenant, a second change fails clearly. Only a detected month change is retried — a writer error or
+  // an assertion is never caught here. Both readers are asked for the captured month.
+  const WIB_MONTH_SQL = `select to_char(coalesce($1::timestamptz, clock_timestamp()) at time zone 'Asia/Jakarta', 'YYYY-MM') as m`;
+  const dbWibMonth = async (at: Date | null = null) => (await h.admin.query<{ m: string }>(WIB_MONTH_SQL, [at])).rows[0].m;
+  async function seedInOneWibMonth<R>(seed: () => Promise<{ before: () => Promise<void>; money: () => Promise<R> }>,
+    month: () => Promise<string>): Promise<{ month: string; out: R; attempts: number }> {
+    const seen: string[] = [];
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const s = await seed(); // a fresh synthetic tenant and its catalog (no money yet)
+      await s.before();
+      const m0 = await month();
+      const out = await s.money(); // every payment, refund and consultation fee the readers window
+      const m1 = await month();
+      if (m0 === m1) return { month: m0, out, attempts: attempt };
+      seen.push(`${m0}→${m1}`);
+    }
+    throw new Error(`K19 parity: the WIB month changed during the seed on both attempts (${seen.join(", ")}); rerun away from a month turn`);
+  }
+
+  it("the rollover guard: one attempt when the month holds, one retry on a fresh seed after a turn, a clear failure after two, and a writer error is never retried", async () => {
+    // the authoritative month is the database's WIB month of an instant: it turns at 17:00 UTC on the last day
+    expect([await dbWibMonth(new Date("2026-10-31T16:59:59Z")), await dbWibMonth(new Date("2026-10-31T17:00:00Z"))]).toEqual(["2026-10", "2026-11"]);
+    const months = (...xs: string[]) => { const q = [...xs]; return async () => q.shift()!; };
+    let seeds = 0;
+    const seed = async () => { const n0 = ++seeds; return { before: async () => {}, money: async () => n0 }; };
+    expect(await seedInOneWibMonth(seed, months("2026-10", "2026-10"))).toEqual({ month: "2026-10", out: 1, attempts: 1 });
+    seeds = 0;
+    expect(await seedInOneWibMonth(seed, months("2026-10", "2026-11", "2026-11", "2026-11"))).toEqual({ month: "2026-11", out: 2, attempts: 2 });
+    seeds = 0;
+    await expect(seedInOneWibMonth(seed, months("2026-10", "2026-11", "2026-11", "2026-12"))).rejects.toThrow(/WIB month changed during the seed on both attempts \(2026-10→2026-11, 2026-11→2026-12\)/);
+    expect(seeds).toBe(2);
+    let calls = 0;
+    const failing = async () => ({ before: async () => {}, money: async () => { calls++; throw new Error("writer refused"); } });
+    await expect(seedInOneWibMonth(failing, months("2026-10", "2026-10", "2026-10", "2026-10"))).rejects.toThrow("writer refused");
+    expect(calls).toBe(1);
+  });
+
+  it("BC1: closing 5,122,000, attainment 8,536 bps on both readers; the consultation and the refund are the deciding inputs; BC3 0", async () => {
+    const { month: period, out: x } = await seedInOneWibMonth(async () => {
+    const w = { t: await tenant() } as { t: T };
+    const own = await person(w.t, "owner"); const fh = await person(w.t, "facility_head", w.t.b1); const doc = await person(w.t, "doctor", w.t.b1);
+    const fo = await person(w.t, "fo_cashier", w.t.b1); const mgr = await person(w.t, "manager", w.t.b1);
+    const bc1 = await person(w.t, "bc", w.t.b1); const bc3 = await person(w.t, "bc", w.t.b2);
+    await credential(w.t, doc, w.t.b1, fh, own);
+    await as(mgr, (db) => enableMockPort(db));
+    const pub = async (kind: "service" | "product" | "package", code: string, price: number, extra: object = {}) => {
+      const v = await as(own, (db) => publish(db, { kind, code }, (kind === "service" ? {
+        name: `Layanan ${code}`, tax_category: "exempt_medical", tax_basis: "Jasa medis", normal_price: price, category: "facial", prep_min: 10, treatment_min: 30, buffer_min: 10,
+        indications: "Indikasi", consent_template: "Templat persetujuan.", delegation: "Dokter", aftercare_text: "Perawatan", eligibility: [{ role: "doctor", mode: "performs" }], ...extra,
+      } : kind === "product" ? { name: `Produk ${code}`, tax_category: "non_object", tax_basis: "Barang", normal_price: price }
+        : { name: `Paket ${code}`, tax_category: "exempt_medical", tax_basis: "Jasa medis", normal_price: price, installments_allowed: true }) as never, "Baru"));
+      if (v.approvalId) await as(fh, (db) => db.query(`select approval_decide($1, true, null)`, [v.approvalId]));
+      return v;
+    };
+    const s2 = await pub("service", "K19-S2", 1_500_000); const s3 = await pub("service", "K19-S3", 400_000);
+    const serum = await pub("product", "K19-SRM", 333_000); const sun = await pub("product", "K19-SUN", 222_000);
+    const pkg = await pub("package", "K19-PKG", 3_000_000);
+    await as(own, (db) => setPackageContents(db, key(), pkg.versionId, [{ serviceItemId: s2.itemId, count: 5 }]));
+    await pub("service", "K19-KON", 99_000, { category: "consultation", treatment_min: 15, prep_min: 0, buffer_min: 0 });
+    await as(own, (db) => changeSetting(db, { key: "SET-6", branchId: null, value: 150_000, reason: "Biaya konsultasi" }));
+    return { before: async () => {}, money: async () => {
+    // a sale BC1 closes: issued, paid in full by a real (non-simulated) tender, then attributed to BC1 as closing BC
+    const sale = async (lines: { itemId: string; quantity: number }[], total: number) => {
+      const pid = await patient(w.t, w.t.b1);
+      const { invoiceId } = await as(fo, (db) => openKasirInvoice(db, key(), { patientId: pid }));
+      await as(fo, (db) => issueKasirInvoice(db, key(), invoiceId, lines));
+      await as(fo, (db) => receivePayment(db, key(), invoiceId, [{ method: "cash", amount: total, cashTendered: total }]));
+      await as(fo, (db) => attributeSale(db, key(), invoiceId, { closingBcId: bc1.staffId }));
+      return invoiceId;
+    };
+    const s1 = await sale([{ itemId: serum.itemId, quantity: 1 }, { itemId: sun.itemId, quantity: 1 }], 555_000);
+    await sale([{ itemId: s2.itemId, quantity: 1 }], 1_500_000);
+    await sale([{ itemId: s3.itemId, quantity: 1 }], 400_000);
+    await sale([{ itemId: pkg.itemId, quantity: 1 }], 3_000_000);
+    // S15b: the serum line refunded in cash (an owner-approved exception), paid this month
+    const serumLine = (await h.admin.query(`select l.id from invoice_lines l where l.invoice_id = $1 and l.item_id = $2`, [s1, serum.itemId])).rows[0].id as string;
+    const rf = await as(fo, (db) => requestRefund(db, key(), serumLine, { amount: 333_000, reason: "Serum dikembalikan", destination: "cash" }));
+    if (rf.approval_id) await as(own, (db) => decideApproval(db, rf.approval_id!, true));
+    if ((await h.admin.query(`select state from refunds where id = $1`, [rf.refund_id])).rows[0].state !== "paid") await as(fo, (db) => payRefund(db, key(), rf.refund_id, "cash"));
+    // S4a: a consultation fee charged and paid on a consultation visit, attributed to BC1 — not closing value (NOT invoices.consultation)
+    const cpid = await patient(w.t, w.t.b1);
+    const cv = (await h.admin.query(`insert into visits (tenant_id, branch_id, patient_id, kind, checked_in_by) values ($1, $2, $3, 'walk_in', $4) returning id`,
+      [w.t.tenantId, w.t.b1, cpid, fo.staffId])).rows[0].id as string;
+    const { examId } = await as(doc, (db) => openExam(db, key(), cv));
+    await as(doc, (db) => signRecord(db, key(), examId, STEP));
+    const ch = await as(fo, (db) => chargeConsultationFee(db, key(), cv));
+    await as(fo, (db) => receivePayment(db, key(), ch.invoice_id, [{ method: "cash", amount: ch.amount, cashTendered: ch.amount }]));
+    await as(fo, (db) => attributeSale(db, key(), ch.invoice_id, { closingBcId: bc1.staffId }));
+    return { w, own, bc1, bc3, rf };
+    } };
+    }, () => dbWibMonth());
+    const { w, own, bc1, bc3, rf } = x;
+    // the inclusion inputs are real rows, not assumed
+    const facts = (await h.admin.query(`select i.consultation c, count(distinct i.id)::int inv, sum(a.amount - a.vat_portion)::bigint net
+        from invoices i join commission_sale_attributions sa on sa.tenant_id = i.tenant_id and sa.invoice_id = i.id and sa.state = 'active' and sa.closing_bc_staff_id = $2
+        join invoice_lines l on l.tenant_id = i.tenant_id and l.invoice_id = i.id
+        join payment_allocations a on a.tenant_id = l.tenant_id and a.invoice_line_id = l.id and not a.is_simulated
+       where i.tenant_id = $1 and i.state = 'issued' and not i.counter and 'closing_bc' = any (commission_item_scopes(l.tenant_id, l.catalog_version_id))
+       group by i.consultation order by i.consultation`, [w.t.tenantId, bc1.staffId])).rows.map((r) => [r.c, r.inv, Number(r.net)]);
+    expect(facts).toEqual([[false, 4, 5_455_000], [true, 1, 150_000]]);
+    expect((await h.admin.query(`select state, amount::bigint a, vat_reversed::bigint v from refunds where id = $1`, [rf.refund_id])).rows.map((r) => [r.state, Number(r.a), Number(r.v)]))
+      .toEqual([["paid", 333_000, 0]]);
+    // targets for the captured WIB month (the database's month the facts were stamped in; both readers read it)
+    for (const [bc, target] of [[bc1, F.targets[0].target], [bc3, F.targets[1].target]] as const)
+      await as(own, (db) => setStaffTarget(db, key(), bc.staffId, period, { closingValueTarget: target }));
+    const [e1, e3] = K19();
+    const list = await as(own, (db) => listTargets(db, { period }));
+    const row = (s: P) => list.rows.find((r) => r.staff_id === s.staffId)!;
+    for (const [s, e] of [[bc1, e1], [bc3, e3]] as const)
+      expect([row(s).closing_value_actual, row(s).target?.closing_value_target, row(s).attainment_bps]).toEqual([e.closing, e.target, e.bps]);
+    const mine = await as(bc1, (db) => myTarget(db, period));
+    expect([mine.closing_value_actual, mine.target?.closing_value_target, mine.attainment_bps]).toEqual([5_122_000, 6_000_000, 8_536]);
   });
 });
 
