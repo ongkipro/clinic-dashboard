@@ -160,6 +160,8 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
+**HYG-NAV-1 (2026-11-23):** integrated on main after HYG-NAV-2: 10 orphan nav routes plus `ApplyTampilan` in `src/app/(app)/layout.tsx` (PR-86, R3), rebaselined onto `50dd8d94`; runs `RUN-20261123T082748Z-99fb70bd` and `RUN-20261123T085757Z-885a11b7` PASS; combined full isolation with both case files 243 passed (1 skipped), combined UI 51/51, browser 17 flows / 104 layouts; independent R3 re-review APPROVE (panel 3, codex `cx/gpt-6.2-sol`). HYG-NAV-2 CI 45141633374 green on `50dd8d94`.
+
 **HYG-NAV-2 (2026-11-23):** integrated on main: 10 orphan nav routes rebaselined onto `1042ffa6` (PR-86, R3), run `RUN-20261123T081540Z-d9f838fe` PASS; full isolation 231 passed, UI 29/29, browser 18 flows / 112 layouts; independent R3 re-review APPROVE (panel 3, codex `cx/gpt-6.2-sol`). Exact-SHA CI: see BUILD-LOG.
 
 **Panel checkpoint (2026-11-23, observed 09:58 WIB):**

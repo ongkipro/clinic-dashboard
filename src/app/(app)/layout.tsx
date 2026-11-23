@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { BlockedState, LoadingList } from "../../components/ui/states";
 import { loadShell } from "../../components/shell/data";
 import { Shell, SignOut } from "../../components/shell/shell";
+import { ApplyTampilan } from "./saya/tampilan/apply";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -21,7 +22,7 @@ async function Gated({ children }: { children: React.ReactNode }) {
       </main>
     );
   }
-  return <Shell {...data.context}>{children}</Shell>;
+  return <Shell {...data.context}><ApplyTampilan />{children}</Shell>;
 }
 
 export default function AppLayout({ children }: LayoutProps<"/">) {

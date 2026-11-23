@@ -1034,3 +1034,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   (`earlier_batch_open`).
 - Evidence: run `RUN-20261123T081540Z-d9f838fe`. Typecheck, lint, full isolation (231 passed), UI 29/29, browser 18 flows / 112 layouts.
   Independent R3 re-review APPROVE (codex `cx/gpt-6.2-sol`, panel 3).
+
+## 2026-11-23 — HYG-NAV-1 navigation pages
+
+- 10 orphan routes (PR-86): Saya (target, jadwal, notifikasi, tampilan, bantuan), Staf target, Persetujuan (koreksi, matriks) and Lead
+  (tindak lanjut, survei). The authorized shell mounts `ApplyTampilan`, so reduce transparency survives a reload. Two server actions
+  re-check the rendered context before writing. No migration.
+- HYG-NAV-2 is on main: `50dd8d94`, CI 45141633374 green. HYG-NAV-1 was fast-forwarded onto it. The 30 candidate files are identical to
+  the reviewed freeze. Combined checks: full isolation with both case files (243 passed, 1 skipped) and UI 51/51. Independent R3
+  re-review APPROVE (codex `cx/gpt-6.2-sol`, panel 3).
+- Follow-up outside this scope: `src/app/(app)/pasienku/load.ts` held its `/saya/target` and `/lead/tindak-lanjut` links until these
+  routes existed.
