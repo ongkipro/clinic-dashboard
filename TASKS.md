@@ -54,6 +54,12 @@ Owner instructions 2026-11-04/05 (foundation review: "jika ada bugs dan kekurang
 | 16 | HYG-022 | R2 | Next.js security patch 16.4.3 → 16.4.5 (Panel 2 supervisor decision 2026-11-17, owner-delegated): GHSA-mfr8-8qww-v76h (moderate; vulnerable >=16.3.0 <=16.4.4) made Next's build-time advisory gate stop every `next build` (T-100 close 2). `next` and its paired `eslint-config-next` pinned to 16.4.5 through the package manager; lockfile changes only in the next family. No other upgrade, no config change, the advisory gate left on. Allowed: `package.json`, `pnpm-lock.yaml`, docs | `docs/tasks/HYG-022.md` | Done: `bada9260`; ledger PASS; CI 43953656875 green |
 | 17 | HYG-023 | R3 | A-12 VAT at delivery when delivery precedes payment (owner 2026-11-18, T-104 owner authorization: a separate hygiene task after T-104; Panel 2 one-pass decisions Q1–Q5 2026-11-18; DEC-116): `vat_line_deliver` recognises the delivered share's not-yet-recognised VAT (payment writer's rounding, monotone; PKP-at-issue lines with VAT; not while a manual discount is pending) with a `vat_events` row (cause `line_delivery`, effective no earlier than the cutover); called from `treatment_finish` (an addition delivered on an issued line), `invoice_issue` (an addition performed before billing, tax point `finished_at`) `consultation_invoice_issue` (the fee charged) and `discount_sync` (a deferred discount decided, Panel 2 S8); an approved void reverses it in `invoice_void_sync` (cause `line_void`, Panel 2 S7); each one drift-pinned marked block. Visit products handed before any invoice stay recognised at payment (no stored line key; stated limit). Allowed: `drizzle/**`, `tests/tax/vat-delivery.test.ts`, `tests/db/vat-delivery-drift.*`, `src/modules/accounting/schema.ts` (cause list), the Kewajiban label, the T-104 S2 assertion block, docs | `docs/tasks/HYG-023.md` | Done: `14c99035`; ledger PASS; Panel 2 boundary; CI 44369421813 green |
 
+### Documentation maintenance (owner-authorised)
+
+| ID | Risk | Scope and Allowed Paths | Done when |
+|---|---|---|---|
+| HYG-025 | R1 | Owner checkpoint of both panels and the integrated baseline (2026-11-23). Allowed: `TASKS.md` (this registration only), `STATUS.md`, `BUILD-LOG.md`, `ARCHITECTURE.md` | `pnpm docs:check`, Mermaid parse, map-to-tree invariants, and documentation-only boundary pass. No feature acceptance, activation or deployment. |
+
 ### Milestone M0
 
 #### T-001: Repository bootstrap: Next.js App Router, TypeScript strict, pnpm, Docker Compose PostgreSQL 16, CI skeleton, `pnpm docs:check`

@@ -1,6 +1,9 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-20 (T-102 increment 4 in verification: TD-31 practitioner NIK lookup, rebased onto `9de482f0` per DEC-049, candidate migration 0128 (not on `main`), DEC-123; T-118 r2 after independent review 1d2a370d: CHANGES REQUIRED, two telemetry findings fixed (WhatsApp due by branch-local day; outbox dead letters, 24-hour failures not measured); T-118 in verification: vendor platform health, rebased on `f0bd3c44`, candidate migration 0127 (not on `main`); T-107 DONE `f0bd3c44`, CI 44610920846 (dashboard read models + UX-60 role homes, migration 0126 on `main`; r3/r4 after independent reviews 3ba1bf52 / 3dcdb005); T-106 DONE `c7f29c4e`, CI 44551597530; T-105 DONE as a PREVIEW `af295ec1`, CI 44509284530; HYG-023 DONE `14c99035`; T-104 DONE `1e54042a`; Fast-Track Careful mode with the end-of-development `cx/gpt-6.2-sol` review; the per-task rows below are the history and are unchanged)
+Updated: 2026-11-23 (development baseline `b7fdd645`, exact CI 45068171413 green; overall panel checkpoint, HYG-025; M8 exit and M9 remain open; no deployment).
+
+Previous Updated (2026-11-22 draft, kept as history; main `353387aa`, CI 45043361121 green; integrated since `f0bd3c44`, each on its own exact-SHA green CI: T-118 `9de482f0` (migration 0127), T-102 increment 4 `3f0e726e` (0128; T-102 final acceptance still OPEN on TD-31), T-108 `00df0033` + `44a24f48` (0129), T-111 `db08f6c4`, T-116 `4f685eda` / `68573cee` / `6785e0c7` / `e5670c2d` (0130; `6785e0c7` CI red, fixed by `e5670c2d`), T-113 `f14a554f`, T-019 date fix `de832388`, T-109 `ef8e1f1d`, T-110 `2b0d5a8c`, T-115 `82340dfa`, T-112 `353387aa`; acceptance gaps stay OPEN as listed in Current state; pending, not integrated: T-114, T-117, T-119, T-120; not deployed; the earlier Updated text and every per-task row below are history and unchanged)
+Previous Updated (kept as written): 2026-11-20 (T-102 increment 4 in verification: TD-31 practitioner NIK lookup, rebased onto `9de482f0` per DEC-049, candidate migration 0128 (not on `main`), DEC-123; T-118 r2 after independent review 1d2a370d: CHANGES REQUIRED, two telemetry findings fixed (WhatsApp due by branch-local day; outbox dead letters, 24-hour failures not measured); T-118 in verification: vendor platform health, rebased on `f0bd3c44`, candidate migration 0127 (not on `main`); T-107 DONE `f0bd3c44`, CI 44610920846 (dashboard read models + UX-60 role homes, migration 0126 on `main`; r3/r4 after independent reviews 3ba1bf52 / 3dcdb005); T-106 DONE `c7f29c4e`, CI 44551597530; T-105 DONE as a PREVIEW `af295ec1`, CI 44509284530; HYG-023 DONE `14c99035`; T-104 DONE `1e54042a`; Fast-Track Careful mode with the end-of-development `cx/gpt-6.2-sol` review; the per-task rows below are the history and are unchanged)
 Status: Active
 State: INTEGRATING
 Review-Risk: R4
@@ -23,7 +26,21 @@ Use `BLOCKED` only as an interruption state. Record the blocker and exact state 
 
 ## Current state
 
-**Summary (2026-11-18):** M0–M6 complete (M6 exit T-101 `427f250a`, CI 43976472609). **M7 open:** T-102 SATUSEHAT — increments 1–3
+**Summary (2026-11-23):** M0–M6 complete; SATUSEHAT final/external acceptance remains open. The project is in M8. Estimated development coverage is about 89% (roughly 117 of 131 primary tasks with their main implementation integrated; not an accepted-task count or a release-readiness measure). The previous snapshot below records the mounts through `353387aa`; the later exact-SHA green changes are:
+
+| Task slice | Commit | CI | Integrated scope |
+|---|---|---|---|
+| T-114 Finance summary | `a0e04659` | 45062707582 | Finance/Owner route mounted; provider settlement remains unavailable (G-SETTLE); reconciliation difference and branch K17 gaps remain open. |
+| T-107 dashboard fixtures | `83891200` | 45063804380 | Test-only coverage; no KPI reader or Finance policy change. |
+| T-116 K19 report fixture | `a3414213` | 45064979095 | Test-only; 84 PostgreSQL tests passed, R3 `9200123b`. |
+| T-109 K7 cleanup | `6c00bf4c` | 45066187931 | Removed an unused provenance label; no K7 calculation or missing-material acceptance change. |
+| T-110 waiting-payment tile | `b7fdd645` | 45068171413 | Active-branch count, including older open visits; refusal stays unavailable, successful empty result is zero. Other acceptance gaps remain open. |
+
+No migration after `0130`. No live activation, staging or deployment; `RELEASE.md` remains DRAFT.
+
+**Previous snapshot (2026-11-22 draft, kept as history):** M0–M6 complete. **M8, integrated and green on `main`** (exact-SHA CI each; integration ≠ acceptance): T-104, HYG-023, T-105 (PREVIEW; gates G-Q4 U1–U4, G-ACT, G-RETRO, G-PENDING, G-EXPORT, G-SETTLE OPEN), T-106, T-107 (as in the 2026-11-18 summary below); T-118 vendor platform health `9de482f0` (CI 44692882076; migration 0127); T-108 Rekon `00df0033` (CI 44852176223; 0129) + route `44a24f48` (CI 44874262682; G-SETTLE open); T-111 shift summary `db08f6c4` (CI 44860532627); T-116 reports + KPI dictionary `4f685eda` (CI 44882577653; 0130), `68573cee` (CI 44886138591), `6785e0c7` (CI 44997538283 **red**), fixed by `e5670c2d` (CI 45008959231); T-113 Ringkasan CS `f14a554f` (CI 45024990389; Scenario PR-33e met; catalogue 19:35 unconfirmed-appointments count OPEN — no count-only reader); T-109 Ringkasan Owner `ef8e1f1d` (CI 45033824080; OPEN: evidence-expiry window, treatment mix, branch K17, owner nav to `/lead` / `/stok/item`, K7Note source); T-110 Ringkasan Cabang `2b0d5a8c` (CI 45038330642; OPEN: the reader fields still "Belum tersedia", `/staf/target`); T-115 Ringkasan Admin Pusat `82340dfa` (CI 45040497301); T-112 Pasienku `353387aa` (CI 45043361121; **five acceptance gaps OPEN**: K9 per BC, dormant count, Belum Memilih counts / value, Paket Hampir Habis sessions / validity, unassigned BC tasks). **M7:** T-102 increments 1–4 integrated (increment 4 `3f0e726e`, CI 44784435200; migration 0128); final acceptance **OPEN / BLOCKED** on the owner's TD-31 decision. T-019 register date fix `de832388` (CI 45031866145). **Pending, not integrated:** T-114 (P2), T-117 (owner digest; slices A + C1 at R3 review), T-119 (M8 exit; gate run scheduled 07:00 WIB), T-120. Migrations through 0130 on `main`. **Not deployed** (no staging, DEC-034); no live provider connected. Main `353387aa`.
+
+Previous summary (2026-11-18, kept): M0–M6 complete (M6 exit T-101 `427f250a`, CI 43976472609). **M7 open:** T-102 SATUSEHAT — increments 1–3
 integrated (`882b2ab3`, CI 44062946402), final acceptance **OPEN / BLOCKED** on the owner's TD-31 practitioner-path decision. T-103 vendor
 server-fee billing (queue exception, Panel 2) — **DONE: implementation fixture-verified, live payment disabled** (`46c4592e`, CI
 44095172936; `7c56843b`, CI 44143966634; Sol r3 `a96ba6f9`); owner activation decisions Q-13, D2, Q-16, BILL-33 OPEN. **M8 started:** T-104
@@ -143,7 +160,15 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
-**Current (2026-11-20, latest):** T-102 increment 4 (M7, TD-31 practitioner NIK lookup; R3; DEC-123; candidate migration 0128, not on `main`) rebased onto `9de482f0` (DEC-049), in verification (P1, `t102-inc4`, ledger `RUN-20261120T072539Z-c404bfa5`; superseded run `RUN-20261119T152539Z-8203d6ee` finished BLOCKED: close 1 8/9, test-full never completed): freeze, gated close of all nine checks, then a new independent R3 review. TD-31 final acceptance and every external SATUSEHAT acceptance stay OPEN; mock adapter only.
+**Panel checkpoint (2026-11-23, observed 09:58 WIB):**
+
+- **P1 — data and evidence:** Preliminary J8 gate-a is pinned to `353387aa`, ledger `RUN-20261122T173821Z-16a51bfd` (short ID `16a51bfd`). Preflight passed; background job `ba019da13` remains queued, with no admission file or JUnit output. The host process scan matches a 99ribu `wrangler dev` dependency path containing `vitest`; the foreign process was not stopped and the gate was not bypassed. The preliminary target is 8 passing, 0 failures and 12 TODOs, not an achieved result. T-120's two-test synthetic draft is offline and unrun; M9 waits for M8 exit.
+- **P2 — UI and navigation:** Offline J10 walkthrough handoff complete; actual owner walkthrough and sign-off remain open. T-130 navigation audit and query-aware tab proposal are prepared, not implemented. `nav.ts` hygiene needs separate owner-approved scope; the full sweep also waits on its declared dependencies.
+- **Coordinator:** Serializes integration on the `b7fdd645` green baseline. T-117 mock email port remains frozen with its first worker consumer; choose the exception-count contract and job-bound read authority before allocating a migration slot. The consolidated DEC-117 review uses `9router-fantastico/cx/gpt-6.2-sol` after T-131 integrates. No outstanding clinical, Finance, privacy, provider or release gate is waived.
+
+**Previous draft (2026-11-22, kept as history):** M8 exit preparation: T-119 gate (run `RUN-20261122T155922Z-874c0f71`, m8 flow alone, window 07:00–22:30 WIB); T-114 (P2); T-117 slices A + C1 at the R3 review; the ARCHITECTURE.md System Map update is a separate serialized change. No acceptance gap above is waived.
+
+(2026-11-20, latest, kept) **Current (2026-11-20, latest):** T-102 increment 4 (M7, TD-31 practitioner NIK lookup; R3; DEC-123; candidate migration 0128, not on `main`) rebased onto `9de482f0` (DEC-049), in verification (P1, `t102-inc4`, ledger `RUN-20261120T072539Z-c404bfa5`; superseded run `RUN-20261119T152539Z-8203d6ee` finished BLOCKED: close 1 8/9, test-full never completed): freeze, gated close of all nine checks, then a new independent R3 review. TD-31 final acceptance and every external SATUSEHAT acceptance stay OPEN; mock adapter only.
 
 (2026-11-20, earlier, kept) T-118 (M8, vendor platform health; R3; DEC-122; candidate migration 0127, not on `main`) rebased on `f0bd3c44` (DEC-049), in verification (P1, `t118`, ledger `RUN-20261119T205209Z-85ac45a3`): freeze, gated close, then the independent R3 review; T-107 DONE (`f0bd3c44`, CI 44610920846).
 
@@ -303,7 +328,11 @@ Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job v
 
 ## Next verified action
 
-**Current (2026-11-20, latest):** finish T-102 increment 4 on `9de482f0` (freeze, gated close 9/9 incl. the first completed full suite, new independent R3 review); integration needs owner Git authorization; TD-31 final acceptance stays OPEN.
+**Current (2026-11-23):** Let the existing J8 job run only after normal host admission in the 07:00–22:30 WIB window, or preserve a no-run/timeout if it is not admitted. If it runs, verify JUnit, cross-timezone controls and the exact R3 boundary. Resolve T-117 and other acceptance gaps, then run T-119 final checks on the final green commit and record the owner walkthrough. Only then open M9. Navigation hygiene is separate; no deployment.
+
+**Previous draft (2026-11-22, kept as history):** run the T-119 gate at or after 07:00 WIB (typecheck, lint, checker self-test, m8 flow: expected 8 passed + 12 todo, 0 failed) and stop at its boundary; map the integrated scenarios only after their Done is confirmed; T-114 and T-117 finish in their lanes; deployment stays out of scope (DEC-034).
+
+(2026-11-20, latest, kept) **Current (2026-11-20, latest):** finish T-102 increment 4 on `9de482f0` (freeze, gated close 9/9 incl. the first completed full suite, new independent R3 review); integration needs owner Git authorization; TD-31 final acceptance stays OPEN.
 
 (2026-11-20, earlier, kept) finish T-118 (freeze, gated close 9/9, independent R3 review, ledger PASS, exact-SHA green CI); then T-102 increment 4 renumbers after 0127.
 

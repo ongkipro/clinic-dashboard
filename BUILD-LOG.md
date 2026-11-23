@@ -1016,3 +1016,11 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - r4 (review 44a609f4): a fence time captured before a lock wait is stale after it. Read the clock after the last lock; if a test clock is
   injected, advance it by the measured wait instead of trusting the caller's instant.
 
+## 2026-11-23 — Integrated M8 reporting baseline
+
+- Migrations `0127`–`0130` are on main: vendor health (`9de482f0`, CI 44692882076), SATUSEHAT practitioner lookup (`3f0e726e`, CI 44784435200), reconciliation (`00df0033`, CI 44852176223), and report readers (`4f685eda`, CI 44882577653). External SATUSEHAT acceptance remains open.
+- Mounted Recon and the report suite, plus the Owner, Cabang, FO, BC, CS, Finance, and Admin Pusat summaries. `STATUS.md` records exact CI and outstanding acceptance gaps. The first report-mount CI failed on a shared synthetic branch fixture; `e5670c2d` separated the Perawatan fixture and CI 45008959231 passed. T-019 now reads the compliance register date as calendar text (`de832388`, CI 45031866145).
+- Test-only reporting follow-ups: `83891200` (dashboard KPI fixtures, CI 45063804380) and `a3414213` (K19 report fixture, CI 45064979095). The K7 label cleanup `6c00bf4c` (CI 45066187931) did not change KPI logic.
+- At `b7fdd645` (CI 45068171413), Ringkasan Cabang counts current and older open visits awaiting payment using the existing branch-scoped reader. A refused read remains unavailable. Evidence: ledger `RUN-20261122T203937Z-9a9cc8a7`, 36 PostgreSQL tests, route isolation, and UX-21 browser checks (14 flows / 40 layouts). No new grant or migration.
+- Keep implementation evidence separate from M8 closure and activation: the digest is not integrated, the owner walkthrough is unrecorded, and the books remain preview-only. Preliminary J8 is not final acceptance. See the current panel checkpoint in `STATUS.md` and the as-built map in `ARCHITECTURE.md`.
+
