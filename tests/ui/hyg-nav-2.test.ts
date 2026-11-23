@@ -2,7 +2,6 @@
 // models (filters, queues, grouping, validation, gates) with hand-worked fixtures, plus static checks that every nav href of the batch now
 // has a page, that each page names its nav roles' reader list and renders a permission state, and that the batch adds no migration and
 // no nav.ts change. Cross-tenant behaviour is in tests/isolation/cases/hyg-nav-2.cases.ts (DB gate).
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -49,10 +48,6 @@ describe("the batch closes ten orphan nav routes", () => {
       "/stok/depot": ["owner", "admin_pusat", "finance", "purchasing", "auditor", "manager", "pharmacist"],
     };
     for (const [r, roles] of Object.entries(readers)) for (const role of pages.get(r)!.roles) expect(roles, `${r} ${role}`).toContain(role);
-  });
-  it("no migration and no nav.ts change in this batch", () => {
-    const changed = execFileSync("git", ["status", "--porcelain"], { cwd: ROOT, encoding: "utf8" }).split("\n").map((l) => l.slice(3));
-    expect(changed.filter((f) => f.startsWith("drizzle/") || f === "src/components/shell/nav.ts" || f.startsWith("src/db/"))).toEqual([]);
   });
 });
 

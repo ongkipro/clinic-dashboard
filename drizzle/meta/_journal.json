@@ -925,6 +925,13 @@
       "when": 1795427448974,
       "tag": "0131_owner_digest",
       "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "7",
+      "when": 1795430030012,
+      "tag": "0132_digest_support_class",
+      "breakpoints": true
     }
   ]
 }

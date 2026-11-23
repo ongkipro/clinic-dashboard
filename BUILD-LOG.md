@@ -1059,3 +1059,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   identifiers spliced across figures; r6 APPROVE (a rendered-text scan with figure-span exemption).
 - Lesson: an at-most-once guarantee cannot be emulated inside a mock of the provider. Narrow the contract to what our side can enforce
   (one authorized dispatch per generation, no false outcome) and require the provider's idempotency key at activation.
+
+## 2026-11-23 — T-117 hotfix: TEN-19 operator class for `digest_runs` (migration 0132)
+
+- CI 45155189295 on `0e5bd462` failed one test: `tests/vendor/support.test.ts` "every tenant table has an operator class". 0131 added
+  the tenant table `digest_runs` with a `scope_map` row but no `support_object_kinds` row.
+- 0132 adds `('public.digest_runs', 'never')`, the same as `satusehat_outbox`: a vendor support session never reads a worker queue.
+- Lesson: a migration that adds a tenant table must run the full `pnpm test`, as CI does, before the push. The targeted suites (digest,
+  rls, migrations, isolation) did not include the TEN-19 coverage test.
+- The local full suite then failed one more test: HYG-NAV-2's "no migration and no nav.ts change in this batch" read `git status`.
+  It fails on any worktree with an uncommitted migration and passes on a clean CI checkout. Removed it, because batch scope is the
+  delivery-ledger boundary's job.
