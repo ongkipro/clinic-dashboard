@@ -60,6 +60,15 @@ Owner instructions 2026-11-04/05 (foundation review: "jika ada bugs dan kekurang
 |---|---|---|---|
 | HYG-025 | R1 | Owner checkpoint of both panels and the integrated baseline (2026-11-23). Allowed: `TASKS.md` (this registration only), `STATUS.md`, `BUILD-LOG.md`, `ARCHITECTURE.md` | `pnpm docs:check`, Mermaid parse, map-to-tree invariants, and documentation-only boundary pass. No feature acceptance, activation or deployment. |
 
+### Navigation hygiene (owner-authorised 2026-11-23; orphan routes found by the T-130 audit)
+
+| ID | Risk | Scope and Allowed Paths | Done when |
+|---|---|---|---|
+| HYG-NAV-2 | R3 | PR-86: 10 orphan nav routes over existing readers and commands: `/jadwal/{daftar,online,tunggu}`, `/pasien/{gabung,keluarga}`, `/layanan/paket`, `/stok/{depot,pemusnahan}`, `/keuangan/ekspor`, `/kasir/pengaturan-bayar`. No migration, no `nav.ts` edit (rows exist). Allowed: those 10 route dirs, `tests/ui/hyg-nav-2*.test.ts`, `tests/isolation/cases/hyg-nav-2.cases.ts`, `tests/isolation/surfaces.ts` | typecheck, lint, full `pnpm test:isolation`, `tests/ui/hyg-nav-2*`, browser at 390/820/1180/1440 × 100/200%; independent R3 review |
+| HYG-NAV-1 | R3 | PR-86: 10 orphan nav routes: `/saya/{target,jadwal,notifikasi,tampilan,bantuan}`, `/staf/target`, `/persetujuan/{koreksi,matriks}`, `/lead/{tindak-lanjut,survei}`, plus `ApplyTampilan` mounted in `src/app/(app)/layout.tsx`. No migration. Allowed: those 10 route dirs, `src/app/(app)/layout.tsx`, `tests/ui/hyg-nav-1.test.ts`, `tests/isolation/cases/hyg-nav-1.cases.ts`, `tests/isolation/surfaces.ts` | as HYG-NAV-2 |
+
+HYG-024 (vendor console readers) is not a hygiene task: it needs a new migration, so it folds into T-129, and its residency `inconclusive` part into T-120 (owner decision 2026-11-23).
+
 ### Milestone M0
 
 #### T-001: Repository bootstrap: Next.js App Router, TypeScript strict, pnpm, Docker Compose PostgreSQL 16, CI skeleton, `pnpm docs:check`

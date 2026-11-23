@@ -1024,3 +1024,13 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - At `b7fdd645` (CI 45068171413), Ringkasan Cabang counts current and older open visits awaiting payment using the existing branch-scoped reader. A refused read remains unavailable. Evidence: ledger `RUN-20261122T203937Z-9a9cc8a7`, 36 PostgreSQL tests, route isolation, and UX-21 browser checks (14 flows / 40 layouts). No new grant or migration.
 - Keep implementation evidence separate from M8 closure and activation: the digest is not integrated, the owner walkthrough is unrecorded, and the books remain preview-only. Preliminary J8 is not final acceptance. See the current panel checkpoint in `STATUS.md` and the as-built map in `ARCHITECTURE.md`.
 
+
+## 2026-11-23 — HYG-NAV-2 navigation pages
+
+- 10 orphan routes found by the T-130 audit (PR-86) over existing readers and commands. The write surfaces are merge / unmerge, package
+  sharing, and depot create / move, all through existing commands. No migration; `nav.ts` already listed the routes.
+- Rebaselined from `c7f29c4e` onto `1042ffa6` with 0 conflicts. One isolation fixture line moved the seeded draft payout-batch month
+  2018 → 2021: the full gate showed that an earlier open draft blocks `komisi.cases.ts` submits on the shared victim tenant
+  (`earlier_batch_open`).
+- Evidence: run `RUN-20261123T081540Z-d9f838fe`. Typecheck, lint, full isolation (231 passed), UI 29/29, browser 18 flows / 112 layouts.
+  Independent R3 re-review APPROVE (codex `cx/gpt-6.2-sol`, panel 3).

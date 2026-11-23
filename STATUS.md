@@ -160,6 +160,8 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
+**HYG-NAV-2 (2026-11-23):** integrated on main: 10 orphan nav routes rebaselined onto `1042ffa6` (PR-86, R3), run `RUN-20261123T081540Z-d9f838fe` PASS; full isolation 231 passed, UI 29/29, browser 18 flows / 112 layouts; independent R3 re-review APPROVE (panel 3, codex `cx/gpt-6.2-sol`). Exact-SHA CI: see BUILD-LOG.
+
 **Panel checkpoint (2026-11-23, observed 09:58 WIB):**
 
 - **P1 — data and evidence:** Preliminary J8 gate-a is pinned to `353387aa`, ledger `RUN-20261122T173821Z-16a51bfd` (short ID `16a51bfd`). Preflight passed; background job `ba019da13` remains queued, with no admission file or JUnit output. The host process scan matches a 99ribu `wrangler dev` dependency path containing `vitest`; the foreign process was not stopped and the gate was not bypassed. The preliminary target is 8 passing, 0 failures and 12 TODOs, not an achieved result. T-120's two-test synthetic draft is offline and unrun; M9 waits for M8 exit.
