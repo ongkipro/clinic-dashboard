@@ -1045,3 +1045,17 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   re-review APPROVE (codex `cx/gpt-6.2-sol`, panel 3).
 - Follow-up outside this scope: `src/app/(app)/pasienku/load.ts` held its `/saya/target` and `/lead/tindak-lanjut` links until these
   routes existed.
+
+## 2026-11-23 — T-117 owner daily digest (PR-80, migration 0131)
+
+- `digest_runs` holds one run per tenant per local business day. The claim runs unbound. The facts read is bound to the claimed tenant,
+  with no staff and no roles. Dispatch re-checks the lease generation, lifecycle and the current SET-37 recipients after its locks.
+  Receipts are durable, and a dispatched run is never recorded as refused (CHECK + trigger).
+- K1 / K2 are extracted from `dashboard_kpi` into internal helpers, with output unchanged; the dashboards and reports suites run
+  unmodified. The six exception counts carry the Ringkasan Owner meanings, uncapped.
+- Review history (panel 3, codex `cx/gpt-6.2-sol`): r1 found the send unfenced by the lease and send-time authority missing; r2 found
+  the clock read before the locks and process-local idempotency; r3 found the DB mock unsound, so r4 removed it and narrowed the
+  contract to provider idempotency on `digestKey`; r4 and r5 found a receipt-vs-closure rollback, a refusal after first dispatch, and
+  identifiers spliced across figures; r6 APPROVE (a rendered-text scan with figure-span exemption).
+- Lesson: an at-most-once guarantee cannot be emulated inside a mock of the provider. Narrow the contract to what our side can enforce
+  (one authorized dispatch per generation, no false outcome) and require the provider's idempotency key at activation.

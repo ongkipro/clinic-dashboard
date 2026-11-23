@@ -160,6 +160,8 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
+**T-117 (2026-11-23):** integrated on main: owner daily digest (PR-80, R3; DEC-124; migration 0131), email through the mock port only; no live provider, no scheduler. Independent R3 reviews r1–r6 by panel 3 (codex `cx/gpt-6.2-sol`); r6 APPROVE. Runs `RUN-20261123T043647Z-8c93fc81` (closed BLOCKED: base moved) and `RUN-20261123T101251Z-be66a49e` on `dd611ac0`. Live activation gate: a provider that honours `digestKey` and replays receipts. M8 exit still needs the T-119 final run and the owner walkthrough.
+
 **HYG-NAV-1 (2026-11-23):** integrated on main after HYG-NAV-2: 10 orphan nav routes plus `ApplyTampilan` in `src/app/(app)/layout.tsx` (PR-86, R3), rebaselined onto `50dd8d94`; runs `RUN-20261123T082748Z-99fb70bd` and `RUN-20261123T085757Z-885a11b7` PASS; combined full isolation with both case files 243 passed (1 skipped), combined UI 51/51, browser 17 flows / 104 layouts; independent R3 re-review APPROVE (panel 3, codex `cx/gpt-6.2-sol`). HYG-NAV-2 CI 45141633374 green on `50dd8d94`.
 
 **HYG-NAV-2 (2026-11-23):** integrated on main: 10 orphan nav routes rebaselined onto `1042ffa6` (PR-86, R3), run `RUN-20261123T081540Z-d9f838fe` PASS; full isolation 231 passed, UI 29/29, browser 18 flows / 112 layouts; independent R3 re-review APPROVE (panel 3, codex `cx/gpt-6.2-sol`). Exact-SHA CI: see BUILD-LOG.

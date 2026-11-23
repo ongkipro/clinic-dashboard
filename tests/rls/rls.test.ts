@@ -661,6 +661,13 @@ describe("functions (TEN-16)", () => {
     "report_k25(date,date,uuid)",
     "report_k26(date,date,uuid)",
     "report_k27(date,date,uuid)",
+    // T-117 (PR-80, 0131): the owner digest job — claim / dispatch / delivered / complete on a fully unbound worker connection only; the facts
+    // only for the claimed run's tenant bound with no staff and no role, with the claimed generation, while the lease holds (TEN-5). Aggregates only.
+    "digest_claim(timestamp with time zone,integer)",
+    "digest_dispatch(uuid,integer,text)",
+    "digest_delivered(uuid,integer,text)",
+    "digest_complete(uuid,integer,text)",
+    "digest_facts(uuid,integer)",
     // T-103 (PR-61): vendor server-fee billing — the clinic's Bayar and reader (the actor lock first) and the executor workers (issuer, fenced finish, recovery, Advice, approved requests, reminders).
     "vendor_billing_bayar_begin(text,uuid,text,text[],timestamp with time zone)",
     "vendor_billing_tenant_view()",

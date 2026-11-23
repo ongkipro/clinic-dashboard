@@ -37,3 +37,4 @@ export * from "../../modules/accounting/schema";
 export * from "../../modules/messaging/schema";
 export * from "../../modules/crm/schema";
 export * from "../../modules/integrations/schema";
+export * from "../../modules/reporting/schema";
