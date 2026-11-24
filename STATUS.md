@@ -160,6 +160,8 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
+**T-119 M8 exit evidence (2026-11-24):** `docs/evidence/m8/**` integrated on main. Independent R3 APPROVE for M8 exit pending ONLY the two owner gates: f3 (codex `cx/gpt-6.2-sol`) and the unified u1 on `40cc4e99` with HYG-026 (Antigravity CLI, Gemini 4 Neon, high). Gated m8-flow 27 passed / 0 failed / 1 todo (TD-31) in WIB, UTC, Pacific/Kiritimati; `pnpm test -- m8` 3791 tests, 0 failed; `check-scenarios --final` FAILs only on the owner walkthrough J1–J8, J10 and T-102 TD-31 (both **OPEN**), AMENDED on M8-AMEND-1 (draft KPIs K4/K12/K14/K15/K17, pending Finance) and M8-AMEND-2 (G-Q4 U1–U4, tracked product work), per `t119/final/OWNER-AMENDMENT-M8-EXIT-20261123.md`. T-119 is NOT Done and M8 has NOT exited: ledger `RUN-20261124T030704Z-d7dda389` closed BLOCKED on the owner gates.
+
 **T-117 hotfix (2026-11-23):** CI 45155189295 on `0e5bd462` failed TEN-19 coverage (`tests/vendor/support.test.ts`): `digest_runs` had no `support_object_kinds` row. Migration 0132 classifies it `never` (as `satusehat_outbox`). Full `pnpm test` run before this push.
 
 **T-117 (2026-11-23):** integrated on main: owner daily digest (PR-80, R3; DEC-124; migration 0131), email through the mock port only; no live provider, no scheduler. Independent R3 reviews r1–r6 by panel 3 (codex `cx/gpt-6.2-sol`); r6 APPROVE. Runs `RUN-20261123T043647Z-8c93fc81` (closed BLOCKED: base moved) and `RUN-20261123T101251Z-be66a49e` on `dd611ac0`. Live activation gate: a provider that honours `digestKey` and replays receipts. M8 exit still needs the T-119 final run and the owner walkthrough.

@@ -1,0 +1,369 @@
+{
+  "_about": "T-119 M8 exit: the PLAN.md §1 M8 exit items, the PRD §8 scenarios of the M8 requirements (PR-25, PR-26, PR-33a–PR-33g, PR-34, PR-62, PR-80, PR-95, PR-98) and the Phase 1 demo journeys J1–J8, J10 (02-PRD §Journeys; §Release phases: owner walkthrough on synthetic data) mapped to the exact test cases that prove each (JUnit classname = file, name = 'describe > test'). Checked by check-scenarios.py against a JUnit report of `pnpm test -- m8`: every required scenario, exit item and journey mapped (or deferred to its named task while T-119 is not final); every title a PRD §8 scenario; every mapped name in its file; every mapped case present once and passed; no failure anywhere. 'proves' states what the cases assert; 'open' what M8 does not prove and what completes it. Final state f2 (2026-11-24, base aa8603bb, run RUN-20261123T113506Z-d634565d): every M8 scenario mapped; every settled KPI exact on this month; `owner_amended` entries (OWNER-AMENDMENT-M8-EXIT-20261123.md: draft K4/K12/K14/K15/K17; G-Q4 U1–U4) are reported by --final as amended, never as passed; the deferred items are the two OWNER GATES only (owner walkthrough; T-102 TD-31).",
+  "scenarios": [
+    {
+      "scenario": "PR-25 liability roll-forward",
+      "file": "tests/accounting/subledgers.test.ts",
+      "tests": [
+        "Scenario PR-25 and money scenarios 8, 11, 12a, 13 (package liability roll-forward) > PR-25: sales, redemptions at two branches, an expiry and a cancellation in one month: opening + paid − counted − moved − refunded = closing"
+      ],
+      "proves": "package sales, redemptions at two branches, an expiry and a cancellation in one month: opening + paid − counted − moved − refunded = closing; inter-branch nets to zero (T-104)",
+      "open": "the Ringkasan Keuangan page view of the roll-forwards (T-114)"
+    },
+    {
+      "scenario": "PR-26 period lock",
+      "file": "tests/accounting/ledger.test.ts",
+      "tests": [
+        "T-105 database invariants > PR-26 period lock: a fact of a locked month posts in the next open period, keeping its own month as the reference; nothing posts into a locked period"
+      ],
+      "proves": "a fact of a locked month posts in the next open period with its own month kept as the reference; nothing posts into a locked period (T-105)",
+      "open": "books activation and journal export (open gates G-ACT, accountant's posting map A-02)"
+    },
+    {
+      "scenario": "PR-34 reconciliation",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — integrated tasks > T-108 PR-34: recon_report on this month lists no difference, nothing pending and nothing unavailable — every fact is posted (bersih)"
+      ],
+      "proves": "recon_report on the fixture month: no item of any kind, nothing unavailable, verdict bersih; the J7 clearing legs on the anchor day (b2 +600,000, b1 −600,000); exact K1 / K2 per branch on the anchor day and the month on the fact and ledger sides; both receivables arms (+400,000 / −400,000) on both sides",
+      "open": "the Scenario PR-34 difference case is the separate tests/accounting/recon.test.ts entry"
+    },
+    {
+      "scenario": "PR-34 reconciliation",
+      "file": "tests/accounting/recon.test.ts",
+      "tests": [
+        "recon_report on PostgreSQL (PR-34; owner, finance, auditor; tenant-scoped) > PR-34: a posted payment is clean; a queued one waits; a completed receipt without its entry is a difference with the receipt number"
+      ],
+      "proves": "Scenario PR-34 Given/When/Then on PostgreSQL: a completed receipt without its ledger entry is listed as a difference with the receipt number; a posted payment is clean; a queued one waits",
+      "open": "the Rekon page view is proven in the T-108 route tests"
+    },
+    {
+      "scenario": "PR-33a K2 at executing branch",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — integrated tasks > T-109 PR-33a: Ringkasan Owner on this month — K3 at the selling branch (b1: the package, the S2 facial and the S3b treatment), K2 at the executing branch (b2: the one package session counted there)"
+      ],
+      "proves": "Ringkasan Owner per branch on the fixture month: K3 at the selling branch (b1 6,400,000, b2 0), K2 at the executing branch (b2 600,000; b1 2,500,000 = S2 facial + S3b filler + the b1 package session; the paid S3b facial was never performed; the b2 session never credited to b1)",
+      "open": "the owner page's other UX-20 items (attention, mix, league) are proven in the T-109 tests, not on this month"
+    },
+    {
+      "scenario": "PR-33b stock risk",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-110 PR-33b: Ringkasan Cabang — an item below its minimum at the manager's branch is listed under stock risk with the reorder link"
+      ],
+      "proves": "readBranchSummary as the b1 manager on this tenant: Kasa Steril M8 (3 fit < minimum 5, real stock writers) under below_min; resolveView + BranchSummaryView render 'Buat PO untuk Kasa Steril M8' linking /pembelian/po",
+      "open": "the other UX-21 tiles are proven in tests/reporting/pr-33b.test.ts, not on this month"
+    },
+    {
+      "scenario": "PR-33c shift summary",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-111 PR-33c: Hari Ini shift summary — the b1 cashier's shift of this month, totals per tender"
+      ],
+      "proves": "summaryIn as the b1 cashier: cash 3 payments 4,900,000, EDC 1 1,500,000, transfer 1 500,000, paid out 0; money in 6,900,000 = K1 at b1",
+      "open": "none recorded (QRIS is proven in tests/reporting/pr-33c.test.ts; this month has no QRIS receipt)"
+    },
+    {
+      "scenario": "PR-33d own figures only",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-112 PR-33d: Pasienku — each BC sees only her own target, closing value and commission"
+      ],
+      "proves": "two BCs at b1: BC (closed S2 + S3b by confirming them) closing 3,400,000 of target 6,000,000; BC2 0 of 4,000,000; each commission a real Rp0 (no active rule on this tenant); BC2's payload never carries BC's figure",
+      "open": "the T-112 acceptance gaps (K9 per BC, dormant count, Belum Memilih, Paket Hampir Habis, unassigned BC tasks) stay open; a non-zero commission is proven in tests/reporting/pr-33d.test.ts"
+    },
+    {
+      "scenario": "PR-33e overdue leads",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-113 PR-33e: Ringkasan CS — a lead created while its branch is open and unanswered for 20 elapsed minutes counts overdue against the 15-minute target; a 10-minute one does not"
+      ],
+      "proves": "readCsSummary as central CS: a b2 lead created while b2 is open (open around the clock, set by Admin Pusat in the T-115 hook) and unanswered for 20 elapsed minutes is overdue vs SET-20 15; a 10-minute one waits, not overdue",
+      "open": "CURRENT SEMANTICS (T-113): open at entry, wall-clock elapsed time since entry; this open-all-day fixture cannot tell that from time counted only in opening hours; unconfirmed appointments and complaints stay 'Belum tersedia'"
+    },
+    {
+      "scenario": "PR-33f roll-forward",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-114 PR-33f: Ringkasan Keuangan on this month — every roll-forward opening + movements = closing; the package and balance movements of the month"
+      ],
+      "proves": "readFinanceSummary as finance: all six roll-forwards balanced (rollCheck); package settlement 3,000,000 / redemption −1,200,000 → 1,800,000; balance top-up 500,000; paid-not-delivered closing 1,500,000; receivables 0",
+      "open": "the rendered page is proven in tests/reporting/pr-33f.test.ts"
+    },
+    {
+      "scenario": "PR-33g Admin Pusat setup view",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-115 PR-33g: Ringkasan Admin Pusat — a branch without opening hours is listed 'Jam buka belum diisi'; once its hours are set it is not"
+      ],
+      "proves": "readAdminHome as Admin Pusat: both fixture branches 'Jam buka belum diisi'; after setHours on b2, only b1",
+      "open": "none"
+    },
+    {
+      "scenario": "PR-62 health without content",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-118 PR-62: vendor platform health lists this tenant with counts and ages only — no clinic content"
+      ],
+      "proves": "vendor_console_health as the platform owner (bootstrapVendor, second factor now): the M8 tenant row is 'PT Klinik M8 Sintetis' / live with the five provider blocks; no patient name, RM number, clinical text or service name in the payload",
+      "open": "exact backlog counts and ages are proven in tests/vendor/health.test.ts; WAL / archiver 'Belum terpantau' until archive_mode"
+    },
+    {
+      "scenario": "PR-80 digest",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-117 PR-80: the owner digest of the anchor day carries K1, K2 and exception counts only — no patient name or record number"
+      ],
+      "proves": "runDigest (mock port, SET-37 17:00 to owner + finance, live tenant) at 21:00 of the anchor day: exactly one outbox entry, keyed digestKey(tenant, day, email); K1 Rp6.900.000, K2 Rp3.100.000; per branch M8-KMG 6,900,000 / 2,500,000, M8-BSD 0 / 600,000; low stock 1, overdue lead 1; no patient name, RM number or clinical text",
+      "open": "the digest runs test-invoked only (no scheduler; owner decision 2026-11-23)"
+    },
+    {
+      "scenario": "PR-95 report definition",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-116 PR-95: each report links every KPI to its dictionary entry; K20 on this month"
+      ],
+      "proves": "definitionHref of every KPI of every report = /laporan/kamus-kpi#<id>; Laporan Pasien carries K21; K20 on this month = K3 6,400,000 ÷ 4 invoices = 1,600,000 (loadReport, Laporan Operasional)",
+      "open": "the rendered link and Kamus KPI page are proven in tests/reporting/reports.test.ts"
+    },
+    {
+      "scenario": "PR-98 Coretax export gated",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-106 PR-98: Coretax export of this month refused while the PKP tenant has no approved tax advice; with it, a PKP sale exports from its frozen snapshot"
+      ],
+      "proves": "PKP without tax advice: retail export refused gate_closed naming 'Saran pajak (PPN per jenis layanan)'; after the owner approves the advice: a 333,000 taxable product issued at b1 freezes base 300,000 / VAT 33,000 and the retail XML exports 1 row, base 300,000, VAT 33,000, TIN 0+NPWP, no patient. SEED BOUNDARY: the PKP-without-advice state and the 70-day PKP history are seeded rows (the tax-profile writer runs once, as tests/accounting/coretax.test.ts makePkp): a broken PKP transition writer is not covered here; the gate and the export run on the real code",
+      "open": "tax adviser confirmation (±1 retail row, retur codes); live upload / NSFP; named-buyer faktur"
+    }
+  ],
+  "items": [
+    {
+      "item": "M8 exit: ledger reconciles to sub-ledgers on the §3 fixtures",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit: one month on the §3 fixtures, ledger ↔ sub-ledgers > J8 month end — the M8 exit check: every sub-ledger's period movement equals its ledger accounts' movement, tenant-wide and per branch",
+        "M8 journeys on the fixture month — final run (aa8603bb) > J6 follow-up (PR-30) + the M8 exit check again: the scan creates the J6 patient's own follow-up (rule, source, due date); every sub-ledger equals its ledger accounts, and every (ledger, term, branch) movement equals its derived amount",
+        "M8 journeys on the fixture month — final run (aa8603bb) > G-Q4 U1–U4 (owner-amended tracked exception): a visit product billed WITHOUT its selection link — the sub-ledger infers the hand-over, the journal posts nothing; exact exception and reconciliation difference"
+      ],
+      "proves": "one tenant, two branches, a month of fixture scenarios through the real writers and the real posting consumer: every sub-ledger with ledger accounts moves exactly as its accounts, tenant-wide, closing per branch and gross per branch (sign-folded); EXACT per (ledger, term, branch) for every movement of the month (the MOVEMENTS list, each amount derived in FINAL-DERIVATION.md §Movements) after the final-run journeys (booking DP received and moved, balance used, partial payments, a package DP, a product handed over on its linked line with no handover exception afterwards, materials, the package expiry); the booking_dp stored-stock comparator reports no mismatch with one deposit present; inter-branch nets to zero; the T-104 comparators report no mismatch",
+      "owner_amended": [
+        {
+          "id": "M8-AMEND-2-GQ4-U1-U4",
+          "what": "G-Q4 U1–U4: a visit product billed WITHOUT its selection link — the sub-ledger infers the hand-over (−150,000 performance at b1) while the journal posts nothing; exercised separately with the exact 'Selisih penyerahan produk' count (unlinked 1, fractional 0, at b1) and the exact four-line paid_not_delivered difference (sub-ledger 3,000,000 vs ledger 3,150,000; gross −3,700,000 vs −3,550,000); no journal line is guessed",
+          "amendment": "t119/final/OWNER-AMENDMENT-M8-EXIT-20261123.md",
+          "scope": [
+            "G-Q4 U1",
+            "G-Q4 U2",
+            "G-Q4 U3",
+            "G-Q4 U4"
+          ],
+          "tracked_in": "G-Q4 U1–U4 (T-105 Panel 2 decision 2026-11-19; product work)"
+        }
+      ]
+    },
+    {
+      "item": "M8 exit: ledger reconciles to sub-ledgers on the §3 fixtures",
+      "file": "tests/accounting/ledger.test.ts",
+      "tests": [
+        "T-105 posting rules (money scenarios; the canonical matrix, draft map version) > scenario 2: prepaid by QRIS then counted — S2-J1 PaymentAllocated Dr Kliring gateway / Cr paid-not-delivered 1,500,000; S2-J2 TreatmentFinished Dr paid-not-delivered / Cr revenue",
+        "T-105 posting rules (money scenarios; the canonical matrix, draft map version) > scenarios 5a / 11: a package paid in cash at branch 1, sessions counted at branch 1 and at branch 2 (inter-branch clearing in the same entry, nets to zero)",
+        "T-105 posting rules (money scenarios; the canonical matrix, draft map version) > scenario 20 (G1 b): a synthetic gateway settlement through the real posting rule — Bank 993,000, fee expense 7,000, clearing 0; balanced, idempotent; commission basis unchanged",
+        "T-105 posting rules (money scenarios; the canonical matrix, draft map version) > every posted entry of the run balances; nothing posts for simulated money; the app cannot call a rule directly, and an event of another tenant is refused"
+      ],
+      "proves": "the journal lines of the §3 money scenarios per fixture (S1–S20 in T-105; the four cases above are the reconciliation anchors: clearing, inter-branch, settlement 20, every entry balanced) (T-105)"
+    },
+    {
+      "item": "M8 exit: ledger reconciles to sub-ledgers on the §3 fixtures",
+      "file": "tests/accounting/subledgers.test.ts",
+      "tests": [
+        "exports, readers and roles > a period reopened after later facts keeps its closing; tenant-wide identity opening + terms = closing for every ledger"
+      ],
+      "proves": "every sub-ledger satisfies opening + terms = closing tenant-wide; a reopened period keeps its closing (T-104)"
+    },
+    {
+      "item": "M8 exit: statements balance; journal export fail-closed",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit: one month on the §3 fixtures, ledger ↔ sub-ledgers > J8 statements and the books' gates: every entry balances, trial balance sums to zero, preview status, journal export refused (G-ACT)"
+      ],
+      "proves": "on the M8 month: every entry balanced with ≥ 2 lines; trial balance sums to zero; preview status; journal export refused with the map unsigned; no handover exception; a cashier refused the statements"
+    },
+    {
+      "item": "M8 exit: statements balance; journal export fail-closed",
+      "file": "tests/accounting/ledger.test.ts",
+      "tests": [
+        "T-105 manual journals, period lock, statements, journal export (fail-closed), invoice void mirror > statements: trial balance balances, P&L and balance sheet by class, cash-flow by counter class; always the preview status; owner / finance / auditor only; not SAK-labelled",
+        "T-105 manual journals, period lock, statements, journal export (fail-closed), invoice void mirror > journal export is refused (fail-closed): unsigned map → refused; signed map evidence alone → still refused (books not activated, G-ACT); never another role"
+      ],
+      "proves": "statements by class, preview status, readers; journal export refused unsigned and still refused with signed evidence while not activated (T-105)"
+    },
+    {
+      "item": "M8 exit: KPI values equal fixture expectations for K1–K19 and PR-95 metrics",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-107: K1–K19 readers on this month equal the fixture expectations (the settled KPIs this month exercises)",
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > T-116 PR-95: each report links every KPI to its dictionary entry; K20 on this month",
+        "M8 journeys on the fixture month — final run (aa8603bb) > T-107 / T-116: every SETTLED KPI exactly on this month — K1–K3, K5–K11, K13, K16, K18 (dashboard_kpi) and K19–K27 (targets, report readers) — from the fixture facts; K4 / K12 / K14 / K15 / K17 are owner-amended (pending Finance)"
+      ],
+      "proves": "EXACT on the exit fixture month, from distinguishing fixture facts (FINAL-DERIVATION.md §KPI): K1 11,090,000 (cash 7,440,000 / EDC 3,150,000 / transfer 500,000, all b1); K2 5,100,000 (b1 treatment 3,400,000, product 300,000, consultation 200,000, session 600,000; b2 session 600,000); K3 13,290,000 (line 7,290,000, package 6,000,000); K5 5,990,000 (PND 3,090,000, packages 600,000, balance 2,300,000, DP 0); K6 1,800,000 at b1; K7 4,973,000 (material −7,000, product −120,000); K8 b1 one consultation, no purchase; K9 b1 6 recommended 7,900,000 / 4 selected 6,000,000, b2 1 recommended 1,500,000; K10 b1 7 new, b2 1 returning; K11 7 new, 0 second visits; K13 whatsapp 2 leads, instagram 1 lead → booked → arrived → paid; K16 b1 4 treatment visits / 1 with product, b2 1; K18 b1 1 below minimum, 1 expiring; K19 6,700,000 of 10,000,000; K20 1,208,182 (13,290,000 ÷ 11); K21 0 of 7 churned (SET-22 90); K22 nine patients in exact LTV order; K23 shift 11,790,000 / 11,090,000 + Tanpa shift 1,500,000 / 0; K24 median of the two hand-over waits; K25 M8-HEMAT v1 1 use, 10,000 discount, 90,000 K3; K26 3.50, 1 of 2 low; K27 DOC 6 signed, 0 unsigned > 24 h, 1 request decided, median check-in → signature EXACT from the six controlled (check-in, signature) pairs (check-ins 90/70/50/30/20/10 min before signing: median ≈ 40 min, distinct from 0, the mean ≈ 45 min and any single pair)",
+      "owner_amended": [
+        {
+          "id": "M8-AMEND-1-DRAFT-KPI",
+          "what": "draft KPIs K4, K12, K14, K15, K17 — pending Finance sign-off of their definitions and expected values (read on this month, not asserted as acceptance values)",
+          "amendment": "t119/final/OWNER-AMENDMENT-M8-EXIT-20261123.md",
+          "scope": [
+            "K4",
+            "K12",
+            "K14",
+            "K15",
+            "K17"
+          ],
+          "tracked_in": "T-107 DRAFT KPIs (tests/reporting/dashboards.test.ts DRAFT rows; Finance sign-off)"
+        }
+      ]
+    }
+  ],
+  "journeys": [
+    {
+      "journey": "J4 Selection and payment",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit: one month on the §3 fixtures, ledger ↔ sub-ledgers > J4–J6 (S2): selected, paid by EDC before the treatment, treated — clearing and paid-not-delivered in both books",
+        "M8 journeys on the fixture month — final run (aa8603bb) > J4 alternative tenders + booking DP: a deposit received and then decided (moved to balance), the balance shown and used, a partial payment, a package DP"
+      ],
+      "proves": "the BC confirms the selection, the cashier takes EDC before the first treatment; the books carry clearing and paid-not-delivered, then revenue at the treatment; booking DP 200,000 received in cash and decided (cancel ≥ 24 h → moved to balance; booking_dp received +200,000 / moved −200,000 in both books); the balance shown at the cashier (200,000, tender available) and used with cash; a partial payment (outstanding 1,000,000 then 0); a package DP (599,999 refused ERR_MIN_DP_NOT_MET, 600,000 accepted). SEED BOUNDARY: the DP appointment is a seeded row (the booking writer is proven in J1 / tests/scheduling/booking.test.ts); deposit_receive, the patient cancel ≥ 24 h, the balance use and the payments run on the real writers"
+    },
+    {
+      "journey": "J5 Treatment",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit: one month on the §3 fixtures, ledger ↔ sub-ledgers > J5 addition + J6 receivable fallback (S3b, S14 pattern): performed before billed, converted, collected in cash",
+        "M8 journeys on the fixture month — final run (aa8603bb) > J5 materials + J6 hand-over and the real visit close: materials issued and reconciled in the room; the pharmacist hands over the paid product; visit_close closes the visit"
+      ],
+      "proves": "an addition proposed in the room, approved by the doctor, re-consented, released, performed before it is billed; materials requested by the nurse, issued by the pharmacist from the gudang, 7 of 10 consumed at finish, 3 returned usable: the request is reconciled (issued 10 = consumed 7 + returned 3, nothing pending or free)"
+    },
+    {
+      "journey": "J6 Dispensing and close",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit: one month on the §3 fixtures, ledger ↔ sub-ledgers > J5 addition + J6 receivable fallback (S3b, S14 pattern): performed before billed, converted, collected in cash",
+        "M8 journeys on the fixture month — final run (aa8603bb) > J5 materials + J6 hand-over and the real visit close: materials issued and reconciled in the room; the pharmacist hands over the paid product; visit_close closes the visit",
+        "M8 journeys on the fixture month — final run (aa8603bb) > J6 follow-up (PR-30) + the M8 exit check again: the scan creates the J6 patient's own follow-up (rule, source, due date); every sub-ledger equals its ledger accounts, and every (ledger, term, branch) movement equals its derived amount"
+      ],
+      "proves": "the unpaid addition is converted to a receivable (receivable_convert, before any close) and collected in cash: Dr 400,000 / Cr 400,000 on patient_receivable; the product handed over by the pharmacist (seven checks) on its linked line; visit_close refused with ERR_VERSION_CONFLICT:pending_dispensing before the hand-over and accepted after; the close's own aftercare notice (one row: the J6 patient, b1, the counted facial's version, nothing queued without an approved template); the PR-30 daily scan creates the J6 patient's own follow-up: rule dormant, source patient, step visit_<visit>, CS queue, b1, due day + 91 (none at day + 90). PR-30 is owned by the scan, not by visit_close"
+    },
+    {
+      "journey": "J7 Package lifecycle",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit: one month on the §3 fixtures, ledger ↔ sub-ledgers > J7 (S5a / S11): a package paid in cash at branch 1, sessions counted at branch 1 and branch 2 — inter-branch clearing nets to zero",
+        "M8 exit: one month on the §3 fixtures, ledger ↔ sub-ledgers > J7 balance + J8 expense (S13 top-up pattern; PR-79): a top-up by transfer and a bank-funded expense in both books",
+        "M8 journeys on the fixture month — final run (aa8603bb) > J7 expiry → balance: the J7 package's validity ends; the expiry scan moves the paid-unused value to the patient balance"
+      ],
+      "proves": "a package paid, sessions redeemed at two branches (inter-branch clearing nets to zero); a balance top-up by transfer; the J7 package expires: package close −1,800,000, patient balance from_expiry +1,800,000. SEED BOUNDARY: validity_end is moved into the past on the row (packages_guard off for the seed); the expiry scan and the balance move run on the real code"
+    },
+    {
+      "journey": "J8 Month end",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit: one month on the §3 fixtures, ledger ↔ sub-ledgers > J8 month end — the M8 exit check: every sub-ledger's period movement equals its ledger accounts' movement, tenant-wide and per branch",
+        "M8 exit: one month on the §3 fixtures, ledger ↔ sub-ledgers > J8 statements and the books' gates: every entry balances, trial balance sums to zero, preview status, journal export refused (G-ACT)",
+        "M8 exit hooks on the fixture month — final run (aa8603bb) > J8 month end: finance locks a closed month (the open fixture month is refused) and exports the month's payments"
+      ],
+      "proves": "the month-end reconciliation on the fixture month: every sub-ledger = its ledger accounts, net and gross (increasing / decreasing terms vs the two ledger sides) tenant-wide, closing per branch; named terms per branch for the exercised paths (receivables created / collected at b1, paid-not-delivered settlement / receivable_convert, package settlement / redemption, the J7 inter-branch legs b1 +600,000 / b2 −600,000, the expense); the expense's own entry on the anchored date; each T-104 comparator ran and reported nothing; statements balance; journal export refused (G-ACT); Kunci Periode: finance's lock of the open fixture month is refused (period_open, by design) and the closed previous month is locked (status.locked_periods); the month's payments exported (exportRows payments: the five receipts, no patient identity)"
+    },
+    {
+      "journey": "J8 Month end",
+      "file": "tests/commission/commission.test.ts",
+      "tests": [
+        "money scenario 10 over three months: payout, deduction after payout, carry-forward, staff exit > month 1 pays 210,000; month 2's refund deducts −210,000 (paid lines unchanged) and carries forward; month 3 recovers; exit → staff receivable"
+      ],
+      "proves": "commissions approved and paid by batch; a refund after payout deducts next month, the paid record unchanged (J8 exception path; T-087)"
+    },
+    {
+      "journey": "J1 Lead to booking",
+      "file": "docs/evidence/m6/m6-flow.test.ts",
+      "tests": [
+        "M6 exit: the test number end to end (recorded fixtures, mock ports) > 4 lead (PR-29): the conversation becomes a lead; converted refused while unpaid, allowed once paid",
+        "M6 exit: the test number end to end (recorded fixtures, mock ports) > 8 waitlist (PR-81): a patient waits for the service; a matching slot is cancelled → the branch's staff are prompted"
+      ],
+      "proves": "a WhatsApp conversation becomes a lead routed to a branch; converted only once paid (M6 flow, recorded fixtures); a waiting patient is put on the waitlist and the staff are prompted when a matching slot frees (PR-81)"
+    },
+    {
+      "journey": "J1 Lead to booking",
+      "file": "tests/scheduling/booking.test.ts",
+      "tests": [
+        "Done-when > scenario PR-6: a doctor + room service booked from source ig-ad at B2 reserves only doctor and room; source, branch and version stored"
+      ],
+      "proves": "the booking records its source and reserves only the resources the service needs (T-044)"
+    },
+    {
+      "journey": "J2 Arrival and intake",
+      "file": "docs/evidence/m1/m1-flow.test.ts",
+      "tests": [
+        "M1 exit: book → check-in → board on a real database > a booked patient is checked in, shown on Hari Ini and Antrean, blocked while unpaid, and closed once settled"
+      ],
+      "proves": "a booked patient is checked in, shown on the board, blocked while unpaid, closed once settled (M1 flow)"
+    },
+    {
+      "journey": "J2 Arrival and intake",
+      "file": "tests/patients/registration.test.ts",
+      "tests": [
+        "T-037 Done-when > scenario PR-5: two patients with the same phone; a search by that phone lists both for an explicit choice, minimal projection only"
+      ],
+      "proves": "a duplicate phone forces an explicit choice (J2 exception path; T-037)"
+    },
+    {
+      "journey": "J3 Examination and plan",
+      "file": "docs/evidence/m2/m2-flow.test.ts",
+      "tests": [
+        "M2 exit flow > one patient through every M2 module on a real database, through the real writers"
+      ],
+      "proves": "BC intake verified by the doctor, examination, plans with stages, consent requirement, contraindication cleared, signing (M2 flow)"
+    },
+    {
+      "journey": "J10 Server-fee month",
+      "file": "tests/vendor/billing/billing.test.ts",
+      "tests": [
+        "T-103 Scenarios PR-61 > prorated first month: go-live 21 Nov, 30 days, Rp1,000,000 → Rp333,333; paid only after AutoLaris reports a verified settled status"
+      ],
+      "proves": "the first month's invoice prorated from go-live; paid only after a verified settled status from the AutoLaris mock (T-103)"
+    },
+    {
+      "journey": "J1 Lead to booking",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 journeys on the fixture month — final run (aa8603bb) > J1: no slot for the service at the branch → the patient goes on the waitlist (the waitlist entry is the note)"
+      ],
+      "proves": "booking_slots for the facial at b2 on the anchor day is empty (no room, no rostered performer); addToWaitlist records the waiting entry, listed by waitlist_list (the entry is the waitlist note)"
+    },
+    {
+      "journey": "J2 Arrival and intake",
+      "file": "docs/evidence/m2/m2-flow.test.ts",
+      "tests": [
+        "M2 exit flow > one patient through every M2 module on a real database, through the real writers"
+      ],
+      "proves": "the BC opens, saves (complaint, an allergy fact, skin observation) and sends the intake; the doctor sees the fact as bc_captured_unverified and verifies it (verifyFact confirmed) in the examination; a photo is added to the visit (M2 flow)"
+    },
+    {
+      "journey": "J2 Arrival and intake",
+      "file": "tests/clinical/media.test.ts",
+      "tests": [
+        "upload > BC, doctor and nurse add media to an open visit of their branch; the same bytes are stored once"
+      ],
+      "proves": "the BC adds a photo to the open visit (uploaded_as bc), the doctor adds one too. Not proven: a doctor verifying a PHOTO separately — main has no such action; the doctor verifies the BC's intake FACTS (M2 flow). A distinct photo-verification action is an open product question, only if the walkthrough requires it"
+    }
+  ],
+  "deferred": [],
+  "deferred_items": [
+    {
+      "item": "M8 exit: owner walkthrough J1–J8, J10 recorded",
+      "completes_in": "OWNER GATE: the T-119 owner walkthrough session (Paduka Ongki; checklist in README.md), on a synthetic tenant"
+    },
+    {
+      "item": "M8 exit: SATUSEHAT steps of J3 / J6 on recorded fixtures",
+      "completes_in": "OWNER GATE: T-102 final acceptance after Paduka Ongki's TD-31 practitioner-path decision (not decided; never faked)"
+    }
+  ]
+}
