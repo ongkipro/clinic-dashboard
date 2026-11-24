@@ -75,7 +75,7 @@ export const vendorProfile = pgTable(
     taxEvidenceRef: text("tax_evidence_ref"),
     residencyOpinionRef: text("residency_opinion_ref"),
     residencyOpinionDate: date("residency_opinion_date"),
-    residencyOpinionOutcome: text("residency_opinion_outcome", { enum: ["positive", "negative"] }),
+    residencyOpinionOutcome: text("residency_opinion_outcome", { enum: ["positive", "negative", "inconclusive"] }),
     residencyOpinionSetBy: uuid("residency_opinion_set_by").references(() => authUser.id, { onDelete: "restrict" }),
     residencyOpinionChecksum: text("residency_opinion_checksum"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -102,7 +102,7 @@ export const vendorProfile = pgTable(
        and (${t.residencyOpinionOutcome} is null) = (${t.residencyOpinionDate} is null)
        and (${t.residencyOpinionOutcome} is null) = (${t.residencyOpinionSetBy} is null)
        and (${t.residencyOpinionOutcome} is null) = (${t.residencyOpinionChecksum} is null)
-       and (${t.residencyOpinionOutcome} is null or ${t.residencyOpinionOutcome} in ('positive','negative'))
+       and (${t.residencyOpinionOutcome} is null or ${t.residencyOpinionOutcome} in ('positive','negative','inconclusive'))
        and (${t.residencyOpinionChecksum} is null or ${t.residencyOpinionChecksum} ~ '^[0-9a-f]{64}$')`,
     ),
   ],

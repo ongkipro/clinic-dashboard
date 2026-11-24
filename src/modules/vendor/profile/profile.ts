@@ -154,7 +154,7 @@ function validateLocations(locs: StorageLocation[]) {
 export async function setResidencyOpinion(
   db: pg.ClientBase,
   actor: VendorActor,
-  opinion: { ref: string; date: string; outcome: "positive" | "negative"; file: Buffer },
+  opinion: { ref: string; date: string; outcome: "positive" | "negative" | "inconclusive"; file: Buffer },
   reason: string,
 ): Promise<void> {
   requireOwner(actor);

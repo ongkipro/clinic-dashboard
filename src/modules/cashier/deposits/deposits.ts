@@ -5,6 +5,7 @@
 // by a clinic cancellation, or refunded for a clinic cause (scenario 17).
 import type pg from "pg";
 import { CommandError, runCommand, type ErrorCode, type Json } from "../../../lib/command";
+import { bindResidencyContext } from "../../platform/residency";
 import { assertProductionGoLive } from "../../vendor/profile/profile";
 
 export class DepositError extends CommandError {
@@ -29,6 +30,7 @@ export async function call<T>(fn: () => Promise<T>): Promise<T> {
 }
 async function command<T extends Json>(db: pg.ClientBase, name: string, key: string, body: Record<string, Json>, sql: string, args: unknown[]) {
   await assertProductionGoLive(db);
+  await bindResidencyContext(db);
   const out = await call(() => runCommand<T>(db, { command: name, key, body }, async (c) => ((await c.query(sql, args)).rows[0]?.r ?? null) as T));
   if (!out.ok) throw out.error;
   return { result: out.result, replayed: out.replayed };

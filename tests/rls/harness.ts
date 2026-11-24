@@ -257,6 +257,8 @@ export type HarnessOptions = Omit<DdlLockOptions, "onLockWait"> & {
   migrate?: (url: string) => Promise<void>;
   stalePattern?: string;
   migrateLockKey?: bigint;
+  // T-120 (Finding #5): synthetic throwaway DBs default to 'local' once 0133 exists; pass null to leave unset (fail-closed production).
+  platformEnv?: "local" | "staging" | "demo" | "production" | null;
 };
 
 export async function createHarness(opts: HarnessOptions = {}): Promise<Harness> {
@@ -295,6 +297,16 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
       await server.query("select pg_advisory_unlock($1)", [mk]).catch(() => {}); // an ended connection released it
     }
     await admin.connect();
+    if (opts.platformEnv !== null) {
+      const hasEnv = (await admin.query<{ ok: boolean }>(`select to_regclass('public.platform_environment') is not null as ok`)).rows[0]?.ok;
+      if (hasEnv) {
+        await admin.query(
+          `insert into public.platform_environment (id, deploy_env) values (1, $1)
+           on conflict (id) do update set deploy_env = excluded.deploy_env, set_at = clock_timestamp()`,
+          [opts.platformEnv ?? "local"],
+        );
+      }
+    }
   } catch (error) {
     // Best effort: an ended connection (an unlock failure) cannot drop; a later sweep does,
     // because ending the session released this database's lifetime lock.

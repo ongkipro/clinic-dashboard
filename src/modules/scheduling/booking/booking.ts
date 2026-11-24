@@ -6,6 +6,7 @@
 // a raised error rolls the claim back), and conflicts are retryable.
 import type pg from "pg";
 import { CommandError, runCommand, type ErrorCode } from "../../../lib/command";
+import { bindResidencyContext } from "../../platform/residency";
 import { assertProductionGoLive } from "../../vendor/profile/profile";
 
 const CODE = /^(ERR_[A-Z_]+):\s*(.*)$/;
@@ -47,6 +48,7 @@ export async function book(
   i: { branchId: string; patientId: string; versionId: string; startsAt: Date; staffId?: string | null; channel: BookingChannel; source?: string | null; campaign?: string | null; note?: string | null; hold?: boolean },
 ): Promise<Booked & { replayed: boolean }> {
   await assertProductionGoLive(db);
+  await bindResidencyContext(db);
   const body = {
     branch: i.branchId, patient: i.patientId, version: i.versionId, start: i.startsAt.toISOString(), staff: i.staffId ?? null, channel: i.channel,
     source: i.source ?? null, campaign: i.campaign ?? null, note: i.note ?? null, hold: i.hold === true,
@@ -65,6 +67,7 @@ export async function book(
 // A live hold becomes a booking (the DP was paid; M4 calls this).
 export async function confirm(db: pg.ClientBase, key: string, appointmentId: string): Promise<{ replayed: boolean }> {
   await assertProductionGoLive(db);
+  await bindResidencyContext(db);
   const out = await call(() => runCommand<null>(db, { command: "booking.confirm", key, body: { appointment: appointmentId } }, async (c) => {
     await c.query(`select booking_confirm($1)`, [appointmentId]);
     return null;

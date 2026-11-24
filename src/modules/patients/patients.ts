@@ -6,6 +6,7 @@ import type pg from "pg";
 import { blindIndex, decryptField, encryptField, type KekRing, type TenantKeys } from "../../lib/keys/envelope";
 import { EncryptionUnavailableError, ensureTenantKeys, kekRing, tenantKeys } from "../../lib/keys/runtime";
 import { CommandError, type ErrorCode } from "../../lib/command";
+import { bindResidencyContext } from "../platform/residency";
 import { assertProductionGoLive } from "../vendor/profile/profile";
 
 export const IDENTITY_PURPOSE = "patient.identity";
@@ -115,6 +116,7 @@ export async function registerPatient(
   decision: "new" | null,
 ): Promise<RegisterResult> {
   await assertProductionGoLive(db);
+  await bindResidencyContext(db);
   const r = await call(() =>
     db.query(`select patient_register($1::jsonb, $2, $3, $4) as r`, [JSON.stringify(fields), sealed?.enc ?? null, sealed?.bidx ?? null, decision]),
   );

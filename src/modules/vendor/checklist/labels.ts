@@ -20,6 +20,7 @@ const VENDOR_LABEL: Record<string, string> = {
   profile_missing: "Profil vendor belum diisi",
   residency_opinion_required: "Opini residensi data belum ada",
   residency_opinion_negative: "Opini residensi data negatif",
+  residency_opinion_inconclusive: "Opini residensi data tidak tegas",
 };
 // The clinical_go_live obligations (0030 labels; PR-97, Q-07), approved by the clinic in Kepatuhan.
 const CLINICAL_LABEL: Record<string, string> = {

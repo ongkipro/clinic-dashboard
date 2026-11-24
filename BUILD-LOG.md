@@ -1088,3 +1088,14 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
   - A test that reads `git status` fails on any worktree with uncommitted work, so it was removed.
   - An exactly-once guarantee cannot be emulated in a provider mock. The digest contract was narrowed to provider idempotency on
     `digestKey`.
+
+## 2026-11-24 — T-119 M8 exit closed on main (`73773b26`, CI 45391453121)
+
+- Reconciled independent R3 review (`R3-REVIEW-e1-panel1.md` REQUEST_CHANGES) under owner-authorized Option 1: amended canonical `TASKS.md:1402` Done-when timing so manual walkthrough J1–J8, J10 is mandatory post-M9 synthetic staging acceptance under `DEC-034` (not signed off, not an M8 exit prerequisite), aligned `docs/evidence/m8/README.md` and `STATUS.md`, and kept `T-102 TD-31`/`TD-34` external sandbox acceptance explicitly open.
+- Independent R3 approvals: `R3-REVIEW-e2-panel1.md` (Panel 1) and `R3-REVIEW-e2r2-pi-sol.md` (`pi` `9router-fantastico/cx/gpt-6.2-sol`, after updating stale `STATUS.md` Next verified action lines). Ledger `RUN-20261124T111142Z-4f88726e` PASS (failed e1 `RUN-20261124T095701Z-7700d9e7` and all 3 immutable freezes preserved). Exact-SHA CI `45391453121` green.
+
+## 2026-11-24 — T-120 residency configuration and ARCH-10 real-patient gate (PR-36, migration 0133, R4)
+
+- Added `drizzle/0133_real_patient_gate.sql` (`platform_environment`, `residency_attestations`, deploy-only `residency_attest`, dual-marker `residency_is_production`, wall-clock `Asia/Jakarta` `real_patient_gate` with `release_digest` + canonical `deployed_locations_digest` (`app.residency_config`) + `file_sha256 === residency_opinion_checksum` binding, lock-ordered `real_patient_gate_assert`, Owner / Admin Pusat `real_patient_gate_status`, HYG-024 `inconclusive` opinion fold-in, and drift-pinned call sites in `vendor_go_live_blockers`, `patient_register`, `booking_create`, `booking_confirm`, `deposit_receive`) plus `drizzle/meta/0133_snapshot.json`.
+- Added `src/modules/platform/residency/{config,gate,index}.ts` (ARCH-9 zero hard-coded providers/regions/countries; `bindResidencyContext` binds `app.deploy_env`, `app.release_digest`, and `app.residency_config` in patient registration, booking, and deposit writers) and fixed two HYG-027 `ARCHITECTURE.md` nits (`verifyStepUp` lock order, `reporting/digest` migration range `0131–0132`).
+- Gotcha: `0133` intentionally inserts no row into `platform_environment` (a missing row fails closed as production); throwaway test databases explicitly insert `'local'` in `tests/rls/harness.ts` (`platformEnv` option) once migration `0133` exists. Direct SQL tests outside `bindResidencyContext` (e.g. `tests/patients/registration.test.ts`) set `app.deploy_env = 'local'` when exercising synthetic registration without production attestation.

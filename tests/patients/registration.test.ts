@@ -207,8 +207,10 @@ describe("duplicates (PR-5, UX-4, plan r1 P2-1)", () => {
 
   it("the database refuses an identity number in clear even from a direct call (mutation run: clear-identity-ok)", async () => {
     const fields = { full_name: "Langsung SQL", birth_date: "1990-01-01", sex: "female", phone: "081255550001", identity_type: "nik", religion: "islam", occupation: "Karyawan", education: "s1", marital_status: "kawin" };
-    await expect(as(FO, (db) => db.query(`select patient_register($1::jsonb, $2, $3, 'new')`, [JSON.stringify(fields), "3171010000005501", "A".repeat(43)])))
-      .rejects.toThrow(/^ERR_INVALID_INPUT: patients_identity_enc_check$/);
+    await expect(as(FO, async (db) => {
+      await db.query(`select set_config('app.deploy_env', 'local', true)`);
+      return db.query(`select patient_register($1::jsonb, $2, $3, 'new')`, [JSON.stringify(fields), "3171010000005501", "A".repeat(43)]);
+    })).rejects.toThrow(/^ERR_INVALID_INPUT: patients_identity_enc_check$/);
     expect((await h.admin.query(`select count(*)::int as n from patients where full_name = 'Langsung SQL'`)).rows[0].n).toBe(0);
   });
 

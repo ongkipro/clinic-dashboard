@@ -958,6 +958,7 @@ describe("functions (TEN-16)", () => {
     "vendor_dual_identity_clinic_revoke(uuid)",
     "vendor_go_live_allowed()",
     "vendor_identity()",
+    "real_patient_gate_status()", // T-120 (PR-36, ARCH-10): Owner / Admin Pusat Kepatuhan status reader
   ];
 
   it("the app executes no SECURITY DEFINER function outside the allow-list", async () => {
