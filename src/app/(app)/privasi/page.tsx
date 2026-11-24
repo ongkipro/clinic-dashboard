@@ -45,6 +45,7 @@ async function Body({ searchParams }: { searchParams: Promise<Q> }) {
           {(Object.keys(SECTIONS) as Section[]).map((s) => (
             <li key={s}><Link className={link} aria-current={section === s ? "page" : undefined} href={s === "persetujuan" ? "/privasi" : `/privasi?bagian=${s}`}>{SECTIONS[s]}</Link></li>
           ))}
+          <li><Link className={link} href="/privasi/permintaan">Permintaan</Link></li>
         </ul>
       </nav>
 

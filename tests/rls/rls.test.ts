@@ -873,6 +873,16 @@ describe("functions (TEN-16)", () => {
     "breach_notice_file(uuid)",
     "breach_record(timestamp with time zone,text,integer,text)",
     "privacy_overview()",
+    "dsr_assign(uuid,uuid)", // T-121: data-subject requests (PR-50, UX-30)
+    "dsr_bind_subject(uuid,uuid)",
+    "dsr_close(uuid,text,text,text,text,timestamp with time zone,text,text,text)",
+    "dsr_confirm_copy_handoff(uuid,uuid,text,text,timestamp with time zone,text)",
+    "dsr_get(uuid)",
+    "dsr_link(uuid,text,uuid,text,boolean)",
+    "dsr_link_options(uuid)",
+    "dsr_list(text,text)",
+    "dsr_log(text,uuid,text,text,text,timestamp with time zone,text,text[])",
+    "dsr_verify(uuid,text)",
     "processor_set_active(uuid,boolean)",
     "processor_upsert(uuid,jsonb)",
     "queue_board(uuid)", // T-048: queue numbers, walk-in, paired displays (PR-71, DEC-058)
