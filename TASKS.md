@@ -59,6 +59,7 @@ Owner instructions 2026-11-04/05 (foundation review: "jika ada bugs dan kekurang
 | ID | Risk | Scope and Allowed Paths | Done when |
 |---|---|---|---|
 | HYG-025 | R1 | Owner checkpoint of both panels and the integrated baseline (2026-11-23). Allowed: `TASKS.md` (this registration only), `STATUS.md`, `BUILD-LOG.md`, `ARCHITECTURE.md` | `pnpm docs:check`, Mermaid parse, map-to-tree invariants, and documentation-only boundary pass. No feature acceptance, activation or deployment. |
+| HYG-027 | R1 | Unified M8 checkpoint (owner 2026-11-24): ARCHITECTURE System Map (0132, HYG-NAV-1/2, T-117, HYG-026, T-119 evidence), BUILD-LOG, STATUS (open work and owner gates). Allowed: `TASKS.md` (this registration only), `STATUS.md`, `BUILD-LOG.md`, `ARCHITECTURE.md` | `pnpm docs:check`, Mermaid parse, map-to-tree invariants, documentation-only boundary; independent review. No feature acceptance, activation or deployment. |
 
 ### Navigation hygiene (owner-authorised 2026-11-23; orphan routes found by the T-130 audit)
 

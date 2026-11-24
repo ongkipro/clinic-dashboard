@@ -1,6 +1,8 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-23 (development baseline `b7fdd645`, exact CI 45068171413 green; overall panel checkpoint, HYG-025; M8 exit and M9 remain open; no deployment).
+Updated: 2026-11-24 (unified M8 checkpoint, HYG-027: main `dc3a9ee5`, CI 45323638379 green. Integrated since `b7fdd645`, each on its own exact-SHA green CI: HYG-NAV-2 `50dd8d94` (CI 45141633374), HYG-NAV-1 `dd611ac0` (CI 45143447680), T-117 `0e5bd462` + hotfix `aa8603bb` (migrations 0131–0132, CI 45164282188), HYG-026 `40cc4e99` (CI 45314572999), T-119 evidence `dc3a9ee5`. M8 exit OPEN on two owner gates; M9 not started; no deployment)
+
+Previous Updated (kept as written): 2026-11-23 (development baseline `b7fdd645`, exact CI 45068171413 green; overall panel checkpoint, HYG-025; M8 exit and M9 remain open; no deployment).
 
 Previous Updated (2026-11-22 draft, kept as history; main `353387aa`, CI 45043361121 green; integrated since `f0bd3c44`, each on its own exact-SHA green CI: T-118 `9de482f0` (migration 0127), T-102 increment 4 `3f0e726e` (0128; T-102 final acceptance still OPEN on TD-31), T-108 `00df0033` + `44a24f48` (0129), T-111 `db08f6c4`, T-116 `4f685eda` / `68573cee` / `6785e0c7` / `e5670c2d` (0130; `6785e0c7` CI red, fixed by `e5670c2d`), T-113 `f14a554f`, T-019 date fix `de832388`, T-109 `ef8e1f1d`, T-110 `2b0d5a8c`, T-115 `82340dfa`, T-112 `353387aa`; acceptance gaps stay OPEN as listed in Current state; pending, not integrated: T-114, T-117, T-119, T-120; not deployed; the earlier Updated text and every per-task row below are history and unchanged)
 Previous Updated (kept as written): 2026-11-20 (T-102 increment 4 in verification: TD-31 practitioner NIK lookup, rebased onto `9de482f0` per DEC-049, candidate migration 0128 (not on `main`), DEC-123; T-118 r2 after independent review 1d2a370d: CHANGES REQUIRED, two telemetry findings fixed (WhatsApp due by branch-local day; outbox dead letters, 24-hour failures not measured); T-118 in verification: vendor platform health, rebased on `f0bd3c44`, candidate migration 0127 (not on `main`); T-107 DONE `f0bd3c44`, CI 44610920846 (dashboard read models + UX-60 role homes, migration 0126 on `main`; r3/r4 after independent reviews 3ba1bf52 / 3dcdb005); T-106 DONE `c7f29c4e`, CI 44551597530; T-105 DONE as a PREVIEW `af295ec1`, CI 44509284530; HYG-023 DONE `14c99035`; T-104 DONE `1e54042a`; Fast-Track Careful mode with the end-of-development `cx/gpt-6.2-sol` review; the per-task rows below are the history and are unchanged)
@@ -25,6 +27,38 @@ Use `BLOCKED` only as an interruption state. Record the blocker and exact state 
 `OBSERVABILITY.md` owns post-deploy verification probes. After deployment, transition to `SMOKE_TESTING` and run `release-check`. Every configured observability probe must pass before transition to `VERIFIED`.
 
 ## Current state
+
+**Unified M8 checkpoint (2026-11-24, main `dc3a9ee5`, CI 45323638379 green):**
+
+| Change | Commit | CI | What it is |
+|---|---|---|---|
+| HYG-NAV-2 (PR-86) | `50dd8d94` | 45141633374 | 10 orphan nav routes: `/jadwal/{daftar,online,tunggu}`, `/pasien/{gabung,keluarga}`, `/layanan/paket`, `/stok/{depot,pemusnahan}`, `/keuangan/ekspor`, `/kasir/pengaturan-bayar`. |
+| HYG-NAV-1 (PR-86) | `dd611ac0` | 45143447680 | 10 orphan nav routes: `/saya/{target,jadwal,notifikasi,tampilan,bantuan}`, `/staf/target`, `/persetujuan/{koreksi,matriks}`, `/lead/{tindak-lanjut,survei}`; `ApplyTampilan` in the shell. |
+| T-117 (PR-80, DEC-124) | `0e5bd462` + `aa8603bb` | 45155189295 red (TEN-19) → 45164282188 green | Owner daily digest: migrations 0131 `digest_runs` (+ definers) and 0132 (TEN-19 `support_object_kinds` row). Email through the mock port only. |
+| HYG-026 (PR-3) | `40cc4e99` | 45314572999 | Shared TOTP step-up producer: an unforgeable, session-bound `StepUp` for `signRecord` / `signLetter` / `signPrescription` (and later T-122). No migration. |
+| T-119 evidence (PR-26) | `dc3a9ee5` | 45323638379 | `docs/evidence/m8/**`: the M8 exit check, gated m8-flow 27/0/1 todo, `pnpm test -- m8` 3791 / 0 failed. |
+
+Independent R3 reviews: Panel 3 codex `cx/gpt-6.2-sol` for HYG-NAV-1/2 r3, T-117 r1–r6 (+ hotfix), HYG-026 r1–r7 and T-119 preliminary r1–r6 and final f1–f3. Antigravity CLI (Gemini 4 Neon, high) for the T-119 unification u1 on `40cc4e99`.
+
+**M8 is NOT exited.** T-119 is not Done. `check-scenarios --final` fails only on the two owner gates below and lists the two owner amendments (`t119/final/OWNER-AMENDMENT-M8-EXIT-20261123.md`) as AMENDED, not passed:
+- M8-AMEND-1: draft KPIs K4 / K12 / K14 / K15 / K17, pending Finance sign-off.
+- M8-AMEND-2: G-Q4 U1–U4 (an unlinked visit product line gives a Rp150,000 PND difference; tracked product work).
+
+**Open owner gates:**
+- **M8 owner walkthrough J1–J8, J10: OPEN**, not signed. The checklist is in `docs/evidence/m8/README.md`.
+- **T-102 TD-31: OPEN.** The SATUSEHAT practitioner path; it also blocks T-102 final acceptance.
+- **SET-35: OPEN.** The clinical signing default is PIN (P-25); HYG-026 ships only the TOTP producer. Decide PIN vs TOTP before any signing UI.
+
+**Unfinished Panel 2 / 3 work, not integrated, no M9 code on main:**
+- **M9 pre-work worktrees** `t120`–`t131` (no `t125`) sit at `af295ec1` with untracked drafts; they are rebaselined from latest green main only after M8 exits.
+- **Wave-1 plans** `t120`–`t123/WAVE1-PLAN-0e5bd462.md`; owner decisions in `M9-OWNER-DECISIONS-20261123.md`:
+  - T-120 OD-1 = B; OD-2..5 per plan.
+  - T-121 D1 = 72 h, D3 = no delete, D2 and D5..7 per plan.
+  - T-122 D1 = HYG-026 (now integrated), D2..7 per plan, D5 = bytea behind a port.
+  - Q-15 is an external legal gate that does not block T-123.
+- **Panel 3 plan pre-reviews, all REVISE PLAN** (notes `t1xx/PLAN-REVIEW-*`): T-120, T-121, T-122, T-123, T-124, T-126, T-127, T-128, T-129. Each plan is revised before its implementation starts.
+- **HYG-024 is folded:** the vendor console readers and their migration into T-129, and the residency `inconclusive` outcome into T-120 (owner decision 2026-11-23). Worktrees `hyg-024` / `hyg-024r` are kept until then.
+- Product observations from T-119 (not blockers): a separate "photo verified by doctor" command does not exist (open product question); G-Q4 above.
 
 **Summary (2026-11-23):** M0–M6 complete; SATUSEHAT final/external acceptance remains open. The project is in M8. Estimated development coverage is about 89% (roughly 117 of 131 primary tasks with their main implementation integrated; not an accepted-task count or a release-readiness measure). The previous snapshot below records the mounts through `353387aa`; the later exact-SHA green changes are:
 
@@ -250,6 +284,14 @@ Carried forward (outside the owning task's Allowed Paths):
 
 ## Blockers
 
+**Current owner gates (2026-11-24):**
+- M8 owner walkthrough J1–J8, J10: OPEN.
+- T-102 TD-31: OPEN; it blocks T-102 final acceptance and the M8 SATUSEHAT exit item.
+- SET-35 PIN vs TOTP: OPEN; it blocks any clinical signing UI.
+- Owner amendments to the M8 exit scope: M8-AMEND-1 (draft KPIs, Finance) and M8-AMEND-2 (G-Q4 U1–U4); both are tracked, not closed.
+- T-103 live-payment gates (Q-13, D2, Q-16, BILL-33) and the books gates (G-ACT, G-RETRO, G-PENDING, G-EXPORT, G-SETTLE): unchanged, OPEN.
+- External: Q-15 counsel (unassigned; it does not block T-123), and PRIV-2 counsel matrix (T-121 uses 72 h meanwhile).
+
 **Current owner gates (2026-11-18, unchanged since 2026-11-17):** T-102 final acceptance OPEN / BLOCKED on TD-31 practitioner path (`docs/tasks/T-102.md`); T-103 live payment activation gates OPEN on Q-13 (settlement mapping), D2 (manual unlock), Q-16 (channel-fee bearer / PPh 23) and BILL-33 (VAT / vendor tax status) — all fail-closed in code (`docs/tasks/T-103.md`).
 
 Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job validation; PR-7, PR-9, PR-14, PR-15, PR-18, PR-71, PR-83), G2 (H-02d, Q-08, Q-10, Q-11, Q-15, Q-17, R-01), G3 (Q-05, Q-06). See `docs/spec/02-PRD.md` §13 and `PLAN.md`.
@@ -338,7 +380,14 @@ Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job v
 
 ## Next verified action
 
-**Current (2026-11-23):** Let the existing J8 job run only after normal host admission in the 07:00–22:30 WIB window, or preserve a no-run/timeout if it is not admitted. If it runs, verify JUnit, cross-timezone controls and the exact R3 boundary. Resolve T-117 and other acceptance gaps, then run T-119 final checks on the final green commit and record the owner walkthrough. Only then open M9. Navigation hygiene is separate; no deployment.
+**Current (2026-11-24):**
+1. The owner runs and signs the M8 walkthrough (J1–J8, J10) on a synthetic tenant at build `dc3a9ee5` or later.
+2. The owner decides TD-31.
+3. Rerun `check-scenarios --final` on the final green SHA, finish T-119 PASS, and record M8 exit.
+4. Then M9 Wave 1 (T-120–T-123): revise each plan per its Panel 3 review, rebaseline from green main, and allocate migration slots serially at integration (DEC-049).
+SET-35 must be decided before any clinical signing UI. No deployment.
+
+**Previous (2026-11-23, kept as history):** Let the existing J8 job run only after normal host admission in the 07:00–22:30 WIB window, or preserve a no-run/timeout if it is not admitted. If it runs, verify JUnit, cross-timezone controls and the exact R3 boundary. Resolve T-117 and other acceptance gaps, then run T-119 final checks on the final green commit and record the owner walkthrough. Only then open M9. Navigation hygiene is separate; no deployment.
 
 **Previous draft (2026-11-22, kept as history):** run the T-119 gate at or after 07:00 WIB (typecheck, lint, checker self-test, m8 flow: expected 8 passed + 12 todo, 0 failed) and stop at its boundary; map the integrated scenarios only after their Done is confirmed; T-114 and T-117 finish in their lanes; deployment stays out of scope (DEC-034).
 

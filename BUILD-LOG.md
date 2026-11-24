@@ -1070,3 +1070,21 @@ Per-task evidence lives in `STATUS.md` (Verification evidence), plans in `docs/t
 - The local full suite then failed one more test: HYG-NAV-2's "no migration and no nav.ts change in this batch" read `git status`.
   It fails on any worktree with an uncommitted migration and passes on a clean CI checkout. Removed it, because batch scope is the
   delivery-ledger boundary's job.
+
+## 2026-11-24 — HYG-026 TOTP step-up producer, T-119 M8 evidence, unified checkpoint
+
+- **HYG-026** (`40cc4e99`, CI 45314572999). The auth factory issues the signing `StepUp`; it can no longer be fabricated as
+  `{ verified: true }`. The proof is TOTP-only, bound to the session, valid ≤ 10 minutes, and verified under the tenant lock. No
+  migration. Independent R3 review needed seven rounds: proof binding, the challenge fallback, provenance, then a run of TOCTOU orderings.
+  The lesson: decide on state read after the last wait, under the lock the writers take. A missing proof or binding always fails closed.
+- **T-119** (`dc3a9ee5`, CI 45323638379). M8 exit evidence: gated m8-flow 27 / 0 / 1 todo, and `pnpm test -- m8` 3791 / 0 failed.
+  - Every settled KPI is exact on one fixture month, and 17 branch / term movements are exact.
+  - The checker pins exactly two owner amendments.
+  - Independent R3 review: f1–f3, plus the unified u1 on top of HYG-026.
+  - **M8 has not exited.** The owner walkthrough and T-102 TD-31 are OPEN.
+- **Lessons from this wave:**
+  - A migration that adds a tenant table needs a `support_object_kinds` row (TEN-19), and the full suite must run before the push. The
+    targeted suites missed it, so CI 45155189295 went red; hotfix 0132 fixed it.
+  - A test that reads `git status` fails on any worktree with uncommitted work, so it was removed.
+  - An exactly-once guarantee cannot be emulated in a provider mock. The digest contract was narrowed to provider idempotency on
+    `digestKey`.
