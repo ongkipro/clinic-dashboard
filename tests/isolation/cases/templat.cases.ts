@@ -11,6 +11,7 @@ import {
 } from "../../../src/modules/documents/documents";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { defineCases, type IsolationEnv } from "../case";
+import { stepUpForTests } from "../../support/step-up";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -62,7 +63,7 @@ async function victim(env: IsolationEnv) {
   const visit = (await env.owner.query(`insert into visits (tenant_id, branch_id, patient_id, kind, checked_in_by) values ($1, $2, $3, 'walk_in', $4) returning id`, [t, b, patient, staff])).rows[0].id as string;
   const doc = <T>(fn: (db: never) => Promise<T>) => as(env, t, b, "doctor", fn);
   const { letterId: letter } = await doc((db) => createLetter(db, crypto.randomUUID(), visit, tpl.version));
-  await doc((db) => signLetter(db, crypto.randomUUID(), letter, { verified: true }));
+  await doc((db) => signLetter(db, crypto.randomUUID(), letter, stepUpForTests()));
   const { letterId: draft } = await doc((db) => createLetter(db, crypto.randomUUID(), visit, tpl.version));
   for (const s of [name, patient, visit, letter, draft, tpl.template, tpl.version]) env.victimSecret(s);
   const out = { name, template: tpl.template, version: tpl.version, visit, letter, draft };
@@ -169,7 +170,7 @@ export default defineCases(
       const attempts = {
         createLetter: await outcome(asMine(env, "doctor", (db) => createLetter(db as never, k(), v.visit, v.version))),
         saveLetter: await outcome(asMine(env, "doctor", (db) => saveLetter(db as never, k(), v.draft, "Isi surat lintas tenant"))),
-        signLetter: await outcome(asMine(env, "doctor", (db) => signLetter(db as never, k(), v.draft, { verified: true }))),
+        signLetter: await outcome(asMine(env, "doctor", (db) => signLetter(db as never, k(), v.draft, stepUpForTests()))),
         correctLetter: await outcome(asMine(env, "doctor", (db) => correctLetter(db as never, k(), v.letter, "Isi surat lintas tenant", "Coba lintas"))),
         saveTemplate: await outcome(asMine(env, "admin_pusat", (db) => saveTemplate(db as never, k(), v.template, { body: LETTER, paper: "a4" }))),
         retireTemplate: await outcome(asMine(env, "admin_pusat", (db) => retireTemplate(db as never, k(), v.template))),

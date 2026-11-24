@@ -17,6 +17,7 @@ import { signRecord } from "../../src/modules/clinical/records/records";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { mergePatients } from "../../src/modules/patients/merge/merge";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { stepUpForTests } from "../support/step-up";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -171,7 +172,7 @@ describe("upload", () => {
     // An examination link must be this visit's draft.
     const { examId } = await as(DOC, (db) => openExam(db, key(), v));
     await as(DOC, (db) => addMedia(db, key(), { ...photo(v, "atas"), examinationId: examId }));
-    await as(DOC, (db) => signRecord(db, key(), examId, { verified: true }));
+    await as(DOC, (db) => signRecord(db, key(), examId, stepUpForTests()));
     expect(await code(as(DOC, (db) => addMedia(db, key(), { ...photo(v, "samping"), examinationId: examId })))).toBe("ERR_VERSION_CONFLICT");
     await close(v);
     expect(await code(as(DOC, (db) => addMedia(db, key(), photo(v))))).toBe("ERR_VERSION_CONFLICT");
@@ -403,7 +404,7 @@ describe("removal, guards, audit, events, cross-tenant", () => {
     const v2 = await visit(A, await patient(A));
     const { examId } = await as(DOC, (db) => openExam(db, key(), v2));
     const { mediaId: m3 } = await as(DOC, (db) => addMedia(db, key(), { ...photo(v2, "depan", png(900, 900, 23)), examinationId: examId }));
-    await as(DOC, (db) => signRecord(db, key(), examId, { verified: true }));
+    await as(DOC, (db) => signRecord(db, key(), examId, stepUpForTests()));
     expect(await code(as(DOC, (db) => removeMedia(db, key(), m3, "Salah unggah")))).toBe("ERR_VERSION_CONFLICT");
     await expect(h.admin.query(`update clinical_media set removed_at = now(), removed_by = uploaded_by, removed_as = 'doctor', removed_reason = 'x x x' where id = $1`, [m3])).rejects.toThrow(/signed examination are final/);
     // Guards.

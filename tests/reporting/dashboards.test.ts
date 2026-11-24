@@ -49,6 +49,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { RoleHomeView } from "../../src/app/(app)/ringkasan/peran/role-home-view";
 import type { K14Extra, MarketingHome } from "../../src/modules/reporting/dashboards/dashboards";
+import { stepUpForTests } from "../support/step-up";
 
 // ── facts (synthetic; money facts from the signed scenarios) ───────────────────────────────────────────────────────────────────────
 type Branch = "A" | "B";
@@ -400,7 +401,7 @@ type T = { tenantId: string; b1: string; b2: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 // Level 2 (tenant-wide) roles carry no branch (staff_branches_level3_check); every other role gets one.
 const TENANT_WIDE: string[] = ROLES.filter((r) => !(LEVEL3_ROLES as readonly string[]).includes(r));
-const STEP: StepUp = { verified: true };
+const STEP: StepUp = stepUpForTests();
 const key = () => crypto.randomUUID();
 async function tenant(): Promise<T> {
   const tenantId = (await h.admin.query(`insert into tenants_registry (lifecycle_state) values ('live') returning id`)).rows[0].id as string;

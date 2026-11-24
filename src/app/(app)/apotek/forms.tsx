@@ -6,7 +6,8 @@ import { useActionState, useId, useState } from "react";
 import { ContextFields } from "../../../components/context-fields";
 import { Button } from "../../../components/ui/button";
 import type { RenderedContext } from "../../../modules/org/context/context";
-import { CHECKS, type ItemRef } from "../../../modules/pharmacy/pharmacy";
+import { CHECKS } from "../../../modules/pharmacy/checks";
+import type { ItemRef } from "../../../modules/pharmacy/pharmacy";
 import { cancelAction, handOverAction, labelAction, mapAction, type PharmacyFormState, prepareAction, prepareMaterialsAction } from "./actions";
 import { CHECK_LABEL, DEPOT_KIND } from "./labels";
 

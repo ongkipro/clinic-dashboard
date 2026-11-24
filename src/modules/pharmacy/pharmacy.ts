@@ -5,9 +5,10 @@
 // codes only.
 import type pg from "pg";
 import { CommandError, runCommand, type ErrorCode, type Json } from "../../lib/command";
-import type { StepUp } from "../clinical/records/records";
+import { type StepUp, verifyStepUp } from "../../auth/server";
 import { assertProductionGoLive } from "../vendor/profile/profile";
-import type { DISPENSING_STATES, LABEL_KINDS, PHARMACIST_CHECKS, PRESCRIPTION_STATES } from "./schema";
+import { CHECKS, type Check } from "./checks";
+import type { DISPENSING_STATES, LABEL_KINDS, PRESCRIPTION_STATES } from "./schema";
 
 const CODE = /^(ERR_[A-Z_]+):\s*(.*)$/;
 const KNOWN = new Set(["ERR_FORBIDDEN", "ERR_NOT_FOUND", "ERR_INVALID_INPUT", "ERR_VERSION_CONFLICT", "ERR_TENANT_SUSPENDED", "ERR_IDEMPOTENCY_CONFLICT",
@@ -43,8 +44,7 @@ const qty = (q: string) => {
 export type PrescriptionState = (typeof PRESCRIPTION_STATES)[number];
 export type DispensingState = (typeof DISPENSING_STATES)[number];
 export type LabelKind = (typeof LABEL_KINDS)[number];
-export type Check = (typeof PHARMACIST_CHECKS)[number];
-export const CHECKS: readonly Check[] = ["identity", "validity", "dose", "allergy", "clarification", "label", "counselling"];
+export { CHECKS, type Check } from "./checks";
 
 // ── Selection (DATA-20 subset) ─────────────────────────────────────────────────────────────────────────
 export type SelectionItem = { planItemId: string; quantity?: string } | { catalogVersionId: string; quantity: string };
@@ -123,7 +123,7 @@ export async function removePrescriptionItem(db: pg.ClientBase, key: string, pre
   return { replayed: out.replayed };
 }
 export async function signPrescription(db: pg.ClientBase, key: string, prescriptionId: string, stepUp: StepUp) {
-  if (stepUp?.verified !== true) throw new PharmacyError("ERR_FORBIDDEN", "step_up_required");
+  if (!(await verifyStepUp(db, stepUp))) throw new PharmacyError("ERR_FORBIDDEN", "step_up_required");
   const out = await command(db, "prescription_sign", key, { prescription_id: prescriptionId }, `select prescription_sign($1) as r`, [prescriptionId]);
   return { replayed: out.replayed };
 }

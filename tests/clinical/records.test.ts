@@ -18,6 +18,7 @@ import { switchContext } from "../../src/modules/org/context/context";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { mergePatients } from "../../src/modules/patients/merge/merge";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { stepUpForTests } from "../support/step-up";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -29,7 +30,7 @@ type T = { tenantId: string; b1: string; b2: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 const TENANT_WIDE = ["owner", "finance", "admin_pusat", "purchasing", "marketing", "central_cs", "auditor"];
 const TABLES = ["record_versions", "record_corrections", "record_copy_requests"];
-const STEP: StepUp = { verified: true }; // the step-up proof a server action produces after a TOTP check (UI task)
+const STEP: StepUp = stepUpForTests(); // the step-up proof a server action produces after a TOTP check (UI task)
 
 async function tenant(state = "live"): Promise<T> {
   const tenantId = (await h.admin.query(`insert into tenants_registry (lifecycle_state) values ($1) returning id`, [state])).rows[0].id as string;
@@ -149,6 +150,8 @@ describe("signing (PR-13, PR-3)", () => {
     expect(await code(as(DOC2, (db) => signRecord(db, key(), examId, STEP)))).toBe("ERR_FORBIDDEN");
     expect(await code(as(DOCB2, (db) => signRecord(db, key(), examId, STEP)))).toBe("ERR_NOT_FOUND");
     expect(await code(as(DOC, (db) => signRecord(db, key(), examId, {} as StepUp)))).toBe("ERR_FORBIDDEN");
+    // HYG-026: a cast literal is not a proof the auth factory minted.
+    expect(await code(as(DOC, (db) => signRecord(db, key(), examId, { verified: true } as unknown as StepUp)))).toBe("ERR_FORBIDDEN");
     expect(await code(as(DOC, (db) => signRecord(db, key(), examId, undefined as unknown as StepUp)))).toBe("ERR_FORBIDDEN");
     await h.admin.query(`update auth_user set two_factor_enabled = false where id = $1`, [DOC.acc]);
     try {

@@ -1,7 +1,7 @@
 // T-059 M2 exit flow (PLAN §1 M2; plan review r1 P2-2): one patient through every M2 module on a real database,
 // through the real writers only — no trigger disabled, no row inserted around a writer, except the documented
 // stand-ins of earlier tasks: the visit row (its writer is the M1 check-in; patients and visits are seeded as the
-// M2 tests do), and the step-up proof `{ verified: true }` that the clinical signing UI will produce (T-053).
+// M2 tests do), and the step-up proof (`stepUpForTests()`; the auth factory mints it in production, HYG-026).
 // A credentialed doctor; the BC's intake with an allergy (a caution for the clinicians); the doctor verifies the
 // fact, writes the sheet, a face-map mark with a dose, two parallel plans, the BC/FO projection, clears a
 // contraindication; a clinical photo behind a short-lived link; signing; procedure consent and the start gate; a
@@ -28,6 +28,7 @@ import { list as listNotifications } from "../../../src/modules/notifications/no
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { credentialValid, decideCredential, recordCredential } from "../../../src/modules/org/licences/licences";
 import { createHarness, type Harness } from "../../../tests/rls/harness";
+import { stepUpForTests } from "../../../tests/support/step-up";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -38,7 +39,7 @@ let n = 0;
 type P = { acc: string; staffId: string; role: Role; branch?: string };
 let tenantId: string;
 let branch: string;
-const STEP: StepUp = { verified: true }; // the step-up proof the clinical signing UI will produce (T-053)
+const STEP: StepUp = stepUpForTests(); // the auth factory mints the real proof (HYG-026)
 const TENANT_WIDE = ["owner", "admin_pusat"];
 
 async function person(role: Role, name: string): Promise<P> {

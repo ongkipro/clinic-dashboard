@@ -1,8 +1,8 @@
 // T-069 M3 exit stock fixture (PLAN §1 M3: "stock fixture: no double deduction, depot balances never negative"): one
 // stock item through every M3 stock writer on a real database, through the real writers only — no trigger disabled,
 // no row inserted around a writer, except the documented stand-ins of earlier tasks: the patient and visit rows (their
-// writers are the M1 registration and check-in; seeded as the M3 tests do) and the step-up proof `{ verified: true }`
-// the prescription signing UI will produce (T-065).
+// writers are the M1 registration and check-in; seeded as the M3 tests do) and the step-up proof (`stepUpForTests()`;
+// the auth factory mints it in production, HYG-026).
 // A supplier's batch received at a cost (T-066); moved gudang → apotek and gudang → room (T-061); sent to branch 2 and
 // received there, one more sent and cancelled (T-061); issued to the room for a treatment and consumed — the completion
 // retried with the same key and concurrently with a new one (T-062, CLIN-008); a second request's leftover returned
@@ -25,6 +25,7 @@ import { assignBranch, assignRole, createMembership, resolveContext } from "../.
 import { addPrescriptionItem, CHECKS, type Check, createPrescription, handOver, prepareDispensing, signPrescription } from "../../../src/modules/pharmacy/pharmacy";
 import { receiveFromSupplier, returnToSupplier, saveSupplier } from "../../../src/modules/purchasing/suppliers/suppliers";
 import { createHarness, type Harness, testPool } from "../../../tests/rls/harness";
+import { stepUpForTests } from "../../../tests/support/step-up";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -197,7 +198,7 @@ describe("M3 stock fixture", () => {
     const v3 = await patientVisit(b1, FO);
     const { prescriptionId } = await as(DOC, (db) => createPrescription(db, key(), v3));
     await as(DOC, (db) => addPrescriptionItem(db, key(), prescriptionId, { catalogVersionId: version, quantity: "3", signa: "1x sehari" }));
-    await as(DOC, (db) => signPrescription(db, key(), prescriptionId, { verified: true }));
+    await as(DOC, (db) => signPrescription(db, key(), prescriptionId, stepUpForTests()));
     const d = (await h.admin.query(`select id from dispensings where visit_id = $1`, [v3])).rows[0].id as string;
     await as(PH, (db) => prepareDispensing(db, key(), d, APT));
     expect(await held(APT, B)).toBe(13);

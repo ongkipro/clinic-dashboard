@@ -24,6 +24,7 @@ import { IDENTITY_PURPOSE } from "../../../src/modules/patients/patients";
 import { bootstrapVendor, createVendorStaff } from "../../../src/modules/vendor/staff/staff";
 import { openSession } from "../../../src/modules/vendor/support/support";
 import { createHarness, type Harness, testPool } from "../../rls/harness";
+import { stepUpForTests } from "../../support/step-up";
 
 process.env.DEPLOY_ENV = "local"; // sandbox environment (satusehat_env), synthetic data
 
@@ -33,7 +34,7 @@ let worker: pg.Pool;
 let owner: pg.Pool;
 let n = 0;
 const RING: KekRing = { current: 1, keys: new Map([[1, Buffer.alloc(32, 7)]]) };
-const STEP: StepUp = { verified: true };
+const STEP: StepUp = stepUpForTests();
 type T = { tenantId: string; b1: string; b2: string; org1: string; org2: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 const TENANT_WIDE = ["owner", "admin_pusat", "finance", "marketing", "central_cs", "auditor", "purchasing"];

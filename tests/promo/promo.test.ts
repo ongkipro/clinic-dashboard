@@ -32,6 +32,7 @@ import { checkPromoCode, createPromoCode, listPromoCodes, setPromoCode, versionP
 import { setTaxProfile } from "../../src/modules/tax/tax";
 import { createHarness, type Harness, testPool } from "../rls/harness";
 import { wibDay } from "../support/dates";
+import { stepUpForTests } from "../support/step-up";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -80,7 +81,7 @@ let A: T; let B: T;
 let OWN: P; let MK: P; let AP: P; let FIN: P; let MGR: P; let FO: P; let FO2: P; let AU: P; let PH: P; let BOWN: P; let RO: P;
 let serum: string; let big: string; let pkg: string; let svc: string; let svcV: string; let filler: string; let fillerV: string;
 let DOC: P; let NUR: P; let BC: P; let FH: P;
-const STEP: StepUp = { verified: true };
+const STEP: StepUp = stepUpForTests();
 
 async function product(t: { own: P; ph: P }, c: string, name: string, price: number, tax = "taxable_goods") {
   const v = await as(t.own, (db) => publish(db, { kind: "product", code: c }, { name, tax_category: tax, tax_basis: "Barang", normal_price: price } as never, "Produk"));

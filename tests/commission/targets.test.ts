@@ -28,6 +28,7 @@ import { confirmSelection } from "../../src/modules/pharmacy/pharmacy";
 import { changeSetting } from "../../src/modules/settings/settings";
 import { finishTreatment, startTreatment } from "../../src/modules/treatment/treatment";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { stepUpForTests } from "../support/step-up";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -38,7 +39,7 @@ let n = 0;
 type T = { tenantId: string; b1: string; b2: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 const TENANT_WIDE = ["owner", "finance", "admin_pusat", "purchasing", "marketing", "central_cs", "auditor"];
-const STEP: StepUp = { verified: true };
+const STEP: StepUp = stepUpForTests();
 const TRF = { bank: "BCA", reference: "TRF-47" };
 
 async function tenant(): Promise<T> {

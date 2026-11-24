@@ -50,6 +50,7 @@ import { confirmSelection } from "../../src/modules/pharmacy/pharmacy";
 import { finishTreatment, startTreatment } from "../../src/modules/treatment/treatment";
 import { runOutboxBatch } from "../../src/workers/outbox";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { stepUpForTests } from "../support/step-up";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -60,7 +61,7 @@ let n = 0;
 type T = { tenantId: string; b1: string; b2: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 const TENANT_WIDE = ["owner", "finance", "admin_pusat", "auditor", "purchasing"];
-const STEP: StepUp = { verified: true };
+const STEP: StepUp = stepUpForTests();
 const key = () => crypto.randomUUID();
 
 async function tenant(name = "PT Buku Besar Sintetis"): Promise<T> {

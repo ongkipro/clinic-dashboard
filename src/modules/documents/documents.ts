@@ -6,7 +6,7 @@
 import type pg from "pg";
 import { CommandError, runCommand, type ErrorCode, type Json } from "../../lib/command";
 import { renderPdf } from "../clinical/records/pdf";
-import type { StepUp } from "../clinical/records/records";
+import { type StepUp, verifyStepUp } from "../../auth/server";
 import { assertProductionGoLive } from "../vendor/profile/profile";
 import type { LETTER_STATES, LETTER_TYPES, LETTER_VERSION_KINDS, PAPER_SIZES, TEMPLATE_KINDS, TEMPLATE_STATES } from "./schema";
 
@@ -88,9 +88,9 @@ export async function saveLetter(db: pg.ClientBase, key: string, letterId: strin
   const out = await command(db, "letter_save", key, { letter_id: letterId, body }, `select letter_save($1, $2) as r`, [letterId, body]);
   return { replayed: out.replayed };
 }
-// Signing needs the same step-up proof as the examination (T-053): the producer arrives with the clinical signing UI.
+// Signing needs the same step-up proof as the examination (T-053), minted only by the auth factory (HYG-026).
 export async function signLetter(db: pg.ClientBase, key: string, letterId: string, stepUp: StepUp) {
-  if (stepUp?.verified !== true) throw new DocumentError("ERR_FORBIDDEN", "step_up_required");
+  if (!(await verifyStepUp(db, stepUp))) throw new DocumentError("ERR_FORBIDDEN", "step_up_required");
   const out = await command<string>(db, "letter_sign", key, { letter_id: letterId }, `select letter_sign($1) as r`, [letterId]);
   return { versionId: out.result, replayed: out.replayed };
 }

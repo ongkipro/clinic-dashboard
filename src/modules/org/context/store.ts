@@ -40,7 +40,9 @@ export async function requestContext(opts: { activity?: boolean } = {}): Promise
   const selection = await storedSelection();
   const app = await appPool();
   const active = await activeContext(app, gate.userId, selection, gate.sessionId);
-  if (active) return { kind: "ok", accountId: gate.userId, sessionId: gate.sessionId, active, selection };
+  // HYG-026: the acting context carries the factory's opaque binding of this request's authenticated session, so a
+  // step-up is checked against this request's session.
+  if (active) return { kind: "ok", accountId: gate.userId, sessionId: gate.sessionId, active: { ...active, context: { ...active.context, session: gate.binding } }, selection };
   // No context left. If the account still has a usable membership, this session was
   // revoked for all of them (PR-91): end the session server-side and sign in again.
   if (await activeContext(app, gate.userId, selection)) {

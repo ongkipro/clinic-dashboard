@@ -4,6 +4,7 @@
 // withTenantContext; the database decides authority. Writers go through runCommand (idempotency key, go-live
 // gate); their stored results hold ids and codes only.
 import type pg from "pg";
+import { type StepUp, verifyStepUp } from "../../../auth/server";
 import { CommandError, runCommand, type ErrorCode, type Json } from "../../../lib/command";
 import { assertProductionGoLive } from "../../vendor/profile/profile";
 import type { CORRECTION_STATES, RECORD_VERSION_KINDS } from "../schema";
@@ -35,13 +36,14 @@ async function command<T extends Json>(db: pg.ClientBase, name: string, key: str
 }
 
 // ── Signing (PR-13, PR-3) ────────────────────────────────────────────────────────────────────────
-// The step-up proof (19:87 "PIN/OTP"): a server action produces it after Better Auth accepted a current TOTP
-// code for the signed-in session. The producer belongs to the auth factory (`src/auth/server.ts`; raw Better
-// Auth API use elsewhere is refused by SEC-21's guard) and arrives with the UI task that wires "Tanda Tangani".
+// The step-up proof (19:87 "PIN/OTP"; HYG-026): only the auth factory issues it (`stepUp(headers, code)` after a
+// current TOTP for the signed-in session, or `freshStepUp(headers)` within 10 minutes of that session's last step-up).
+// verifyStepUp binds it to the auth session this transaction is bound to (requestContext → withTenantContext), the
+// account it acts for, the deadline and a still-live session; a literal, cast or other session's proof is refused.
 // The database cannot verify a code: it requires the factor to be enrolled and the actor to act as Dokter.
-export type StepUp = { readonly verified: true };
+export type { StepUp };
 export async function signRecord(db: pg.ClientBase, key: string, examId: string, stepUp: StepUp) {
-  if (stepUp?.verified !== true) throw new RecordError("ERR_FORBIDDEN", "step_up_required");
+  if (!(await verifyStepUp(db, stepUp))) throw new RecordError("ERR_FORBIDDEN", "step_up_required");
   const out = await command<string>(db, "record_sign", key, { examination_id: examId }, `select record_sign($1) as r`, [examId]);
   return { versionId: out.result, replayed: out.replayed };
 }

@@ -18,6 +18,7 @@ import {
 } from "../../src/modules/documents/documents";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { stepUpForTests } from "../support/step-up";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -29,7 +30,7 @@ type T = { tenantId: string; b1: string; b2: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 const TENANT_WIDE = ["owner", "finance", "admin_pusat", "purchasing", "marketing", "central_cs", "auditor"];
 const TABLES = ["document_templates", "document_template_versions", "medical_letters", "medical_letter_versions", "medical_letter_corrections"];
-const STEP: StepUp = { verified: true };
+const STEP: StepUp = stepUpForTests();
 const LETTER = `{{klinik.nama}}\nSURAT KETERANGAN\nTanggal {{tanggal}}\nYang bertanda tangan menerangkan bahwa {{pasien.nama}} ({{pasien.no_rm}}) telah diperiksa.\nKeluhan: {{pemeriksaan.keluhan}}\n{{dokter.nama}} — SIP {{dokter.sip}}`;
 
 async function tenant(state = "live"): Promise<T> {
@@ -142,6 +143,7 @@ describe("scenario PR-74: signed letter", () => {
     expect((await h.admin.query(`select used_at from document_template_versions where id = $1`, [tplVersion])).rows[0].used_at).not.toBeNull();
     // Signing needs the step-up proof; then the body is frozen as version 1 and stored with the record.
     expect(await reason(as(DOC, (db) => signLetter(db, key(), letterId, {} as StepUp)))).toBe("step_up_required");
+    expect(await reason(as(DOC, (db) => signLetter(db, key(), letterId, { verified: true } as unknown as StepUp)))).toBe("step_up_required");
     const { versionId } = await as(DOC, (db) => signLetter(db, key(), letterId, STEP));
     l = await as(DOC, (db) => getLetter(db, letterId));
     expect([l.state, l.versions.length, l.versions[0].version, l.versions[0].kind, l.versions[0].id]).toEqual(["signed", 1, 1, "original", versionId]);

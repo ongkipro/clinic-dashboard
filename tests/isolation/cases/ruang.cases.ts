@@ -15,6 +15,7 @@ import { requestMaterials } from "../../../src/modules/inventory/materials/mater
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { finishTreatment, getTreatment, pauseTreatment, roomList, startTreatment } from "../../../src/modules/treatment/treatment";
 import { defineCases, type IsolationEnv } from "../case";
+import { stepUpForTests } from "../../support/step-up";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -103,7 +104,7 @@ async function victim(env: IsolationEnv) {
   const { planId } = await doc((db) => createPlan(db, crypto.randomUUID(), examId, "Program Rahasia", "Kondisi rahasia"));
   const { itemId: item } = await doc((db) => addPlanItem(db, crypto.randomUUID(), examId, planId, { stage: 1, catalog_version_id: s!.version, qty: 1 }));
   const { itemId: item2 } = await doc((db) => addPlanItem(db, crypto.randomUUID(), examId, planId, { stage: 1, catalog_version_id: s!.version, qty: 2 }));
-  await doc((db) => signRecord(db, crypto.randomUUID(), examId, { verified: true }));
+  await doc((db) => signRecord(db, crypto.randomUUID(), examId, stepUpForTests()));
   const text = await doc((db) => consentText(db, visit, planId));
   await doc((db) => captureConsent(db, crypto.randomUUID(), { visitId: visit, planId, signer: "patient", expectedHash: text.content_hash, signature: png() }));
   const { executionId: execution } = await doc((db) => startTreatment(db, crypto.randomUUID(), visit, { planItemId: item2, performerId: docStaff, identityConfirmed: true }));

@@ -13,6 +13,7 @@ import { errorBody, linkPractitioner, requestPractitionerLookup, resend, resolve
   from "../../../src/modules/integrations/satusehat/satusehat";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { defineCases, expectLive, type IsolationEnv } from "../case";
+import { stepUpForTests } from "../../support/step-up";
 
 process.env.DEPLOY_ENV = "local";
 setKekRingForTests({ current: 1, keys: new Map([[1, Buffer.alloc(32, 7)]]) });
@@ -79,7 +80,7 @@ async function victim(env: IsolationEnv) {
     [t, b, patient, s.doctor])).rows[0].id as string;
   const { examId } = await doc((db) => openExam(db, k(), visit));
   await doc((db) => saveExam(db, k(), examId, { assessment: "Catatan rahasia", icd10_codes: ["L70.0"] }));
-  await doc((db) => signRecord(db, k(), examId, { verified: true }));
+  await doc((db) => signRecord(db, k(), examId, stepUpForTests()));
   // worker stand-ins (the owner inserts what the worker would): identity review, and a rejected Encounter with the provider's answer
   await env.owner.query(`insert into satusehat_patient_identity (tenant_id, patient_id, state, reason) values ($1, $2, 'review', 'no_nik')`, [t, patient]);
   const link = (await env.owner.query(`insert into satusehat_links (tenant_id, branch_id, environment, visit_id, fhir_type, local_key, organization_id, current_revision)

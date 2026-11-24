@@ -23,6 +23,7 @@ import { bodyFingerprint, linkPractitioner, resend, runSatusehatSync, setCodeMap
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { IDENTITY_PURPOSE } from "../../../src/modules/patients/patients";
 import { createHarness, type Harness, testPool } from "../../rls/harness";
+import { stepUpForTests } from "../../support/step-up";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -32,7 +33,7 @@ let worker: pg.Pool;
 let owner: pg.Pool;
 let n = 0;
 const RING: KekRing = { current: 1, keys: new Map([[1, Buffer.alloc(32, 9)]]) };
-const STEP: StepUp = { verified: true };
+const STEP: StepUp = stepUpForTests();
 type T = { tenantId: string; b1: string; org1: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 const TENANT_WIDE = ["owner", "admin_pusat", "finance", "marketing", "central_cs", "auditor", "purchasing"];

@@ -8,6 +8,7 @@
 // - Database rate limiting (shared by every app container) plus a per-account failed
 //   sign-in lockout (RATE-2) that is independent of IP.
 // - No telemetry (H-08).
+import { createHash } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -15,6 +16,7 @@ import { TWO_FACTOR_ERROR_CODES, twoFactor } from "better-auth/plugins/two-facto
 import { and, count, eq, gte, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type pg from "pg";
+import { boundSession, type SessionBinding } from "../db/rls/context";
 import * as schema from "./schema";
 import {
   LOGIN_FAILURE_LIMIT,
@@ -23,6 +25,7 @@ import {
   PASSWORD_MIN,
   passwordProblem,
   requiresTotp,
+  type Role,
   type RoleSource,
   type SessionGate,
   sessionGate,
@@ -55,6 +58,10 @@ export type AuthConfig = {
   // Test-only (tests/auth/security.test.ts): called inside the step-up counting transaction,
   // with that transaction's backend pid before the row is locked, and after it is read.
   twoFactorCountHooks?: { onBackend?: (pid: number) => Promise<void> | void; afterRead?: () => Promise<void> };
+  // Test-only (tests/auth/step-up.test.ts): called inside stepUp after the session was read and before the code is
+  // checked, after the code was accepted and before the gate, inside the gate's transaction just before the row lock,
+  // and after the gate committed (controlled concurrent changes and waits).
+  stepUpHooks?: { beforeVerify?: () => Promise<void>; afterVerify?: () => Promise<void>; beforeLock?: () => Promise<void>; afterGate?: () => Promise<void> };
 };
 
 export const LOGIN_LOCKED_CODE = "LOGIN_TEMPORARILY_LOCKED";
@@ -95,6 +102,103 @@ const SECOND_FACTOR_PATHS = new Set(["/two-factor/verify-totp", "/two-factor/ver
 export function progressiveDelayMs(priorAttempts: number): number {
   return priorAttempts <= 0 ? 0 : Math.min(250 * 2 ** (priorAttempts - 1), 4_000);
 }
+
+// ── HYG-026 step-up proof (PR-3, IAM-1; T-122 D1 = (a)) ─────────────────────────────────────────────────────────────
+// The proof clinical signing (signRecord, signLetter, signPrescription) and the tenant export accept. Only a clinic-surface
+// factory mints one (stepUp, freshStepUp below); the registry and the mint are module-private, never exported.
+// - type: the brand is a declared, never-exported unique symbol, so no object literal satisfies StepUp;
+// - run time: the proof is an opaque frozen object; what it attests (account, auth session, factor "totp", verifiedAt,
+//   expiresAt, the issuing factory's clock and liveness check) is held in a private WeakMap, so it can be neither forged
+//   by a cast or copy nor read and altered;
+// - use: verifyStepUp checks it against the trusted current context (see there) and the deadline.
+declare const brand: unique symbol;
+export type StepUp = { readonly verified: true; readonly [brand]: true };
+// Same window as vendor_guard's second-factor freshness (drizzle/0032_vendor_staff_rules.sql).
+export const STEP_UP_MAX_AGE_MS = 10 * 60_000;
+// Clock skew tolerated for a persisted second_factor_at ahead of this process (vendor_guard's 1 minute).
+const STEP_UP_SKEW_MS = 60_000;
+type ProofRecord =
+  | { kind: "test" }
+  | {
+      kind: "session";
+      accountId: string;
+      sessionId: string;
+      factor: "totp";
+      verifiedAt: Date;
+      expiresAt: Date;
+      clock: () => Date;
+      live: () => Promise<boolean>;
+    };
+const proofs = new WeakMap<object, ProofRecord>();
+// Session bindings: minted only by checkSession from the authenticated session it resolved (requestContext passes the
+// object on in the TenantContext); the session id lives here, not on the object, so a UUID or a copy never binds.
+const bindings = new WeakMap<object, string>();
+function bindSession(sessionId: string): SessionBinding {
+  const b = Object.freeze({}) as SessionBinding;
+  bindings.set(b, sessionId);
+  return b;
+}
+function mint(record: ProofRecord): StepUp {
+  const proof = Object.freeze({ verified: true }) as StepUp;
+  proofs.set(proof, record);
+  return proof;
+}
+
+// The consumer check, inside the caller's withTenantContext transaction (db). The consumer passes the proof alone. A
+// proof is accepted only if all hold:
+// - this module minted it, and the auth session the transaction is bound to is the session the proof was issued for:
+//   the binding withTenantContext holds (boundSession()) must be one checkSession minted (requestContext() puts it in
+//   the TenantContext), resolved here through the private registry; a session id string or a hand-built object binds
+//   nothing;
+// - the issuing factory's clock is within [verifiedAt, expiresAt] (expiresAt ≤ verifiedAt + STEP_UP_MAX_AGE_MS),
+//   checked last, after the asynchronous reads below, so a proof presented just in time is not accepted late;
+// - first the tenant's staff_access lock, taken in the caller's transaction and held to its end (the lock every signer's
+//   tenant_actor_lock takes first, 0048, and that staff_session_revoke / staff_revoke take, 0026; none of those holders
+//   touches auth_session rows, and the auth writers take no tenant lock, so tenant lock → auth read cannot deadlock);
+//   then, after that wait, every decision read:
+// - the proof's session is still live: on the clinic surface, unexpired, passing the gate (enrolled, not locked, not
+//   idle-locked) and holding the same verified authenticator it was issued with (roles, then the auth read, then the
+//   time; through the auth pool);
+// - the transaction acts (app.staff_id) as a staff member of the proof's account, and that membership has not revoked
+//   the session (PR-91, staff_session_revoked). A sign-out, idle cutoff or revocation therefore either happened before
+//   these reads, or (a revocation) waits until the caller's protected effect has committed.
+// A test proof (tests/support/step-up.ts) is accepted only under Vitest.
+export async function verifyStepUp(db: pg.ClientBase, proof: unknown): Promise<boolean> {
+  const record = typeof proof === "object" && proof !== null ? proofs.get(proof) : undefined;
+  if (!record) return false;
+  if (record.kind === "test") return process.env.NODE_ENV === "test";
+  const bound = boundSession();
+  if (!bound || bindings.get(bound) !== record.sessionId) return false;
+  const inTime = () => {
+    const t = record.clock().getTime();
+    return t >= record.verifiedAt.getTime() && t <= record.expiresAt.getTime();
+  };
+  // The tenant's staff_access lock first (held to the end of the caller's transaction), then every decision read.
+  await db.query(`select pg_advisory_xact_lock(hashtextextended('staff_access:' || public.app_tenant_id()::text, 0))`);
+  if (!(await record.live())) return false;
+  const { rows } = await db.query<{ account_id: string; revoked: boolean }>(
+    `select m.account_id, public.staff_session_revoked(m.id, $1::uuid) as revoked
+       from public.staff s join public.memberships m on m.tenant_id = s.tenant_id and m.id = s.membership_id
+      where s.id = public.app_staff_id() and s.tenant_id = public.app_tenant_id()`,
+    [record.sessionId],
+  );
+  if (rows.length !== 1 || rows[0].account_id !== record.accountId || rows[0].revoked) return false;
+  return inTime();
+}
+
+// Test seam for tests/support/step-up.ts only (a source guard refuses any other caller in src/): a proof without an
+// account or session, which verifyStepUp accepts under Vitest only. Refused outside Vitest (NODE_ENV is "production"
+// in the built app and "development" under `next dev`).
+export function stepUpTestSeam(): StepUp {
+  if (process.env.NODE_ENV !== "test") throw new Error("the step-up test seam is available in tests only");
+  return mint({ kind: "test" });
+}
+
+// The authenticator a proof is bound to: its row id and a digest of its stored (encrypted) secret, so a replacement
+// (disable, then enrol again) or a re-keyed row no longer matches.
+const factorKey = (id: string, secret: string) => `${id}:${createHash("sha256").update(secret).digest("hex")}`;
+// The two-factor challenge cookie; stepUp never forwards it, so the plugin cannot complete a pending sign-in instead.
+const CHALLENGE_COOKIE = /(^|\.)two_factor$/;
 
 export function createAuth(config: AuthConfig) {
   if (config.secret.length < 32) throw new Error("BETTER_AUTH_SECRET must be at least 32 characters");
@@ -184,6 +288,17 @@ export function createAuth(config: AuthConfig) {
   // the after hook: a successful enrolment replaces the session, so it is never re-derived.
   // Keyed on the request's headers object, which both hooks of one request share.
   const countedFor = new WeakMap<Headers, string>();
+  // HYG-026: TOTP provenance for freshStepUp, written only by stepUp after its exact-row gate, from the values that gate
+  // checked (the session and the authenticator the stamp required). A sign-in or enrolment TOTP is not recorded: the
+  // shared after hook cannot attest which authenticator the plugin checked, so freshStepUp asks for a code there.
+  // Backup codes never qualify. A session verified in another app process has no entry (fails closed). Entries older
+  // than the proof window are pruned on each write.
+  // lazy: per-process; a `step_up_totp_at` column on auth_session would share it across containers (needs a migration).
+  const totpAt = new Map<string, { at: Date; factor: string }>();
+  const rememberTotp = (sessionId: string, at: Date, factor: string) => {
+    for (const [k, v] of totpAt) if (at.getTime() - v.at.getTime() > STEP_UP_MAX_AGE_MS) totpAt.delete(k);
+    totpAt.set(sessionId, { at, factor });
+  };
 
   // Which account a password endpoint is about: the body email on sign-in, the session
   // user elsewhere.
@@ -433,7 +548,7 @@ export function createAuth(config: AuthConfig) {
   // lock server-side, so a locked front-desk session cannot be used from another tab.
   async function checkSession(headers: Headers, opts: { activity?: boolean } = {}): Promise<
     | { gate: "anonymous" }
-    | { gate: SessionGate; userId: string; sessionId: string; token: string }
+    | { gate: SessionGate; userId: string; sessionId: string; token: string; binding: SessionBinding }
   > {
     // A session of the other surface is refused by the before hook (SEC-21): anonymous here.
     const s = await auth.api.getSession({ headers, query: { disableCookieCache: true } }).catch((e: unknown) => {
@@ -459,7 +574,7 @@ export function createAuth(config: AuthConfig) {
     if (gate === "ok" && opts.activity !== false) {
       await db.update(schema.authSession).set({ lastActiveAt: t }).where(eq(schema.authSession.id, row.id));
     }
-    return { gate, userId: s.user.id, sessionId: s.session.id, token: row.token };
+    return { gate, userId: s.user.id, sessionId: s.session.id, token: row.token, binding: bindSession(s.session.id) };
   }
 
   // IAM-7: unlock by password re-check. Counts toward RATE-2 like a sign-in, with the
@@ -528,6 +643,147 @@ export function createAuth(config: AuthConfig) {
     return true;
   }
 
+  // HYG-026 (PR-3; T-122 D1): issuing the step-up proof, clinic surface only.
+  // Every decision about a session is made on state read after the last wait: the roles are resolved first (from the
+  // verified account), then one read of the session and its authenticator, then the decision time is sampled. The
+  // factory clock is used because it is the clock that writes last_active_at (and, in production, the app clock that
+  // writes expires_at); tests inject it.
+  type SessionRow = {
+    user_id: string; token: string; surface: string; expires_at: Date; locked_at: Date | null; last_active_at: Date;
+    second_factor_at: Date | null; two_factor_enabled: boolean; factor_id: string | null; secret: string | null; verified: boolean | null;
+  };
+  type LiveSession = { userId: string; token: string; factor: string; factorId: string; secret: string; secondFactorAt: Date | null };
+  const SESSION_READ = `select s.user_id, s.token, s.surface, s.expires_at, s.locked_at, s.last_active_at, s.second_factor_at,
+              u.two_factor_enabled, f.id as factor_id, f.secret, f.verified
+         from auth_session s join auth_user u on u.id = s.user_id left join auth_two_factor f on f.user_id = s.user_id
+        where s.id = $1`;
+  // The decision on a row read after the last wait, at time t sampled after that read: the expected account, this
+  // surface, unexpired, enrolled with a verified authenticator, and the session gate (not locked, not idle-locked).
+  const judge = (r: SessionRow | undefined, accountId: string, roles: readonly Role[], t: Date): LiveSession | null => {
+    if (!r || r.user_id !== accountId || r.surface !== surface) return null;
+    if (!r.two_factor_enabled || !r.factor_id || !r.secret || r.verified !== true) return null;
+    if (r.expires_at.getTime() <= t.getTime()) return null;
+    const gate = sessionGate({ roles, twoFactorEnabled: r.two_factor_enabled, lastActiveAt: r.last_active_at, lockedAt: r.locked_at, now: t, totpAlways: vendor });
+    if (gate !== "ok") return null;
+    return { userId: r.user_id, token: r.token, factor: factorKey(r.factor_id, r.secret), factorId: r.factor_id, secret: r.secret, secondFactorAt: r.second_factor_at };
+  };
+  async function liveSession(sessionId: string, accountId: string): Promise<LiveSession | null> {
+    const roles = await config.roles(accountId); // first: the last wait before the read
+    const { rows } = await config.pool.query<SessionRow>(SESSION_READ, [sessionId]);
+    return judge(rows[0], accountId, roles, now());
+  }
+  const issue = (sessionId: string, live: LiveSession, verifiedAt: Date, maxAgeMs: number) =>
+    mint({
+      kind: "session",
+      accountId: live.userId,
+      sessionId,
+      factor: "totp",
+      verifiedAt,
+      expiresAt: new Date(verifiedAt.getTime() + Math.min(maxAgeMs, STEP_UP_MAX_AGE_MS)),
+      clock: now,
+      // At each use: the same session is still live with the same authenticator.
+      live: async () => (await liveSession(sessionId, live.userId))?.factor === live.factor,
+    });
+
+  // stepUp checks a current authenticator code (the current-code contract: the verifier accepts a valid code again
+  // within its acceptance period; no one-use-per-period replay protection) for the exact signed-in session, through
+  // the plugin's own verify-totp endpoint, so this file's hooks apply as over HTTP: the surface and session-gate
+  // checks, the per-account counted attempt (HYG-007, DEC-010: one budget with sign-in, 5 failures lock 15 minutes)
+  // and second_factor_at. Issuance then requires:
+  // - the request carries no two-factor challenge cookie to the plugin (stripped), so verify-totp can only continue
+  //   the session it finds, never complete a pending sign-in for a new session; and the plugin's answer names the
+  //   original session's token;
+  // - an enrolled account (a step-up never completes an enrolment);
+  // - the final gate, in one short transaction on a checked-out client: the exact session row locked FOR UPDATE alone,
+  //   then the session and its authenticator read in a new statement and judged at a time sampled after both (the same
+  //   account, token and authenticator as before the code check; live, this surface, unexpired, not locked or
+  //   idle-locked; the TOTP still within STEP_UP_MAX_AGE_MS); only then second_factor_at is stamped, and the proof is
+  //   minted after COMMIT, after the TOTP deadline is checked once more;
+  // - the TOTP time (the stamp, the provenance and the proof's verifiedAt) is taken when the plugin accepted the code,
+  //   before any gate wait, so waiting never extends freshness.
+  // Any refusal (anonymous, other surface, locked session, malformed or wrong code, lockout) is null.
+  async function stepUp(headers: Headers, code: string): Promise<StepUp | null> {
+    if (vendor) return null;
+    const c = code.replace(/\s/g, "");
+    if (!/^[0-9]{6}$/.test(c)) return null; // never reaches the plugin, so not counted
+    // A copy (the hooks key the counted attempt on this request's headers object) without the challenge cookie.
+    const h = new Headers(headers);
+    const cookie = h.get("cookie");
+    if (cookie) {
+      const kept = cookie.split(";").map((p) => p.trim()).filter((p) => p && !CHALLENGE_COOKIE.test(p.slice(0, Math.max(p.indexOf("="), 0))));
+      if (kept.length) h.set("cookie", kept.join("; "));
+      else h.delete("cookie");
+    }
+    try {
+      const current = await sessionRow(h);
+      if (!current) return null;
+      const before = await liveSession(current.row.id, current.s.user.id);
+      if (!before || before.userId !== current.s.user.id) return null;
+      await config.stepUpHooks?.beforeVerify?.();
+      const res = (await auth.api.verifyTOTP({ headers: h, body: { code: c } })) as { token?: unknown } | null;
+      if (res?.token !== before.token) return null;
+      const verifiedAt = now(); // the TOTP time: never moved by the gate's waits
+      const fresh = (t: Date) => { // the proof's own window: 0 <= TOTP age <= STEP_UP_MAX_AGE_MS (as the consumer)
+        const age = t.getTime() - verifiedAt.getTime();
+        return age >= 0 && age <= STEP_UP_MAX_AGE_MS;
+      };
+      await config.stepUpHooks?.afterVerify?.();
+      const roles = await config.roles(before.userId); // first: the last wait before the gate
+      const client = await config.pool.connect();
+      let gated: LiveSession | null = null;
+      try {
+        await client.query("begin");
+        await config.stepUpHooks?.beforeLock?.();
+        // The exact session row locked alone, then read with its authenticator in a new statement (a fresh snapshot, so
+        // a factor change committed during the lock wait is seen), judged at a time sampled after both.
+        await client.query(`select 1 from auth_session where id = $1 for update`, [current.row.id]);
+        const { rows } = await client.query<SessionRow>(SESSION_READ, [current.row.id]);
+        const t = now(); // after the lock: no wait can follow before the decision
+        const r = judge(rows[0], before.userId, roles, t);
+        if (r && r.token === before.token && r.factor === before.factor && fresh(t)) {
+          // The row is locked and present, so this updates exactly it.
+          await client.query(`update auth_session set second_factor_at = $2 where id = $1`, [current.row.id, verifiedAt]);
+          gated = r;
+        }
+        await client.query(gated ? "commit" : "rollback");
+      } catch (e) {
+        await client.query("rollback").catch(() => {});
+        throw e;
+      } finally {
+        client.release();
+      }
+      if (!gated) return null;
+      await config.stepUpHooks?.afterGate?.();
+      if (!fresh(now())) return null; // the TOTP deadline again, right before publishing
+      rememberTotp(current.row.id, verifiedAt, gated.factor);
+      return issue(current.row.id, gated, verifiedAt, STEP_UP_MAX_AGE_MS);
+    } catch (e) {
+      if (e instanceof APIError) return null;
+      throw e;
+    }
+  }
+
+  // A proof without a new code while this clinic session's last gated stepUp (a TOTP; never a backup code, sign-in or
+  // enrolment) is at most maxAgeMs old; the window can only be narrowed below STEP_UP_MAX_AGE_MS. That TOTP must be for
+  // the session's current authenticator (a replacement voids it) and not in the future; the session's second_factor_at,
+  // from the same authoritative read as the gate (lock, idle lock, enrolment), must cover it and not be ahead of this
+  // clock beyond STEP_UP_SKEW_MS. Records no activity.
+  async function freshStepUp(headers: Headers, maxAgeMs: number = STEP_UP_MAX_AGE_MS): Promise<StepUp | null> {
+    if (vendor) return null;
+    const s = await checkSession(headers, { activity: false });
+    if (s.gate !== "ok") return null;
+    const live = await liveSession(s.sessionId, s.userId);
+    const proved = totpAt.get(s.sessionId);
+    if (!live || !proved || proved.factor !== live.factor) return null;
+    if (!live.secondFactorAt || live.secondFactorAt.getTime() < proved.at.getTime()) return null;
+    // A persisted stamp ahead of this clock (beyond the skew) is refused; it never extends the window (the age below
+    // is from the TOTP time this factory recorded).
+    if (live.secondFactorAt.getTime() > now().getTime() + STEP_UP_SKEW_MS) return null;
+    const age = now().getTime() - proved.at.getTime();
+    if (age < 0 || age > Math.min(maxAgeMs, STEP_UP_MAX_AGE_MS)) return null;
+    return issue(s.sessionId, live, proved.at, maxAgeMs);
+  }
+
   // Undo createStaffAccount when the invitation could not be accepted in the same request
   // (cancelled or expired meanwhile), so the email is not left with an orphan account.
   // One transaction: if the accept did commit after all (a lost response), the membership
@@ -548,7 +804,7 @@ export function createAuth(config: AuthConfig) {
     }
   }
 
-  return { auth, createStaffAccount, discardNewAccount, checkSession, unlock, endSession, ownSecurity, ownSessions, endOwnSession };
+  return { auth, createStaffAccount, discardNewAccount, checkSession, unlock, endSession, ownSecurity, ownSessions, endOwnSession, stepUp, freshStepUp };
 }
 
 export class AccountExistsError extends Error {

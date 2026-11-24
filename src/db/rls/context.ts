@@ -114,7 +114,15 @@ export type TenantContext = {
   activeBranchId?: string;
   staffId?: string;
   roles: readonly string[];
+  // HYG-026: the authenticated auth session this transaction acts for, as the opaque binding the auth factory's
+  // checkSession minted for this request (requestContext puts it here). Kept in this process's AsyncLocalStorage for
+  // the step-up verifier only; never sent to the database, so no policy or grant reads it.
+  session?: SessionBinding;
 };
+
+// HYG-026: opaque; only the auth factory mints one (a session id string or a hand-built object never binds).
+declare const sessionBinding: unique symbol;
+export type SessionBinding = { readonly [sessionBinding]: true };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ROLE = /^[a-z][a-z_]*$/;
@@ -123,7 +131,13 @@ function assertUuid(name: string, value: string | undefined): void {
   if (value !== undefined && !UUID.test(value)) throw new TypeError(`${name} is not a UUID`);
 }
 
-const active = new AsyncLocalStorage<true>();
+const active = new AsyncLocalStorage<{ session?: SessionBinding }>();
+
+// HYG-026: the session binding the current withTenantContext call was given (undefined outside one, or when the
+// context carried none). The step-up verifier resolves it through the auth factory's registry, not from its caller.
+export function boundSession(): SessionBinding | undefined {
+  return active.getStore()?.session;
+}
 
 // Runs fn in one transaction on a client checked out from the pool for this call only,
 // (fn must not schedule work that outlives it: timers started inside fn inherit the
@@ -172,7 +186,7 @@ export async function withTenantContext<T>(
           ctx.roles.join(","),
         ],
       );
-      const result = await active.run(true, () => fn(client));
+      const result = await active.run({ session: ctx.session }, () => fn(client));
       await client.query("commit");
       // A session-level SET inside fn would outlive the transaction; clear it so the
       // pooled connection fails closed again. If the backend dies between commit and

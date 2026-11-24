@@ -26,6 +26,7 @@ import { confirmSelection } from "../../src/modules/pharmacy/pharmacy";
 import { createHarness, type Harness, testPool } from "../rls/harness";
 import { type Amount, attainment, type ContactRow, type PackageRow, type PasienkuData, type PasienkuProps, ratio, type Rows, sortContact, sortPackages, type Target, type UnselectedRow, type WaitingRow } from "../../src/app/(app)/pasienku/model";
 import { Pasienku } from "../../src/app/(app)/pasienku/view";
+import { stepUpForTests } from "../support/step-up";
 
 const v = (rp: number): Amount => ({ state: "value", rp });
 const na = (reason = "Pembacaan belum tersedia"): Amount => ({ state: "unavailable", reason });
@@ -610,7 +611,7 @@ describe("T-112 Pasienku on the real readers (PostgreSQL)", () => {
     const { planId } = await w.as(doc, (db) => exam.createPlan(db, key(), examId, "Program Komisi", "Kondisi rahasia pasien"));
     const item = (await w.as(doc, (db) => exam.addPlanItem(db, key(), examId, planId, { stage: 1, catalog_version_id: svc.versionId, qty: 1 }))).itemId;
     const rec = await import("../../src/modules/clinical/records/records");
-    await w.as(doc, (db) => rec.signRecord(db, key(), examId, { verified: true }));
+    await w.as(doc, (db) => rec.signRecord(db, key(), examId, stepUpForTests()));
     const cons = await import("../../src/modules/clinical/consent/consent");
     const ctext = await w.as(doc, (db) => cons.consentText(db, vis, planId));
     const png = Buffer.alloc(80); Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(png, 0); png.writeUInt32BE(13, 8); png.write("IHDR", 12, "latin1"); png.writeUInt32BE(640, 16); png.writeUInt32BE(240, 20);

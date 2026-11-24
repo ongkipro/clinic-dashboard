@@ -27,6 +27,7 @@ import {
 import { closeVisit } from "../../src/modules/visits/visits";
 import { createHarness, type Harness, testPool } from "../rls/harness";
 import { wibDay } from "../support/dates";
+import { stepUpForTests } from "../support/step-up";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -37,7 +38,7 @@ let n = 0;
 type T = { tenantId: string; b1: string; b2: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 const TENANT_WIDE = ["owner", "finance", "admin_pusat", "purchasing", "marketing", "central_cs", "auditor"];
-const STEP: StepUp = { verified: true };
+const STEP: StepUp = stepUpForTests();
 const ALL: Record<Check, boolean> = Object.fromEntries(CHECKS.map((c) => [c, true])) as Record<Check, boolean>;
 
 async function tenant(): Promise<T> {
@@ -263,6 +264,8 @@ describe("dispensing (CLIN-017, CLIN-018, CD-19)", () => {
     const r = await rx([{ version: serum, qty: "2" }]);
     const before = [await stockQty(SERUM_A, APT), await stockQty(SERUM_B, APT)];
     const mv0 = num((await h.admin.query(`select count(*) from stock_movements where item_id = $1`, [serumItem])).rows[0].count);
+    // HYG-026: no proof, or a cast literal the auth factory did not mint, is refused before the database.
+    for (const forged of [undefined, { verified: true }]) expect(await code(as(DOC, (db) => signPrescription(db, key(), r.prescriptionId, forged as unknown as StepUp)))).toBe("ERR_FORBIDDEN");
     await as(DOC, (db) => signPrescription(db, key(), r.prescriptionId, STEP));
     const [d] = await dispensingsOf(r.v);
     await as(PH, (db) => prepareDispensing(db, key(), d.id));

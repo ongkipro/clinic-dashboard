@@ -18,6 +18,7 @@ import { addPlanItem, createPlan, openExam, removePlanItem } from "../../src/mod
 import { signRecord } from "../../src/modules/clinical/records/records";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../src/modules/org/identity";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { stepUpForTests } from "../support/step-up";
 
 process.env.DEPLOY_ENV = "local"; // synthetic data (MIG-2)
 
@@ -29,7 +30,7 @@ type T = { tenantId: string; b1: string; b2: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 const TENANT_WIDE = ["owner", "finance", "admin_pusat", "purchasing", "marketing", "central_cs", "auditor"];
 const TABLES = ["procedure_consents", "procedure_consent_items", "contraindication_reviews"];
-const STEP = { verified: true } as const;
+const STEP = stepUpForTests();
 
 // A PNG of a given size (header only; the sniffer and the database check signature, IHDR and size).
 function png(w = 640, hgt = 240, salt = 0): Buffer {

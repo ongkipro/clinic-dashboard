@@ -15,6 +15,7 @@ import { openExam } from "../../../src/modules/clinical/exam/exam";
 import { signRecord } from "../../../src/modules/clinical/records/records";
 import { assignBranch, assignRole, createMembership, resolveContext } from "../../../src/modules/org/identity";
 import { defineCases, type IsolationEnv } from "../case";
+import { stepUpForTests } from "../../support/step-up";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -64,7 +65,7 @@ async function victim(env: IsolationEnv): Promise<string> {
      returning id`, [t, `Pasien Rahasia Staf ${t.slice(0, 8)} ${n}`, b, docStaff])).rows[0].id as string;
   const visit = (await env.owner.query(`insert into visits (tenant_id, branch_id, patient_id, kind, checked_in_by) values ($1, $2, $3, 'walk_in', $4) returning id`, [t, b, patient, docStaff])).rows[0].id as string;
   const { examId } = await as(env, t, b, "doctor", (db) => openExam(db, crypto.randomUUID(), visit));
-  await as(env, t, b, "doctor", (db) => signRecord(db, crypto.randomUUID(), examId, { verified: true }));
+  await as(env, t, b, "doctor", (db) => signRecord(db, crypto.randomUUID(), examId, stepUpForTests()));
   env.victimSecret(doctor);
   return doctor;
 }

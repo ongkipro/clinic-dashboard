@@ -29,6 +29,7 @@ import { confirmSelection } from "../../src/modules/pharmacy/pharmacy";
 import { finishTreatment, startTreatment } from "../../src/modules/treatment/treatment";
 import { closeVisit } from "../../src/modules/visits/visits";
 import { createHarness, type Harness, testPool } from "../rls/harness";
+import { stepUpForTests } from "../support/step-up";
 
 process.env.DEPLOY_ENV = "local";
 
@@ -40,7 +41,7 @@ let n = 0;
 type T = { tenantId: string; b1: string; b2: string };
 type P = { acc: string; staffId: string; tenantId: string; role: Role; branch?: string };
 const TENANT_WIDE = ["owner", "finance", "admin_pusat", "auditor", "purchasing", "marketing", "central_cs"];
-const STEP: StepUp = { verified: true };
+const STEP: StepUp = stepUpForTests();
 // the WhatsApp bill template (BILL-22): synced from the mock adapter for these tests only (the shared recorded list is T-090's)
 const BILL_TEMPLATES = [...RECORDED_TEMPLATES,
   { name: "tagihan_kunjungan", language: "id", category: "utility" as const, status: "approved" as const,
