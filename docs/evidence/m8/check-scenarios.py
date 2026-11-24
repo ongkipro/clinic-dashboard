@@ -41,13 +41,19 @@ REQUIRED_ITEMS = [
 REQUIRED_JOURNEYS = ["J1 Lead to booking", "J2 Arrival and intake", "J3 Examination and plan", "J4 Selection and payment", "J5 Treatment",
                      "J6 Dispensing and close", "J7 Package lifecycle", "J8 Month end", "J10 Server-fee month"]
 FLOW = "docs/evidence/m8/m8-flow.test.ts"
-# Reviewed allowlist (R3 f2, panel 3): the ONLY owner amendments to the M8 exit scope. Changing it is a reviewed change, never a map edit.
-AMENDMENT_SOURCE = "t119/final/OWNER-AMENDMENT-M8-EXIT-20261123.md"
+# Reviewed allowlist (R3 f2/f3, panel 3; extended 2026-11-24 for T-119 final exit e1): the ONLY owner amendments to the M8 exit scope.
+# Changing it is a reviewed change, never a map edit.
+AMENDMENT_SOURCE_20261123 = "t119/final/OWNER-AMENDMENT-M8-EXIT-20261123.md"
+AMENDMENT_SOURCE_20261124 = "t119/final/OWNER-AMENDMENT-M8-EXIT-20261124.md"
 OWNER_AMENDMENTS = {
-    "M8-AMEND-1-DRAFT-KPI": {"item": "M8 exit: KPI values equal fixture expectations for K1–K19 and PR-95 metrics", "amendment": AMENDMENT_SOURCE,
+    "M8-AMEND-1-DRAFT-KPI": {"item": "M8 exit: KPI values equal fixture expectations for K1–K19 and PR-95 metrics", "amendment": AMENDMENT_SOURCE_20261123,
                              "scope": ["K12", "K14", "K15", "K17", "K4"]},
-    "M8-AMEND-2-GQ4-U1-U4": {"item": "M8 exit: ledger reconciles to sub-ledgers on the §3 fixtures", "amendment": AMENDMENT_SOURCE,
+    "M8-AMEND-2-GQ4-U1-U4": {"item": "M8 exit: ledger reconciles to sub-ledgers on the §3 fixtures", "amendment": AMENDMENT_SOURCE_20261123,
                              "scope": ["G-Q4 U1", "G-Q4 U2", "G-Q4 U3", "G-Q4 U4"]},
+    "M8-AMEND-3-TD31-SATUSEHAT": {"item": "M8 exit: SATUSEHAT steps of J3 / J6 on recorded fixtures", "amendment": AMENDMENT_SOURCE_20261124,
+                                  "scope": ["T-102 TD-31", "TD-34 sandbox fixtures"]},
+    "M8-AMEND-4-WALKTHROUGH-STAGING": {"item": "M8 exit: owner walkthrough J1–J8, J10 recorded", "amendment": AMENDMENT_SOURCE_20261124,
+                                       "scope": ["J10 walkthrough", "J1–J8 walkthrough"]},
 }
 
 args = sys.argv[1:]
@@ -126,7 +132,7 @@ def check_tests(label: str, entry: dict) -> None:
                 elif not all(isinstance(a.get(k), str) and a[k].strip() for k in ("what", "tracked_in")):
                     bad.append(f"owner_amended {aid} needs what / tracked_in: {label}")
                 elif final:
-                    amended.append(f"{label}: {aid} {sorted(a['scope'])} — {a['what']} ({AMENDMENT_SOURCE}; tracked in {a['tracked_in']})")
+                    amended.append(f"{label}: {aid} {sorted(a['scope'])} — {a['what']} ({a['amendment']}; tracked in {a['tracked_in']})")
     fr = entry.get("final_required")
     if fr is not None and not (isinstance(fr, list) and fr and all(isinstance(x, str) and x.strip() for x in fr)):
         bad.append(f"final_required must be a non-empty list of strings: {label}")

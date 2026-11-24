@@ -1,5 +1,5 @@
 {
-  "_about": "T-119 M8 exit: the PLAN.md §1 M8 exit items, the PRD §8 scenarios of the M8 requirements (PR-25, PR-26, PR-33a–PR-33g, PR-34, PR-62, PR-80, PR-95, PR-98) and the Phase 1 demo journeys J1–J8, J10 (02-PRD §Journeys; §Release phases: owner walkthrough on synthetic data) mapped to the exact test cases that prove each (JUnit classname = file, name = 'describe > test'). Checked by check-scenarios.py against a JUnit report of `pnpm test -- m8`: every required scenario, exit item and journey mapped (or deferred to its named task while T-119 is not final); every title a PRD §8 scenario; every mapped name in its file; every mapped case present once and passed; no failure anywhere. 'proves' states what the cases assert; 'open' what M8 does not prove and what completes it. Final state f2 (2026-11-24, base aa8603bb, run RUN-20261123T113506Z-d634565d): every M8 scenario mapped; every settled KPI exact on this month; `owner_amended` entries (OWNER-AMENDMENT-M8-EXIT-20261123.md: draft K4/K12/K14/K15/K17; G-Q4 U1–U4) are reported by --final as amended, never as passed; the deferred items are the two OWNER GATES only (owner walkthrough; T-102 TD-31).",
+  "_about": "T-119 M8 exit: the PLAN.md §1 M8 exit items, the PRD §8 scenarios of the M8 requirements (PR-25, PR-26, PR-33a–PR-33g, PR-34, PR-62, PR-80, PR-95, PR-98) and the Phase 1 demo journeys J1–J8, J10 (02-PRD §Journeys; §Release phases: owner walkthrough on synthetic data) mapped to the exact test cases that prove each (JUnit classname = file, name = 'describe > test'). Checked by check-scenarios.py against a JUnit report of `pnpm test -- m8`: every required scenario, exit item and journey mapped (or deferred to its named task while T-119 is not final); every title a PRD §8 scenario; every mapped name in its file; every mapped case present once and passed; no failure anywhere. 'proves' states what the cases assert; 'open' what M8 does not prove and what completes it. Final exit candidate e1 (2026-11-24, base 2e417cb8, run RUN-20261124T095701Z-7700d9e7): every M8 scenario, exit item and Phase 1 journey mapped with 0 deferrals; every settled KPI exact on this month; four explicit owner_amended exceptions are pinned in check-scenarios.py and reported by --final as AMENDED (never passed): OWNER-AMENDMENT-M8-EXIT-20261123.md (M8-AMEND-1 draft KPIs K4/K12/K14/K15/K17; M8-AMEND-2 G-Q4 U1–U4) and OWNER-AMENDMENT-M8-EXIT-20261124.md (M8-AMEND-3 T-102 TD-31 / TD-34 sandbox fixtures; M8-AMEND-4 manual owner walkthrough J1–J8, J10 deferred to Staging per DEC-034).",
   "scenarios": [
     {
       "scenario": "PR-25 liability roll-forward",
@@ -222,6 +222,55 @@
           "tracked_in": "T-107 DRAFT KPIs (tests/reporting/dashboards.test.ts DRAFT rows; Finance sign-off)"
         }
       ]
+    },
+    {
+      "item": "M8 exit: SATUSEHAT steps of J3 / J6 on recorded fixtures",
+      "file": "tests/integrations/satusehat/foundation.test.ts",
+      "tests": [
+        "T-102 Scenario PR-35 (outage) and the reporting context > SATUSEHAT unreachable: the doctor signs, the record is saved, an outbox item waits and the monitor shows it pending; it sends once reachable"
+      ],
+      "proves": "T-102 guide-shaped synthetic SATUSEHAT flow on PostgreSQL (outage queue, signing trigger, facility context, send once reachable); live recorded sandbox responses (TD-34) are not proven here and remain an open external activation gate"
+    },
+    {
+      "item": "M8 exit: SATUSEHAT steps of J3 / J6 on recorded fixtures",
+      "file": "tests/integrations/satusehat/lookup.test.ts",
+      "tests": [
+        "TD-31 NIK lookup: request → claim → record > a facility head requests; the row holds only a sealed NIK bound to staff + lookup for ≤ 15 min; the worker matches → link (source lookup), nik_enc cleared, audited without the NIK",
+        "TD-31 NIK lookup: request → claim → record > a doctor held practitioner_unresolved is requeued by a matched lookup, exactly as by a manual link"
+      ],
+      "proves": "T-102 increment 4 (DEC-123, migration 0128): ephemeral sealed practitioner NIK lookup and requeue of practitioner_unresolved visits on guide-shaped synthetic fixtures; real sandbox responses (TD-34) remain unverified",
+      "owner_amended": [
+        {
+          "id": "M8-AMEND-3-TD31-SATUSEHAT",
+          "what": "T-102 TD-31 / TD-34 external sandbox activation gate: T-102 increments 1–4 pass on guide-shaped synthetic fixtures, while recorded live SATUSEHAT sandbox responses wait for external sandbox activation; T-102 final acceptance stays OPEN/HELD",
+          "amendment": "t119/final/OWNER-AMENDMENT-M8-EXIT-20261124.md",
+          "scope": [
+            "T-102 TD-31",
+            "TD-34 sandbox fixtures"
+          ],
+          "tracked_in": "T-102 final acceptance & TD-34 external sandbox activation gate (docs/tasks/T-102.md)"
+        }
+      ]
+    },
+    {
+      "item": "M8 exit: owner walkthrough J1–J8, J10 recorded",
+      "file": "docs/evidence/m8/m8-flow.test.ts",
+      "tests": [
+        "M8 exit: one month on the §3 fixtures, ledger ↔ sub-ledgers > J8 month end — the M8 exit check: every sub-ledger's period movement equals its ledger accounts' movement, tenant-wide and per branch"
+      ],
+      "proves": "automated J1–J8 and J10 flows pass on real PostgreSQL (with local synthetic walkthrough prep on 2e417cb8 verifying J8 hooks, host isolation, RBAC and TOTP gate); manual owner walkthrough and sign-off are NOT claimed here and are explicitly deferred to Staging per DEC-034",
+      "owner_amended": [
+        {
+          "id": "M8-AMEND-4-WALKTHROUGH-STAGING",
+          "what": "manual owner walkthrough of Phase 1 demo journeys J1–J8 and J10 deferred to Staging on Vultr + Coolify + Cloudflare over real HTTPS with normal TOTP enrolment (DEC-034, after M9 T-120–T-131); owner sign-off NOT claimed",
+          "amendment": "t119/final/OWNER-AMENDMENT-M8-EXIT-20261124.md",
+          "scope": [
+            "J10 walkthrough",
+            "J1–J8 walkthrough"
+          ],
+          "tracked_in": "Staging acceptance walkthrough (DEC-034, pre-release after M9 T-131)"
+        }
+      ]
     }
   ],
   "journeys": [
@@ -356,14 +405,5 @@
     }
   ],
   "deferred": [],
-  "deferred_items": [
-    {
-      "item": "M8 exit: owner walkthrough J1–J8, J10 recorded",
-      "completes_in": "OWNER GATE: the T-119 owner walkthrough session (Paduka Ongki; checklist in README.md), on a synthetic tenant"
-    },
-    {
-      "item": "M8 exit: SATUSEHAT steps of J3 / J6 on recorded fixtures",
-      "completes_in": "OWNER GATE: T-102 final acceptance after Paduka Ongki's TD-31 practitioner-path decision (not decided; never faked)"
-    }
-  ]
+  "deferred_items": []
 }

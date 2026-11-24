@@ -1399,7 +1399,7 @@ HYG-024 (vendor console readers) is not a hygiene task: it needs a new migration
 - **Protected Paths:** `drizzle/**`, `src/db/rls/**`
 - **Depends On:** T-106, T-108, T-115, T-117, T-118, T-102, T-109, T-110, T-111, T-112, T-113, T-114
 - **Visual Contract:** Not applicable
-- **Done when:** `pnpm test -- m8` passes; owner walkthrough recorded
+- **Done when:** `pnpm test -- m8` passes and `check-scenarios.py --final` exits 0 with 0 deferrals and only owner-amended exceptions; manual owner walkthrough J1–J8, J10 deferred to mandatory synthetic staging acceptance after M9 under DEC-034 (owner amendment 2026-11-24 16:55 WIB `M8-AMEND-4-WALKTHROUGH-STAGING`, recorded in `t119/final/OWNER-AMENDMENT-M8-EXIT-20261124.md`, not signed off and not an M8 exit prerequisite); T-102 TD-31/TD-34 external SATUSEHAT sandbox acceptance remains OPEN/HELD (owner amendment 2026-11-24 16:36 WIB `M8-AMEND-3-TD31-SATUSEHAT`); draft KPIs K4/K12/K14/K15/K17 and G-Q4 U1–U4 remain tracked exceptions (owner amendment 2026-11-23 `M8-AMEND-1`/`M8-AMEND-2`)
 - **Non-Scope:** anything outside Allowed Paths; live provider calls; production data
 - **Escalation Conditions:** verification fails after one repair attempt, or the task needs a contract change in `docs/spec/`
 

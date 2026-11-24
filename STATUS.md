@@ -1,6 +1,8 @@
 # Status — clinic-dashboard
 
-Updated: 2026-11-24 (unified M8 checkpoint, HYG-027: main `dc3a9ee5`, CI 45323638379 green. Integrated since `b7fdd645`, each on its own exact-SHA green CI: HYG-NAV-2 `50dd8d94` (CI 45141633374), HYG-NAV-1 `dd611ac0` (CI 45143447680), T-117 `0e5bd462` + hotfix `aa8603bb` (migrations 0131–0132, CI 45164282188), HYG-026 `40cc4e99` (CI 45314572999), T-119 evidence `dc3a9ee5`. M8 exit OPEN on two owner gates; M9 not started; no deployment)
+Updated: 2026-11-24 (T-119 final M8 exit candidate e2 on base `2e417cb8`, CI 45326107021 green; ledger `RUN-20261124T111142Z-4f88726e` with owner-authorized Option 1 scope expansion on `TASKS.md:1402`, superseding preserved e1 `RUN-20261124T095701Z-7700d9e7` closed FAIL after `R3-REVIEW-e1-panel1.md` REQUEST_CHANGES: `check-scenarios.py --final` exits 0 with 0 deferrals and 4 explicit owner-amended exceptions — M8-AMEND-1 draft KPIs, M8-AMEND-2 G-Q4 U1–U4, M8-AMEND-3 T-102 TD-31/TD-34 external sandbox acceptance OPEN/HELD, M8-AMEND-4 manual owner walkthrough J1–J8/J10 deferred to mandatory post-M9 synthetic staging acceptance under DEC-034, not signed off and not an M8 exit prerequisite; SET-35 decided PIN default per P-25; M9 not started; no deployment)
+
+Previous Updated (kept as written): 2026-11-24 (unified M8 checkpoint, HYG-027: main `dc3a9ee5`, CI 45323638379 green. Integrated since `b7fdd645`, each on its own exact-SHA green CI: HYG-NAV-2 `50dd8d94` (CI 45141633374), HYG-NAV-1 `dd611ac0` (CI 45143447680), T-117 `0e5bd462` + hotfix `aa8603bb` (migrations 0131–0132, CI 45164282188), HYG-026 `40cc4e99` (CI 45314572999), T-119 evidence `dc3a9ee5`. M8 exit OPEN on two owner gates; M9 not started; no deployment)
 
 Previous Updated (kept as written): 2026-11-23 (development baseline `b7fdd645`, exact CI 45068171413 green; overall panel checkpoint, HYG-025; M8 exit and M9 remain open; no deployment).
 
@@ -40,17 +42,19 @@ Use `BLOCKED` only as an interruption state. Record the blocker and exact state 
 
 Independent R3 reviews: Panel 3 codex `cx/gpt-6.2-sol` for HYG-NAV-1/2 r3, T-117 r1–r6 (+ hotfix), HYG-026 r1–r7 and T-119 preliminary r1–r6 and final f1–f3. Antigravity CLI (Gemini 4 Neon, high) for the T-119 unification u1 on `40cc4e99`.
 
-**M8 is NOT exited.** T-119 is not Done. `check-scenarios --final` fails only on the two owner gates below and lists the two owner amendments (`t119/final/OWNER-AMENDMENT-M8-EXIT-20261123.md`) as AMENDED, not passed:
-- M8-AMEND-1: draft KPIs K4 / K12 / K14 / K15 / K17, pending Finance sign-off.
-- M8-AMEND-2: G-Q4 U1–U4 (an unlinked visit product line gives a Rp150,000 PND difference; tracked product work).
+**M8 exit (`T-119`, final candidate e2 on `2e417cb8`, ledger `RUN-20261124T111142Z-4f88726e`, superseding preserved e1 `RUN-20261124T095701Z-7700d9e7` closed FAIL after `R3-REVIEW-e1-panel1.md` REQUEST_CHANGES):** canonical `TASKS.md:1402` Done-when timing amended under owner-authorized Option 1 scope expansion (`2026-11-24 18:10 WIB`) and aligned with `docs/evidence/m8/README.md`; `check-scenarios.py --final` exits 0 with 0 deferrals, 0 failures, and **4 explicit owner-amended exceptions** (reported as `AMENDED`, never counted as passed):
+- `M8-AMEND-1-DRAFT-KPI` (`t119/final/OWNER-AMENDMENT-M8-EXIT-20261123.md`): draft KPIs K4 / K12 / K14 / K15 / K17, pending Finance sign-off.
+- `M8-AMEND-2-GQ4-U1-U4` (`t119/final/OWNER-AMENDMENT-M8-EXIT-20261123.md`): G-Q4 U1–U4 (an unlinked visit product line gives a Rp150,000 PND difference; tracked product work).
+- `M8-AMEND-3-TD31-SATUSEHAT` (`t119/final/OWNER-AMENDMENT-M8-EXIT-20261124.md`, owner decision 2026-11-24 16:36 WIB): `T-102 TD-31` / `TD-34` live recorded SATUSEHAT sandbox fixtures (open external activation gate; T-102 increments 1–4 pass on guide-shaped synthetic fixtures; **`T-102` final acceptance stays OPEN/HELD**).
+- `M8-AMEND-4-WALKTHROUGH-STAGING` (`t119/final/OWNER-AMENDMENT-M8-EXIT-20261124.md`, owner decision 2026-11-24 16:55 WIB; canonical `TASKS.md:1402` amended 18:10 WIB): manual owner walkthrough of Phase 1 demo journeys J1–J8, J10 deferred to mandatory synthetic staging acceptance after M9 `T-120`–`T-131` under `DEC-034` (real HTTPS, normal TOTP enrolment); **not signed off and not an M8 exit prerequisite**.
 
-**Open owner gates:**
-- **M8 owner walkthrough J1–J8, J10: OPEN**, not signed. The checklist is in `docs/evidence/m8/README.md`.
-- **T-102 TD-31: OPEN.** The SATUSEHAT practitioner path; it also blocks T-102 final acceptance.
-- **SET-35: OPEN.** The clinical signing default is PIN (P-25); HYG-026 ships only the TOTP producer. Decide PIN vs TOTP before any signing UI.
+**Decisions & still-open external / pre-release gates:**
+- **SET-35: DECIDED (2026-11-24 16:36 WIB).** Clinical signing default stays **PIN** per P-25; `HYG-026` (`40cc4e99`) supplies the TOTP step-up producer.
+- **T-102 final acceptance (`TD-34` sandbox): OPEN / HELD** (tracked external activation gate; does not block M8 exit per `M8-AMEND-3-TD31-SATUSEHAT` & `TASKS.md:1402`).
+- **Manual owner walkthrough J1–J8, J10: OPEN / MANDATORY POST-M9 STAGING ACCEPTANCE (`DEC-034`)** (not signed off and not an M8 exit prerequisite per `M8-AMEND-4-WALKTHROUGH-STAGING` & `TASKS.md:1402`; local synthetic walkthrough prep on `2e417cb8` verified J8 hooks, host isolation, RBAC and TOTP gate before shutdown).
 
-**Unfinished Panel 2 / 3 work, not integrated, no M9 code on main:**
-- **M9 pre-work worktrees** `t120`–`t131` (no `t125`) sit at `af295ec1` with untracked drafts; they are rebaselined from latest green main only after M8 exits.
+**Unfinished Panel 2 / 3 work, not integrated, no M9 code on main (M9 Wave 1 starts only after this T-119 candidate passes independent R3 review and lands green on `main`):**
+- **M9 pre-work worktrees** `t120`–`t131` (no `t125`) sit at `af295ec1` with untracked drafts (`t129` also has three modified tracked files: `src/app/vendor/_lib/post.ts`, `src/app/vendor/api/console/[action]/route.ts`, `tests/isolation/surfaces.ts`); they are rebaselined from latest green main only after M8 exits.
 - **Wave-1 plans** `t120`–`t123/WAVE1-PLAN-0e5bd462.md`; owner decisions in `M9-OWNER-DECISIONS-20261123.md`:
   - T-120 OD-1 = B; OD-2..5 per plan.
   - T-121 D1 = 72 h, D3 = no delete, D2 and D5..7 per plan.
@@ -194,7 +198,7 @@ Built so far: `DECISIONS.md` lists every repository decision (DEC-005 onwards); 
 
 ## Active work
 
-**T-119 M8 exit evidence (2026-11-24):** `docs/evidence/m8/**` integrated on main. Independent R3 APPROVE for M8 exit pending ONLY the two owner gates: f3 (codex `cx/gpt-6.2-sol`) and the unified u1 on `40cc4e99` with HYG-026 (Antigravity CLI, Gemini 4 Neon, high). Gated m8-flow 27 passed / 0 failed / 1 todo (TD-31) in WIB, UTC, Pacific/Kiritimati; `pnpm test -- m8` 3791 tests, 0 failed; `check-scenarios --final` FAILs only on the owner walkthrough J1–J8, J10 and T-102 TD-31 (both **OPEN**), AMENDED on M8-AMEND-1 (draft KPIs K4/K12/K14/K15/K17, pending Finance) and M8-AMEND-2 (G-Q4 U1–U4, tracked product work), per `t119/final/OWNER-AMENDMENT-M8-EXIT-20261123.md`. T-119 is NOT Done and M8 has NOT exited: ledger `RUN-20261124T030704Z-d7dda389` closed BLOCKED on the owner gates.
+**T-119 M8 exit final candidate e2 (2026-11-24, base `2e417cb8`, ledger `RUN-20261124T111142Z-4f88726e`):** supersedes preserved e1 (`RUN-20261124T095701Z-7700d9e7`, `freeze-e1` preserved read-only, closed FAIL after Panel 1 independent R3 review `R3-REVIEW-e1-panel1.md` REQUEST_CHANGES on canonical `TASKS.md:1402` timing). Adds owner-authorized Option 1 requirement-linked scope expansion on `TASKS.md:1402` and aligns `docs/evidence/m8/README.md` + `STATUS.md`: automated exit verification stays required, J1–J8/J10 manual walkthrough is deferred to mandatory synthetic staging acceptance after M9 under `DEC-034` (not signed off, not an M8 exit prerequisite), `T-102 TD-31`/`TD-34` external acceptance remains OPEN/HELD, `SET-35` = PIN default, and draft KPIs + G-Q4 remain tracked exceptions (`M8-AMEND-1`..`M8-AMEND-4`). Frozen at `REVIEW_REQUIRED` pending independent R3 review by Panel 1. Earlier u1 run `RUN-20261124T030704Z-d7dda389` on `40cc4e99` (integrated `dc3a9ee5`, CI 45323638379) closed BLOCKED on the two owner gates before those amendments.
 
 **T-117 hotfix (2026-11-23):** CI 45155189295 on `0e5bd462` failed TEN-19 coverage (`tests/vendor/support.test.ts`): `digest_runs` had no `support_object_kinds` row. Migration 0132 classifies it `never` (as `satusehat_outbox`). Full `pnpm test` run before this push.
 
@@ -284,11 +288,13 @@ Carried forward (outside the owning task's Allowed Paths):
 
 ## Blockers
 
-**Current owner gates (2026-11-24):**
-- M8 owner walkthrough J1–J8, J10: OPEN.
-- T-102 TD-31: OPEN; it blocks T-102 final acceptance and the M8 SATUSEHAT exit item.
-- SET-35 PIN vs TOTP: OPEN; it blocks any clinical signing UI.
-- Owner amendments to the M8 exit scope: M8-AMEND-1 (draft KPIs, Finance) and M8-AMEND-2 (G-Q4 U1–U4); both are tracked, not closed.
+**Current owner gates & tracked exceptions (2026-11-24):**
+- M8 exit scope amendments (`AMENDED`, tracked, never claimed passed):
+  - `M8-AMEND-1-DRAFT-KPI`: draft KPIs K4/K12/K14/K15/K17 (Finance sign-off).
+  - `M8-AMEND-2-GQ4-U1-U4`: unlinked visit product line (tracked product work).
+  - `M8-AMEND-3-TD31-SATUSEHAT`: `T-102 TD-31` / `TD-34` recorded SATUSEHAT sandbox fixtures (open external activation gate; `T-102` final acceptance remains OPEN/HELD).
+  - `M8-AMEND-4-WALKTHROUGH-STAGING`: manual owner walkthrough J1–J8, J10 deferred to mandatory synthetic staging acceptance after M9 `T-120`–`T-131` under `DEC-034` (not signed off, not an M8 exit prerequisite; canonical `TASKS.md:1402` amended 2026-11-24).
+- `SET-35` PIN vs TOTP: **DECIDED (2026-11-24)** — PIN default per P-25 (`HYG-026` supplies TOTP step-up producer).
 - T-103 live-payment gates (Q-13, D2, Q-16, BILL-33) and the books gates (G-ACT, G-RETRO, G-PENDING, G-EXPORT, G-SETTLE): unchanged, OPEN.
 - External: Q-15 counsel (unassigned; it does not block T-123), and PRIV-2 counsel matrix (T-121 uses 72 h meanwhile).
 
@@ -380,12 +386,10 @@ Historical M0 note (kept as written): None for M0. Later gates: Q-12 (Numa job v
 
 ## Next verified action
 
-**Current (2026-11-24):**
-1. The owner runs and signs the M8 walkthrough (J1–J8, J10) on a synthetic tenant at build `dc3a9ee5` or later.
-2. The owner decides TD-31.
-3. Rerun `check-scenarios --final` on the final green SHA, finish T-119 PASS, and record M8 exit.
-4. Then M9 Wave 1 (T-120–T-123): revise each plan per its Panel 3 review, rebaseline from green main, and allocate migration slots serially at integration (DEC-049).
-SET-35 must be decided before any clinical signing UI. No deployment.
+**Current (2026-11-24, amended T-119 e2r2):**
+1. Complete independent R3 review of `T-119` (`RUN-20261124T111142Z-4f88726e`, `TASKS.md:1402` amended under owner-authorized Option 1), record `delivery-ledger review-boundary` + `finish --result PASS`, integrate fast-forward to `main`, push `origin/main`, and verify exact-SHA green CI to close M8 exit.
+2. Keep open external/post-M9 gates explicit (never claimed passed or signed off): manual owner walkthrough J1–J8, J10 is mandatory synthetic staging acceptance after M9 under `DEC-034` (`M8-AMEND-4-WALKTHROUGH-STAGING`); `T-102 TD-31`/`TD-34` SATUSEHAT sandbox acceptance stays OPEN/HELD (`M8-AMEND-3-TD31-SATUSEHAT`); draft KPIs (`K4/K12/K14/K15/K17`) and `G-Q4 U1–U4` stay tracked (`M8-AMEND-1`/`M8-AMEND-2`); `SET-35` is decided PIN default per `P-25`.
+3. Only after M8 exit is green on `main`, execute M9 Wave 1 (`T-120`–`T-123`) through `T-131` using the revised plans, serializing `drizzle/**` migrations and shared docs at integration (`DEC-049`), followed by the consolidated `DEC-117` review on `9router-fantastico/cx/gpt-6.2-sol`. No staging provisioning, live activation, or deployment.
 
 **Previous (2026-11-23, kept as history):** Let the existing J8 job run only after normal host admission in the 07:00–22:30 WIB window, or preserve a no-run/timeout if it is not admitted. If it runs, verify JUnit, cross-timezone controls and the exact R3 boundary. Resolve T-117 and other acceptance gaps, then run T-119 final checks on the final green commit and record the owner walkthrough. Only then open M9. Navigation hygiene is separate; no deployment.
 
