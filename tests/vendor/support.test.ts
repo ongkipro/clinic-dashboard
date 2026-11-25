@@ -17,6 +17,7 @@ import { bootstrapVendor, createVendorStaff, type VendorCaller } from "../../src
 import {
   endSession, endSessionAsOwner, expireSessions, extendSession, listSessions, openSession, SupportBindError, withSupportSession,
 } from "../../src/modules/vendor/support/support";
+import { projectRows } from "../../src/app/vendor/sesi/model";
 import { createHarness, type Harness, testPool } from "../rls/harness";
 
 const ROOT = join(import.meta.dirname, "../..");
@@ -682,6 +683,97 @@ describe("roles, step-up, owner, privileges", () => {
     await expect(consoleDb.query(`select 1 from branches limit 1`)).rejects.toMatchObject({ code: "42501" });
     const writes = (await h.admin.query(`select count(*)::int n from information_schema.role_table_grants where grantee = 'clinic_operator' and privilege_type <> 'SELECT'`)).rows[0].n;
     expect(writes).toBe(0);
+  });
+});
+
+// T-129 vendor UI subset (PR-87, PR-60; DEL-2: tests/isolation/surfaces.ts cites this for /vendor/sesi). Konsol Vendor › Sesi Dukungan
+// reads vendor_console_support_list and shows projectRows of its answer. On a real database, with the real reader:
+// a clinic filter never returns another clinic's session, and nothing the page shows carries the free text the reader answers.
+describe("Konsol Vendor › Sesi Dukungan: clinic filter and safe projection (T-129)", () => {
+  const PURPOSE_A = "SENTINEL-TUJUAN-A pasien Budi alergi penisilin";
+  const PURPOSE_B = "SENTINEL-TUJUAN-B keluhan nyeri pasien Sari";
+  const REASON = "SENTINEL-ALASAN perpanjangan atas permintaan klinik";
+
+  it("?tenant=A answers A's sessions only: no session, clinic id or text of clinic B", async () => {
+    const a = await clinic();
+    const b = await clinic();
+    const a1 = await open(supTok, a, ["public.branches", "public.tenants"], 60, PURPOSE_A);
+    const a2 = await open(supTok, a, ["public.staff"], 30, PURPOSE_A); // personal scope: waits for the Owner
+    const b1 = await open(supTok, b, ["public.branches"], 60, PURPOSE_B);
+    const b2 = await open(sup2Tok, b, ["public.branches"], 30, PURPOSE_B);
+    expect(await endSession(consoleDb, as(sup2Tok), b2.id)).toMatchObject({ ok: true });
+
+    const onlyA = await listSessions(consoleDb, as(supTok), a.tenantId);
+    if (!onlyA.ok) throw new Error(JSON.stringify(onlyA));
+    expect(onlyA.data.rows.map((r) => r.id).sort()).toEqual([a1.id, a2.id].sort());
+    expect(new Set(onlyA.data.rows.map((r) => r.tenant_id))).toEqual(new Set([a.tenantId]));
+    const rawA = JSON.stringify(onlyA.data);
+    for (const x of [b.tenantId, b1.id, b2.id, "SENTINEL-TUJUAN-B", "Sari"]) expect(rawA, x).not.toContain(x);
+
+    // Positive control: the same reader, asked for B and for every clinic, does return B's sessions.
+    const onlyB = await listSessions(consoleDb, as(supTok), b.tenantId);
+    if (!onlyB.ok) throw new Error(JSON.stringify(onlyB));
+    expect(onlyB.data.rows.map((r) => r.id).sort()).toEqual([b1.id, b2.id].sort());
+    const all = await listSessions(consoleDb, as(supTok), null);
+    if (!all.ok) throw new Error(JSON.stringify(all));
+    for (const id of [a1.id, a2.id, b1.id, b2.id]) expect(all.data.rows.map((r) => r.id), id).toContain(id);
+    // A well-formed id that names no clinic answers an empty list (the page turns it into not-found before asking).
+    expect(await listSessions(consoleDb, as(supTok), crypto.randomUUID())).toMatchObject({ ok: true, data: { rows: [] } });
+  });
+
+  it("the page's projection of the real answer carries no purpose, operator, end reason, extension reason or table name", async () => {
+    const a = await clinic();
+    const act = await open(supTok, a, ["public.branches", "public.tenants"], 60, PURPOSE_A);
+    expect(await extendSession(consoleDb, as(supTok), act.id, REASON, 30)).toMatchObject({ ok: true });
+    const pend = await open(supTok, a, ["public.staff"], 30, PURPOSE_A);
+    const done = await open(supTok, a, ["public.branches"], 30, PURPOSE_A);
+    expect(await endSession(consoleDb, as(supTok), done.id)).toMatchObject({ ok: true });
+
+    const r = await listSessions(consoleDb, as(supTok), a.tenantId);
+    if (!r.ok) throw new Error(JSON.stringify(r));
+    // The reader itself does answer the free text and the operator (why the projection is needed) …
+    const raw = JSON.stringify(r.data.rows);
+    for (const x of ["SENTINEL-TUJUAN-A", "Dukungan Satu", "public.branches", "\"end_reason\":\"operator\""]) expect(raw, x).toContain(x);
+    expect(Object.keys(r.data.rows[0]).sort()).toEqual(["end_reason", "ends_at", "extended", "id", "operator", "purpose", "requested_at", "scope", "state", "tenant_id"]);
+
+    // … and the page's rows hold exactly six fields, none of them text a person typed.
+    const rows = projectRows(r.data.rows)!;
+    expect(rows).toHaveLength(3);
+    for (const row of rows) expect(Object.keys(row).sort()).toEqual(["endsAt", "id", "kinds", "requestedAt", "state", "tenantId"]);
+    const shown = JSON.stringify(rows);
+    for (const x of ["SENTINEL", "Budi", "penisilin", "Dukungan Satu", "public.", "branches", "staff", "operator", "purpose", "end_reason", "extended", "perpanjangan"]) expect(shown, x).not.toContain(x);
+    const by = new Map(rows.map((x) => [x.id, x]));
+    expect(by.get(act.id)).toMatchObject({ tenantId: a.tenantId, state: "active", kinds: 2 });
+    expect(by.get(pend.id)).toMatchObject({ tenantId: a.tenantId, state: "pending_approval", kinds: 1, endsAt: null });
+    expect(by.get(done.id)).toMatchObject({ tenantId: a.tenantId, state: "ended", kinds: 1 });
+    // The reason of the extension is stored and never answered by the list at all.
+    expect((await h.admin.query(`select extension_reason from support_sessions where id = $1`, [act.id])).rows[0].extension_reason).toBe(REASON);
+    expect(raw).not.toContain("SENTINEL-ALASAN");
+  });
+
+  it("an answer that is not the reader's shape projects to nothing (the page shows its error state)", () => {
+    const validTs = "2026-11-25T02:00:00Z";
+    for (const bad of [
+      null,
+      "x",
+      {},
+      [null],
+      [{ id: "a" }],
+      [{ id: "a", tenant_id: "t", state: "open", requested_at: validTs, scope: [] }],
+      [{ id: "a", tenant_id: "t", state: "active", requested_at: validTs, scope: "public.branches" }],
+      [{ id: "a", tenant_id: "t", state: "active", requested_at: "not-a-date", ends_at: null, scope: [] }],
+      [{ id: "a", tenant_id: "t", state: "active", requested_at: "2026-02-30T02:00:00Z", ends_at: null, scope: [] }],
+      [{ id: "a", tenant_id: "t", state: "active", requested_at: "0097-02-29T02:00:00Z", ends_at: null, scope: [] }],
+      [{ id: "a", tenant_id: "t", state: "active", requested_at: validTs, ends_at: "not-a-date", scope: [] }],
+      [{ id: "a", tenant_id: "t", state: "active", requested_at: validTs, ends_at: "2026-02-30T02:00:00Z", scope: [] }],
+      [{ id: "a", tenant_id: "t", state: "active", requested_at: validTs, ends_at: 12345, scope: [] }],
+    ]) {
+      expect(projectRows(bad), JSON.stringify(bad)).toBeNull();
+    }
+    expect(projectRows([{ id: "a", tenant_id: "t", state: "active", requested_at: "0096-02-29T02:00:00Z", ends_at: "0096-02-29T03:00:00Z", scope: [] }])).toEqual([
+      { id: "a", tenantId: "t", state: "active", kinds: 0, requestedAt: "0096-02-29T02:00:00Z", endsAt: "0096-02-29T03:00:00Z" },
+    ]);
+    expect(projectRows([])).toEqual([]);
   });
 });
 

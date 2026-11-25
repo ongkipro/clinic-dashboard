@@ -823,9 +823,14 @@ Scenario: PR-86 role-filtered menu
   Then Apotek & Inventaris pages appear and Keuangan and Komisi rules do not
 
 Scenario: PR-87 vendor console tree
-  Given a platform owner
+  Given one vendor staff member for each vendor role
   When the vendor console opens
-  Then Tenant, Onboarding, Integrasi, Tagihan Server, Sesi Dukungan, Kesehatan Platform, Tim Vendor, Audit Vendor, Profil Vendor, Feature Flag and Templat Global are listed
+  Then a platform owner sees Tenant, Onboarding, Tagihan Server, Kesehatan Platform, Tim Vendor, Audit Vendor, Profil Vendor, Feature Flag Platform and Templat Global
+  And an onboarding specialist sees Tenant, Onboarding and Sesi Dukungan
+  And a support operator sees Tenant, Integrasi, Sesi Dukungan and Kesehatan Platform
+  And vendor finance sees Tenant and Tagihan Server
+  And a vendor auditor sees Tenant, Tagihan Server and Audit Vendor
+  And no role sees a page outside its list, and every sidebar page of the console tree is listed for at least one role
 
 Scenario: PR-88 service needs a room
   Given a service whose master requires a laser device

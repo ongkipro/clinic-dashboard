@@ -261,9 +261,9 @@ Branch roles never see branches outside their scope; tenant-wide roles start on 
 |---|---|---|---|---|
 | Tenant | Daftar klinik: status siklus, biaya bulanan, cabang, go-live, status bayar, kesehatan | All vendor roles | UX-40 | R1 |
 | Detail Tenant | ▸ Ringkasan · Cabang · Onboarding · Integrasi · Tagihan · Sesi Dukungan · Audit (vendor actions only); aksi: Ajukan Suspend / Aktifkan Kembali / Mulai Exit (pengaju: vendor finance atau support; penyetuju: platform owner, orang berbeda), alasan wajib, pemberitahuan owner | Vendor roles per IAM-10 | UX-40 | R1 |
-| Onboarding | Ceklis per tenant & cabang | Onboarding | UX-41 | R1 |
+| Onboarding | Ceklis per tenant & cabang | Onboarding, platform owner | UX-41 | R1 |
 | Integrasi | Status WABA, SATUSEHAT (kode), webhook pembayaran | Support | UX-42 | R1 |
-| Tagihan Server | Versi biaya (ajukan → setujui, bulan berlaku), tagihan (terbit, jatuh tempo, prorata), percobaan bayar AutoLaris (status, Advice), nota kredit/pembebasan (ajukan → setujui) | Vendor finance (ajukan), platform owner (setujui) | UX-43 | R1 |
+| Tagihan Server | Versi biaya (ajukan → setujui, bulan berlaku), tagihan (terbit, jatuh tempo, prorata), percobaan bayar AutoLaris (status, Advice), nota kredit/pembebasan (ajukan → setujui) | Vendor finance (ajukan), platform owner (setujui), vendor auditor (read) | UX-43 | R1 |
 | Sesi Dukungan | Ajukan sesi (tenant, tujuan, jenis objek, durasi ≤ 2 jam); ruang lingkup data klinis/pribadi menunggu persetujuan owner; aktif & riwayat; perpanjang sekali; data yang dibaca tercatat | Support, onboarding | UX-44 | R1 |
 | Kesehatan Platform | Uptime, worker, backlog, backup, error rate | Platform owner, support | UX-45 | R1 |
 | Tim Vendor | Staf vendor, peran, TOTP | Platform owner | UX-46 | R1 |
