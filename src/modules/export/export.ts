@@ -85,9 +85,9 @@ export function buildManifest(o: {
   assertPilotCeilings(o.files);
   const seen = new Set<string>();
   for (const f of o.files) {
-    if (!safePath(f.path)) throw new ExportRuleError("ERR_INVALID_INPUT", `path ${JSON.stringify(f.path).slice(0, 60)}`);
+    if (!safePath(f.path)) throw new ExportRuleError("ERR_INVALID_INPUT", "invalid_path");
     if (!FILE_KINDS.includes(f.kind)) throw new ExportRuleError("ERR_INVALID_INPUT", "kind");
-    if (seen.has(f.path)) throw new ExportRuleError("ERR_INVALID_INPUT", `duplicate_path ${f.path}`);
+    if (seen.has(f.path)) throw new ExportRuleError("ERR_INVALID_INPUT", "duplicate_path");
     seen.add(f.path);
   }
   const files = [...o.files]

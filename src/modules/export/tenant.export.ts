@@ -21,6 +21,9 @@ import {
   ExportRuleError,
   exportZip,
   fhirPath,
+  MAX_ENTRIES,
+  MAX_FILE_BYTES,
+  MAX_TOTAL_BYTES,
   mediaPath,
   parseVerifiedManifest,
   pdfPath,
@@ -556,23 +559,52 @@ export function buildTenantExportFiles(
       : undefined;
 
   const files: ExportFile[] = [];
+  let totalBytes = 0;
+  // DEC-117 Row 9 P2: enforce entry/file/total ceilings BEFORE allocating or buffering oversized
+  // payloads (entry capacity check pre-generation, base64 decoded-length preflight, row-by-row CSV byte budget).
+  const checkEntrySlot = () => {
+    if (files.length >= MAX_ENTRIES) {
+      throw new ExportRuleError("ERR_INVALID_INPUT", "export_too_many_entries");
+    }
+  };
+  const checkByteBudget = (size: number) => {
+    if (size > MAX_FILE_BYTES) {
+      throw new ExportRuleError("ERR_INVALID_INPUT", "export_file_too_large");
+    }
+    if (totalBytes + size > MAX_TOTAL_BYTES) {
+      throw new ExportRuleError("ERR_INVALID_INPUT", "export_total_too_large");
+    }
+  };
+  const pushFile = (f: ExportFile) => {
+    checkEntrySlot();
+    checkByteBudget(f.bytes.byteLength);
+    totalBytes += f.bytes.byteLength;
+    files.push(f);
+  };
+  const estimateBase64Bytes = (b64: string): number => {
+    const clean = b64.replace(/\s+/g, "");
+    const pad = clean.endsWith("==") ? 2 : clean.endsWith("=") ? 1 : 0;
+    return Math.max(0, Math.floor((clean.length * 3) / 4) - pad);
+  };
   const sortedPatients = [...snapshot.patients].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const patientIndex = new Map<string, number>();
   sortedPatients.forEach((p, idx) => patientIndex.set(p.id, idx + 1));
 
   // Per-patient FHIR R4 Bundle (local IDs, D2=a)
   for (const p of sortedPatients) {
+    checkEntrySlot();
     const n = patientIndex.get(p.id)!;
     const nikPlain = requireDecrypt(opts.kekRing, keys, EXPORT_DECRYPT_PURPOSES.patientIdentity, p.identity_enc);
     const pVisits = snapshot.visits.filter((v) => v.patient_id === p.id);
     const pVersions = snapshot.record_versions.filter((rv) => rv.patient_id === p.id);
-    files.push({
+    pushFile({
       path: fhirPath(n),
       kind: "fhir",
       bytes: buildPatientFhirBundle(p, nikPlain, pVisits, pVersions),
     });
     for (const rv of pVersions) {
-      files.push({
+      checkEntrySlot();
+      pushFile({
         path: pdfPath(n, rv.version, rv.id),
         kind: "pdf",
         bytes: buildRecordPdf(snapshot.tenant.legal_name, p, rv),
@@ -580,25 +612,58 @@ export function buildTenantExportFiles(
     }
   }
 
-  // Clinical media bytes stored separately (D3/D4, never logged)
+  // Clinical media bytes stored separately (D3/D4, never logged); preflight decoded length BEFORE Buffer.from()
   for (const m of snapshot.media) {
     const n = patientIndex.get(m.patient_id);
     if (!n) continue;
+    checkEntrySlot();
+    checkByteBudget(estimateBase64Bytes(m.content_b64));
     const ext = EXT_BY_MIME[m.content_type] ?? "bin";
-    files.push({
+    pushFile({
       path: mediaPath(n, m.id, ext),
       kind: "media",
       bytes: new Uint8Array(Buffer.from(m.content_b64, "base64")),
     });
   }
 
-  // 13 formula-safe CSV families (explicit inventory, zero runtime secrets/credentials/DEKs/auth hashes)
-  const enc = new TextEncoder();
-  const addCsv = (family: string, rows: (string | null)[][]) => {
-    files.push({ path: csvPath(family), kind: "csv", bytes: enc.encode(toCsv(rows)) });
+  // 13 formula-safe CSV families (explicit inventory, zero runtime secrets/credentials/DEKs/auth hashes);
+  // preflight entry slot BEFORE building rows and check remaining byte budget cell-by-cell BEFORE allocating row buffers.
+  const csvCellBytes = (val: string | null): number => {
+    if (val === null) return 0;
+    let quoteCount = 0;
+    for (let k = 0; k < val.length; k++) if (val.charCodeAt(k) === 34) quoteCount++;
+    const raw = Buffer.byteLength(val, "utf8");
+    // Exact RFC 4180 formula-safe size without allocating an escaped copy:
+    // leading "'" + outer quotes + 1 extra byte per embedded '"'
+    const needsQuote = quoteCount > 0 || /[,\r\n]/.test(val);
+    const formulaPrefix = /^[=+\-@\t\r]/.test(val) ? 1 : 0;
+    return raw + formulaPrefix + quoteCount + (needsQuote ? 2 : 0);
+  };
+  const addCsv = (family: string, buildRows: () => (string | null)[][]) => {
+    checkEntrySlot();
+    const rows = buildRows();
+    const chunks: Buffer[] = [];
+    let csvBytes = 3; // UTF-8 BOM on header row
+    checkByteBudget(csvBytes);
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      // Preflight estimated row byte size BEFORE serializing or allocating the Buffer
+      let estRowBytes = Math.max(0, row.length - 1) + 2; // commas + CRLF
+      for (let j = 0; j < row.length; j++) {
+        estRowBytes += csvCellBytes(row[j]);
+        checkByteBudget(csvBytes + estRowBytes);
+      }
+      const lineStr = i === 0 ? toCsv([row]) : toCsv([row]).replace(/^\uFEFF/, "");
+      const buf = Buffer.from(lineStr, "utf8");
+      const actualBytes = i === 0 ? buf.byteLength : csvBytes + buf.byteLength;
+      csvBytes = actualBytes;
+      checkByteBudget(csvBytes);
+      chunks.push(buf);
+    }
+    pushFile({ path: csvPath(family), kind: "csv", bytes: new Uint8Array(Buffer.concat(chunks, csvBytes)) });
   };
 
-  addCsv("pasien", [
+  addCsv("pasien", () => [
     ["id", "mrn", "full_name", "birth_date", "sex", "identity_type", "identity_number", "phone", "address", "ihs_patient_id", "registered_branch_id", "created_at"],
     ...sortedPatients.map((p) => [
       p.id,
@@ -616,52 +681,52 @@ export function buildTenantExportFiles(
     ]),
   ]);
 
-  addCsv("kunjungan", [
+  addCsv("kunjungan", () => [
     ["id", "branch_id", "patient_id", "kind", "checked_in_at", "closed_at"],
     ...snapshot.visits.map((v) => [v.id, v.branch_id, v.patient_id, v.kind, v.checked_in_at, v.closed_at]),
   ]);
 
-  addCsv("tagihan", [
+  addCsv("tagihan", () => [
     ["id", "branch_id", "patient_id", "visit_id", "number", "state", "issued_at", "created_at"],
     ...snapshot.invoices.map((i) => [i.id, i.branch_id, i.patient_id, i.visit_id, i.number, i.state, i.issued_at, i.created_at]),
   ]);
 
-  addCsv("baris_tagihan", [
+  addCsv("baris_tagihan", () => [
     ["id", "invoice_id", "item_id", "quantity", "unit_price", "discount", "line_total", "tax_category", "vat_base", "vat_amount", "created_at"],
     ...snapshot.invoice_lines.map((l) => [l.id, l.invoice_id, l.item_id, s(l.quantity), s(l.unit_price), s(l.discount), s(l.line_total), l.tax_category, s(l.vat_base), s(l.vat_amount), l.created_at]),
   ]);
 
-  addCsv("pembayaran", [
+  addCsv("pembayaran", () => [
     ["id", "branch_id", "invoice_id", "patient_id", "method", "amount", "is_simulated", "received_at"],
     ...snapshot.payments.map((p) => [p.id, p.branch_id, p.invoice_id, p.patient_id, p.method, s(p.amount), s(p.is_simulated), p.received_at]),
   ]);
 
-  addCsv("paket", [
+  addCsv("paket", () => [
     ["id", "sold_branch_id", "patient_id", "invoice_id", "item_id", "price", "state", "validity_end", "created_at"],
     ...snapshot.packages.map((p) => [p.id, p.sold_branch_id, p.patient_id, p.invoice_id, p.item_id, s(p.price), p.state, p.validity_end, p.created_at]),
   ]);
 
-  addCsv("saldo", [
+  addCsv("saldo", () => [
     ["id", "account_id", "patient_id", "branch_id", "kind", "amount", "balance_after", "created_at"],
     ...snapshot.balance_entries.map((b) => [b.id, b.account_id, b.patient_id, b.branch_id, b.kind, s(b.amount), s(b.balance_after), b.created_at]),
   ]);
 
-  addCsv("piutang", [
+  addCsv("piutang", () => [
     ["id", "branch_id", "patient_id", "visit_id", "amount", "collected_amount", "written_off_amount", "state", "created_at"],
     ...snapshot.receivables.map((r) => [r.id, r.branch_id, r.patient_id, r.visit_id, s(r.amount), s(r.collected_amount), s(r.written_off_amount), r.state, r.created_at]),
   ]);
 
-  addCsv("jurnal", [
+  addCsv("jurnal", () => [
     ["id", "kind", "event", "source_kind", "source_id", "business_date", "period", "posted_at"],
     ...snapshot.journal_entries.map((j) => [j.id, j.kind, j.event, j.source_kind, j.source_id, j.business_date, j.period, j.posted_at]),
   ]);
 
-  addCsv("baris_jurnal", [
+  addCsv("baris_jurnal", () => [
     ["id", "entry_id", "account_id", "branch_id", "debit", "credit"],
     ...snapshot.journal_lines.map((jl) => [jl.id, jl.entry_id, jl.account_id, jl.branch_id, s(jl.debit), s(jl.credit)]),
   ]);
 
-  addCsv("lead", [
+  addCsv("lead", () => [
     ["id", "branch_id", "source", "patient_id", "contact_name", "contact_phone", "stage", "created_at"],
     ...snapshot.leads.map((l) => [
       l.id,
@@ -675,7 +740,7 @@ export function buildTenantExportFiles(
     ]),
   ]);
 
-  addCsv("percakapan", [
+  addCsv("percakapan", () => [
     ["id", "branch_id", "patient_id", "contact_wa_id", "contact_name", "state", "last_inbound_at", "created_at"],
     ...snapshot.conversations.map((c) => [
       c.id,
@@ -689,7 +754,7 @@ export function buildTenantExportFiles(
     ]),
   ]);
 
-  addCsv("pesan_wa", [
+  addCsv("pesan_wa", () => [
     ["id", "conversation_id", "direction", "kind", "body", "status", "created_at"],
     ...snapshot.messages.map((m) => [
       m.id,

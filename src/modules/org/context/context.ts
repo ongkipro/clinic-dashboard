@@ -51,7 +51,13 @@ const roleOrder = (r: Role) => ROLES.indexOf(r);
 // only branch, or its first branch; tenant-wide roles on "Semua Cabang").
 // With a session id, memberships revoked for that session (IAM-16, PR-91) are left out:
 // the request continues in another clinic, or has no context at all.
-export async function activeContext(app: pg.Pool, accountId: string, sel: Selection, sessionId?: string): Promise<ActiveContext | null> {
+export async function activeContext(
+  app: pg.Pool,
+  accountId: string,
+  sel: Selection,
+  sessionId?: string,
+  opts?: { noClinicFallback?: boolean },
+): Promise<ActiveContext | null> {
   const c = await app.connect();
   let memberships: MembershipRole[];
   try {
@@ -67,12 +73,23 @@ export async function activeContext(app: pg.Pool, accountId: string, sel: Select
     c.release();
   }
   if (memberships.length === 0) return null;
-  const tenantIds = [...new Set(memberships.map((m) => m.tenantId))];
-  const tenantId = sel.tenantId && tenantIds.includes(sel.tenantId) ? sel.tenantId : tenantIds[0];
-  const held = memberships.filter((m) => m.tenantId === tenantId);
-  const roles = [...new Set(held.map((m) => m.role))].sort((a, b) => roleOrder(a) - roleOrder(b));
-  // Prefer the selected role, then roles that can act (a branch role needs a branch).
-  const usable = roles.filter((r) => isLevel2(r) || (held.find((m) => m.role === r)?.branchIds?.length ?? 0) > 0);
+
+  // DEC-117 Row 2b P2: choose the clinic only from memberships with at least one usable role,
+  // so a clinic whose roles have no assigned branch never blocks access to another usable clinic.
+  const usableMemberships = memberships.filter((m) => isLevel2(m.role) || (m.branchIds?.length ?? 0) > 0);
+  if (usableMemberships.length === 0) return null;
+
+  const tenantIds = [...new Set(usableMemberships.map((m) => m.tenantId))];
+  let tenantId: string;
+  if (sel.tenantId && tenantIds.includes(sel.tenantId)) {
+    tenantId = sel.tenantId;
+  } else if (opts?.noClinicFallback && sel.tenantId) {
+    return null;
+  } else {
+    tenantId = tenantIds[0];
+  }
+  const held = usableMemberships.filter((m) => m.tenantId === tenantId);
+  const usable = [...new Set(held.map((m) => m.role))].sort((a, b) => roleOrder(a) - roleOrder(b));
   const role = sel.role && usable.includes(sel.role as Role) ? (sel.role as Role) : usable[0];
   if (!role) return null;
   const roleBranches = held.find((m) => m.role === role)?.branchIds ?? null; // null = Level 2
@@ -95,11 +112,22 @@ export async function activeContext(app: pg.Pool, accountId: string, sel: Select
     }
   }
 
+  // DEC-117 Row 2b P2: re-check session revocation against the FINAL resolved membership
+  // after resolveContext(), closing the race window between initial list and context resolution.
+  const resolvedMembershipId = held.find((m) => m.role === role)?.membershipId;
+  if (sessionId && resolvedMembershipId) {
+    const revCheck = await app.query<{ revoked: boolean }>(
+      `select public.staff_session_revoked($1::uuid, $2::uuid) as revoked`,
+      [resolvedMembershipId, sessionId],
+    );
+    if (revCheck.rows[0]?.revoked) return null;
+  }
+
   // A clinic is offered when any of its roles can act there (07 order); its name is read
   // in that role's context.
   const clinics: ClinicOption[] = [];
   for (const t of tenantIds) {
-    const candidates = t === tenantId ? [role] : [...new Set(memberships.filter((x) => x.tenantId === t).map((x) => x.role))].sort((a, b) => roleOrder(a) - roleOrder(b));
+    const candidates = t === tenantId ? [role] : [...new Set(usableMemberships.filter((x) => x.tenantId === t).map((x) => x.role))].sort((a, b) => roleOrder(a) - roleOrder(b));
     for (const r of candidates) {
       try {
         const ctx = await resolveContext(app, accountId, { tenantId: t, actingRole: r });
@@ -113,7 +141,17 @@ export async function activeContext(app: pg.Pool, accountId: string, sel: Select
 
   return withTenantContext(app, context, async (db) => {
     const b = await db.query<BranchOption>(`select id, name from branches order by name`);
-    const s = await db.query<{ display_name: string }>(`select display_name from staff where id = $1`, [context.staffId]);
+    const s = await db.query<{ display_name: string; membership_id: string }>(
+      `select display_name, membership_id from staff where id = $1`,
+      [context.staffId],
+    );
+    if (sessionId && s.rows[0]?.membership_id) {
+      const rev = await db.query<{ revoked: boolean }>(
+        `select public.staff_session_revoked($1::uuid, $2::uuid) as revoked`,
+        [s.rows[0].membership_id, sessionId],
+      );
+      if (rev.rows[0]?.revoked) return null;
+    }
     const allowed = context.allowedBranchIds;
     return {
       context,
@@ -178,15 +216,25 @@ export async function switchContext(
     }
     next = { tenantId: now.context.tenantId, role: now.context.actingRole, branchId: req.branchId };
   }
-  const after = await activeContext(app, accountId, next, sessionId);
+  const after = await activeContext(app, accountId, next, sessionId, { noClinicFallback: true });
   if (!after) throw new ContextSwitchError("no active membership");
   const unchanged =
     after.context.tenantId === now.context.tenantId &&
     after.context.actingRole === now.context.actingRole &&
     (after.context.activeBranchId ?? null) === (now.context.activeBranchId ?? null);
-  // A request that the defaults silently replaced is refused, not half-applied.
-  if (req.kind === "role" && after.context.actingRole !== req.role) throw new ContextSwitchError("role cannot act");
-  if (req.kind === "branch" && (after.context.activeBranchId ?? null) !== req.branchId) throw new ContextSwitchError("branch not applied");
+  // A request that the defaults silently replaced is refused, not half-applied (DEC-117 Row 2b P2).
+  if (req.kind === "clinic" && after.context.tenantId !== req.tenantId) throw new ContextSwitchError("clinic not available");
+  if (req.kind === "role" && (after.context.tenantId !== now.context.tenantId || after.context.actingRole !== req.role)) {
+    throw new ContextSwitchError("role cannot act");
+  }
+  if (
+    req.kind === "branch" &&
+    (after.context.tenantId !== now.context.tenantId ||
+      after.context.actingRole !== now.context.actingRole ||
+      (after.context.activeBranchId ?? null) !== req.branchId)
+  ) {
+    throw new ContextSwitchError("branch not applied");
+  }
   if (!unchanged) await recordContextSelected(app, after.context); // a repeat of the current context records nothing
   return { tenantId: after.context.tenantId, role: after.context.actingRole, branchId: after.context.activeBranchId ?? null };
 }

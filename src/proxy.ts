@@ -84,10 +84,26 @@ function refused() {
   });
 }
 
+function mediaTypeOf(contentType: string | null): string {
+  return (contentType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
 export async function proxy(request: NextRequest) {
   const decision = resolveRequest(config(), request.headers.get("host"), request.nextUrl.pathname);
   if (!decision.allow) return refused();
+  const method = request.method.toUpperCase();
+  const mediaType = mediaTypeOf(request.headers.get("content-type"));
   if (decision.host === "booking") {
+    // DEC-117 Row 1 P1: BOOKING_HOST never dispatches Next.js Server Actions (neither Next-Action
+    // fetch nor progressive-enhancement form POST to page routes). Legitimate public writes live
+    // exclusively on explicit route handlers under /api/v1/public/ and /api/v1/webhooks/payment.
+    const pathname = request.nextUrl.pathname;
+    const isBookingWriteApi =
+      pathname.startsWith("/api/v1/public/") ||
+      pathname === "/api/v1/webhooks/payment" ||
+      pathname.startsWith("/api/v1/webhooks/payment/");
+    if (request.headers.has("next-action")) return refused();
+    if (method !== "GET" && method !== "HEAD" && !isBookingWriteApi) return refused();
     // H-02c / SEC-4 / ARCH-3 / PR-39 (T-123 Finding #3, T-127 r2 Finding #3):
     // Single final CSP + strict no-store + security headers on every BOOKING_HOST response.
     // Non-eligible routes (/{slug}/cabang directory, /perawatan, /dokter, /booking, /aftercare, /kebijakan-*)
@@ -148,14 +164,12 @@ export async function proxy(request: NextRequest) {
     return response;
   }
   if (decision.host !== "vendor") return NextResponse.next();
-  const method = request.method.toUpperCase();
-  const contentType = (request.headers.get("content-type") ?? "").toLowerCase();
   const authApi = request.nextUrl.pathname.startsWith("/vendor/api/auth/");
   const consoleApi = request.nextUrl.pathname.startsWith("/vendor/api/console/");
   if (request.headers.has("next-action")) return refused();
   if (method !== "GET" && method !== "HEAD" && !authApi && !(consoleApi && method === "POST")) return refused();
-  if (authApi && (contentType.startsWith("multipart/form-data") || contentType.startsWith("application/x-www-form-urlencoded"))) return refused();
-  if (consoleApi && !contentType.startsWith("application/json")) return refused();
+  if (authApi && (mediaType === "multipart/form-data" || mediaType === "application/x-www-form-urlencoded")) return refused();
+  if (consoleApi && mediaType !== "application/json") return refused();
   const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(18))));
   const csp = vendorCsp(nonce);
   const forwarded = new Headers(request.headers);

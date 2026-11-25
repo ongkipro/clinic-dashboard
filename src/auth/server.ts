@@ -13,7 +13,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { TWO_FACTOR_ERROR_CODES, twoFactor } from "better-auth/plugins/two-factor";
-import { and, count, eq, gte, lt, sql } from "drizzle-orm";
+import { and, count, eq, gte, lt, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type pg from "pg";
 import { boundSession, type SessionBinding } from "../db/rls/context";
@@ -173,9 +173,9 @@ export async function verifyStepUp(db: pg.ClientBase, proof: unknown): Promise<b
     const t = record.clock().getTime();
     return t >= record.verifiedAt.getTime() && t <= record.expiresAt.getTime();
   };
-  // The tenant's staff_access lock first (held to the end of the caller's transaction), then every decision read.
+  // The tenant's staff_access lock first (held to the end of the caller's transaction), then membership
+  // validation, then session liveness as the final awaited check before proof age (DEC-117 Row 2a P2).
   await db.query(`select pg_advisory_xact_lock(hashtextextended('staff_access:' || public.app_tenant_id()::text, 0))`);
-  if (!(await record.live())) return false;
   const { rows } = await db.query<{ account_id: string; revoked: boolean }>(
     `select m.account_id, public.staff_session_revoked(m.id, $1::uuid) as revoked
        from public.staff s join public.memberships m on m.tenant_id = s.tenant_id and m.id = s.membership_id
@@ -183,6 +183,7 @@ export async function verifyStepUp(db: pg.ClientBase, proof: unknown): Promise<b
     [record.sessionId],
   );
   if (rows.length !== 1 || rows[0].account_id !== record.accountId || rows[0].revoked) return false;
+  if (!(await record.live())) return false;
   return inTime();
 }
 
@@ -224,14 +225,39 @@ export function createAuth(config: AuthConfig) {
       if (row.n >= LOGIN_FAILURE_LIMIT) return undefined;
       const [ins] = await tx
         .insert(schema.authLoginFailure)
-        .values({ email, failedAt: now() })
+        .values({ email, failedAt: now(), state: "pending" })
         .returning({ id: schema.authLoginFailure.id });
       return { id: ins.id, prior: row.n };
     });
 
-  // Password proven: clear the account's failures (including this attempt).
-  const passwordAccepted = async (email: string) => {
-    await db.delete(schema.authLoginFailure).where(eq(schema.authLoginFailure.email, email));
+  // DEC-117 Row 2a P2: DB-backed pending vs failed state serialized under the SAME per-account
+  // advisory lock as claimAttempt, so concurrent attempts across multiple app instances are never
+  // erased by another request's success.
+  const claimedForReq = new WeakMap<Headers, { id: string; email: string }>();
+  const settleFailed = async (email: string, attemptId: string | undefined) => {
+    if (!attemptId) return;
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"auth-login:" + email}))`);
+      await tx
+        .update(schema.authLoginFailure)
+        .set({ state: "failed" })
+        .where(and(eq(schema.authLoginFailure.id, attemptId), eq(schema.authLoginFailure.email, email)));
+    });
+  };
+
+  // Password proven: under the same per-account advisory lock, clear settled failures and this
+  // attempt while preserving every other in-flight `state = 'pending'` attempt across all instances.
+  const passwordAccepted = async (email: string, myAttemptId?: string) => {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"auth-login:" + email}))`);
+      const cond = myAttemptId
+        ? and(
+            eq(schema.authLoginFailure.email, email),
+            or(eq(schema.authLoginFailure.state, "failed"), eq(schema.authLoginFailure.id, myAttemptId)),
+          )
+        : and(eq(schema.authLoginFailure.email, email), eq(schema.authLoginFailure.state, "failed"));
+      await tx.delete(schema.authLoginFailure).where(cond);
+    });
   };
   const pruneOld = async () => {
     await db
@@ -427,12 +453,17 @@ export function createAuth(config: AuthConfig) {
             const gate = sessionGate({
               roles: await config.roles(current.s.user.id),
               twoFactorEnabled: Boolean((current.s.user as { twoFactorEnabled?: boolean }).twoFactorEnabled),
+              secondFactorAt: current.row.secondFactorAt,
               lastActiveAt: current.row.lastActiveAt,
               lockedAt: current.row.lockedAt,
               now: now(),
               totpAlways: vendor,
             });
-            if (gate === "locked" || (gate === "enrol_totp" && !ENROL_PATHS.has(ctx.path))) {
+            if (
+              gate === "locked" ||
+              (gate === "enrol_totp" && !ENROL_PATHS.has(ctx.path)) ||
+              (gate === "reauth" && !CODE_PATHS.has(ctx.path))
+            ) {
               throw APIError.from("FORBIDDEN", {
                 code: SESSION_LOCKED_CODE,
                 message: "Sesi terkunci. Masukkan kata sandi untuk melanjutkan.",
@@ -462,6 +493,7 @@ export function createAuth(config: AuthConfig) {
         }
 
         // RATE-2: claim an attempt before any password is checked.
+        let claimed: { id: string; email: string } | undefined;
         if (PASSWORD_PATHS.has(ctx.path)) {
           const email =
             ctx.path === "/sign-in/email"
@@ -470,6 +502,8 @@ export function createAuth(config: AuthConfig) {
           if (!email) return;
           const attempt = await claimAttempt(email);
           if (!attempt) throw lockedOut();
+          claimed = { id: attempt.id, email };
+          if (ctx.headers) claimedForReq.set(ctx.headers, claimed);
           await sleep(progressiveDelayMs(attempt.prior));
         }
 
@@ -479,9 +513,14 @@ export function createAuth(config: AuthConfig) {
         // claim above and counts once as a second-factor failure (the nested verify-totp).
         // Roles that require TOTP are sent straight back to enrolment by the session gate (PR-3).
         if (POSSESSION_PATHS.has(ctx.path)) {
-          const code = String((ctx.body as { code?: unknown } | undefined)?.code ?? "").replace(/\s/g, "");
-          if (!/^[0-9]{6}$/.test(code)) throw APIError.from("UNAUTHORIZED", { code: "INVALID_CODE", message: "Invalid code" });
-          await auth.api.verifyTOTP({ headers: ctx.headers ?? new Headers(), body: { code } });
+          try {
+            const code = String((ctx.body as { code?: unknown } | undefined)?.code ?? "").replace(/\s/g, "");
+            if (!/^[0-9]{6}$/.test(code)) throw APIError.from("UNAUTHORIZED", { code: "INVALID_CODE", message: "Invalid code" });
+            await auth.api.verifyTOTP({ headers: ctx.headers ?? new Headers(), body: { code } });
+          } catch (e) {
+            if (claimed) await settleFailed(claimed.email, claimed.id);
+            throw e;
+          }
         }
       }),
       after: createAuthMiddleware(async (ctx) => {
@@ -499,15 +538,17 @@ export function createAuth(config: AuthConfig) {
           await clearSecondFactorAttempts(counted);
         }
         if (!PASSWORD_PATHS.has(ctx.path)) return;
+        const claimed = ctx.headers ? claimedForReq.get(ctx.headers) : undefined;
         const email =
-          ctx.path === "/sign-in/email"
+          claimed?.email ??
+          (ctx.path === "/sign-in/email"
             ? String(ctx.body?.email ?? "").trim().toLowerCase()
-            : ctx.context.session?.user.email.toLowerCase();
+            : ctx.context.session?.user.email.toLowerCase());
         if (!email) return;
-        // A failure keeps its claimed attempt row; success clears the account's rows.
-        // Only a wrong password counts: other 4xx (validation) still keep the claim, so
-        // they cannot be used to probe without cost.
-        if (!failed) await passwordAccepted(email);
+        // A failure settles its claimed row to state='failed'; success clears settled rows + this
+        // attempt while preserving concurrent pending attempts across all app instances.
+        if (!failed) await passwordAccepted(email, claimed?.id);
+        else await settleFailed(email, claimed?.id);
         await pruneOld();
       }),
     },
@@ -563,6 +604,7 @@ export function createAuth(config: AuthConfig) {
     const gate = sessionGate({
       roles,
       twoFactorEnabled: Boolean((s.user as { twoFactorEnabled?: boolean }).twoFactorEnabled),
+      secondFactorAt: row.secondFactorAt,
       lastActiveAt: row.lastActiveAt,
       lockedAt: row.lockedAt,
       now: t,
@@ -589,14 +631,22 @@ export function createAuth(config: AuthConfig) {
       await (await auth.$context).internalAdapter.deleteSession(s.session.token);
       return false;
     }
-    await sleep(progressiveDelayMs(attempt.prior));
-    const ctx = await auth.$context;
-    const account = (await ctx.internalAdapter.findAccounts(s.user.id)).find(
-      (a) => a.providerId === "credential",
-    );
-    const ok = Boolean(account?.password) && (await ctx.password.verify({ hash: account!.password!, password }));
-    if (!ok) return false;
-    await passwordAccepted(email);
+    try {
+      await sleep(progressiveDelayMs(attempt.prior));
+      const ctx = await auth.$context;
+      const account = (await ctx.internalAdapter.findAccounts(s.user.id)).find(
+        (a) => a.providerId === "credential",
+      );
+      const ok = Boolean(account?.password) && (await ctx.password.verify({ hash: account!.password!, password }));
+      if (!ok) {
+        await settleFailed(email, attempt.id);
+        return false;
+      }
+      await passwordAccepted(email, attempt.id);
+    } catch (e) {
+      await settleFailed(email, attempt.id);
+      throw e;
+    }
     await db
       .update(schema.authSession)
       .set({ lockedAt: null, lastActiveAt: now() })
@@ -663,7 +713,7 @@ export function createAuth(config: AuthConfig) {
     if (!r || r.user_id !== accountId || r.surface !== surface) return null;
     if (!r.two_factor_enabled || !r.factor_id || !r.secret || r.verified !== true) return null;
     if (r.expires_at.getTime() <= t.getTime()) return null;
-    const gate = sessionGate({ roles, twoFactorEnabled: r.two_factor_enabled, lastActiveAt: r.last_active_at, lockedAt: r.locked_at, now: t, totpAlways: vendor });
+    const gate = sessionGate({ roles, twoFactorEnabled: r.two_factor_enabled, secondFactorAt: r.second_factor_at, lastActiveAt: r.last_active_at, lockedAt: r.locked_at, now: t, totpAlways: vendor });
     if (gate !== "ok") return null;
     return { userId: r.user_id, token: r.token, factor: factorKey(r.factor_id, r.secret), factorId: r.factor_id, secret: r.secret, secondFactorAt: r.second_factor_at };
   };

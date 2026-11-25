@@ -228,10 +228,15 @@ export function buildPublicSiteDto(i: PublishInput): PublishBuildResult {
       tariffListAllowed: i.tariffListAllowed,
       branchPrice: validBranches.map((bs) => t.branchPrices[bs] ?? null).find((p) => p !== null) ?? null,
     });
+    const categoryViolations = checkText(`${t.slug}.category`, t.category);
+    if (categoryViolations.length > 0) {
+      violations.push(...categoryViolations);
+    }
     if (!baseProj.ok) {
       violations.push(...baseProj.violations.map((v) => ({ ...v, field: `${t.slug}.${v.field}` })));
       continue;
     }
+    if (categoryViolations.length > 0) continue;
     const branchTariffs = validBranches.map((bs) => {
       const p = projectTreatment({
         slug: t.slug,
@@ -333,10 +338,16 @@ export function applyLiveBranchOverlay(
     .map((t) => {
       const bs = t.branchSlugs.filter((s) => kept.has(s));
       if (bs.length === 0) return null;
+      const keptTariffs = t.branchTariffs.filter((bt) => kept.has(bt.branchSlug));
+      // DEC-117 Row 10 P2: recompute top-level tariff from surviving branches so a hidden
+      // branch's tariff never leaks on the filtered public site.
+      const nextTariff =
+        keptTariffs.find((bt) => bt.tariff.kind === "amount")?.tariff ?? keptTariffs[0]?.tariff ?? t.tariff;
       return Object.freeze({
         ...t,
+        tariff: nextTariff,
         branchSlugs: bs,
-        branchTariffs: t.branchTariffs.filter((bt) => kept.has(bt.branchSlug)),
+        branchTariffs: keptTariffs,
       });
     })
     .filter((t): t is PublicTreatmentDto => t !== null);

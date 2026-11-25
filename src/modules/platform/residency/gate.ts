@@ -64,7 +64,7 @@ export function evaluateGate(i: GateInput): GateResult {
   for (const m of matchDeclared(i.deployed.locations, i.declared)) {
     blockers.push({ code: "location_mismatch", kind: m.kind, problem: m.problem });
   }
-  if (i.attested === false) blockers.push({ code: "unattested" });
+  if (i.attested !== true) blockers.push({ code: "unattested" });
   const known = new Map(i.deployed.locations.map((l) => [l.kind, l.country]));
   const kinds = [...new Set([...i.deployed.locations.map((l) => l.kind), ...i.deployed.issues.map((x) => x.kind)])];
   const outside = kinds.filter((k) => known.get(k) !== "ID");
@@ -73,7 +73,7 @@ export function evaluateGate(i: GateInput): GateResult {
     if (o.outcome === null) blockers.push({ code: "opinion_required", outside });
     else if (o.outcome === "negative") blockers.push({ code: "opinion_negative", outside });
     else if (o.outcome === "inconclusive") blockers.push({ code: "opinion_inconclusive", outside });
-    else if (!o.evidenceApproved || o.checksumMatches === false) blockers.push({ code: "opinion_unapproved", outside });
+    else if (!o.evidenceApproved || o.checksumMatches !== true) blockers.push({ code: "opinion_unapproved", outside });
   }
   for (const ob of [...VENDOR_OBLIGATIONS, ...TENANT_OBLIGATIONS]) {
     if (!i.approved.has(ob)) blockers.push({ code: "obligation_missing", obligation: ob });

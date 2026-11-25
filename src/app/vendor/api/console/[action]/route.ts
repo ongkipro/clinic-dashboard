@@ -58,7 +58,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
   // token names the invitation; a new account for the invited email is created with the
   // IAM-1 policy and removed again when accepting is refused.
   if (action === "staff-invite-accept") {
-    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    const raw = (await request.json().catch(() => null)) as unknown;
+    const body = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
     const token = str(body?.token, 64);
     const password = str(body?.password, 128);
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(token) || !password) return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
@@ -75,7 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
   if (s.gate !== "ok") return json({ ok: false, code: "ERR_UNAUTHENTICATED" }, 401);
   const c: ConsoleCall = { token: s.token, ip: request.headers.get(ipHeader()) ?? "" };
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-  if (!body || typeof body !== "object") return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
+  if (!body || typeof body !== "object" || Array.isArray(body)) return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
   const db = await vendorPool();
   let r;
   switch (action) {

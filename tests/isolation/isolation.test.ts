@@ -214,10 +214,13 @@ describe("cross-tenant negative cases", () => {
         marker,
       );
       secrets.add(marker);
+      let ownAttemptKeys: string[] = [];
       if (c.kind !== "route") {
         // Every attempt must succeed as B itself (review P1): an attempt B could not make either
         // would accept any refusal from A and hide a cross-tenant regression.
-        for (const [name, outcome] of Object.entries(attemptsOf(ownResult.body))) {
+        const ownAttempts = attemptsOf(ownResult.body);
+        ownAttemptKeys = Object.keys(ownAttempts).sort();
+        for (const [name, outcome] of Object.entries(ownAttempts)) {
           expect(outcome, `${name}: positive control, the attempt as B itself must succeed`).toBe("done");
         }
       }
@@ -230,6 +233,10 @@ describe("cross-tenant negative cases", () => {
       for (const secret of secrets) expect(text).not.toContain(secret);
       if (c.kind !== "route") {
         const attempts = attemptsOf(result.body);
+        // DEC-117 Row 3 P2: positive and negative runs must execute the exact same attempt keys.
+        expect(Object.keys(attempts).sort(), "negative run attempt keys must match positive control").toEqual(
+          ownAttemptKeys,
+        );
         for (const [name, outcome] of Object.entries(attempts)) {
           expect(outcome, `${name}: as tenant A an attempt on B must be refused`).not.toBe("done");
           expect(outcome, `${name}: refusal must be an error code`).toMatch(/^(ERR_[A-Z_]+|refused|not_seen)$/);

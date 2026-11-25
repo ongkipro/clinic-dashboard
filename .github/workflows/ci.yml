@@ -63,14 +63,15 @@ jobs:
       - run: pnpm audit --prod
       - run: pnpm docs:check
       - run: pnpm docs:promotion
-      - name: Image migration check (migrations run from the release image)
+      - name: Build release image once
+        run: docker build -t "clinic-dashboard:${{ github.sha }}" .
+      - name: Image migration check (migrations run from the exact built release image)
         run: tests/platform/image-migrate.sh
         env:
+          IMAGE: clinic-dashboard:${{ github.sha }}
           ADMIN_URL: postgres://clinic:clinic_ci_only@127.0.0.1:5432/postgres
-      - name: Build image and record digest
-        run: |
-          docker build -t "clinic-dashboard:${GITHUB_SHA}" .
-          node scripts/record-digest.mjs "clinic-dashboard:${GITHUB_SHA}" image-digest.json
+      - name: Record built release image digest
+        run: node scripts/record-digest.mjs "clinic-dashboard:${{ github.sha }}" image-digest.json
         env:
           GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

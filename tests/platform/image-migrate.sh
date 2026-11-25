@@ -6,15 +6,25 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 admin="${ADMIN_URL:-postgres://clinic:clinic_local_only@127.0.0.1:5432/postgres}"
 db="img_$(date +%s)_$$"
-image="clinic-dashboard:image-check-$$"
+built_locally=0
+if [ -n "${IMAGE:-}" ]; then
+  image="$IMAGE"
+else
+  image="clinic-dashboard:image-check-$$"
+  built_locally=1
+fi
 pg() { docker run --rm --network host postgres:16.15-bookworm psql "$1" -v ON_ERROR_STOP=1 -qtAc "$2"; }
 cleanup() {
   pg "$admin" "drop database if exists $db with (force)" >/dev/null 2>&1 || true
-  docker image rm "$image" >/dev/null 2>&1 || true
+  if [ "$built_locally" = "1" ]; then
+    docker image rm "$image" >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT
 
-docker build -q -t "$image" "$root" >/dev/null
+if [ "$built_locally" = "1" ]; then
+  docker build -q -t "$image" "$root" >/dev/null
+fi
 pg "$admin" "create database $db" >/dev/null
 # Replace the database name, keeping any ?query (e.g. sslmode).
 base="${admin%%\?*}"; query="${admin#"$base"}"

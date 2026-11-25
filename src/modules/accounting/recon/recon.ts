@@ -92,41 +92,55 @@ export function reconcile(x: ReconInput): ReconReport {
   const unavailableFor = (metric: Metric, branchId: string) => x.unavailable.find((u) => u.metric === metric && (u.branchId === null || u.branchId === branchId));
   const items: Item[] = [];
   for (const metric of METRICS) {
-    const facts = new Map<string, Fact>();
+    // DEC-117 Row 5a P2: bucket facts by (ref, day, branchId) so facts sharing a ref on different
+    // days or branches are never silently collapsed into the first bucket.
+    const factBucketsByRef = new Map<string, Map<string, Fact>>();
     for (const f of x.facts.filter((f) => f.metric === metric)) {
-      const k = key(f.ref);
-      const prev = facts.get(k);
-      facts.set(k, prev ? { ...prev, amount: add(prev.amount, f.amount, `fact ${k}`) } : f); // a document's parts on the same day/branch
+      const rk = key(f.ref);
+      let byPlace = factBucketsByRef.get(rk);
+      if (!byPlace) {
+        byPlace = new Map<string, Fact>();
+        factBucketsByRef.set(rk, byPlace);
+      }
+      const pk = `${f.day}|${f.branchId}`;
+      const prev = byPlace.get(pk);
+      byPlace.set(pk, prev ? { ...prev, amount: add(prev.amount, f.amount, `fact ${rk}`) } : f);
     }
     const posts = new Map<string, Posting[]>();
     for (const p of x.postings.filter((p) => p.metric === metric)) posts.set(key(p.ref), [...(posts.get(key(p.ref)) ?? []), p]);
 
-    for (const [k, f] of facts) {
+    for (const [k, byPlace] of factBucketsByRef) {
       const ps = posts.get(k) ?? [];
       if (ps.length === 0) {
         const ev = pending.get(k);
-        items.push({ kind: ev ? "queued" : "missing", metric, ref: f.ref, day: f.day, branchId: f.branchId, fact: f.amount, ledger: null, difference: f.amount, eventId: ev?.eventId });
+        for (const f of byPlace.values()) {
+          items.push({ kind: ev ? "queued" : "missing", metric, ref: f.ref, day: f.day, branchId: f.branchId, fact: f.amount, ledger: null, difference: f.amount, eventId: ev?.eventId });
+        }
         continue;
       }
-      // Placement: the ledger must carry the fact on the same business day and branch (Appendix A attribution).
-      const here = ps.filter((p) => p.branchId === f.branchId && p.businessDay === f.day);
-      for (const p of ps.filter((p) => !here.includes(p))) {
-        items.push({ kind: "placement", metric, ref: f.ref, day: p.businessDay, branchId: p.branchId, fact: null, ledger: p.amount, difference: sub(0, p.amount, `placement ${k}`), entryId: p.entryId });
+      // Placement: flag any posting whose (businessDay, branchId) has no matching fact bucket for this ref.
+      for (const p of ps) {
+        if (!byPlace.has(`${p.businessDay}|${p.branchId}`)) {
+          items.push({ kind: "placement", metric, ref: p.ref, day: p.businessDay, branchId: p.branchId, fact: null, ledger: p.amount, difference: sub(0, p.amount, `placement ${k}`), entryId: p.entryId });
+        }
       }
-      const ledger = sum(here.map((p) => p.amount), `ledger ${k}`);
-      if (here.length === 0) {
-        items.push({ kind: "placement", metric, ref: f.ref, day: f.day, branchId: f.branchId, fact: f.amount, ledger: null, difference: f.amount });
-      } else if (ledger !== f.amount) {
-        items.push({ kind: "amount", metric, ref: f.ref, day: f.day, branchId: f.branchId, fact: f.amount, ledger, difference: sub(f.amount, ledger, `difference ${k}`), entryId: here[0].entryId });
-      }
-      // Timing: a late fact booked into a later open period (its own month was locked, PR-26). Same business day and branch, so it
-      // matches here; the books show it in the booked period, which finance must see, but it is not a difference.
-      for (const p of here.filter((p) => p.period !== p.originalPeriod)) {
-        items.push({ kind: "timing", metric, ref: f.ref, day: f.day, branchId: f.branchId, fact: f.amount, ledger: p.amount, difference: 0, bookedPeriod: p.period, entryId: p.entryId });
+      for (const f of byPlace.values()) {
+        const here = ps.filter((p) => p.branchId === f.branchId && p.businessDay === f.day);
+        const ledger = sum(here.map((p) => p.amount), `ledger ${k}`);
+        if (here.length === 0) {
+          items.push({ kind: "placement", metric, ref: f.ref, day: f.day, branchId: f.branchId, fact: f.amount, ledger: null, difference: f.amount });
+        } else if (ledger !== f.amount) {
+          items.push({ kind: "amount", metric, ref: f.ref, day: f.day, branchId: f.branchId, fact: f.amount, ledger, difference: sub(f.amount, ledger, `difference ${k}`), entryId: here[0].entryId });
+        }
+        // Timing: a late fact booked into a later open period (its own month was locked, PR-26). Same business day and branch, so it
+        // matches here; the books show it in the booked period, which finance must see, but it is not a difference.
+        for (const p of here.filter((p) => p.period !== p.originalPeriod)) {
+          items.push({ kind: "timing", metric, ref: f.ref, day: f.day, branchId: f.branchId, fact: f.amount, ledger: p.amount, difference: 0, bookedPeriod: p.period, entryId: p.entryId });
+        }
       }
     }
     for (const [k, ps] of posts) {
-      if (facts.has(k)) continue;
+      if (factBucketsByRef.has(k)) continue;
       // net per business day and branch first: an original and its reversal in the same bucket leave nothing; a nonzero bucket keeps
       // each entry listed with its own attribution (never cancelled across days or branches)
       const buckets = new Map<string, Posting[]>();

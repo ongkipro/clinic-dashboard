@@ -130,6 +130,11 @@ export const authLoginFailure = pgTable(
     id: id(),
     email: text("email").notNull(),
     failedAt: ts("failed_at").notNull().defaultNow(),
+    // DEC-117 Row 2a P2: DB-backed pending vs settled failure state shared across app instances.
+    state: text("state").notNull().default("pending"),
   },
-  (t) => [index("auth_login_failure_email_idx").on(t.email, t.failedAt)],
+  (t) => [
+    index("auth_login_failure_email_idx").on(t.email, t.failedAt),
+    check("auth_login_failure_state_check", sql`${t.state} in ('pending','failed')`),
+  ],
 );

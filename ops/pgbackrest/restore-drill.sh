@@ -13,6 +13,7 @@ id="drill-$(date +%s)-$$"
 image="clinic-pgbackrest:drill"
 net="$id-net"
 repo="$id-repo"
+dst_data="$id-dst-data"
 src="$id-src"
 dst="$id-dst"
 pass="$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 40)"
@@ -20,7 +21,7 @@ env=(-e POSTGRES_PASSWORD=drill -e PGBACKREST_STANZA=clinic -e "PGBACKREST_REPO1
 
 cleanup() {
   docker rm -f -v "$src" "$dst" >/dev/null 2>&1 || true # -v: their anonymous data volumes
-  docker volume rm "$repo" >/dev/null 2>&1 || true
+  docker volume rm "$repo" "$dst_data" >/dev/null 2>&1 || true
   docker image rm "$image" >/dev/null 2>&1 || true
   docker network rm "$net" >/dev/null 2>&1 || true
 }
@@ -103,21 +104,27 @@ expected="$(psql_in "$src" -c "$counts_sql")"
 docker stop "$src" >/dev/null
 
 echo "== restore into a scratch instance"
-docker run -d --name "$dst" --network "$net" "${env[@]}" -v "$repo:/var/lib/pgbackrest" \
-  --entrypoint bash "$image" -c 'sleep infinity' >/dev/null
-docker exec "$dst" bash -c '
-  set -e
-  /usr/local/bin/entrypoint-pgbackrest.sh true
-  install -d -o postgres -g postgres -m 0700 "$PGDATA"
-  su postgres -c "pgbackrest --stanza=clinic --type=default restore"
-' >/dev/null
-docker exec -d -e PGBACKREST_ARCHIVE=off "$dst" /usr/local/bin/entrypoint-pgbackrest.sh postgres
+rto_start="$(date +%s)"
+docker volume create "$dst_data" >/dev/null
+docker run --rm --init --network "$net" "${env[@]}" \
+  -v "$repo:/var/lib/pgbackrest" -v "$dst_data:/var/lib/postgresql/data" \
+  --entrypoint bash "$image" -c '
+    set -e
+    /usr/local/bin/entrypoint-pgbackrest.sh true
+    install -d -o postgres -g postgres -m 0700 "$PGDATA"
+    su postgres -c "pgbackrest --stanza=clinic --type=default restore"
+  ' >/dev/null
+docker run -d --init --name "$dst" --network "$net" "${env[@]}" -e PGBACKREST_ARCHIVE=off \
+  -v "$repo:/var/lib/pgbackrest" -v "$dst_data:/var/lib/postgresql/data" \
+  "$image" >/dev/null
 wait_ready "$dst"
 wait_recovered "$dst"
+rto_elapsed="$(( $(date +%s) - rto_start ))"
 actual="$(psql_in "$dst" -c "$counts_sql")"
 
 echo "expected:"; echo "$expected"
 echo "restored:"; echo "$actual"
+echo "restore_rto_seconds=${rto_elapsed} (NFR-3 target <= 14400s)"
 if [ "$expected" != "$actual" ]; then
   echo "RESTORE DRILL FAILED: row counts or contents differ" >&2
   exit 1
@@ -126,4 +133,8 @@ if ! grep -q '^tenants|35|' <<<"$actual"; then
   echo "RESTORE DRILL FAILED: rows written after the backup were not replayed" >&2
   exit 1
 fi
-echo "RESTORE DRILL PASSED"
+if [ "$rto_elapsed" -gt 14400 ]; then
+  echo "RESTORE DRILL FAILED: RTO ${rto_elapsed}s exceeded NFR-3 4h target" >&2
+  exit 1
+fi
+echo "RESTORE DRILL PASSED (RTO ${rto_elapsed}s)"

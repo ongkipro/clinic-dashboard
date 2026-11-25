@@ -35,6 +35,7 @@ export async function requestContext(opts: { activity?: boolean } = {}): Promise
   const gate = await (await getAuth()).checkSession(h, opts);
   if (gate.gate === "anonymous") return { kind: "redirect", to: "/masuk" };
   if (gate.gate === "enrol_totp") return { kind: "redirect", to: "/aktifkan-2fa" };
+  if (gate.gate === "reauth") return { kind: "redirect", to: "/masuk" };
   if (gate.gate === "locked") return { kind: "redirect", to: "/terkunci" };
   if (gate.gate !== "ok") return { kind: "redirect", to: "/masuk" }; // fail closed
   const selection = await storedSelection();
@@ -43,9 +44,9 @@ export async function requestContext(opts: { activity?: boolean } = {}): Promise
   // HYG-026: the acting context carries the factory's opaque binding of this request's authenticated session, so a
   // step-up is checked against this request's session.
   if (active) return { kind: "ok", accountId: gate.userId, sessionId: gate.sessionId, active: { ...active, context: { ...active.context, session: gate.binding } }, selection };
-  // No context left. If the account still has a usable membership, this session was
-  // revoked for all of them (PR-91): end the session server-side and sign in again.
-  if (await activeContext(app, gate.userId, selection)) {
+  // No context left. Only end the session when the account still has a usable membership overall
+  // (empty selection), meaning session revocation excluded every usable membership (PR-91, DEC-117 Row 2b P2).
+  if (await activeContext(app, gate.userId, {})) {
     await (await getAuth()).endSession(gate.sessionId);
     return { kind: "redirect", to: "/masuk" };
   }

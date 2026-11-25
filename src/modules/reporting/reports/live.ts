@@ -27,10 +27,22 @@ export type LiveTable = { kpi: KpiId; caption: string; columns: { id: string; la
 export type LiveReport = { report: ReportId; from: string; to: string; branchId: string | null; kpis: LiveKpi[]; tables: LiveTable[]; allForbidden: boolean };
 
 const off = (reason: Unavailable): Metric => ({ kind: "unavailable", reason });
-const n = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && /^-?\d+$/.test(v) ? Number(v) : 0);
+// DEC-117 Row 8 P2: distinguish absent optional keys (null/undefined -> 0) from malformed reader values
+// (NaN, non-numeric text, unsafe integers -> NaN, which money()/count()/checkedRatio() render as unavailable: invalid).
+const n = (v: unknown): number => {
+  if (v === undefined || v === null) return 0;
+  if (typeof v === "number") return Number.isSafeInteger(v) ? v : Number.NaN;
+  if (typeof v === "string" && /^-?\d+$/.test(v)) {
+    const parsed = Number(v);
+    return Number.isSafeInteger(parsed) ? parsed : Number.NaN;
+  }
+  return Number.NaN;
+};
 const dim = (r: KpiResult, k: string) => n(r.by_dim?.[k]);
+const safeRatio = (num: number, den: number): Metric =>
+  Number.isSafeInteger(num) && Number.isSafeInteger(den) ? ratio(num, den) : off("invalid");
 // money totals: the reader's total is the sum of the money parts, null when there are none — a real Rp0 for a flow over the period
-const total = (r: KpiResult): Metric => money(r.total === null ? 0 : n(r.total));
+const total = (r: KpiResult): Metric => (r.total === null ? money(0) : money(n(r.total)));
 const K17_BRANCH = "Komisi yang sudah dibayar tidak tercatat per cabang; lihat Semua Cabang";
 const basis = (id: KpiId, note?: string) => [BY_ID.get(id)!.attribution, note].filter(Boolean).join(" · ");
 
@@ -44,51 +56,59 @@ export function fromKpi(id: KpiId, r: KpiResult): LiveKpi[] {
       return [{ id, metric: total(r), basis: basis(id) }];
     case "K4": {
       const x = r.extra as K4Extra | null;
-      if (!x || x.complete !== true) return [{ id, metric: off("incomplete"), basis: basis(id, `${n(x?.undated_cancellations)} pembatalan tanpa tanggal`) }];
+      const undated = n(x?.undated_cancellations);
+      if (x && !Number.isSafeInteger(undated)) return [{ id, metric: off("invalid"), basis: basis(id) }];
+      if (!x || x.complete !== true) {
+        return [{ id, metric: off("incomplete"), basis: basis(id, `${undated} pembatalan tanpa tanggal`) }];
+      }
       return [{ id, metric: total(r), basis: basis(id) }];
     }
     case "K5": {
       const residue = dim(r, "incomplete");
+      if (!Number.isSafeInteger(residue)) return [{ id, metric: off("invalid"), basis: basis(id) }];
       return [{ id, metric: residue > 0 ? off("incomplete") : total(r), basis: basis(id, residue > 0 ? `${residue} gerakan sebelum cutover` : undefined) }];
     }
     case "K7": {
       const uncosted = dim(r, "uncosted"), est = dim(r, "estimasi");
+      if (!Number.isSafeInteger(uncosted) || !Number.isSafeInteger(est)) return [{ id, metric: off("invalid"), basis: basis(id) }];
       if (uncosted > 0) return [{ id, metric: off("incomplete"), basis: basis(id, `biaya belum lengkap (${uncosted})`) }];
       return [{ id, metric: total(r), basis: basis(id, est > 0 ? "estimasi" : undefined) }];
     }
-    case "K8": return [{ id, metric: ratio(dim(r, "purchase"), dim(r, "consultation")), basis: basis(id) }];
+    case "K8": return [{ id, metric: safeRatio(dim(r, "purchase"), dim(r, "consultation")), basis: basis(id) }];
     case "K9":
       return [
-        { id, label: "Rencana dipilih ≤ 30 hari (jumlah)", metric: ratio(dim(r, "selected_30_count"), dim(r, "recommended_count")), basis: basis(id) },
-        { id, label: "Rencana dipilih ≤ 30 hari (nilai)", metric: ratio(dim(r, "selected_30_value"), dim(r, "recommended_value")), basis: basis(id) },
+        { id, label: "Rencana dipilih ≤ 30 hari (jumlah)", metric: safeRatio(dim(r, "selected_30_count"), dim(r, "recommended_count")), basis: basis(id) },
+        { id, label: "Rencana dipilih ≤ 30 hari (nilai)", metric: safeRatio(dim(r, "selected_30_value"), dim(r, "recommended_value")), basis: basis(id) },
       ];
     case "K10":
       return [
         { id, label: "Pasien baru", metric: count(dim(r, "new")), basis: basis(id) },
         { id, label: "Pasien kembali", metric: count(dim(r, "returning")), basis: basis(id) },
       ];
-    case "K11": return [{ id, metric: ratio(dim(r, "second_visit"), dim(r, "new")), basis: basis(id, "batas SET-22 saat kunjungan pertama") }];
+    case "K11": return [{ id, metric: safeRatio(dim(r, "second_visit"), dim(r, "new")), basis: basis(id, "batas SET-22 saat kunjungan pertama") }];
     case "K12": {
       const x = r.extra as K12Extra | null;
-      return [{ id, metric: ratio(n(x?.failed), n(x?.booked)), basis: basis(id) }];
+      return [{ id, metric: safeRatio(n(x?.failed), n(x?.booked)), basis: basis(id) }];
     }
-    case "K13": return [{ id, metric: ratio(dim(r, "paid"), dim(r, "lead")), basis: basis(id, `${dim(r, "lead")} lead`) }];
+    case "K13": return [{ id, metric: safeRatio(dim(r, "paid"), dim(r, "lead")), basis: basis(id, `${dim(r, "lead")} lead`) }];
     case "K14": {
       const x = r.extra as K14Extra | null;
-      if (!x || n(x.leads) === 0) return [{ id, metric: noData, basis: basis(id) }];
+      const leads = n(x?.leads);
+      if (!x || !Number.isSafeInteger(leads)) return [{ id, metric: x ? off("invalid") : noData, basis: basis(id) }];
+      if (leads === 0) return [{ id, metric: noData, basis: basis(id) }];
       // the share against the SLA is labelled by the thresholds in effect at entry (sla_mix), never today's sla_minutes
       const mix = (x.sla_mix ?? []).map((m) => `SLA ${m.minutes} menit: ${m.within} dari ${m.leads}`).join(" · ");
       return [
         { id, label: "Median respons", metric: duration(x.median_minutes === null ? null : Math.round(x.median_minutes * 60)), basis: basis(id, `${x.answered} dari ${x.leads} dijawab`) },
-        { id, label: "Dijawab ≤ 15 menit", metric: ratio(n(x.within_15m), n(x.leads)), basis: basis(id) },
-        { id, label: "Dijawab sesuai SLA saat lead masuk", metric: ratio(n(x.within_sla), n(x.leads)), basis: basis(id, mix) },
+        { id, label: "Dijawab ≤ 15 menit", metric: safeRatio(n(x.within_15m), leads), basis: basis(id) },
+        { id, label: "Dijawab sesuai SLA saat lead masuk", metric: safeRatio(n(x.within_sla), leads), basis: basis(id, mix) },
       ];
     }
     case "K15": {
       const x = r.extra as K15Extra | null;
-      return [{ id, metric: ratio(n(x?.covered_minutes), n(x?.rostered_minutes)), basis: basis(id, "menit terisi ÷ menit jadwal") }];
+      return [{ id, metric: safeRatio(n(x?.covered_minutes), n(x?.rostered_minutes)), basis: basis(id, "menit terisi ÷ menit jadwal") }];
     }
-    case "K16": return [{ id, metric: ratio(dim(r, "with_product"), dim(r, "treatment_visit")), basis: basis(id) }];
+    case "K16": return [{ id, metric: safeRatio(dim(r, "with_product"), dim(r, "treatment_visit")), basis: basis(id) }];
     case "K18":
       return [
         { id, label: "Di bawah minimum", metric: count(dim(r, "below_min")), basis: basis(id) },
@@ -215,9 +235,12 @@ export async function loadReport(db: pg.ClientBase, report: ReportId, o: { from:
     }
     if (k === 19) {
       const month = wholeMonth(o.from, o.to);
-      if (!month) { readable++; kpis.push({ id, metric: off("period_unsupported"), basis: basis(id) }); continue; }
-      const t = await guarded(db, () => listTargets(db, { period: month, branchId: o.branchId ?? null }));
+      // DEC-117 Row 8 P2: verify role authorization and branch scope via target_list BEFORE returning
+      // period_unsupported so unauthorized roles and out-of-scope branches are never masked by period shape.
+      const probePeriod = month ?? o.from.slice(0, 7);
+      const t = await guarded(db, () => listTargets(db, { period: probePeriod, branchId: o.branchId ?? null }));
       if (t === "forbidden") kpis.push({ id, metric: off("forbidden"), basis: basis(id) });
+      else if (!month) { readable++; kpis.push({ id, metric: off("period_unsupported"), basis: basis(id) }); }
       else { readable++; kpis.push(...fromTargets(t)); }
       continue;
     }

@@ -214,7 +214,7 @@ describe("scenario PR-63 Admin Pusat cannot grant Owner", () => {
     const ownerP = people.get("owner")!;
     const target = await person(["nurse"]);
     const roles = roleSource(app);
-    const gate = async () => sessionGate({ roles: await roles(target.acc), twoFactorEnabled: false, lastActiveAt: new Date(), lockedAt: null, now: new Date() });
+    const gate = async () => sessionGate({ roles: await roles(target.acc), twoFactorEnabled: false, secondFactorAt: null, lastActiveAt: new Date(), lockedAt: null, now: new Date() });
     expect(await gate()).toBe("ok"); // a nurse needs no TOTP
     const g = await withTenantContext(app, await ctxOf(ownerP, "owner"), (db) => assignRole(db, target.staffId, "owner"));
     expect(await gate()).toBe("ok"); // not yet an Owner

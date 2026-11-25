@@ -87,7 +87,7 @@ const RULES: { rule: RuleId; patterns: string[] }[] = [
       "rp ?\\.? ?\\d[\\d.,]*",
       "idr ?\\d[\\d.,]*",
       "\\d[\\d.,]* ?(?:rb|ribu|jt|juta|k\\b)",
-      "(?:mulai|harga|tarif|biaya) (?:dari )?\\d[\\d.,]{3,}",
+      "(?:mulai|harga|tarif|biaya) ?[:\\-]? ?(?:dari )?(?:rp ?\\.? ?)?\\d[\\d.,]{3,}",
     ],
   },
 ];

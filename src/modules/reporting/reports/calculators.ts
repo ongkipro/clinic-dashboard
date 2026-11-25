@@ -40,13 +40,23 @@ export function k3(invoices: readonly Invoice[], reductions: readonly SaleReduct
   return sum(invoices.filter((i) => b(i) && inPeriod(i.day, p)).map(saleValue)) - sum(reductions.filter((r) => b(r) && inPeriod(r.day, p)).map((r) => r.amount));
 }
 
+// Exact BigInt half-away-from-zero integer quotient (DEC-117 Row 8 P3: avoids IEEE-754 precision loss).
+function divRoundHalfAway(num: number, den: number): number {
+  const n = BigInt(num);
+  const d = BigInt(den);
+  const sign = n < BigInt(0) ? BigInt(-1) : BigInt(1);
+  const absN = n < BigInt(0) ? -n : n;
+  const q = (absN * BigInt(2) + d) / (d * BigInt(2));
+  return Number(sign * q);
+}
+
 // K20 Rata-rata transaksi — K3 ÷ issued invoices with K3 > 0 in the period; rounded half away from zero to whole rupiah.
 // Draft reading (marker on the entry): an invoice counts when its own sale value at issue is > 0; a later refund lowers the numerator in
 // the refund period and never the count.
 export function k20(invoices: readonly Invoice[], reductions: readonly SaleReduction[], p: Period, branch?: string) {
   const counted = invoices.filter((i) => (branch === undefined || i.branch === branch) && inPeriod(i.day, p) && saleValue(i) > 0);
   const k3v = k3(invoices, reductions, p, branch);
-  return { k3: money(k3v), invoices: count(counted.length), average: counted.length === 0 ? noData : money(roundHalfAway(k3v / counted.length)) };
+  return { k3: money(k3v), invoices: count(counted.length), average: counted.length === 0 ? noData : money(divRoundHalfAway(k3v, counted.length)) };
 }
 
 // ── K21 Churn ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────

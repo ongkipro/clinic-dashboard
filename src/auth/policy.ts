@@ -88,20 +88,24 @@ export function hasIdleLock(roles: readonly Role[]): boolean {
   return roles.some((r) => IDLE_LOCK_ROLES.has(r));
 }
 
-// Session gate for every tenant page and API (PR-3 scenario): a TOTP role without an
-// enrolled and verified second factor may reach only the enrolment flow.
-export type SessionGate = "ok" | "enrol_totp" | "locked";
+// Session gate for every tenant page and API (PR-3 scenario, DEC-117 Row 2a P1): a TOTP role
+// without an enrolled and session-verified second factor cannot access protected routes.
+export type SessionGate = "ok" | "enrol_totp" | "reauth" | "locked";
 
 export function sessionGate(input: {
   roles: readonly Role[];
   twoFactorEnabled: boolean;
+  secondFactorAt: Date | null;
   lastActiveAt: Date;
   lockedAt: Date | null;
   now: Date;
   // The vendor console requires TOTP for every account, whatever its clinic roles (IAM-10).
   totpAlways?: boolean;
 }): SessionGate {
-  if ((input.totpAlways || requiresTotp(input.roles)) && !input.twoFactorEnabled) return "enrol_totp";
+  if (input.totpAlways || requiresTotp(input.roles)) {
+    if (!input.twoFactorEnabled) return "enrol_totp";
+    if (!input.secondFactorAt) return "reauth";
+  }
   if (input.lockedAt) return "locked";
   if (hasIdleLock(input.roles) && input.now.getTime() - input.lastActiveAt.getTime() >= IDLE_LOCK_MS) {
     return "locked";

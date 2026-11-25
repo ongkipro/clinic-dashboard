@@ -8,6 +8,8 @@
 import { withTenantContext } from "../../../src/db/rls/context";
 import { setKekRingForTests } from "../../../src/lib/keys/runtime";
 import { publish } from "../../../src/modules/catalog/catalog";
+import { NextRequest } from "next/server";
+import { handleAftercarePost } from "../../../src/app/api/v1/public/aftercare/handler";
 import { aftercarePage, sendAftercareOtp, verifyAftercareOtp } from "../../../src/modules/crm/aftercare/aftercare";
 import { RECORDED_TEMPLATES } from "../../../src/modules/messaging/inbox/fixtures";
 import { syncTemplates } from "../../../src/modules/messaging/inbox/inbox";
@@ -150,22 +152,66 @@ export default defineCases(
       }
       return { status: 200, body: page as never };
     } },
-  // The actions: as B, sending and verifying B's OTP succeed; as A, every attempt on B's link without B's code is refused.
-  { kind: "action", id: "app/(public)/aftercare/[token]/actions", marker: (env) => links.get(env.victim.tenantId)?.secret ?? "",
+  // The OTP API route handler (DEC-117 Rows 1/7: exercises real handleAftercarePost handler,
+  // origin policy, JSON parsing, HttpOnly cookie issuance, and cross-tenant refusal):
+  { kind: "route", id: "/api/v1/public/aftercare#route", expect: "filtered", marker: (env) => links.get(env.victim.tenantId)?.secret ?? "",
     async run(env) {
       const b = await victim(env);
+      const localEnv = { DEPLOY_ENV: "local", BOOKING_HOST: "booking.localhost:3000" };
+      const prodEnv = { DEPLOY_ENV: "production", BOOKING_HOST: "booking.klinik.example" };
+      // Origin check: HTTP origin on production BOOKING_HOST is refused with 403
+      const badOriginReq = new NextRequest("https://booking.klinik.example/api/v1/public/aftercare", {
+        method: "POST",
+        headers: { host: "booking.klinik.example", origin: "http://booking.klinik.example", "content-type": "application/json" },
+        body: JSON.stringify({ action: "send", token: b.token }),
+      });
+      const badOriginRes = await handleAftercarePost(badOriginReq, env.app, { env: prodEnv });
+      if (badOriginRes.status !== 403) throw new Error(`aftercare route allowed insecure origin in production: ${badOriginRes.status}`);
+
+      const postJson = async (payload: Record<string, unknown>, port?: ReturnType<typeof mockInboxPort>) => {
+        const req = new NextRequest("http://booking.localhost:3000/api/v1/public/aftercare", {
+          method: "POST",
+          headers: {
+            host: "booking.localhost:3000",
+            origin: "http://booking.localhost:3000",
+            "content-type": "application/json",
+            "x-real-ip": `192.0.2.${++seq % 250}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        return handleAftercarePost(req, env.app, { env: localEnv, port });
+      };
+
       if (own(env)) {
-        const s = await verified(env, b);
-        const page = await aftercarePage(env.app, b.token, s.session);
-        return { attempts: { send: s.send, verify: s.verify } as Record<string, string>, body: page as never };
+        const codes: string[] = [];
+        const basePort = mockInboxPort();
+        const sendRes = await postJson(
+          { action: "send", token: b.token },
+          {
+            ...basePort,
+            sendMessage: async (i) => {
+              if (i.kind === "template") codes.push(i.params[0]);
+              return basePort.sendMessage(i);
+            },
+          },
+        );
+        if (sendRes.status !== 200 || codes.length === 0) throw new Error(`aftercare route send failed: ${sendRes.status}`);
+        const verifyRes = await postJson({ action: "verify", token: b.token, code: codes[0] });
+        const cookie = verifyRes.cookies.get("aftercare_session")?.value ?? null;
+        if (verifyRes.status !== 200 || !cookie) throw new Error("aftercare route verify did not issue session cookie");
+        const page = await aftercarePage(env.app, b.token, cookie);
+        return { status: 200, body: page as never };
       }
-      // A cannot read B's code (it goes to B's patient's phone): a guessed code is refused; A's own session never opens B's link
+      // Attacker A: guessing OTP against B's link via the real POST handler fails and sets no cookie
+      const guessRes = await postJson({ action: "verify", token: b.token, code: "000000" });
+      const guessBody = (await guessRes.json()) as Record<string, unknown>;
+      if (guessBody.step === "done" || guessRes.cookies.get("aftercare_session")) {
+        throw new Error("aftercare route isolation: guessed OTP succeeded on victim link");
+      }
       const a = await link(env, env.actor.tenantId, env.actor.branchId);
       const as_ = await verified(env, a);
-      const guess = await verifyAftercareOtp(env.app, b.token, "000000");
       const crossed = await aftercarePage(env.app, b.token, as_.session);
-      const attempts: Record<string, string> = { verify: guess.ok ? "done" : guess.reason === "otp_invalid" || guess.reason === "otp_expired" ? "refused" : guess.reason,
-        session: crossed.state === "verified" ? "done" : "refused" };
-      return { attempts, body: { verify: guess.ok, state: crossed.state } as never };
+      if (crossed.state === "verified") throw new Error("aftercare isolation: attacker session opened victim link");
+      return { status: guessRes.status, body: { verify: guessBody.step, state: crossed.state } as never };
     } },
 );

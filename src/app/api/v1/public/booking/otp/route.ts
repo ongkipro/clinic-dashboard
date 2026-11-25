@@ -11,6 +11,7 @@ import {
   resendPublicBookingOtp,
   signBookingCookiePayload,
 } from "../../../../../../modules/public-site/booking/db";
+import { isSameBookingOrigin } from "../../../../../../lib/public-origin";
 import { envOf } from "../../../../../../modules/platform/residency";
 import { normalizeSourceHint } from "../../../../../(public)/[slug]/booking/model";
 
@@ -27,14 +28,7 @@ const SEC_HEADERS = {
 } as const;
 
 function sameOrigin(req: NextRequest): boolean {
-  const host = req.headers.get("host")?.toLowerCase();
-  const origin = req.headers.get("origin");
-  if (!host || !origin) return false;
-  try {
-    return new URL(origin).host.toLowerCase() === host;
-  } catch {
-    return false;
-  }
+  return isSameBookingOrigin(req);
 }
 
 function normalizePhoneId(raw: string): string | null {

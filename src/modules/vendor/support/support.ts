@@ -63,6 +63,10 @@ export async function withSupportSession<T>(
 ): Promise<T> {
   const client = await operatorPool.connect();
   let broken: Error | undefined;
+  const onError = (err: Error) => {
+    broken ??= err;
+  };
+  client.on("error", onError);
   try {
     // Not READ ONLY: the bind consumes its ticket and writes its binding row, and touched rows are
     // recorded (SECURITY DEFINER); clinic_operator itself holds no write privilege on any table.
@@ -82,7 +86,12 @@ export async function withSupportSession<T>(
         throw new SupportBindError(r.reason ?? "forbidden");
       }
       const out = await fn(client);
-      await client.query("commit");
+      const commitRes = await client.query("commit");
+      // DEC-117 Row 3 P2: PostgreSQL responds with command="ROLLBACK" if the tx was already aborted.
+      // Never return rows whose support_session_reads audit entries were rolled back.
+      if (commitRes.command !== "COMMIT") {
+        throw new SupportBindError("audit_commit_aborted");
+      }
       return out;
     } catch (e) {
       // Always roll back (after a committed refusal this is a no-op warning); a client whose
@@ -93,6 +102,7 @@ export async function withSupportSession<T>(
       throw e;
     }
   } finally {
+    client.removeListener("error", onError);
     client.release(broken);
   }
 }

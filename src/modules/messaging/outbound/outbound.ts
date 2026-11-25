@@ -90,9 +90,14 @@ export async function runOutboundDispatch(worker: pg.Pool | pg.ClientBase, o: { 
     } catch (e) {
       error = e instanceof Error ? (e.message === "token_unavailable" ? e.message : e.name) : "send_failed";
     }
-    const st = (await worker.query<{ s: string }>(`select outbound_complete($1, $2, $3, $4) s`, [c.id, providerId, error, o.now ?? null])).rows[0].s;
-    if (st === "sent") result.sent++;
-    else result.failed++;
+    try {
+      const st = (await worker.query<{ s: string }>(`select outbound_complete($1, $2, $3, $4) s`, [c.id, providerId, error, o.now ?? null])).rows[0].s;
+      if (st === "sent") result.sent++;
+      else result.failed++;
+    } catch {
+      // DEC-117 Row 7 P2: isolate completion failures per claimed row so remaining rows still dispatch.
+      result.failed++;
+    }
   }
   return result;
 }

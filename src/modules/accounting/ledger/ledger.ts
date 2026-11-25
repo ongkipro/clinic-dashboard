@@ -41,7 +41,11 @@ export type Entry = {
 };
 export type Journal = { status: LedgerStatus; entries: Entry[]; accounts: { key: string; label: string; class: AccountClass }[] };
 
-const num = (v: unknown) => Number(v);
+const num = (v: unknown) => {
+  const n = Number(v);
+  if (!Number.isSafeInteger(n)) throw new RangeError("unsafe integer money amount");
+  return n;
+};
 const normalizeReport = (r: Report): Report => ({
   ...r,
   trial_balance: r.trial_balance.map((x) => ({ ...x, opening: num(x.opening), debit: num(x.debit), credit: num(x.credit), closing: num(x.closing) })),
@@ -51,7 +55,11 @@ const normalizeReport = (r: Report): Report => ({
   cash_flow: Object.fromEntries(Object.entries(r.cash_flow).map(([k, v]) => [k, num(v)])),
 });
 
-export const isCalendarDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !s.startsWith("0000") && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
+export const isCalendarDate = (s: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || s.startsWith("0000")) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+};
 
 export async function report(db: pg.ClientBase, o: { from: string; to: string; branchId?: string | null }): Promise<Report> {
   if (!isCalendarDate(o.from) || !isCalendarDate(o.to)) throw new LedgerError("ERR_INVALID_INPUT", "period");

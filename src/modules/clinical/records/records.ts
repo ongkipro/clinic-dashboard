@@ -109,6 +109,13 @@ function copyLines(d: CopyData): PdfLine[] {
     lines.push({ text: `Kunjungan ${day(r.checked_in_at)} - ${r.branch_name} - ${r.author_name}`, bold: true });
     lines.push({ text: `Ditandatangani ${day(r.signed_at)}, versi ${r.version}` });
     for (const [k, label] of SECTIONS) if (r.content[k]) lines.push({ text: `${label}: ${r.content[k]}` });
+    const tpl = Object.entries(r.content.template_values ?? {}).filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "");
+    if (tpl.length) {
+      for (const [k, v] of tpl) {
+        const label = k.replace(/[_-]+/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+        lines.push({ text: `${label}: ${v}` });
+      }
+    }
     const vit = Object.entries(r.content.vitals ?? {});
     if (vit.length) lines.push({ text: `Tanda vital: ${vit.map(([k, v]) => `${VITAL_LABEL[k] ?? k} ${v}`).join(", ")}` });
     if (r.content.icd10_codes?.length) lines.push({ text: `Diagnosis (ICD-10): ${r.content.icd10_codes.join(", ")}` });

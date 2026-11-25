@@ -29,9 +29,16 @@ async function assertNoDrift(client: pg.Client, folder: string): Promise<void> {
   const applied = await client.query<{ hash: string; created_at: string }>(
     `select hash, created_at from drizzle.__drizzle_migrations order by created_at`,
   );
-  const files = new Map(
-    readMigrationFiles({ migrationsFolder: folder }).map((m) => [String(m.folderMillis), m.hash]),
-  );
+  const files = new Map<string, string>();
+  for (const m of readMigrationFiles({ migrationsFolder: folder })) {
+    const key = String(m.folderMillis);
+    if (files.has(key)) {
+      throw new MigrationDriftError(
+        `duplicate migration timestamp ${key} in drizzle/meta/_journal.json; regenerate the newer migration`,
+      );
+    }
+    files.set(key, m.hash);
+  }
   // Drizzle runs only files newer than the newest applied one, so an unapplied file with
   // an older timestamp (e.g. merged from another branch) would be skipped silently.
   const newest = applied.rows.reduce((m, r) => Math.max(m, Number(r.created_at)), 0);

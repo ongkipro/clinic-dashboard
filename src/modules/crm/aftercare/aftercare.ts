@@ -3,7 +3,7 @@
 // /aftercare/<token> on the booking host, asks for a WhatsApp OTP (TD-26: 5 min, 5 attempts; RATE-1), and after it reads each treatment's
 // aftercare text. Everything here runs on an unbound pool: the page has no staff session. Hashes only reach SQL; the plain link token
 // lives in the patient's WhatsApp message and URL, the session token in an httpOnly cookie.
-import { createHash, randomBytes, randomInt } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt } from "node:crypto";
 import type pg from "pg";
 import { decryptField, type KekRing, type TenantKeys, type WrappedDek } from "../../../lib/keys/envelope";
 import { EncryptionUnavailableError, kekRing } from "../../../lib/keys/runtime";
@@ -11,6 +11,18 @@ import { mockInboxPort } from "../../messaging/inbox/mock";
 import type { InboxPort } from "../../messaging/inbox/port";
 
 export const hashOf = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
+// DEC-117 Row 7 P2: 6-digit OTPs are bound to the link token and keyed with HMAC-SHA256 so an
+// exposed otp_hash cannot be brute-forced offline across the 10^6 code space.
+function otpSecret(): string {
+  const k = process.env.AFTERCARE_OTP_SECRET || process.env.BETTER_AUTH_SECRET;
+  if (k && k.length >= 16) return k;
+  if (process.env.DEPLOY_ENV === "production" || process.env.NODE_ENV === "production") {
+    throw new Error("AFTERCARE_OTP_SECRET or BETTER_AUTH_SECRET is required");
+  }
+  return "clinic-dashboard-local-aftercare-otp-key";
+}
+export const otpHashOf = (token: string, code: string) =>
+  createHmac("sha256", otpSecret()).update(`${token}:${code}`, "utf8").digest("hex");
 // A link token is 43 base64url characters (32 random bytes); anything else is not looked up.
 export const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
@@ -50,7 +62,7 @@ export async function sendAftercareOtp(pool: pg.Pool | pg.ClientBase, token: str
   Promise<{ ok: true } | { ok: false; reason: OtpRefusal }> {
   if (!TOKEN.test(token)) return { ok: false, reason: "not_found" };
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  const r = (await pool.query<{ r: Route }>(`select aftercare_otp_send($1, $2, $3, $4) r`, [hashOf(token), hashOf(code), hashOf(ip), o.now ?? null])).rows[0].r;
+  const r = (await pool.query<{ r: Route }>(`select aftercare_otp_send($1, $2, $3, $4) r`, [hashOf(token), otpHashOf(token, code), hashOf(ip), o.now ?? null])).rows[0].r;
   if (!r.ok) return r;
   try {
     const keys = keysOf(r.tenant_id, r.keys);
@@ -73,6 +85,6 @@ export async function verifyAftercareOtp(pool: pg.Pool | pg.ClientBase, token: s
   if (!/^[0-9]{6}$/.test(code)) return { ok: false, reason: "otp_invalid" };
   const session = randomBytes(32).toString("base64url");
   const r = (await pool.query<{ r: { ok: boolean; reason?: string; attempts_remaining?: number } }>(`select aftercare_otp_verify($1, $2, $3, $4) r`,
-    [hashOf(token), hashOf(code), hashOf(session), now ?? null])).rows[0].r;
+    [hashOf(token), otpHashOf(token, code), hashOf(session), now ?? null])).rows[0].r;
   return r.ok ? { ok: true, sessionToken: session } : (r as VerifyResult);
 }

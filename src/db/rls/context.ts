@@ -87,6 +87,20 @@ export async function assertAppRole(
                          lateral aclexplode(n.nspacl) a
                          where a.grantee = (select oid from pg_roles where rolname = session_user))
             then 'has direct privileges' end,
+       case when exists (select 1 from pg_class c join user_schemas s on s.oid = c.relnamespace,
+                         lateral aclexplode(c.relacl) a
+                         where a.grantee = 0)
+              or exists (select 1 from pg_attribute att join pg_class c on c.oid = att.attrelid
+                         join user_schemas s on s.oid = c.relnamespace,
+                         lateral aclexplode(att.attacl) a
+                         where a.grantee = 0)
+              or exists (select 1 from pg_proc p join user_schemas s on s.oid = p.pronamespace
+                         left join pg_depend d on d.objid = p.oid and d.classid = 'pg_proc'::regclass and d.deptype = 'e'
+                         where d.objid is null
+                           and p.proname <> 'uuid_generate_v7'
+                           and (p.proacl is null
+                                or exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0)))
+            then 'protected objects grant PUBLIC privileges' end,
        case when exists (select 1 from pg_db_role_setting rs, unnest(rs.setconfig) cfg
                          where rs.setdatabase in (0, (select oid from pg_database
                                                       where datname = current_database()))

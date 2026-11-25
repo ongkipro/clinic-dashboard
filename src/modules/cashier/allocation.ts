@@ -4,8 +4,9 @@
 // BigInt throughout (the BigInt() form: the TS target is below ES2020): amount × outstanding can exceed 2^53 at the schema bound (1e12 each).
 export function allocate(amount: bigint, outstanding: readonly bigint[]): bigint[] {
   const total = outstanding.reduce((s, o) => s + o, BigInt(0));
-  if (amount <= BigInt(0) || outstanding.length === 0) return outstanding.map(() => BigInt(0));
+  if (amount <= BigInt(0)) return outstanding.map(() => BigInt(0));
   if (amount > total) throw new RangeError("overpayment");
+  if (outstanding.length === 0) return [];
   const base = outstanding.map((o) => (amount * o) / total);
   const rem = outstanding.map((o, i) => amount * o - base[i] * total);
   let left = amount - base.reduce((s, b) => s + b, BigInt(0));

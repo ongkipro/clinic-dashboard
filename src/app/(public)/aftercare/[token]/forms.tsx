@@ -3,8 +3,22 @@
 // session cookie and shows the instructions; nothing about the patient or the treatment is in this component.
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState } from "react";
-import { sendCodeAction, verifyCodeAction } from "./actions";
 import type { OtpState } from "./labels";
+
+async function postAftercare(payload: { action: "send" | "verify"; token: string; code?: string }): Promise<OtpState> {
+  try {
+    const res = await fetch("/api/v1/public/aftercare", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = (await res.json().catch(() => null)) as OtpState | null;
+    if (data && typeof data.step === "string") return data;
+  } catch {
+    // network error handled below
+  }
+  return { step: payload.action === "verify" ? "code" : "send", error: "Terjadi gangguan koneksi. Coba lagi." };
+}
 
 const field = "min-h-[var(--target)] w-full rounded-[var(--radius-field)] border border-[var(--control-border)] bg-[var(--surface)] px-3 text-[1.25rem] tracking-[0.3em] tabular-nums";
 const primary = "min-h-[var(--button-primary)] w-full rounded-[var(--radius-group)] bg-[var(--tint)] px-4 text-[1.06rem] font-semibold text-[var(--on-tint)] aria-disabled:opacity-60";
@@ -20,9 +34,17 @@ export function OtpFlow({ token, initial, maskedPhone }: { token: string; initia
   const router = useRouter();
   // each answer is stamped when it arrives; the page follows the latest of the two (review r1 P3-1: a resend after a wrong code must not
   // keep showing the old error)
-  const [sent, send, sending] = useActionState<OtpState>(async () => ({ ...(await sendCodeAction(token)), at: Date.now() }), { step: initial });
+  const [sent, send, sending] = useActionState<OtpState>(
+    async () => ({ ...(await postAftercare({ action: "send", token })), at: Date.now() }),
+    { step: initial },
+  );
   const [checked, verify, verifying] = useActionState<OtpState, FormData>(
-    async (prev: OtpState, form: FormData) => ({ ...(await verifyCodeAction(token, prev, form)), at: Date.now() }), { step: "code" });
+    async (_prev: OtpState, form: FormData) => ({
+      ...(await postAftercare({ action: "verify", token, code: String(form.get("code") ?? "") })),
+      at: Date.now(),
+    }),
+    { step: "code" },
+  );
   const latest = sent.at === undefined && checked.at === undefined ? null : (checked.at ?? 0) > (sent.at ?? 0) ? checked : sent;
   const step: "send" | "code" = latest === null || latest.step === "done" ? initial : latest.step;
   useEffect(() => { if (checked.step === "done") router.refresh(); }, [checked, router]);
