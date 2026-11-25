@@ -65,7 +65,8 @@ const RULES: { rule: RuleId; patterns: string[] }[] = [
     rule: "promo_diskon",
     patterns: [
       "diskon", "potongan harga", "promo", "kode promo", "voucher", "cashback", "gratis", "harga (?:spesial|khusus|coret|promo|hemat)",
-      "hemat (?:rp|\\d)", "beli \\d+ gratis \\d+", "\\d+ ?% ?(?:off|diskon)", "flash sale", "sale", "discount", "free (?:consultation|session|treatment)",
+      "paket hemat", "bundling", "cicilan 0 ?%", "hemat (?:rp|\\d)", "beli \\d+ gratis \\d+", "\\d+ ?% ?(?:off|diskon)",
+      "flash sale", "sale", "discount", "free (?:consult(?:ation)?|session|treatment)",
       "buy \\d+ get \\d+", "special price", "limited offer",
     ],
   },
@@ -92,7 +93,14 @@ const RULES: { rule: RuleId; patterns: string[] }[] = [
 ];
 
 export function normalise(s: string): string {
-  return s.normalize("NFKC").toLowerCase().replace(/[\u2010-\u2015\u2212]/g, "-").replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, " ").trim();
+  return s
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .toLowerCase()
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 const bounded = (p: string) => new RegExp(`(?<![\\p{L}\\p{N}])(?:${p})(?![\\p{L}\\p{N}])`, "u");
@@ -101,12 +109,22 @@ const SYMBOLS: { rule: RuleId; re: RegExp }[] = [
   { rule: "testimoni", re: /[\u2605\u2606\u2B50]/u },
   { rule: "promo_diskon", re: /~~|<\s*(?:s|del|strike)\b|\u0336/iu },
 ];
+// Bare numeric tariff patterns disallowed inside priceNote (closes T-124 Finding #1 numeric smuggling).
+const PRICE_NOTE_NUMERIC: RegExp[] = [
+  /(?<![\p{L}\p{N}])\d{1,3}(?:[.,]\d{3})+(?![\p{L}\p{N}])/u,
+  /(?<![\p{L}\p{N}])\d{5,}(?![\p{L}\p{N}])/u,
+  /(?<![\p{L}\p{N}])(?:mulai|dari|hanya|cuma)\s+\d+(?![\p{L}\p{N}])/iu,
+];
 
 export function checkText(field: string, text: string | null | undefined): Violation[] {
   if (!text) return [];
   const t = normalise(text);
   const raw = text.normalize("NFKC");
-  const checks = [...COMPILED.map((c) => ({ rule: c.rule, re: c.re, on: t })), ...SYMBOLS.map((x) => ({ rule: x.rule, re: x.re, on: raw }))];
+  const checks = [
+    ...COMPILED.map((c) => ({ rule: c.rule, re: c.re, on: t })),
+    ...SYMBOLS.map((x) => ({ rule: x.rule, re: x.re, on: raw })),
+    ...(field === "priceNote" ? PRICE_NOTE_NUMERIC.map((re) => ({ rule: "harga_di_teks" as RuleId, re, on: t })) : []),
+  ];
   const out: Violation[] = [];
   for (const { rule, re, on } of checks) {
     if (out.some((v) => v.rule === rule)) continue;
@@ -170,7 +188,6 @@ export type PublicTreatment = Readonly<{
 
 export type Projection = { ok: true; page: PublicTreatment; artifactDigest: string } | { ok: false; violations: Violation[] };
 
-const CLINICAL_FIELDS = ["purpose", "contraindications"] as const;
 const TEXT_FIELDS = ["name", "purpose", "performedBy", "downtime", "contraindications", "heroAlt", "caption"] as const;
 
 const optTrim = (v: string | null | undefined): string | null => {
@@ -210,16 +227,16 @@ export const showsAmount = (s: Pick<TreatmentSource, "publishPrice" | "tariffLis
 
 export function checkTreatment(s: TreatmentSource): Violation[] {
   const out = TEXT_FIELDS.flatMap((f) => checkText(f, s[f]));
-  // Only lint priceNote when it will actually be emitted (and catch bare numeric prices in unpublished notes if someone checks).
+  // Lint priceNote strictly when it will actually be emitted (including bare numeric price smuggling).
   if (showsAmount(s)) {
     out.push(...checkText("priceNote", s.priceNote));
   }
-  if (!reviewed(s.clinicalReview) && CLINICAL_FIELDS.some((f) => (s[f] ?? "").trim() !== "")) {
+  if (!reviewed(s.clinicalReview)) {
     out.push({ field: "purpose", rule: "belum_direview", match: "", message: RULE_LABEL.belum_direview });
-  }
-  if (s.clinicalReview.reviewedArtifactHash) {
+  } else {
+    // Fail-closed Finding #2: clinical approval MUST bind the exact canonical artifact digest (never silently optional).
     const current = computeArtifactDigest(s);
-    if (s.clinicalReview.reviewedArtifactHash !== current) {
+    if (!s.clinicalReview.reviewedArtifactHash || s.clinicalReview.reviewedArtifactHash !== current) {
       out.push({ field: "artifact", rule: "artefak_berubah", match: "", message: RULE_LABEL.artefak_berubah });
     }
   }

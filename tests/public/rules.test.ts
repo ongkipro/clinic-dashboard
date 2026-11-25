@@ -1,11 +1,12 @@
 // Public treatment rules unit tests (PR-65, T-124) + canonical DTO/legal-template checks.
 // Proves all 3/3 High findings of t124/WAVE2-PLAN-T124-T126-T127-REVISED-20261124.md:
 // 1. Unpublished tariff emits strictly { kind: "consultation", text: CONSULTATION_PRICE } — no amount,
-//    no priceNote, and secondary serializers (card, meta, JSON-LD) never leak raw price or promo.
-// 2. Clinical review binds exact artifact digest (computeArtifactDigest); editing name, purpose,
-//    contraindications, heroPhoto, heroAlt, or caption invalidates approval.
+//    no priceNote, and secondary serializers (card, meta, JSON-LD) never leak raw price or promo;
+//    published priceNote rejects bare numeric tariff smuggling.
+// 2. Clinical review fail-closed binds the exact canonical artifact digest (computeArtifactDigest);
+//    missing/null reviewedArtifactHash or editing ANY of the 12 canonical fields invalidates approval.
 // 3. Permenkes 1787/2010 patterns block superlatives, comparisons, outcome guarantees, discounts/promos,
-//    testimonials/stars, before-after claims, strikethrough pricing, and prices embedded in prose.
+//    testimonials/stars, before-after claims, strikethrough pricing, zero-width evasion, and prose prices.
 import { describe, expect, it } from "vitest";
 import {
   CHECKLIST,
@@ -33,7 +34,7 @@ import {
 } from "../../src/modules/public-site/snapshot";
 
 function baseTreatment(over: Partial<TreatmentSource> = {}): TreatmentSource {
-  const src: TreatmentSource = {
+  const draft: TreatmentSource = {
     slug: "facial-oksigen",
     name: "Facial Oksigen",
     purpose: "Membersihkan pori dan menjaga kelembapan permukaan kulit wajah.",
@@ -56,14 +57,21 @@ function baseTreatment(over: Partial<TreatmentSource> = {}): TreatmentSource {
     rating: 4.9,
     ...over,
   };
-  return src;
+  if (over.clinicalReview === undefined) {
+    draft.clinicalReview = {
+      state: "approved",
+      reviewedVersion: 2,
+      currentVersion: 2,
+      reviewedArtifactHash: computeArtifactDigest(draft),
+    };
+  }
+  return draft;
 }
 
-describe("T-124 public treatment rules (Permenkes 1787/2010)", () => {
-  it("projects a reviewed treatment with published price and strips promo/rating/normalPrice", () => {
+describe("T-124 public treatment rules (PR-65, Permenkes 1787/2010)", () => {
+  it("Scenario: PR-65 no advertised discount — active promo, normalPrice, and rating never leak across page, card, meta, or JSON-LD", () => {
     const src = baseTreatment();
     const digest = computeArtifactDigest(src);
-    src.clinicalReview = { state: "approved", reviewedVersion: 2, currentVersion: 2, reviewedArtifactHash: digest };
 
     const res = projectTreatment(src);
     expect(res.ok).toBe(true);
@@ -90,15 +98,21 @@ describe("T-124 public treatment rules (Permenkes 1787/2010)", () => {
     expect(json).not.toContain("4.9");
   });
 
-  it("Scenario PR-65: unpublished price or counsel-blocked tariff strips BOTH amount AND priceNote across all outputs", () => {
-    for (const flags of [
-      { publishPrice: false, tariffListAllowed: true },
-      { publishPrice: true, tariffListAllowed: false },
-      { publishPrice: false, tariffListAllowed: false },
-    ]) {
+  it("Scenario: PR-65 unpublished price — unpublished, counsel-blocked, or invalid branchPrice emits consultation fallback and strips BOTH amount AND priceNote", () => {
+    const cases: Partial<TreatmentSource>[] = [
+      { publishPrice: false, tariffListAllowed: true, branchPrice: 777_000 },
+      { publishPrice: true, tariffListAllowed: false, branchPrice: 777_000 },
+      { publishPrice: false, tariffListAllowed: false, branchPrice: 777_000 },
+      { publishPrice: true, tariffListAllowed: true, branchPrice: null },
+      { publishPrice: true, tariffListAllowed: true, branchPrice: 0 },
+      { publishPrice: true, tariffListAllowed: true, branchPrice: -50_000 },
+      { publishPrice: true, tariffListAllowed: true, branchPrice: Number.NaN },
+      { publishPrice: true, tariffListAllowed: true, branchPrice: 450_000.5 },
+    ];
+
+    for (const flags of cases) {
       const src = baseTreatment({
         ...flags,
-        branchPrice: 777_000,
         priceNote: "RAHASIA_TARIF_999000",
       });
       const res = projectTreatment(src);
@@ -121,14 +135,27 @@ describe("T-124 public treatment rules (Permenkes 1787/2010)", () => {
     }
   });
 
-  it("blocks every forbidden Permenkes 1787/2010 category (ID & EN, symbols, strikethrough, prose price)", () => {
+  it("Finding #1: published priceNote rejects bare numeric tariff smuggling without currency prefix", () => {
+    for (const smuggled of ["Termasuk 500.000 paket awal", "Biaya 450000 bersih", "Mulai 350 per kunjungan", "Hanya 250 untuk sesi lanjutan"]) {
+      const res = projectTreatment(baseTreatment({ publishPrice: true, tariffListAllowed: true, branchPrice: 450_000, priceNote: smuggled }));
+      expect(res.ok, `smuggled=${smuggled}`).toBe(false);
+      if (!res.ok) expect(res.violations.map((v) => v.rule)).toContain("harga_di_teks");
+    }
+    const clean = projectTreatment(baseTreatment({ publishPrice: true, tariffListAllowed: true, branchPrice: 450_000, priceNote: "Termasuk evaluasi awal 15 menit" }));
+    expect(clean.ok).toBe(true);
+  });
+
+  it("blocks every forbidden Permenkes 1787/2010 category (ID & EN, zero-width evasion, symbols, strikethrough, prose price)", () => {
     const cases: [string, string][] = [
       ["Klinik terbaik di Jakarta Selatan", "superlatif"],
+      ["Klinik ter\u200Bbaik dengan alat modern", "superlatif"],
       ["Satu-satunya alat tercanggih di Indonesia", "superlatif"],
       ["Lebih efektif daripada klinik lain", "perbandingan"],
       ["Dijamin hasil permanen tanpa efek samping", "janji_hasil"],
       ["Diskon 30% spesial bulan ini dengan kode promo HEMAT", "promo_diskon"],
+      ["Dis\u200Bkon khusus bundling dan cicilan 0%", "promo_diskon"],
       ["Harga ~~500.000~~ jadi lebih ringan", "promo_diskon"],
+      ["Harga <s>500.000</s> khusus hari ini", "promo_diskon"],
       ["Testimoni pasien puas rating 4.9/5", "testimoni"],
       ["Layanan bintang ★5 di kota", "testimoni"],
       ["Lihat foto sebelum dan sesudah tindakan", "sebelum_sesudah"],
@@ -141,31 +168,57 @@ describe("T-124 public treatment rules (Permenkes 1787/2010)", () => {
     }
   });
 
-  it("refuses unreviewed clinical text and refuses post-review edits to text OR media/caption", () => {
+  it("Finding #2 fail-closed: refuses unreviewed treatment (even with empty purpose), missing/null artifact digest, and post-review drift on ANY of the 12 canonical fields", () => {
     const unreviewed = baseTreatment({
+      purpose: "",
+      contraindications: null,
       clinicalReview: { state: "pending", reviewedVersion: 1, currentVersion: 2 },
     });
-    const r1 = projectTreatment(unreviewed);
-    expect(r1.ok).toBe(false);
-    if (!r1.ok) expect(r1.violations.map((v) => v.rule)).toContain("belum_direview");
+    const rUnrev = projectTreatment(unreviewed);
+    expect(rUnrev.ok).toBe(false);
+    if (!rUnrev.ok) expect(rUnrev.violations.map((v) => v.rule)).toContain("belum_direview");
 
+    // Approved version WITHOUT reviewedArtifactHash MUST fail closed!
+    const missingDigest = baseTreatment({
+      clinicalReview: { state: "approved", reviewedVersion: 2, currentVersion: 2 },
+    });
+    const rMissing = projectTreatment(missingDigest);
+    expect(rMissing.ok).toBe(false);
+    if (!rMissing.ok) expect(rMissing.violations.map((v) => v.rule)).toContain("artefak_berubah");
+
+    const nullDigest = baseTreatment({
+      clinicalReview: { state: "approved", reviewedVersion: 2, currentVersion: 2, reviewedArtifactHash: null },
+    });
+    const rNull = projectTreatment(nullDigest);
+    expect(rNull.ok).toBe(false);
+    if (!rNull.ok) expect(rNull.violations.map((v) => v.rule)).toContain("artefak_berubah");
+
+    // Mutating ANY of the 12 canonical fields after approval MUST invalidate the digest!
     const approved = baseTreatment();
     const digest = computeArtifactDigest(approved);
-    const tamperedCaption = baseTreatment({
-      caption: "Tindakan dilakukan di ruang VIP.",
-      clinicalReview: { state: "approved", reviewedVersion: 2, currentVersion: 2, reviewedArtifactHash: digest },
-    });
-    const r2 = projectTreatment(tamperedCaption);
-    expect(r2.ok).toBe(false);
-    if (!r2.ok) expect(r2.violations.map((v) => v.rule)).toContain("artefak_berubah");
-
-    const tamperedPhoto = baseTreatment({
-      heroPhoto: "/media/public/klinik-contoh/" + "b".repeat(64) + ".webp",
-      clinicalReview: { state: "approved", reviewedVersion: 2, currentVersion: 2, reviewedArtifactHash: digest },
-    });
-    const r3 = projectTreatment(tamperedPhoto);
-    expect(r3.ok).toBe(false);
-    if (!r3.ok) expect(r3.violations.map((v) => v.rule)).toContain("artefak_berubah");
+    const mutations: [string, Partial<TreatmentSource>][] = [
+      ["slug", { slug: "facial-oksigen-baru" }],
+      ["name", { name: "Facial Oksigen Lanjut" }],
+      ["purpose", { purpose: "Membersihkan pori wajah secara bertahap." }],
+      ["performedBy", { performedBy: "Dokter estetika berizin praktik" }],
+      ["durationMin", { durationMin: 60 }],
+      ["downtime", { downtime: "Kemerahan ringan selama beberapa jam" }],
+      ["sessions", { sessions: 4 }],
+      ["intervalDays", { intervalDays: 21 }],
+      ["contraindications", { contraindications: "Hindari pada kulit meradang." }],
+      ["heroPhoto", { heroPhoto: "/media/public/klinik-contoh/" + "b".repeat(64) + ".webp" }],
+      ["heroAlt", { heroAlt: "Meja perawatan bersih dengan pencahayaan alami" }],
+      ["caption", { caption: "Dilakukan setelah evaluasi awal dokter." }],
+    ];
+    for (const [field, patch] of mutations) {
+      const drifted = baseTreatment({
+        ...patch,
+        clinicalReview: { state: "approved", reviewedVersion: 2, currentVersion: 2, reviewedArtifactHash: digest },
+      });
+      const r = projectTreatment(drifted);
+      expect(r.ok, `expected drift on ${field} to fail closed`).toBe(false);
+      if (!r.ok) expect(r.violations.map((v) => v.rule), `field=${field}`).toContain("artefak_berubah");
+    }
   });
 
   it("summarizes compliance checklist cleanly", () => {
@@ -246,6 +299,22 @@ describe("T-123 legal templates & canonical PublicSiteDto guards", () => {
   });
 
   it("overlays live branch publish windows and reason-free closures, cascading removed branches from treatments", () => {
+    const sampleTreatment = {
+      slug: "facial-oksigen",
+      name: "Facial Oksigen",
+      category: "facial",
+      purpose: "Membersihkan pori secara lembut.",
+      performedBy: "Terapis terlatih",
+      durationMin: 45,
+      downtime: null,
+      sessions: 1,
+      intervalDays: null,
+      contraindications: "Infeksi aktif",
+      priceNote: null,
+      heroPhoto: null,
+      heroAlt: null,
+      caption: null,
+    };
     const built = buildPublicSiteDto({
       brand: "Klinik Mawar",
       slug: "klinik-mawar",
@@ -284,21 +353,13 @@ describe("T-123 legal templates & canonical PublicSiteDto guards", () => {
       ],
       treatments: [
         {
-          slug: "facial-oksigen",
-          name: "Facial Oksigen",
-          category: "facial",
-          purpose: "Membersihkan pori secara lembut.",
-          performedBy: "Terapis terlatih",
-          durationMin: 45,
-          downtime: null,
-          sessions: 1,
-          intervalDays: null,
-          contraindications: "Infeksi aktif",
-          priceNote: null,
-          heroPhoto: null,
-          heroAlt: null,
-          caption: null,
-          clinicalReview: { state: "approved", reviewedVersion: 1, currentVersion: 1 },
+          ...sampleTreatment,
+          clinicalReview: {
+            state: "approved",
+            reviewedVersion: 1,
+            currentVersion: 1,
+            reviewedArtifactHash: computeArtifactDigest(sampleTreatment),
+          },
           publishPrice: true,
           onlineBookable: true,
           published: true,
