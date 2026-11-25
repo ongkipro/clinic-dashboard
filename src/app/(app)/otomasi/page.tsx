@@ -95,7 +95,7 @@ async function Content({ sp }: { sp: SP }) {
           {d.log.length === 0 ? (scenario || state !== "all" ? (
             <div className="grid gap-2 rounded-[var(--radius-field)] bg-[var(--bg-grouped)] p-3">
               <p className="m-0">Tidak ada pengiriman untuk saringan ini.</p>
-              <a href="/otomasi#log" className="inline-flex min-h-[var(--target)] items-center self-start font-semibold text-[var(--tint)]">Hapus Filter</a>
+              <Link href="/otomasi#log" className="inline-flex min-h-[var(--target)] items-center self-start font-semibold text-[var(--tint)]">Hapus Filter</Link>
             </div>
           ) : <p className="m-0">Belum ada pesan otomatis.</p>) : (
             <ul className="m-0 grid list-none gap-2 p-0" aria-label="Pengiriman">
