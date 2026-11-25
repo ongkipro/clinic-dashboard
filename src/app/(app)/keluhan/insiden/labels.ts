@@ -16,7 +16,7 @@ export const EVENT: Record<string, string> = {
   reported: "Dilaporkan", taken: "Mulai ditangani", investigated: "Investigasi selesai", determined: "Keputusan pelaporan", submitted: "Laporan dikirim", closed: "Ditutup",
 };
 export const ROLE_LABEL: Record<string, string> = {
-  doctor: "Dokter", nurse: "Perawat", therapist: "Terapis", pharmacist: "Apoteker", bc: "Beauty Consultant", manager: "Manajer Cabang",
+  doctor: "Dokter", nurse: "Perawat", therapist: "Terapis", pharmacist: "Apoteker", bc: "BC", manager: "Manajer Cabang",
   facility_head: "Penanggung Jawab Klinik", owner: "Owner", auditor: "Auditor Internal",
 };
 export const REPORTERS = new Set(["doctor", "nurse", "therapist", "pharmacist", "bc", "manager", "facility_head"]);

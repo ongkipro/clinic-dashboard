@@ -7,7 +7,7 @@ export const STATE: Record<string, { tone: "neutral" | "warning" | "success" | "
   cancelled: { tone: "neutral", label: "Dibatalkan" },
 };
 export const ROLE_LABEL: Record<string, string> = {
-  bc: "Beauty Consultant", doctor: "Dokter", nurse: "Perawat", therapist: "Terapis", facility_head: "Penanggung Jawab Klinik",
+  bc: "BC", doctor: "Dokter", nurse: "Perawat", therapist: "Terapis", facility_head: "Penanggung Jawab Klinik",
 };
 export const UNIT_LABEL: Record<string, string> = { unit: "unit", ml: "ml", mg: "mg", cm2: "cm²" };
 export const PROPOSERS = new Set(["bc", "doctor", "nurse", "therapist"]);

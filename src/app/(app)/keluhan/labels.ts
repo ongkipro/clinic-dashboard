@@ -28,7 +28,7 @@ export const EVENT_LABEL: Record<string, string> = {
   flagged: "Dilaporkan", taken: "Mulai ditangani", triaged: "Triase diubah", note: "Catatan", resolved: "Diselesaikan", reopened: "Dibuka kembali", escalated: "Melewati target, diteruskan",
 };
 export const ROLE_LABEL: Record<string, string> = {
-  fo_cashier: "FO/Kasir", central_cs: "CS Pusat", bc: "Beauty Consultant", doctor: "Dokter", nurse: "Perawat", pharmacist: "Apoteker",
+  fo_cashier: "FO/Kasir", central_cs: "CS Pusat", bc: "BC", doctor: "Dokter", nurse: "Perawat", pharmacist: "Apoteker",
   facility_head: "Penanggung Jawab Klinik", manager: "Manajer Cabang",
 };
 // Who handles which kind (DEC-066); the database decides, the pages only choose segments and controls.
