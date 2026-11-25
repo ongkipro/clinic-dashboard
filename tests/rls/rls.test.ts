@@ -377,6 +377,7 @@ describe("functions (TEN-16)", () => {
     "branch_is_open(uuid,timestamp with time zone,timestamp with time zone)",
     "branch_price_cancel(uuid)", // T-035: Owner-only branch price writers and reader (PR-42)
     "branch_price_set(uuid,uuid,bigint,timestamp with time zone,text)",
+    "feature_flag_on(text)", // T-129 + HYG-024 (ADR-7): tenant-scoped read-only feature flag check
     "catalog_branch_price(uuid,uuid,timestamp with time zone)",
     "branch_set_hours(uuid,jsonb)",
     "branch_set_services(uuid,uuid[])",

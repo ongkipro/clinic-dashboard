@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, date, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { authUser } from "../../auth/schema";
 import { branches } from "../org/schema";
 
@@ -580,5 +580,45 @@ export const onboardingChecklistItems = pgTable(
     check("onboarding_checklist_items_status_check", sql`${t.status} in ('open','done','not_applicable')`),
     check("onboarding_checklist_items_na_check", sql`${t.status} <> 'not_applicable' or (${t.item} in ('payment_port','waba','satusehat') and length(btrim(coalesce(${t.note}, ''))) between 3 and 500)`),
     check("onboarding_checklist_items_note_check", sql`${t.note} is null or length(${t.note}) <= 500`),
+  ],
+);
+
+// Platform & tenant feature flags (ADR-7, B-23; T-129 / HYG-024, migration 0140).
+// Policy kind: platform. Release 1 ships an empty catalogue and keeps console writes closed.
+// Clinic reads go solely through feature_flag_on(p_key) bound to app.tenant_id.
+export const platformFeatureFlags = pgTable(
+  "platform_feature_flags",
+  {
+    key: text("key").primaryKey(),
+    label: text("label").notNull(),
+    description: text("description").notNull(),
+    tenderRef: text("tender_ref").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    check("platform_feature_flags_key_chk", sql`${t.key} ~ '^[a-z][a-z0-9_]{2,48}$'`),
+    check("platform_feature_flags_label_chk", sql`length(btrim(${t.label})) between 3 and 120`),
+  ],
+);
+
+export const tenantFeatureFlags = pgTable(
+  "tenant_feature_flags",
+  {
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenantsRegistry.id, { onDelete: "restrict" }),
+    flagKey: text("flag_key")
+      .notNull()
+      .references(() => platformFeatureFlags.key, { onDelete: "restrict" }),
+    enabled: boolean("enabled").notNull().default(false),
+    decisionRef: text("decision_ref").notNull(),
+    approvedBy: uuid("approved_by")
+      .notNull()
+      .references(() => authUser.id, { onDelete: "restrict" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.flagKey] }),
+    check("tenant_feature_flags_dec_chk", sql`${t.decisionRef} ~ '^DEC-[0-9]{3,5}$'`),
   ],
 );

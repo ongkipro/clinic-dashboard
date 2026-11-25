@@ -572,11 +572,12 @@ describe("structural: every vendor console entry point re-checks before each exi
     // The inventory in 0049's header plus T-027's two (0051), T-103's five billing entry points (0120; Panel 2 2026-11-17) and T-118's
     // health reader (0127; Panel 2 pre-approved) (fails when an entry point is added without a decision).
     expect(listed).toEqual([
+      "vendor_console_actions_export", "vendor_console_actions_list",
       "vendor_console_billing", "vendor_console_billing_cancel", "vendor_console_billing_decide", "vendor_console_billing_issue", "vendor_console_billing_request",
-      "vendor_console_checklist", "vendor_console_checklist_set", "vendor_console_health", "vendor_console_me", "vendor_console_onboarding_access", "vendor_console_onboarding_invite", "vendor_console_owner_invite",
-      "vendor_console_owner_invite_approve", "vendor_console_owner_invite_cancel", "vendor_console_staff_invite", "vendor_console_staff_invite_cancel",
+      "vendor_console_checklist", "vendor_console_checklist_set", "vendor_console_flags", "vendor_console_health", "vendor_console_integrations", "vendor_console_me", "vendor_console_onboarding_access", "vendor_console_onboarding_invite", "vendor_console_owner_invite",
+      "vendor_console_owner_invite_approve", "vendor_console_owner_invite_cancel", "vendor_console_profile", "vendor_console_staff_invite", "vendor_console_staff_invite_cancel",
       "vendor_console_staff_list", "vendor_console_staff_state", "vendor_console_support_end", "vendor_console_support_extend",
-      "vendor_console_support_list", "vendor_console_support_open", "vendor_console_support_ticket", "vendor_console_tenant_advance",
+      "vendor_console_support_list", "vendor_console_support_open", "vendor_console_support_ticket", "vendor_console_template_save", "vendor_console_templates_list", "vendor_console_tenant_advance",
       "vendor_console_tenant_create", "vendor_console_tenant_detail", "vendor_console_tenants",
     ]);
     for (const { proname, d } of fns) {

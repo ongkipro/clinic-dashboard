@@ -29,6 +29,15 @@ const COPY: Record<string, string> = {
   ERR_VERSION_CONFLICT: "Pengajuan ini sudah diputuskan atau berubah. Muat ulang halaman.",
   ERR_NOT_FOUND: "Data ini sudah tidak ada. Muat ulang halaman.",
   ERR_UNAUTHENTICATED: "Sesi Anda berakhir. Masuk kembali.",
+  // T-129 + HYG-024 Audit Export & Global Legal Templates
+  rate_limited: "Batas ekspor 5 kali per 5 menit tercapai. Tunggu beberapa menit lalu coba lagi.",
+  row_limit_exceeded: "Jumlah baris melebihi batas 10.000 baris. Persempit rentang waktu atau pilih satu klinik.",
+  invalid_range: "Tanggal mulai tidak boleh lebih akhir dari tanggal selesai.",
+  invalid_kind: "Jenis templat tidak dikenal.",
+  invalid_body: "Isi templat harus teks polos minimal 20 karakter, tanpa tag HTML, dan hanya memakai token yang diizinkan.",
+  ERR_RATE_LIMITED: "Batas ekspor tercapai. Tunggu beberapa menit lalu coba lagi.",
+  ERR_LIMIT_EXCEEDED: "Jumlah baris melebihi batas ekspor. Persempit rentang waktu.",
+  ERR_UNSUPPORTED_MEDIA_TYPE: "Format permintaan tidak didukung.",
 };
 
 export async function post(action: string, body: unknown): Promise<PostResult> {

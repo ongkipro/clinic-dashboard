@@ -19,17 +19,66 @@ const h = vi.hoisted(() => ({
   gate: { kind: "signed-out" } as unknown,
   tenants: { ok: true, data: { rows: [] as unknown[] } } as unknown,
   sessions: { ok: true, rows: [] as unknown[] } as unknown,
+  integrations: { ok: true, at: "2026-11-25T02:00:00Z", rows: [] as unknown[] } as unknown,
+  actions: { ok: true, rows: [] as unknown[] } as unknown,
+  profile: {
+    ok: true,
+    profile: {
+      legalName: "PT Vendor Sintetis",
+      nib: "1234567890123",
+      pseNumber: "PSE-001",
+      npwp: "123456789012345",
+      metaBusinessId: "123456",
+      website: "https://vendor-sintetis.test",
+      privacyUrl: "https://vendor-sintetis.test/privasi",
+      supportEmail: "dukungan@vendor-sintetis.test",
+      supportPhone: "+6281234567890",
+      placeholderFields: [],
+      storageLocations: [{ kind: "database", provider: "vultr", region: "sgp", country: "SG" }],
+      isPkp: false,
+      pkpEffectiveFrom: null,
+      residencyOpinionOutcome: "positive",
+      residencyOpinionDate: "2026-11-01",
+      residencyOpinionRef: "DEC-120",
+      updatedAt: "2026-11-25T02:00:00Z",
+    },
+    goLiveBlockers: [] as string[],
+  } as unknown,
+  flags: { ok: true, writesOpen: false, catalogue: [] as unknown[], assignments: [] as unknown[] } as unknown,
+  templates: { ok: true, rows: [] as unknown[] } as unknown,
+  auditExport: { ok: true, count: 0, rows: [] as unknown[] } as unknown,
   queries: [] as { sql: string; args: unknown[] }[],
   tenantCalls: 0,
 }));
+vi.mock("next/navigation", async (orig) => {
+  const actual = await orig<typeof import("next/navigation")>();
+  return { ...actual, useRouter: () => ({ refresh: vi.fn() }) };
+});
 vi.mock("../../src/app/vendor/_lib/server", () => ({
   consoleGate: async () => h.gate,
+  vendorOrigin: () => "https://vendor.test.local",
+  ipHeader: () => "x-forwarded-for",
+  vendorAuth: async () => ({
+    checkSession: async () => ({ gate: "ok", token: "tok-route-test" }),
+  }),
   call: async () => { h.tenantCalls += 1; return h.tenants; },
-  vendorPool: async () => ({ query: async (sql: string, args: unknown[]) => { h.queries.push({ sql, args }); return { rows: [{ r: h.sessions }] }; } }),
+  vendorPool: async () => ({
+    query: async (sql: string, args: unknown[]) => {
+      h.queries.push({ sql, args });
+      if (sql.includes("vendor_console_integrations")) return { rows: [{ r: h.integrations }] };
+      if (sql.includes("vendor_console_actions_list")) return { rows: [{ r: h.actions }] };
+      if (sql.includes("vendor_console_actions_export")) return { rows: [{ r: h.auditExport }] };
+      if (sql.includes("vendor_console_profile")) return { rows: [{ r: h.profile }] };
+      if (sql.includes("vendor_console_flags")) return { rows: [{ r: h.flags }] };
+      if (sql.includes("vendor_console_templates_list")) return { rows: [{ r: h.templates }] };
+      return { rows: [{ r: h.sessions }] };
+    },
+  }),
 }));
 // The sign-out button needs the app router; the tree does not.
 vi.mock("../../src/app/vendor/_lib/sign-out", () => ({ VendorSignOut: () => null }));
 
+import { POST as consolePost } from "../../src/app/vendor/api/console/[action]/route";
 import AuditPage from "../../src/app/vendor/audit/page";
 import FlagPage from "../../src/app/vendor/flag/page";
 import IntegrasiPage from "../../src/app/vendor/integrasi/page";
@@ -245,13 +294,17 @@ describe("the six pages: gate first, role next, then the request", () => {
       expect(h.tenantCalls + h.queries.length).toBe(0);
     });
 
-    it(`${p.href}: each allowed role opens it; no form, button, input or inline style`, async () => {
+    it(`${p.href}: each allowed role opens it; no inline style or form action (read-only pages have no form controls)`, async () => {
+      const wiredActions = p.href === "/vendor/audit" || p.href === "/vendor/templat";
       for (const role of p.roles) {
         h.gate = signedIn(role);
         const html = await open(p.page);
         expect(main(html), role).toContain(`<h1`);
         expect(main(html), role).toContain(p.title);
-        expect(html, role).not.toMatch(/<form|<button|<input|<select|<textarea|\sstyle=|\saction=/);
+        expect(html, role).not.toMatch(/\sstyle=|\saction=/);
+        if (!wiredActions) {
+          expect(html, role).not.toMatch(/<form|<button|<input|<select|<textarea/);
+        }
         // The sidebar marks this page as current: every role that may open a page has its link.
         expect(/<a\b[^>]*aria-current="page"[^>]*>/.exec(html)?.[0] ?? "", role).toContain(`href="${p.href}"`);
       }
@@ -336,55 +389,101 @@ describe("Sesi Dukungan (existing reader, safe fields only)", () => {
   });
 });
 
-describe("pages without a reader say so", () => {
-  it("Integrasi, Audit Vendor, Templat Global and Profil Vendor read 'Belum tersedia' with the reason and show no figure", async () => {
-    for (const p of PAGES.filter((x) => ["Integrasi", "Audit Vendor", "Templat Global", "Profil Vendor"].includes(x.title))) {
-      h.gate = signedIn(p.roles[0]);
-      const html = main(await open(p.page, p.tenantParam ? { tenant: T1 } : {}));
-      expect(html, p.title).toContain('data-state="not_available"');
-      expect(html, p.title).toContain("Belum tersedia");
-      expect(html, p.title).toContain("Konsol Vendor belum punya pembaca");
-      expect(html.replace(/<[^>]+>/g, " "), p.title).not.toMatch(/\d/);
-      expect(html, p.title).not.toContain("<table");
-    }
-    expect(h.tenantCalls + h.queries.length).toBe(0);
+describe("wired HYG-024 vendor console pages (0140 readers & actions)", () => {
+  it("Integrasi, Audit Vendor (with export control), and Templat Global (with save/activate form) render cleanly", async () => {
+    h.gate = signedIn("support");
+    const intHtml = main(await open(IntegrasiPage));
+    expect(intHtml).toContain("Belum ada klinik terdaftar untuk pemantauan integrasi.");
+
+    h.gate = signedIn("vendor_auditor");
+    const audHtml = main(await open(AuditPage));
+    expect(audHtml).toContain("Belum ada catatan aksi vendor pada cakupan ini.");
+    expect(audHtml).toContain("Unduh CSV Audit");
+    expect(audHtml).toContain('id="audit-from"');
+    expect(audHtml).toContain('id="audit-to"');
+
+    h.gate = signedIn("platform_owner");
+    const tplHtml = main(await open(TemplatPage));
+    expect(tplHtml).toContain("Belum ada versi templat legal global tersimpan.");
+    expect(tplHtml).toContain("Simpan Versi Templat");
+    expect(tplHtml).toContain('id="tpl-kind"');
+    expect(tplHtml).toContain('id="tpl-body"');
+    expect(tplHtml).toContain("Aktifkan versi ini untuk situs publik");
   });
 
-  it("Profil Vendor points at Onboarding, which its only role (the platform owner) has", async () => {
+  it("Profil Vendor renders vendor identity, storage locations, go-live gate status, and points at Onboarding", async () => {
     h.gate = signedIn("platform_owner");
-    const html = main(await open(ProfilPage as Page));
+    const html = main(await open(ProfilPage));
+    expect(html).toContain("PT Vendor Sintetis");
+    expect(html).toContain("Lokasi Penyimpanan Data");
+    expect(html).toContain("vultr · sgp (SG)");
+    expect(html).toContain("Terbuka");
     expect([...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1])).toEqual(["/vendor/onboarding"]);
     expect(mayOpen(["platform_owner"], "/vendor/onboarding")).toBe(true);
   });
 
-  // DEL-2 (tests/isolation/surfaces.ts cites this): the five pages without a reader hold no data access at all. Their only imports
-  // are the console gate, the shell and the router; the two database entry points the gate module exports are never referenced.
-  it("the five pages without a reader import no reader and reference no database entry point", () => {
-    for (const p of PAGES.filter((x) => x.title !== "Sesi Dukungan")) {
-      const src = readFileSync(pageFile(p.href), "utf8");
-      const from = [...src.matchAll(/from "([^"]+)"/g)].map((m) => m[1]).sort();
-      const allowed = ["../_lib/console.module.css", "../_lib/server", "../_lib/shell", "next/link", "next/navigation"];
-      expect(from.filter((f) => !allowed.includes(f)), p.href).toEqual([]);
-      expect(/import \{([^}]*)\} from "\.\.\/_lib\/server"/.exec(src)![1].trim(), p.href).toBe("consoleGate");
-      expect(src, p.href).not.toMatch(/vendorPool|\bcall\b|\.query\(|modules\/|select |fetch\(/);
-    }
-  });
-
-  it("every allowed role opens each of the five pages without one database call", async () => {
-    for (const p of PAGES.filter((x) => x.title !== "Sesi Dukungan")) {
-      for (const role of p.roles) {
-        h.gate = signedIn(role);
-        await open(p.page, p.tenantParam ? { tenant: T1 } : {});
-      }
-    }
-    expect(h.tenantCalls + h.queries.length).toBe(0);
-  });
-
   it("Feature Flag Platform shows the empty Release 1 catalogue and nothing to switch", async () => {
     h.gate = signedIn("platform_owner");
-    const html = main(await open(FlagPage as Page));
+    const html = main(await open(FlagPage));
     expect(html).toContain("Belum ada fitur khusus tender.");
     expect(html).toContain('data-state="empty"');
     expect(html).not.toMatch(/href=|<input|role="switch"|checkbox/);
+  });
+
+  it("POST /vendor/api/console/audit-export enforces exact Content-Type (415) and DB-safe Gregorian timestamps (400)", async () => {
+    const req = (ct: string | null, body: unknown) =>
+      consolePost(
+        new Request("https://vendor.test.local/vendor/api/console/audit-export", {
+          method: "POST",
+          headers: {
+            origin: "https://vendor.test.local",
+            "x-forwarded-for": "203.0.113.7",
+            ...(ct !== null ? { "content-type": ct } : {}),
+          },
+          body: JSON.stringify(body),
+        }),
+        { params: Promise.resolve({ action: "audit-export" }) },
+      );
+
+    // Malformed, missing, non-JSON, non-HTTP whitespace (NBSP), or repeated charset Content-Type -> 415
+    for (const badCt of [
+      null,
+      "text/plain",
+      "application/json;",
+      "application/json; charset=utf-8; charset=utf-8",
+      "application/json; charset=iso-8859-1",
+      "application/json; foo=bar",
+      "application/json;\u00A0charset=utf-8",
+      "\u00A0application/json",
+    ]) {
+      const r = await req(badCt, {});
+      expect(r.status, String(badCt)).toBe(415);
+    }
+
+    // Year 0000, offset > 14:00, impossible calendar date, non-string, reversed range, and sub-millisecond reversal -> 400
+    for (const badBody of [
+      { from: "0000-01-01T00:00:00Z" },
+      { from: "2026-01-01T00:00:00+16:00" },
+      { from: "2026-01-01T00:00:00+14:30" },
+      { from: "2026-02-30T00:00:00Z" },
+      { from: 12345 },
+      { from: "2026-11-26T10:00:00+07:00", to: "2026-11-26T09:00:00+07:00" },
+      { from: "2026-11-26T00:00:00.000002Z", to: "2026-11-26T00:00:00.000001Z" },
+    ]) {
+      const r = await req("application/json", badBody);
+      expect(r.status, JSON.stringify(badBody)).toBe(400);
+    }
+
+    // Valid application/json; charset=utf-8 normalizes timestamps preserving full microsecond precision before SQL
+    h.queries.length = 0;
+    const ok = await req("application/json; charset=utf-8", {
+      from: "2026-11-26T00:00:00.000001+07:00",
+      to: "2026-11-26T23:59:59.999999+07:00",
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("content-type")).toBe("text/csv; charset=utf-8");
+    const sqlCall = h.queries.find((q) => q.sql.includes("vendor_console_actions_export"));
+    expect(sqlCall?.args[3]).toBe("2026-11-25T17:00:00.000001Z");
+    expect(sqlCall?.args[4]).toBe("2026-11-26T16:59:59.999999Z");
   });
 });

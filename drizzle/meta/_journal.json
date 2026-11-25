@@ -981,6 +981,13 @@
       "when": 1795630100000,
       "tag": "0139_public_pixel_revision",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1795634833908,
+      "tag": "0140_vendor_console_readers",
+      "breakpoints": true
     }
   ]
 }

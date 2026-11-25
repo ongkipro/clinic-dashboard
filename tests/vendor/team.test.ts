@@ -307,6 +307,9 @@ describe("history and privileges", () => {
       "vendor_authority_refused(text, text, text, text, uuid, uuid, text)",
       // T-103 (Panel 2 2026-11-17, exact): the support note and the four billing console entry points.
       "vendor_billing_attempt_note(text, text, uuid, text, text)",
+      // T-129 + HYG-024 (0140): vendor console readers, rate-limited audit export, and legal template writer.
+      "vendor_console_actions_export(text, text, uuid, timestamp with time zone, timestamp with time zone)",
+      "vendor_console_actions_list(text, text, uuid, timestamp with time zone, timestamp with time zone, integer)",
       "vendor_console_billing(text, text, uuid)",
       "vendor_console_billing_cancel(text, text, uuid)",
       "vendor_console_billing_decide(text, text, uuid, boolean, text)",
@@ -314,8 +317,10 @@ describe("history and privileges", () => {
       "vendor_console_billing_request(text, text, uuid, text, jsonb, text)",
       "vendor_console_checklist(text, text, uuid)",
       "vendor_console_checklist_set(text, text, uuid, uuid, text, text, text, uuid)",
+      "vendor_console_flags(text, text)",
       // T-118 (Panel 2 pre-approved): the Kesehatan Platform reader (platform_owner, support; read-only).
       "vendor_console_health(text, text)",
+      "vendor_console_integrations(text, text, uuid)",
       "vendor_console_ip_allowed(text)",
       "vendor_console_me(text, text)",
       "vendor_console_onboarding_access(text, text, uuid, text)",
@@ -323,6 +328,7 @@ describe("history and privileges", () => {
       "vendor_console_owner_invite(text, text, uuid, text, text)",
       "vendor_console_owner_invite_approve(text, text, uuid, text)",
       "vendor_console_owner_invite_cancel(text, text, uuid)",
+      "vendor_console_profile(text, text)",
       "vendor_console_staff_invite(text, text, text, text, text[], text)",
       "vendor_console_staff_invite_cancel(text, text, uuid)",
       "vendor_console_staff_list(text, text)",
@@ -332,6 +338,8 @@ describe("history and privileges", () => {
       "vendor_console_support_list(text, text, uuid)",
       "vendor_console_support_open(text, text, uuid, text, text[], integer)",
       "vendor_console_support_ticket(text, text, uuid, integer, bigint)",
+      "vendor_console_template_save(text, text, text, text, boolean)",
+      "vendor_console_templates_list(text, text)",
       "vendor_console_tenant_advance(text, text, uuid, text, text)",
       "vendor_console_tenant_create(text, text, text, text, text, text, text, text, text)",
       "vendor_console_tenant_detail(text, text, uuid)",

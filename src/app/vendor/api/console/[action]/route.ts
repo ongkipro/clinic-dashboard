@@ -8,17 +8,51 @@ import { AccountExistsError, PasswordPolicyError } from "../../../../../auth/ser
 import { acceptMemberWithNewAccount, cancelMemberInvite, inviteMember, setMemberState } from "../../../../../modules/vendor/team/team";
 import { setChecklistItem } from "../../../../../modules/vendor/checklist/checklist";
 import { cancelBilling, decideBilling, issueBilling, noteAttempt, requestBilling } from "../../../../../modules/vendor/billing/console";
+import { exportVendorActionsCsv } from "../../../../../modules/vendor/console/audit.export";
+import { saveLegalTemplate } from "../../../../../modules/vendor/console/console";
 import {
   advanceTenant, approveOwnerInvite, cancelOwnerInvite, type ConsoleCall, createTenant, requestOwnerInvite,
 } from "../../../../../modules/vendor/tenants/tenants";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+// Strict Gregorian ISO-8601 within PostgreSQL timestamptz safe bounds (years 0001..9999, timezone offsets -14:00..+14:00),
+// preserving full microsecond precision as canonical UTC ISO string + exact BigInt microseconds for range comparison.
+const ISO_TS = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(?:Z|([+-])(0\d|1[0-4]):([0-5]\d))$/;
+const isLeapYear = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+const daysInMonth = (y: number, mo: number) => (mo === 2 ? (isLeapYear(y) ? 29 : 28) : mo === 4 || mo === 6 || mo === 9 || mo === 11 ? 30 : 31);
+const pad = (n: number, len = 2) => String(n).padStart(len, "0");
+type ParsedTs = { iso: string; wholeSecMs: number; us: number };
+const isoTimestamp = (v: unknown): ParsedTs | null => {
+  if (typeof v !== "string" || v.length > 40) return null;
+  const m = ISO_TS.exec(v);
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]), h = Number(m[4]), mi = Number(m[5]), s = Number(m[6]);
+  if (y < 1 || y > 9999 || mo < 1 || mo > 12 || d < 1 || d > daysInMonth(y, mo) || h > 23 || mi > 59 || s > 59) return null;
+  if (m[9] === "14" && m[10] !== "00") return null;
+  const us = Number((m[7] ?? "").padEnd(6, "0"));
+  const offMin = m[8] ? (m[8] === "+" ? 1 : -1) * (Number(m[9]) * 60 + Number(m[10])) : 0;
+  const dt = new Date(0);
+  dt.setUTCFullYear(y, mo - 1, d);
+  dt.setUTCHours(h, mi, s, 0);
+  const wholeSecMs = dt.getTime() - offMin * 60_000;
+  if (!Number.isFinite(wholeSecMs)) return null;
+  const utc = new Date(wholeSecMs);
+  const uy = utc.getUTCFullYear();
+  if (uy < 1 || uy > 9999) return null;
+  const frac = us === 0 ? "" : `.${pad(us, 6)}`;
+  const iso = `${pad(uy, 4)}-${pad(utc.getUTCMonth() + 1)}-${pad(utc.getUTCDate())}T${pad(utc.getUTCHours())}:${pad(utc.getUTCMinutes())}:${pad(utc.getUTCSeconds())}${frac}Z`;
+  return { iso, wholeSecMs, us };
+};
 const str = (v: unknown, max = 254) => (typeof v === "string" && v.length <= max ? v : "");
 const uuid = (v: unknown) => (typeof v === "string" && UUID.test(v) ? v : null);
+// HTTP OWS (RFC 9110): space (0x20) and horizontal tab (0x09) only; rejects NBSP, newlines, empty or duplicate params.
+const EXACT_JSON_CT = /^[ \t]*application\/json(?:[ \t]*;[ \t]*charset=utf-8)?[ \t]*$/i;
+const isExactJsonContentType = (ct: string | null) => ct !== null && EXACT_JSON_CT.test(ct);
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "cache-control": "no-store" } });
 
 export async function POST(request: Request, { params }: { params: Promise<{ action: string }> }) {
   if (request.headers.get("origin") !== vendorOrigin()) return json({ ok: false, code: "ERR_FORBIDDEN" }, 403);
+  if (!isExactJsonContentType(request.headers.get("content-type"))) return json({ ok: false, code: "ERR_UNSUPPORTED_MEDIA_TYPE" }, 415);
   const { action } = await params;
   // Accepting a Tim Vendor invitation (DEC-036) is the one action without a session: the
   // token names the invitation; a new account for the invited email is created with the
@@ -131,9 +165,56 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
     case "staff-state":
       r = await setMemberState(db, c, uuid(body.staffId), str(body.state, 16));
       break;
+    case "template-save": {
+      if (body.activate !== undefined && typeof body.activate !== "boolean") {
+        return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
+      }
+      r = await saveLegalTemplate(db, c, {
+        kind: str(body.kind, 40),
+        body: str(body.body, 50_000),
+        activate: Boolean(body.activate),
+      });
+      break;
+    }
+    case "audit-export": {
+      const absent = (v: unknown) => v === undefined || v === null || v === "";
+      const tenant = absent(body.tenantId) ? null : uuid(body.tenantId);
+      if (!absent(body.tenantId) && !tenant) return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
+      const from = absent(body.from) ? null : isoTimestamp(body.from);
+      const to = absent(body.to) ? null : isoTimestamp(body.to);
+      if ((!absent(body.from) && !from) || (!absent(body.to) && !to)) {
+        return json({ ok: false, code: "ERR_INVALID_INPUT" }, 400);
+      }
+      if (from && to && (from.wholeSecMs > to.wholeSecMs || (from.wholeSecMs === to.wholeSecMs && from.us > to.us))) {
+        return json({ ok: false, code: "ERR_INVALID_INPUT", reason: "invalid_range" }, 400);
+      }
+      const exp = await exportVendorActionsCsv(db, c, { tenantId: tenant, from: from?.iso ?? null, to: to?.iso ?? null });
+      if (!exp.ok) {
+        const status =
+          exp.code === "ERR_RATE_LIMITED"
+            ? 429
+            : exp.code === "ERR_LIMIT_EXCEEDED"
+              ? 422
+              : exp.code === "ERR_NOT_FOUND"
+                ? 404
+                : exp.code === "ERR_FORBIDDEN"
+                  ? 403
+                  : 400;
+        return json({ ok: false, code: exp.code, reason: exp.reason }, status);
+      }
+      return new NextResponse(exp.data.csv, {
+        status: 200,
+        headers: {
+          "content-type": "text/csv; charset=utf-8",
+          "content-disposition": 'attachment; filename="audit-vendor.csv"',
+          "cache-control": "private, no-store",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    }
     default:
       return json({ ok: false, code: "ERR_NOT_FOUND" }, 404);
   }
-  if (!r.ok) return json({ ok: false, code: r.code, reason: r.reason, ...(r.blocker ? { blocker: r.blocker } : {}) }, r.code === "ERR_INVALID_INPUT" ? 400 : r.code === "ERR_NOT_FOUND" ? 404 : r.code === "ERR_FORBIDDEN" ? 403 : 409);
+  if (!r.ok) return json({ ok: false, code: r.code, reason: r.reason, ...("blocker" in r && r.blocker ? { blocker: r.blocker } : {}) }, r.code === "ERR_INVALID_INPUT" ? 400 : r.code === "ERR_NOT_FOUND" ? 404 : r.code === "ERR_FORBIDDEN" ? 403 : 409);
   return json({ ok: true, ...(r.data as object), r: undefined });
 }
