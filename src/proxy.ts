@@ -60,6 +60,16 @@ function refused() {
 export function proxy(request: NextRequest) {
   const decision = resolveRequest(config(), request.headers.get("host"), request.nextUrl.pathname);
   if (!decision.allow) return refused();
+  if (decision.host === "booking") {
+    // H-02c / SEC-4 / ARCH-3 (T-123 Finding #3): zero-DB strict no-store + security headers on
+    // every BOOKING_HOST response (HTML, RSC/prefetch, metadata, 404) so suspension/unpublish/revocation
+    // takes effect immediately with zero stale CDN or browser cache.
+    const response = NextResponse.next();
+    response.headers.set("cache-control", "private, no-store");
+    response.headers.set("x-content-type-options", "nosniff");
+    response.headers.set("referrer-policy", "no-referrer");
+    return response;
+  }
   if (decision.host !== "vendor") return NextResponse.next();
   const method = request.method.toUpperCase();
   const contentType = (request.headers.get("content-type") ?? "").toLowerCase();

@@ -896,6 +896,17 @@ describe("functions (TEN-16)", () => {
     "export_release_load(uuid)",
     "export_request(text)",
     "export_snapshot_read(uuid,integer)",
+    // T-123 (PR-64, PR-65, UX-50, UX-51, DEC-128; migration 0136): public site generator & Situs Klinik admin definers
+    // (bound admin/review/publish definers behind _site_actor + unbound public_site_by_slug).
+    "public_site_by_slug(text)",
+    "site_admin_view()",
+    "site_approve_web_review(uuid,integer,text)",
+    "site_commit_publish(jsonb,text)",
+    "site_publish_facts()",
+    "site_save_settings(text,text,text,text,text,boolean,boolean,boolean,boolean,boolean)",
+    "site_save_web_field(uuid,text,boolean,boolean,text,text,text,integer,integer,text,text,text,text)",
+    "site_unpublish()",
+    "site_web_review_source(uuid)",
     "processor_set_active(uuid,boolean)",
     "processor_upsert(uuid,jsonb)",
     "queue_board(uuid)", // T-048: queue numbers, walk-in, paired displays (PR-71, DEC-058)
