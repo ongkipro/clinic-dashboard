@@ -10,6 +10,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  customType,
   date,
   foreignKey,
   index,
@@ -22,6 +23,10 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 import { catalogItems, catalogVersions } from "../catalog/schema";
 import { evidenceApprovals } from "../compliance/schema";
 import { branches, staff, tenants } from "../org/schema";
@@ -230,6 +235,7 @@ export const publicBookingIntents = pgTable(
     branchId: uuid("branch_id").notNull(),
     catalogVersionId: uuid("catalog_version_id").notNull(),
     doctorStaffId: uuid("doctor_staff_id"),
+    doctorConsentId: uuid("doctor_consent_id"),
     slotStart: timestamp("slot_start", { withTimezone: true }).notNull(),
     sourceTag: text("source_tag").notNull(),
     phoneE164: text("phone_e164"),
@@ -254,7 +260,9 @@ export const publicBookingIntents = pgTable(
     foreignKey({ name: "public_booking_intents_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
     foreignKey({ name: "public_booking_intents_version_fk", columns: [t.tenantId, t.catalogVersionId], foreignColumns: [catalogVersions.tenantId, catalogVersions.id] }).onDelete("restrict"),
     foreignKey({ name: "public_booking_intents_doctor_fk", columns: [t.tenantId, t.doctorStaffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "public_booking_intents_doctor_consent_fk", columns: [t.tenantId, t.doctorConsentId], foreignColumns: [doctorListingConsents.tenantId, doctorListingConsents.id] }).onDelete("restrict"),
     foreignKey({ name: "public_booking_intents_appt_fk", columns: [t.tenantId, t.appointmentId], foreignColumns: [appointments.tenantId, appointments.id] }).onDelete("restrict"),
+    check("public_booking_intents_doctor_consent_chk", sql`(${t.doctorStaffId} is null and ${t.doctorConsentId} is null) or (${t.doctorStaffId} is not null and ${t.doctorConsentId} is not null)`),
     unique("public_booking_intents_tenant_id_id_key").on(t.tenantId, t.id),
     unique("public_booking_intents_hash_key").on(t.tenantId, t.intentHash),
     unique("public_booking_intents_cmd_key").on(t.tenantId, t.commandKey),
@@ -272,5 +280,79 @@ export const publicBookingIntents = pgTable(
     check("public_booking_intents_consumed_chk", sql`(${t.consumedAt} is null and ${t.appointmentId} is null and ${t.commandKey} is null) or (${t.consumedAt} is not null and ${t.appointmentId} is not null and ${t.commandKey} is not null)`),
     index("public_booking_intents_rate_phone_idx").on(t.tenantId, t.phoneHash, t.createdAt),
     index("public_booking_intents_rate_ip_idx").on(t.ipHash, t.createdAt),
+  ],
+).enableRLS();
+
+// Doctor public listing consents with immediate purge on withdrawal (PR-66, UX-50, UX-51; T-125).
+// TEN-19 'never', RLS enabled with zero direct clinic_app grants; monotone granted -> withdrawn history
+// (never deleted); withdrawal atomically clears photo_ref and removes the doctor from live public reads.
+export const DOCTOR_CONSENT_STATES = ["granted", "withdrawn"] as const;
+
+export const doctorListingConsents = pgTable(
+  "doctor_listing_consents",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
+    state: text("state", { enum: DOCTOR_CONSENT_STATES }).notNull().default("granted"),
+    publicSlug: text("public_slug").notNull(),
+    displayName: text("display_name").notNull(),
+    title: text("title"),
+    scheduleSummary: text("schedule_summary"),
+    focusAreas: text("focus_areas").array().notNull().default(sql`'{}'::text[]`),
+    showPhoto: boolean("show_photo").notNull().default(false),
+    photoRef: text("photo_ref"),
+    photoBytes: bytea("photo_bytes"),
+    photoMediaType: text("photo_media_type"),
+    showTitleAndSip: boolean("show_title_and_sip").notNull().default(false),
+    acknowledgementRef: text("acknowledgement_ref"),
+    consentSha256: text("consent_sha256").notNull(),
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    grantedBy: uuid("granted_by").notNull(),
+    grantedAs: text("granted_as").notNull(),
+    withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+    withdrawnBy: uuid("withdrawn_by"),
+    withdrawnAs: text("withdrawn_as"),
+    withdrawalReason: text("withdrawal_reason"),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "doctor_listing_consents_staff_fk", columns: [t.tenantId, t.staffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "doctor_listing_consents_granted_by_fk", columns: [t.tenantId, t.grantedBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "doctor_listing_consents_withdrawn_by_fk", columns: [t.tenantId, t.withdrawnBy], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    unique("doctor_listing_consents_tenant_id_id_key").on(t.tenantId, t.id),
+    uniqueIndex("doctor_listing_consents_active_staff_uidx")
+      .on(t.tenantId, t.staffId)
+      .where(sql`${t.state} = 'granted'`),
+    uniqueIndex("doctor_listing_consents_active_slug_uidx")
+      .on(t.tenantId, t.publicSlug)
+      .where(sql`${t.state} = 'granted'`),
+    index("doctor_listing_consents_tenant_state_idx").on(t.tenantId, t.state),
+    check("doctor_listing_consents_state_chk", sql`${t.state} in ('granted','withdrawn')`),
+    check("doctor_listing_consents_slug_chk", sql`${t.publicSlug} ~ '^[a-z0-9][a-z0-9-]{1,59}$'`),
+    check("doctor_listing_consents_name_chk", sql`length(btrim(${t.displayName})) between 2 and 120`),
+    check("doctor_listing_consents_title_chk", sql`${t.title} is null or length(btrim(${t.title})) between 1 and 120`),
+    check("doctor_listing_consents_schedule_chk", sql`${t.scheduleSummary} is null or length(btrim(${t.scheduleSummary})) between 2 and 240`),
+    check("doctor_listing_consents_focus_chk", sql`cardinality(${t.focusAreas}) <= 12`),
+    check(
+      "doctor_listing_consents_photo_chk",
+      sql`${t.photoRef} is null or ${t.photoRef} ~ '^/api/v1/public/doctor-photo/[a-z0-9-]+/[a-z0-9-]+\\?v=[0-9a-f]{24}$'`,
+    ),
+    check(
+      "doctor_listing_consents_photo_bytes_chk",
+      sql`(${t.photoBytes} is null and ${t.photoMediaType} is null and ${t.photoRef} is null)
+       or (${t.photoBytes} is not null and octet_length(${t.photoBytes}) between 1 and 524288 and ${t.photoMediaType} in ('image/jpeg','image/png','image/webp') and ${t.photoRef} is not null)`,
+    ),
+    check(
+      "doctor_listing_consents_photo_toggle_chk",
+      sql`${t.showPhoto} or (${t.photoRef} is null and ${t.photoBytes} is null and ${t.photoMediaType} is null)`,
+    ),
+    check("doctor_listing_consents_ack_chk", sql`${t.acknowledgementRef} is null or length(btrim(${t.acknowledgementRef})) between 3 and 120`),
+    check("doctor_listing_consents_sha_chk", sql`${t.consentSha256} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "doctor_listing_consents_withdrawn_chk",
+      sql`(${t.state} = 'granted' and ${t.withdrawnAt} is null and ${t.withdrawnBy} is null and ${t.withdrawnAs} is null)
+       or (${t.state} = 'withdrawn' and ${t.withdrawnAt} is not null and ${t.withdrawnBy} is not null and ${t.withdrawnAs} is not null and ${t.photoRef} is null and ${t.photoBytes} is null and ${t.photoMediaType} is null)`,
+    ),
   ],
 ).enableRLS();

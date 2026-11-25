@@ -896,6 +896,14 @@ describe("functions (TEN-16)", () => {
     "export_release_load(uuid)",
     "export_request(text)",
     "export_snapshot_read(uuid,integer)",
+    // T-125 (PR-66, UX-50, UX-51, DEC-130; migration 0138): doctor listing consent & immediate purge
+    // (bound grant/withdraw/list behind tenant_actor_lock / approval_actor + unbound public_doctors_by_slug / public_doctor_detail / public_doctor_photo).
+    "doctor_listing_grant(uuid,text,text,text,text,text[],boolean,bytea,text,boolean,text)",
+    "doctor_listing_list()",
+    "doctor_listing_withdraw(uuid,text)",
+    "public_doctor_detail(text,text)",
+    "public_doctor_photo(text,text,text)",
+    "public_doctors_by_slug(text)",
     // T-126 (PR-67, UX-24, DATA-56, OD-1 Option B; migration 0137): narrow unbound public booking seam
     // (server resolves live published counsel-valid tenant from slug; enforces real_patient_gate_assert + scheduled purge).
     "public_booking_catalog(text)",
