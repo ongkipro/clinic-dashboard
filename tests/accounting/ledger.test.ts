@@ -200,14 +200,14 @@ describe("T-105 database invariants", () => {
     // the map version is recorded where the accountant's approval binds, by the first automatic posting of the tenant
     expect((await h.admin.query(`select count(*)::int c from compliance_config_versions where tenant_id = $1 and kind = 'posting_map'`, [B.tenantId])).rows[0].c).toBe(0);
     await post(B, `t-${crypto.randomUUID()}`, [{ account: "cash_shift", debit: 1 }, { account: "other_income", credit: 1 }]);
-    expect((await h.admin.query(`select version from compliance_config_versions where tenant_id = $1 and kind = 'posting_map'`, [B.tenantId])).rows[0].version).toBe("draft-11-2026-11-19");
+    expect((await h.admin.query(`select version from compliance_config_versions where tenant_id = $1 and kind = 'posting_map'`, [B.tenantId])).rows[0].version).toBe("draft-11-2026-11-26-t128");
     expect((await h.admin.query(`select count(*)::int c from ledger_activations`)).rows[0].c).toBe(0); // no activation writer (G-ACT)
   });
 
   it("an entry posts balanced with its map version; an unbalanced or one-line entry is refused at commit; a repeated posting key writes nothing", async () => {
     const k = `t-${crypto.randomUUID()}`;
     const id = await post(A, k, [{ account: "cash_shift", branch: A.b1, debit: 333_000 }, { account: "liability_paid_not_delivered", branch: A.b1, credit: 333_000 }]);
-    expect((await h.admin.query(`select map_version, period, original_period from journal_entries where id = $1`, [id])).rows[0]).toEqual({ map_version: "draft-11-2026-11-19", period: "2026-11", original_period: "2026-11" });
+    expect((await h.admin.query(`select map_version, period, original_period from journal_entries where id = $1`, [id])).rows[0]).toEqual({ map_version: "draft-11-2026-11-26-t128", period: "2026-11", original_period: "2026-11" });
     expect(await post(A, k, [{ account: "cash_shift", debit: 1 }, { account: "bank", credit: 1 }])).toBeNull();
     expect((await h.admin.query(`select count(*)::int c from journal_entries where posting_key = $1`, [k])).rows[0].c).toBe(1);
     expect(await err(post(A, `t-${crypto.randomUUID()}`, [{ account: "cash_shift", debit: 100 }, { account: "bank", credit: 99 }]))).toMatch(/not balanced/);
@@ -257,7 +257,7 @@ describe("T-105 database invariants", () => {
     expect((await as(BFIN, (db) => db.query(`select count(*)::int c from ledger_accounts`))).rows[0].c).toBe(31); // B's own chart only
     expect(await err(as(FIN, (db) => db.query(`insert into ledger_periods (tenant_id, period, locked_by, command_key) values ($1, '2026-02', $2, 'lock-direct-1')`, [A.tenantId, FIN.staffId])))).toMatch(/permission denied/);
     expect(await err(as(FIN, (db) => db.query(`select ledger_post($1, 'manual', 'x-direct', 'TestPosted', 'test_fact', gen_random_uuid(), null, '2026-11-01', '[]'::jsonb, null, null, null)`, [A.tenantId])))).toMatch(/permission denied/);
-    expect(await err(as(OWN, (db) => db.query(`insert into ledger_activations (tenant_id, map_version) values ($1, 'draft-11-2026-11-19')`, [A.tenantId])))).toMatch(/permission denied/);
+    expect(await err(as(OWN, (db) => db.query(`insert into ledger_activations (tenant_id, map_version) values ($1, 'draft-11-2026-11-26-t128')`, [A.tenantId])))).toMatch(/permission denied/);
   });
 });
 
@@ -424,7 +424,7 @@ describe("T-105 posting rules (money scenarios; the canonical matrix, draft map 
     expect(await accountBalance(T20, "merchant_fee_expense")).toBe(7_000);
     expect((await h.admin.query(`select coalesce(sum(basis), 0)::bigint b from commission_entitlements where tenant_id = $1`, [T20.tenantId])).rows[0].b).toBe(basis);
     const e = (await h.admin.query(`select map_version, kind from journal_entries where posting_key = $1`, [`gateway_settlement:${fact}`])).rows[0];
-    expect(e).toEqual({ map_version: "draft-11-2026-11-19", kind: "auto" }); // a draft-map entry (preview; no activation)
+    expect(e).toEqual({ map_version: "draft-11-2026-11-26-t128", kind: "auto" }); // a draft-map entry (preview; no activation)
   });
 
   it("every posted entry of the run balances; nothing posts for simulated money; the app cannot call a rule directly, and an event of another tenant is refused", async () => {
@@ -700,7 +700,7 @@ describe("T-105 posting rules — booking DP (scenarios 6, 17) and PKP VAT (16, 
     await drain();
     expect(await journal(`deposit_forfeited:${d2.deposit_id}`)).toEqual(sorted([["liability_booking_dp", 200_000, 0], ["other_income", 0, 200_000]]));
     expect((await h.admin.query(`select memo, map_version from journal_entries where posting_key = $1`, [`deposit_forfeited:${d2.deposit_id}`])).rows[0])
-      .toEqual({ memo: "PENDING A-10 / Q-05 (draft)", map_version: "draft-11-2026-11-19" });
+      .toEqual({ memo: "PENDING A-10 / Q-05 (draft)", map_version: "draft-11-2026-11-26-t128" });
     const p3 = await patient(A, A.b1, "Pasien DP 6e");
     // the DP is received on a future slot, then the start is moved to now (fixture surgery, as 6c above): quarter(1 h) lands on
     // tomorrow's WIB date after 23:00 WIB and visit_check_in refuses a visit that is not today (T-107 gated close 1)
@@ -934,7 +934,7 @@ describe("T-105 manual journals, period lock, statements, journal export (fail-c
 
   it("statements: trial balance balances, P&L and balance sheet by class, cash-flow by counter class; always the preview status; owner / finance / auditor only; not SAK-labelled", async () => {
     const r = await as(FIN, (db) => report(db, { from: monthStart(), to: now() }));
-    expect(r.status).toMatchObject({ state: "preview", map_version: "draft-11-2026-11-19", activated: false });
+    expect(r.status).toMatchObject({ state: "preview", map_version: "draft-11-2026-11-26-t128", activated: false });
     expect(r.trial_balance.reduce((s, x) => s + x.closing, 0)).toBe(0);
     expect(r.balanced).toBe(true);
     const assets = r.balance_sheet.filter((x) => x.class === "asset").reduce((s, x) => s + x.amount, 0);
@@ -962,7 +962,7 @@ describe("T-105 manual journals, period lock, statements, journal export (fail-c
     await as(FIN, (db) => decideEvidence(db, ev, fileId, "approved"));
     expect((await as(FIN, (db) => report(db, { from: monthStart(), to: now() }))).status).toMatchObject({ state: "preview", map_signed: true, activated: false });
     expect(await as(FIN, (db) => exportJournal(db, { from: monthStart(), to: now() }))).toEqual({ ok: false, refused: "ledger_not_activated" });
-    expect((await h.admin.query(`select count(*)::int c from journal_entries where tenant_id = $1 and kind = 'auto' and map_version <> 'draft-11-2026-11-19'`, [A.tenantId])).rows[0].c).toBe(0);
+    expect((await h.admin.query(`select count(*)::int c from journal_entries where tenant_id = $1 and kind = 'auto' and map_version <> 'draft-11-2026-11-26-t128'`, [A.tenantId])).rows[0].c).toBe(0);
     for (const p of [OWN, AU]) expect(await code(as(p, (db) => exportJournal(db, { from: monthStart(), to: now() }))), p.role).toMatch(/^ERR_FORBIDDEN/);
     const denied = (await h.admin.query(`select reason_code from audit_events where tenant_id = $1 and action = 'export' and object_kind = 'journal' order by at`, [A.tenantId])).rows.map((r) => r.reason_code);
     expect(denied).toEqual(expect.arrayContaining(["posting_map_unsigned", "ledger_not_activated"]));

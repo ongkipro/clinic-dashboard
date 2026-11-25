@@ -50,8 +50,11 @@ export const packages = pgTable(
     tenantId: uuid("tenant_id").notNull(),
     soldBranchId: uuid("sold_branch_id").notNull(),
     patientId: uuid("patient_id").notNull(),
-    invoiceId: uuid("invoice_id").notNull(),
-    invoiceLineId: uuid("invoice_line_id").notNull(),
+    invoiceId: uuid("invoice_id"),
+    invoiceLineId: uuid("invoice_line_id"),
+    isOpening: boolean("is_opening").notNull().default(false),
+    openingBatchId: uuid("opening_batch_id"),
+    openingHistoricalUsedCount: integer("opening_historical_used_count").notNull().default(0),
     itemId: uuid("item_id").notNull(),
     catalogVersionId: uuid("catalog_version_id").notNull(),
     price: bigint("price", { mode: "number" }).notNull(),
@@ -91,7 +94,9 @@ export const packages = pgTable(
       and ${t.minDp} between 1 and ${t.price} and ${t.movedToBalance} between 0 and ${t.price}
       and ((${t.state} = 'active') = (${t.closedAt} is null))
       and (${t.state} = 'active' or ${t.closeReason} is not null and ${t.paidUnusedMoved} >= 0 and ${t.remainderCancelled} >= 0)
-      and ${t.vatReversedAmount} >= 0 and ((${t.vatReversedAmount} > 0) = (${t.vatReversedAt} is not null))`),
+      and ${t.vatReversedAmount} >= 0 and ((${t.vatReversedAmount} > 0) = (${t.vatReversedAt} is not null))
+      and ((not ${t.isOpening} and ${t.invoiceId} is not null and ${t.invoiceLineId} is not null and ${t.openingBatchId} is null and ${t.openingHistoricalUsedCount} = 0)
+        or (${t.isOpening} and ${t.invoiceId} is null and ${t.invoiceLineId} is null and ${t.openingBatchId} is not null and ${t.openingHistoricalUsedCount} >= 0))`),
   ],
 );
 

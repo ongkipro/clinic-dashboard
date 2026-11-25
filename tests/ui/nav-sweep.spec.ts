@@ -17,14 +17,12 @@ import { join } from "node:path";
 const ROOT = join(import.meta.dirname, "../..");
 const APP = join(ROOT, "src/app/(app)");
 
-// Tasks whose Allowed Paths still count as "owned, not built yet": T-128 and later (base 5cfa0f52: M0–M8, T-120–T-127, T-129,
-// HYG-NAV-1/2/3 all integrated on main). Raise this as each task closes; an earlier task's unbuilt route is an orphan by construction.
-const FIRST_PENDING_TASK = 128;
+// Tasks whose Allowed Paths still count as "owned, not built yet": T-131 and later (T-128 /pasien/impor is now built).
+const FIRST_PENDING_TASK = 131;
 
-// Unbuilt nav routes that no pending task owns (base 5cfa0f52; HYG-NAV-1/2/3 closed 25 of the original 27).
+// Unbuilt nav routes that no pending task owns (HYG-NAV-1/2/3 + T-128 closed 26 of the original 27).
 // Keep in sync: the gate fails on any stale entry or unexplained unbuilt route.
 export const ORPHANS: Record<string, string> = {
-  "/pasien/impor": "T-128 owns src/modules/import/** in TASKS.md (UI page awaits Owner/Finance decision on Apply/Reversal)",
   "/pengaturan/cabang/integrasi": "Email & Google Business (UX-2 ▸ Integrasi): pending owner decision H vs S (t130/P1-INTEGRASI-DECISION-PACKET-20261120.md)",
 };
 

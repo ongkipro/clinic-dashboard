@@ -11,9 +11,9 @@ import { paymentCharges } from "../payments/schema";
 
 export const BALANCE_KINDS = [
   "top_up", "use", "from_expiry", "from_cancel", "from_interrupted_treatment", "from_substitution", "from_refund", "dp_transfer", "cash_refund",
-  "opening_balance",
+  "opening_balance", "opening_reversal",
 ] as const;
-const DEBITS = ["use", "cash_refund"] as const;
+const DEBITS = ["use", "cash_refund", "opening_reversal"] as const;
 const inList = (xs: readonly string[]) => sql.raw(xs.map((x) => `'${x}'`).join(","));
 const KEY = (c: unknown) => sql`${c} ~ '^[A-Za-z0-9_.:-]{8,128}$'`;
 

@@ -139,7 +139,7 @@ export const vatCutoverOpenings = pgTable(
 // under; an entry is official only while approved posting_map_signoff evidence covers that exact version (Panel 2 G4, T-105) — until
 // then the books are a preview. Accounts carry stable keys and Indonesian labels, no numeric codes (G3); statements are generic by class,
 // not labelled SAK-compliant (G2).
-export const LEDGER_MAP_VERSION = "draft-11-2026-11-19";
+export const LEDGER_MAP_VERSION = "draft-11-2026-11-26-t128";
 export const ACCOUNT_CLASSES = ["asset", "liability", "equity", "revenue", "expense"] as const;
 export const ENTRY_KINDS = ["auto", "manual", "reversal"] as const;
 

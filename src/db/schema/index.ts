@@ -41,3 +41,4 @@ export * from "../../modules/reporting/schema";
 export * from "../../modules/platform/schema";
 export * from "../../modules/export/schema";
 export * from "../../modules/public-site/schema";
+export * from "../../modules/import/schema";

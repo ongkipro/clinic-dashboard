@@ -988,6 +988,13 @@
       "when": 1795634833908,
       "tag": "0140_vendor_console_readers",
       "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "7",
+      "when": 1795644011608,
+      "tag": "0141_opening_import",
+      "breakpoints": true
     }
   ]
 }

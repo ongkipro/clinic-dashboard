@@ -318,7 +318,7 @@ export const additionReleases = pgTable(
 // cancellation), forfeited (a later patient change or a no-show) or refunded in cash (a clinic cancellation, scenario 17).
 // The cutoff is SET-10 batas_ubah, snapshotted at receipt. VAT (PKP, taxable item) is recognised at receipt and reversed
 // on a move or a refund; on apply it moves to the line.
-export const DEPOSIT_STATES = ["held", "applied", "moved_to_balance", "forfeited", "refunded"] as const;
+export const DEPOSIT_STATES = ["held", "applied", "moved_to_balance", "forfeited", "refunded", "opening_reversed"] as const;
 export const DEPOSIT_METHODS = ["cash", "edc", "transfer"] as const;
 export const bookingDeposits = pgTable(
   "booking_deposits",
@@ -326,10 +326,12 @@ export const bookingDeposits = pgTable(
     id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
     tenantId: uuid("tenant_id").notNull(),
     branchId: uuid("branch_id").notNull(),
-    appointmentId: uuid("appointment_id").notNull(),
+    appointmentId: uuid("appointment_id"),
     patientId: uuid("patient_id").notNull(),
-    catalogVersionId: uuid("catalog_version_id").notNull(),
-    receiptId: uuid("receipt_id").notNull(),
+    catalogVersionId: uuid("catalog_version_id"),
+    receiptId: uuid("receipt_id"),
+    isOpening: boolean("is_opening").notNull().default(false),
+    openingBatchId: uuid("opening_batch_id"),
     method: text("method", { enum: DEPOSIT_METHODS }).notNull(),
     amount: bigint("amount", { mode: "number" }).notNull(),
     taxCategory: text("tax_category", { enum: TAX_CATEGORIES }).notNull(),
@@ -378,7 +380,9 @@ export const bookingDeposits = pgTable(
       and ((${t.state} = 'refunded') = (${t.refundMethod} is not null)) and (${t.refundMethod} is null or ${t.refundMethod} in ('cash','edc','transfer'))
       and (${t.refundDetails} is null or ${t.refundMethod} in ('edc','transfer') and jsonb_typeof(${t.refundDetails}) = 'object')
       and (${t.state} = 'held' or ${t.decisionCode} ~ '^[a-z][a-z_]{2,40}$')
-      and (${t.decidedAs} is null or ${t.decidedAs} in ('owner','admin_pusat','manager','fo_cashier','central_cs','finance'))`),
+      and (${t.decidedAs} is null or ${t.decidedAs} in ('owner','admin_pusat','manager','fo_cashier','central_cs','finance'))
+      and ((not ${t.isOpening} and ${t.appointmentId} is not null and ${t.catalogVersionId} is not null and ${t.receiptId} is not null and ${t.openingBatchId} is null and ${t.state} <> 'opening_reversed')
+        or (${t.isOpening} and ${t.receiptId} is null and ${t.openingBatchId} is not null))`),
   ],
 );
 
@@ -450,7 +454,7 @@ export const refunds = pgTable(
   ],
 );
 
-export const RECEIVABLE_STATES = ["open", "collected", "written_off"] as const;
+export const RECEIVABLE_STATES = ["open", "collected", "written_off", "opening_reversed"] as const;
 export const receivables = pgTable(
   "receivables",
   {
@@ -458,7 +462,9 @@ export const receivables = pgTable(
     tenantId: uuid("tenant_id").notNull(),
     branchId: uuid("branch_id").notNull(),
     patientId: uuid("patient_id").notNull(),
-    visitId: uuid("visit_id").notNull(),
+    visitId: uuid("visit_id"),
+    isOpening: boolean("is_opening").notNull().default(false),
+    openingBatchId: uuid("opening_batch_id"),
     amount: bigint("amount", { mode: "number" }).notNull(),
     collectedAmount: bigint("collected_amount", { mode: "number" }).notNull().default(0),
     writtenOffAmount: bigint("written_off_amount", { mode: "number" }).notNull().default(0),
@@ -485,7 +491,9 @@ export const receivables = pgTable(
       and ((${t.state} = 'collected') = (${t.collectedAmount} = ${t.amount}))
       and ((${t.state} = 'written_off') = (${t.writtenOffAmount} > 0)) and (${t.state} <> 'written_off' or ${t.collectedAmount} + ${t.writtenOffAmount} = ${t.amount})
       and (${t.state} = 'open' or ${t.writeOffApprovalId} is null or ${t.state} = 'written_off')
-      and ${t.createdAs} in ('owner','manager','fo_cashier')`),
+      and ${t.createdAs} in ('owner','manager','fo_cashier')
+      and ((not ${t.isOpening} and ${t.visitId} is not null and ${t.openingBatchId} is null and ${t.state} <> 'opening_reversed')
+        or (${t.isOpening} and ${t.visitId} is null and ${t.openingBatchId} is not null))`),
   ],
 );
 export const receivableLines = pgTable(
