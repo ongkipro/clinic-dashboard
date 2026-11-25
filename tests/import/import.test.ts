@@ -442,7 +442,6 @@ describe("T-128 opening-data import real-DB contract (PR-85, DATA-58, Option 1A 
       ["jkt", branchA1],
       ["sby", branchA2],
     ]);
-    const src = "legacy_clinic_system";
 
     expect(LEDGER_MAP_VERSION).toBe("draft-11-2026-11-26-t128");
     expect((await h.admin.query<{ v: string }>(`select public.ledger_map_version() as v`)).rows[0].v).toBe(
