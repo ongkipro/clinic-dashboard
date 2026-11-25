@@ -946,6 +946,13 @@
       "when": 1795533096692,
       "tag": "0134_data_subject_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1795538202794,
+      "tag": "0135_tenant_export",
+      "breakpoints": true
     }
   ]
 }

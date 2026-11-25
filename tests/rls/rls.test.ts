@@ -883,6 +883,19 @@ describe("functions (TEN-16)", () => {
     "dsr_list(text,text)",
     "dsr_log(text,uuid,text,text,text,timestamp with time zone,text,text[])",
     "dsr_verify(uuid,text)",
+    // T-122 (PR-52, UX-32, 0135): tenant export — owner-only request/list/release/audit definers (actor lock + exit/live/suspended capability)
+    // and unbound/staffless worker definers (claim, REPEATABLE READ snapshot read, fenced put/finish/fail, expire).
+    "export_audit_denial(uuid,text)",
+    "export_claim(integer)",
+    "export_expire(integer)",
+    "export_fail(uuid,integer,text)",
+    "export_finish(uuid,integer,timestamp with time zone,text,text)",
+    "export_list()",
+    "export_put_file(uuid,integer,text,text,text,bytea)",
+    "export_release_commit(uuid)",
+    "export_release_load(uuid)",
+    "export_request(text)",
+    "export_snapshot_read(uuid,integer)",
     "processor_set_active(uuid,boolean)",
     "processor_upsert(uuid,jsonb)",
     "queue_board(uuid)", // T-048: queue numbers, walk-in, paired displays (PR-71, DEC-058)

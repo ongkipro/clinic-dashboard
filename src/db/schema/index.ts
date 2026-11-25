@@ -39,3 +39,4 @@ export * from "../../modules/crm/schema";
 export * from "../../modules/integrations/schema";
 export * from "../../modules/reporting/schema";
 export * from "../../modules/platform/schema";
+export * from "../../modules/export/schema";
