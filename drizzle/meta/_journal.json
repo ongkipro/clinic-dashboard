@@ -960,6 +960,13 @@
       "when": 1795587584860,
       "tag": "0136_public_site",
       "breakpoints": true
+    },
+    {
+      "idx": 137,
+      "version": "7",
+      "when": 1795609396974,
+      "tag": "0137_public_booking",
+      "breakpoints": true
     }
   ]
 }

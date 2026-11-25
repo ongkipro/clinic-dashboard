@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { toTreatmentCard } from "../../../modules/public-site";
 import { loadPublicSite, NEUTRAL_NOT_FOUND_META, PublicShell, safeJsonLd } from "./_shared";
+import { bookingHref, whatsappLink } from "./booking/model";
 
 // Blocking dynamic route so unknown/unpublished/revoked tenants return a real HTTP 404 (not streamed 200).
 export const instant = false;
@@ -38,6 +39,10 @@ export default async function ClinicHomePage({
   const { dto } = resolved;
   const base = `/${dto.slug}`;
   const cards = dto.treatments.map(toTreatmentCard);
+  const primaryWa = whatsappLink(dto.branches.find((b) => b.whatsapp)?.whatsapp ?? null, {
+    brand: dto.brand,
+    page: "beranda",
+  });
   const ld = {
     "@context": "https://schema.org",
     "@type": "MedicalClinic",
@@ -63,10 +68,16 @@ export default async function ClinicHomePage({
             </p>
           )}
           <div className="flex flex-wrap gap-3 pt-2">
+            <a
+              href={bookingHref(dto.slug, { page: "beranda" })}
+              className="inline-flex min-h-[var(--target)] items-center rounded-full bg-[var(--tint)] px-5 text-[0.9375rem] font-semibold text-white no-underline"
+            >
+              Buat Janji
+            </a>
             {dto.sections.treatments && (
               <a
                 href={`${base}/perawatan`}
-                className="inline-flex min-h-[var(--target)] items-center rounded-full bg-[var(--tint)] px-5 text-[0.9375rem] font-semibold text-white no-underline"
+                className="inline-flex min-h-[var(--target)] items-center rounded-full bg-[var(--surface-2)] px-5 text-[0.9375rem] font-semibold text-[var(--label)] no-underline"
               >
                 Lihat Perawatan
               </a>
@@ -77,6 +88,16 @@ export default async function ClinicHomePage({
                 className="inline-flex min-h-[var(--target)] items-center rounded-full bg-[var(--surface-2)] px-5 text-[0.9375rem] font-semibold text-[var(--label)] no-underline"
               >
                 Lihat Cabang
+              </a>
+            )}
+            {primaryWa && (
+              <a
+                href={primaryWa.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-[var(--target)] items-center rounded-full border border-[var(--separator)] bg-[var(--surface)] px-5 text-[0.9375rem] font-semibold text-[var(--label)] no-underline"
+              >
+                {primaryWa.label}
               </a>
             )}
           </div>

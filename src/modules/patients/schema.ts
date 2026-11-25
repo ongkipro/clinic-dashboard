@@ -7,7 +7,7 @@ import { sql } from "drizzle-orm";
 import { boolean, check, date, foreignKey, index, integer, bigint, jsonb, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { branches, staff, tenants } from "../org/schema";
 
-export const IDENTITY_TYPES = ["nik", "passport", "kitas", "newborn_via_guardian"] as const;
+export const IDENTITY_TYPES = ["nik", "passport", "kitas", "newborn_via_guardian", "online_pending"] as const;
 export const SEXES = ["female", "male"] as const;
 // Permenkes 24/2022 Pasal 14(4) social data; closed lists with "lainnya".
 export const RELIGIONS = ["islam", "kristen", "katolik", "hindu", "buddha", "konghucu", "lainnya"] as const;
@@ -68,7 +68,7 @@ export const patients = pgTable(
     address: text("address"),
     ihsPatientId: text("ihs_patient_id"), // SATUSEHAT, later milestone
     registeredBranchId: uuid("registered_branch_id").notNull(),
-    createdBy: uuid("created_by").notNull(),
+    createdBy: uuid("created_by"),
     createdAs: text("created_as").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -85,7 +85,9 @@ export const patients = pgTable(
     check("patients_sex_check", sql`${t.sex} in ('female','male')`),
     check("patients_identity_check", sql`(${t.identityType} = 'nik' and ${t.identityEnc} is not null and ${t.identityBidx} is not null and ${t.noIdentityReason} is null)
       or (${t.identityType} in ('passport','kitas') and ${t.identityEnc} is not null and ${t.identityBidx} is not null and length(btrim(coalesce(${t.noIdentityReason}, ''))) between 3 and 300)
-      or (${t.identityType} = 'newborn_via_guardian' and ${t.identityEnc} is null and ${t.identityBidx} is null and length(btrim(coalesce(${t.noIdentityReason}, ''))) between 3 and 300)`),
+      or (${t.identityType} = 'newborn_via_guardian' and ${t.identityEnc} is null and ${t.identityBidx} is null and length(btrim(coalesce(${t.noIdentityReason}, ''))) between 3 and 300)
+      or (${t.identityType} = 'online_pending' and ${t.createdAs} = 'patient_online' and ${t.createdBy} is null and ${t.identityEnc} is null and ${t.identityBidx} is null and ${t.noIdentityReason} = 'Pendaftaran awal booking online, lengkapi identitas di Front Office')`),
+    check("patients_created_as_check", sql`(${t.createdAs} <> 'patient_online' and ${t.createdBy} is not null) or (${t.createdAs} = 'patient_online' and ${t.createdBy} is null)`),
     check("patients_identity_enc_check", sql`${t.identityEnc} is null or ${t.identityEnc} ~ '^v1\\.[1-9][0-9]{0,8}\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$'`),
     check("patients_identity_bidx_check", sql`${t.identityBidx} is null or ${t.identityBidx} ~ '^[A-Za-z0-9_-]{43}$'`),
     check("patients_social_check", sql`${t.religion} in ('islam','kristen','katolik','hindu','buddha','konghucu','lainnya')

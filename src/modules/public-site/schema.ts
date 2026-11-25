@@ -10,6 +10,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -21,9 +22,10 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { catalogItems } from "../catalog/schema";
+import { catalogItems, catalogVersions } from "../catalog/schema";
 import { evidenceApprovals } from "../compliance/schema";
-import { staff, tenants } from "../org/schema";
+import { branches, staff, tenants } from "../org/schema";
+import { appointments } from "../scheduling/schema";
 
 export const SITE_STATES = ["draft", "published", "unpublished"] as const;
 export const LEGAL_TEMPLATE_KINDS = [
@@ -213,5 +215,62 @@ export const vendorLegalTemplates = pgTable(
     check("vendor_legal_templates_version_check", sql`${t.version} >= 1`),
     check("vendor_legal_templates_body_check", sql`length(btrim(${t.body})) between 20 and 50000 and ${t.body} !~ '[<>]'`),
     check("vendor_legal_templates_sha_check", sql`${t.bodySha256} ~ '^[0-9a-f]{64}$'`),
+  ],
+).enableRLS();
+
+// Server-bound public booking intents & OTP challenges (PR-67, DATA-56, UX-24, OD-1 Option B; T-126).
+// TEN-19 'never' (zero vendor support read), RLS enabled with zero direct clinic_app grants;
+// phone_e164, patient_name, birth_date, and sex are cleared (NULL) on consumption, lockout, or expiry purge.
+export const publicBookingIntents = pgTable(
+  "public_booking_intents",
+  {
+    id: uuid("id").primaryKey().default(sql`uuid_generate_v7()`),
+    tenantId: uuid("tenant_id").notNull(),
+    intentHash: text("intent_hash").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    catalogVersionId: uuid("catalog_version_id").notNull(),
+    doctorStaffId: uuid("doctor_staff_id"),
+    slotStart: timestamp("slot_start", { withTimezone: true }).notNull(),
+    sourceTag: text("source_tag").notNull(),
+    phoneE164: text("phone_e164"),
+    phoneHash: text("phone_hash").notNull(),
+    patientName: text("patient_name"),
+    birthDate: date("birth_date"),
+    sex: text("sex", { enum: ["female", "male"] }),
+    otpHash: text("otp_hash").notNull(),
+    otpExpiresAt: timestamp("otp_expires_at", { withTimezone: true }).notNull(),
+    otpAttempts: integer("otp_attempts").notNull().default(0),
+    resendCount: integer("resend_count").notNull().default(0),
+    lastSentAt: timestamp("last_sent_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+    ipHash: text("ip_hash").notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    purgedAt: timestamp("purged_at", { withTimezone: true }),
+    appointmentId: uuid("appointment_id"),
+    commandKey: text("command_key"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete("restrict"),
+    foreignKey({ name: "public_booking_intents_branch_fk", columns: [t.tenantId, t.branchId], foreignColumns: [branches.tenantId, branches.id] }).onDelete("restrict"),
+    foreignKey({ name: "public_booking_intents_version_fk", columns: [t.tenantId, t.catalogVersionId], foreignColumns: [catalogVersions.tenantId, catalogVersions.id] }).onDelete("restrict"),
+    foreignKey({ name: "public_booking_intents_doctor_fk", columns: [t.tenantId, t.doctorStaffId], foreignColumns: [staff.tenantId, staff.id] }).onDelete("restrict"),
+    foreignKey({ name: "public_booking_intents_appt_fk", columns: [t.tenantId, t.appointmentId], foreignColumns: [appointments.tenantId, appointments.id] }).onDelete("restrict"),
+    unique("public_booking_intents_tenant_id_id_key").on(t.tenantId, t.id),
+    unique("public_booking_intents_hash_key").on(t.tenantId, t.intentHash),
+    unique("public_booking_intents_cmd_key").on(t.tenantId, t.commandKey),
+    check("public_booking_intents_intent_hash_chk", sql`${t.intentHash} ~ '^[0-9a-f]{64}$'`),
+    check("public_booking_intents_otp_hash_chk", sql`${t.otpHash} ~ '^[0-9a-f]{64}$'`),
+    check("public_booking_intents_phone_hash_chk", sql`${t.phoneHash} ~ '^[0-9a-f]{64}$'`),
+    check("public_booking_intents_ip_hash_chk", sql`${t.ipHash} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "public_booking_intents_pii_chk",
+      sql`(${t.consumedAt} is null and ${t.purgedAt} is null and ${t.phoneE164} is not null and ${t.phoneE164} ~ '^\\+[1-9][0-9]{7,14}$' and ${t.patientName} is not null and length(btrim(${t.patientName})) between 2 and 120 and ${t.birthDate} is not null and ${t.birthDate} >= date '1900-01-01' and ${t.sex} is not null and ${t.sex} in ('female','male')) or ((${t.consumedAt} is not null or ${t.purgedAt} is not null) and ${t.phoneE164} is null and ${t.patientName} is null and ${t.birthDate} is null and ${t.sex} is null)`,
+    ),
+    check("public_booking_intents_source_chk", sql`${t.sourceTag} ~ '^situs(-[a-z0-9]{1,30})?$'`),
+    check("public_booking_intents_attempts_chk", sql`${t.otpAttempts} between 0 and 5`),
+    check("public_booking_intents_resend_chk", sql`${t.resendCount} between 0 and 5`),
+    check("public_booking_intents_consumed_chk", sql`(${t.consumedAt} is null and ${t.appointmentId} is null and ${t.commandKey} is null) or (${t.consumedAt} is not null and ${t.appointmentId} is not null and ${t.commandKey} is not null)`),
+    index("public_booking_intents_rate_phone_idx").on(t.tenantId, t.phoneHash, t.createdAt),
+    index("public_booking_intents_rate_ip_idx").on(t.ipHash, t.createdAt),
   ],
 ).enableRLS();

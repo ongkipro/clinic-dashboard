@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { toTreatmentJsonLd, toTreatmentMeta } from "../../../../../modules/public-site";
 import { loadPublicSite, NEUTRAL_NOT_FOUND_META, PublicShell, safeJsonLd } from "../../_shared";
+import { bookingHref, whatsappLink } from "../../booking/model";
 
 // Blocking dynamic route so unknown/unpublished/revoked tenants return a real HTTP 404 (not streamed 200).
 export const instant = false;
@@ -45,6 +46,13 @@ export default async function TreatmentDetailPage({
   const { dto } = resolved;
   const base = `/${dto.slug}`;
   const branchNameBySlug = new Map(dto.branches.map((b) => [b.slug, b.name]));
+  const defaultBranchSlug = item.branchSlugs.length === 1 ? item.branchSlugs[0] : null;
+  const treatmentWa = whatsappLink(
+    dto.branches.find((b) => item.branchSlugs.includes(b.slug) && b.whatsapp)?.whatsapp ??
+      dto.branches.find((b) => b.whatsapp)?.whatsapp ??
+      null,
+    { brand: dto.brand, page: "perawatan" },
+  );
   const ld = toTreatmentJsonLd(item, dto.brand, `${base}/perawatan/${item.slug}`);
 
   return (
@@ -66,6 +74,30 @@ export default async function TreatmentDetailPage({
         <header className="grid gap-3">
           <h1 className="m-0 text-[2rem] font-bold tracking-tight">{item.name}</h1>
           <p className="m-0 text-[1.0625rem] leading-relaxed text-[var(--label-2)]">{item.purpose}</p>
+          <div className="flex flex-wrap gap-3 pt-1">
+            {item.bookable && (
+              <a
+                href={bookingHref(dto.slug, {
+                  page: "perawatan",
+                  treatment: item.slug,
+                  branch: defaultBranchSlug,
+                })}
+                className="inline-flex min-h-[var(--target)] items-center rounded-full bg-[var(--tint)] px-5 text-[0.9375rem] font-semibold text-white no-underline"
+              >
+                Buat Janji
+              </a>
+            )}
+            {treatmentWa && (
+              <a
+                href={treatmentWa.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-[var(--target)] items-center rounded-full border border-[var(--separator)] bg-[var(--surface)] px-5 text-[0.9375rem] font-semibold text-[var(--label)] no-underline"
+              >
+                {treatmentWa.label}
+              </a>
+            )}
+          </div>
         </header>
 
         {item.heroPhoto && (
@@ -145,7 +177,21 @@ export default async function TreatmentDetailPage({
                   >
                     {branchNameBySlug.get(bt.branchSlug) ?? bt.branchSlug}
                   </Link>
-                  <span className="text-[var(--label-2)]">{bt.tariff.text}</span>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-[var(--label-2)]">{bt.tariff.text}</span>
+                    {item.bookable && (
+                      <a
+                        href={bookingHref(dto.slug, {
+                          page: "perawatan",
+                          treatment: item.slug,
+                          branch: bt.branchSlug,
+                        })}
+                        className="inline-flex min-h-[var(--target)] items-center rounded-full bg-[var(--surface-2)] px-3.5 text-[0.875rem] font-semibold text-[var(--label)] no-underline"
+                      >
+                        Buat Janji
+                      </a>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

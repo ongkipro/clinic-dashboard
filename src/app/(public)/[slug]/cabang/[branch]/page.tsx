@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { loadPublicSite, NEUTRAL_NOT_FOUND_META, PublicShell, safeJsonLd, weekdayLabel } from "../../_shared";
+import { bookingHref, whatsappLink } from "../../booking/model";
 
 // Blocking dynamic route so unknown/unpublished/revoked tenants return a real HTTP 404 (not streamed 200).
 export const instant = false;
@@ -42,6 +43,7 @@ export default async function BranchDetailPage({
   const { dto } = resolved;
   const base = `/${dto.slug}`;
   const treatments = dto.treatments.filter((t) => t.branchSlugs.includes(item.slug));
+  const branchWa = whatsappLink(item.whatsapp, { brand: dto.brand, page: "cabang" });
   const ld = {
     "@context": "https://schema.org",
     "@type": "MedicalClinic",
@@ -69,6 +71,12 @@ export default async function BranchDetailPage({
           <h1 className="m-0 text-[2rem] font-bold tracking-tight">{item.name}</h1>
           {item.address && <p className="m-0 text-[1rem] text-[var(--label-2)]">{item.address}</p>}
           <div className="flex flex-wrap gap-3 pt-2">
+            <a
+              href={bookingHref(dto.slug, { page: "cabang", branch: item.slug })}
+              className="inline-flex min-h-[var(--target)] items-center rounded-full bg-[var(--tint)] px-4 text-[0.9375rem] font-semibold text-white no-underline"
+            >
+              Buat Janji di Cabang Ini
+            </a>
             {item.mapUrl && (
               <a
                 href={item.mapUrl}
@@ -79,14 +87,14 @@ export default async function BranchDetailPage({
                 Buka Peta
               </a>
             )}
-            {item.whatsapp && (
+            {branchWa && (
               <a
-                href={`https://wa.me/${item.whatsapp}`}
+                href={branchWa.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[var(--target)] items-center rounded-full bg-[var(--tint)] px-4 text-[0.9375rem] font-semibold text-white no-underline"
+                className="inline-flex min-h-[var(--target)] items-center rounded-full border border-[var(--separator)] bg-[var(--surface)] px-4 text-[0.9375rem] font-semibold text-[var(--label)] no-underline"
               >
-                Hubungi WhatsApp Cabang
+                {branchWa.label}
               </a>
             )}
           </div>

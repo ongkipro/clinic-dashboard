@@ -98,7 +98,7 @@ export const appointments = pgTable(
     source: text("source"),
     campaign: text("campaign"),
     note: text("note"),
-    createdBy: uuid("created_by").notNull(),
+    createdBy: uuid("created_by"),
     createdAs: text("created_as").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
     stateReason: text("state_reason"),
@@ -131,7 +131,10 @@ export const appointments = pgTable(
     check("appointments_channel_check", sql`${t.channel} in ('walk_in','phone','whatsapp','staff','online')`),
     check("appointments_source_check", sql`(${t.source} is null or ${t.source} ~ '^[a-z0-9][a-z0-9_-]{0,39}$') and (${t.campaign} is null or ${t.campaign} ~ '^[a-z0-9][a-z0-9_-]{0,39}$')`),
     check("appointments_note_check", sql`${t.note} is null or length(${t.note}) <= 500`),
-    check("appointments_created_as_check", sql`${t.createdAs} in ('owner','admin_pusat','manager','fo_cashier','central_cs')`),
+    check(
+      "appointments_created_as_check",
+      sql`(${t.createdAs} in ('owner','admin_pusat','manager','fo_cashier','central_cs') and ${t.createdBy} is not null) or (${t.createdAs} = 'patient_online' and ${t.createdBy} is null and ${t.channel} = 'online')`,
+    ),
   ],
 );
 

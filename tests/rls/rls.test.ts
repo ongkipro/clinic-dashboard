@@ -896,6 +896,16 @@ describe("functions (TEN-16)", () => {
     "export_release_load(uuid)",
     "export_request(text)",
     "export_snapshot_read(uuid,integer)",
+    // T-126 (PR-67, UX-24, DATA-56, OD-1 Option B; migration 0137): narrow unbound public booking seam
+    // (server resolves live published counsel-valid tenant from slug; enforces real_patient_gate_assert + scheduled purge).
+    "public_booking_catalog(text)",
+    "public_booking_otp_abort(text,text)",
+    "public_booking_otp_request(text,text,text,timestamp with time zone,text,text,text,text,text,date,text,text,text,text)",
+    "public_booking_otp_resend_commit(text,text,text)",
+    "public_booking_otp_resend_prepare(text,text)",
+    "public_booking_otp_verify_and_book(text,text,text,text)",
+    "public_booking_purge_expired(integer)",
+    "public_booking_slots(text,text,text,date,text)",
     // T-123 (PR-64, PR-65, UX-50, UX-51, DEC-128; migration 0136): public site generator & Situs Klinik admin definers
     // (bound admin/review/publish definers behind _site_actor + unbound public_site_by_slug).
     "public_site_by_slug(text)",
