@@ -157,6 +157,7 @@ export type ResolvedPublicSite =
       dto: PublicSiteDto;
       metaPixelId: string | null;
       gaMeasurementId: string | null;
+      pixelConfigRevision: number;
     };
 
 export async function getSiteAdminView(db: Db): Promise<SiteAdminView> {
@@ -302,6 +303,7 @@ type RawPublicSiteRow =
       liveClosures: LiveBranchClosure[];
       metaPixelId: string | null;
       gaMeasurementId: string | null;
+      pixelConfigRevision: number;
     };
 
 // Unbound public site lookup for BOOKING_HOST (Finding #2, #4, #5).
@@ -327,5 +329,6 @@ export async function resolvePublicSiteBySlug(slug: string, db: Db): Promise<Res
     dto: overlaid,
     metaPixelId: r.metaPixelId,
     gaMeasurementId: r.gaMeasurementId,
+    pixelConfigRevision: Number.isInteger(r.pixelConfigRevision) && r.pixelConfigRevision >= 1 ? r.pixelConfigRevision : 1,
   };
 }

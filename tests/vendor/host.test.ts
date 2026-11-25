@@ -437,7 +437,7 @@ describe("tenant strings are escaped in vendor tables", () => {
 
 describe("proxy on the vendor host (SEC-21)", () => {
   const cfg = { APP_HOST: "app.test", BOOKING_HOST: "booking.test", VENDOR_HOST: "vendor.test" };
-  let proxy: (r: import("next/server").NextRequest) => Response;
+  let proxy: (r: import("next/server").NextRequest) => Response | Promise<Response>;
   let NextRequest: typeof import("next/server").NextRequest;
   beforeAll(async () => {
     Object.assign(process.env, cfg);
@@ -448,8 +448,8 @@ describe("proxy on the vendor host (SEC-21)", () => {
     new NextRequest(new URL(`http://${host}${path}`), { headers: { host, ...headers } });
 
   it("every vendor response carries a strict CSP with a fresh nonce, also forwarded to the render", async () => {
-    const a = proxy(req("vendor.test", "/vendor/tenant"));
-    const b = proxy(req("vendor.test", "/vendor/tenant"));
+    const a = await proxy(req("vendor.test", "/vendor/tenant"));
+    const b = await proxy(req("vendor.test", "/vendor/tenant"));
     const csp = a.headers.get("content-security-policy") ?? "";
     for (const d of ["default-src 'self'", "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'", "form-action 'self'"]) expect(csp).toContain(d);
     const nonce = /script-src 'self' 'nonce-([A-Za-z0-9+/=]{24})'/.exec(csp)?.[1];
@@ -465,49 +465,49 @@ describe("proxy on the vendor host (SEC-21)", () => {
     expect(a.headers.get("permissions-policy")).toContain("camera=()");
   });
 
-  it("the app and booking hosts are unchanged; vendor routes stay refused there", () => {
-    const r = proxy(req("app.test", "/persetujuan"));
+  it("the app and booking hosts are unchanged; vendor routes stay refused there", async () => {
+    const r = await proxy(req("app.test", "/persetujuan"));
     expect(r.headers.get("content-security-policy")).toBeNull();
     expect(r.headers.get("x-host-policy")).toBeNull();
-    expect(proxy(req("app.test", "/vendor/tenant")).headers.get("x-host-policy")).toBe("refused");
-    expect(proxy(req("booking.test", "/vendor/api/auth/get-session")).headers.get("x-host-policy")).toBe("refused");
+    expect((await proxy(req("app.test", "/vendor/tenant"))).headers.get("x-host-policy")).toBe("refused");
+    expect((await proxy(req("booking.test", "/vendor/api/auth/get-session"))).headers.get("x-host-policy")).toBe("refused");
   });
 
-  it("the clinic auth API and Server Actions are refused on the vendor host", () => {
+  it("the clinic auth API and Server Actions are refused on the vendor host", async () => {
     for (const p of ["/api/auth/sign-in/email", "/api/auth/get-session", "/masuk"]) {
-      expect(proxy(req("vendor.test", p)).headers.get("x-host-policy"), p).toBe("refused");
+      expect((await proxy(req("vendor.test", p))).headers.get("x-host-policy"), p).toBe("refused");
     }
-    expect(proxy(req("vendor.test", "/vendor/tenant", { "next-action": "abc" })).headers.get("x-host-policy")).toBe("refused");
+    expect((await proxy(req("vendor.test", "/vendor/tenant", { "next-action": "abc" }))).headers.get("x-host-policy")).toBe("refused");
   });
 
-  it("no Server Action reaches the vendor host: form POSTs and every non-GET outside its auth API are refused", () => {
+  it("no Server Action reaches the vendor host: form POSTs and every non-GET outside its auth API are refused", async () => {
     const post = (path: string, contentType: string) =>
       proxy(new NextRequest(new URL(`http://vendor.test${path}`), { method: "POST", headers: { host: "vendor.test", "content-type": contentType }, body: "x" }));
     for (const ct of ["multipart/form-data; boundary=x", "application/x-www-form-urlencoded", "text/plain"]) {
-      expect(post("/vendor/tenant", ct).headers.get("x-host-policy"), ct).toBe("refused");
-      expect(post("/vendor/masuk", ct).headers.get("x-host-policy"), ct).toBe("refused");
+      expect((await post("/vendor/tenant", ct)).headers.get("x-host-policy"), ct).toBe("refused");
+      expect((await post("/vendor/masuk", ct)).headers.get("x-host-policy"), ct).toBe("refused");
     }
     for (const ct of ["multipart/form-data; boundary=x", "application/x-www-form-urlencoded"]) {
-      expect(post("/vendor/api/auth/sign-in/email", ct).headers.get("x-host-policy"), ct).toBe("refused");
+      expect((await post("/vendor/api/auth/sign-in/email", ct)).headers.get("x-host-policy"), ct).toBe("refused");
     }
-    expect(post("/vendor/api/auth/sign-in/email", "application/json").headers.get("x-host-policy")).toBeNull();
-    const put = proxy(new NextRequest(new URL("http://vendor.test/vendor/tenant"), { method: "PUT", headers: { host: "vendor.test" } }));
+    expect((await post("/vendor/api/auth/sign-in/email", "application/json")).headers.get("x-host-policy")).toBeNull();
+    const put = await proxy(new NextRequest(new URL("http://vendor.test/vendor/tenant"), { method: "PUT", headers: { host: "vendor.test" } }));
     expect(put.headers.get("x-host-policy")).toBe("refused");
   });
 
-  it("console writes (T-023): JSON POST only under /vendor/api/console/, never a form or a Server Action", () => {
+  it("console writes (T-023): JSON POST only under /vendor/api/console/, never a form or a Server Action", async () => {
     const send = (method: string, contentType: string, extra: Record<string, string> = {}) =>
       proxy(new NextRequest(new URL("http://vendor.test/vendor/api/console/tenant-create"), { method, headers: { host: "vendor.test", "content-type": contentType, ...extra }, body: method === "GET" ? undefined : "{}" }));
-    expect(send("POST", "application/json").headers.get("x-host-policy")).toBeNull();
-    expect(send("POST", "application/json").headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect((await send("POST", "application/json")).headers.get("x-host-policy")).toBeNull();
+    expect((await send("POST", "application/json")).headers.get("content-security-policy")).toContain("default-src 'self'");
     for (const ct of ["multipart/form-data; boundary=x", "application/x-www-form-urlencoded", "text/plain", ""]) {
-      expect(send("POST", ct).headers.get("x-host-policy"), ct).toBe("refused");
+      expect((await send("POST", ct)).headers.get("x-host-policy"), ct).toBe("refused");
     }
-    expect(send("PUT", "application/json").headers.get("x-host-policy")).toBe("refused");
-    expect(send("DELETE", "application/json").headers.get("x-host-policy")).toBe("refused");
-    expect(send("POST", "application/json", { "next-action": "abc" }).headers.get("x-host-policy")).toBe("refused");
+    expect((await send("PUT", "application/json")).headers.get("x-host-policy")).toBe("refused");
+    expect((await send("DELETE", "application/json")).headers.get("x-host-policy")).toBe("refused");
+    expect((await send("POST", "application/json", { "next-action": "abc" })).headers.get("x-host-policy")).toBe("refused");
     // Not on the app host.
-    const app = proxy(new NextRequest(new URL("http://app.test/vendor/api/console/tenant-create"), { method: "POST", headers: { host: "app.test", "content-type": "application/json" }, body: "{}" }));
+    const app = await proxy(new NextRequest(new URL("http://app.test/vendor/api/console/tenant-create"), { method: "POST", headers: { host: "app.test", "content-type": "application/json" }, body: "{}" }));
     expect(app.headers.get("x-host-policy")).toBe("refused");
   });
 });

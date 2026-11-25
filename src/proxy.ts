@@ -12,8 +12,35 @@
 // routes under /vendor/api/console/: POST with application/json only (a cross-site form
 // cannot send it without a CORS preflight, which is never answered), and the route
 // checks Origin again.
+import type pg from "pg";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  eligibleTargetFromPath,
+  normalizeActivePixelConfig,
+  publicBaseCsp,
+  resolveBookingHostCsp,
+} from "./app/(public)/_pixel-policy";
+import { openAppPool } from "./db/rls/pool";
 import { type HostConfig, hostConfigFromEnv, resolveRequest } from "./lib/hosts";
+import { resolvePublicSiteBySlug } from "./modules/public-site";
+
+let cachedProxyPoolUrl: string | undefined;
+let cachedProxyPool: Promise<pg.Pool> | undefined;
+function proxyAppPool(url: string): Promise<pg.Pool> {
+  if (cachedProxyPool && cachedProxyPoolUrl === url) return cachedProxyPool;
+  const previous = cachedProxyPool;
+  cachedProxyPoolUrl = url;
+  const next = openAppPool({ connectionString: url, max: 2 }).catch((err) => {
+    if (cachedProxyPool === next) {
+      cachedProxyPool = undefined;
+      cachedProxyPoolUrl = undefined;
+    }
+    throw err;
+  });
+  cachedProxyPool = next;
+  if (previous) void previous.then((p) => p.end()).catch(() => {});
+  return next;
+}
 
 // Read once per process. Outside production the three hosts default to loopback names
 // (browsers resolve *.localhost to 127.0.0.1); production must configure all three
@@ -57,15 +84,65 @@ function refused() {
   });
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const decision = resolveRequest(config(), request.headers.get("host"), request.nextUrl.pathname);
   if (!decision.allow) return refused();
   if (decision.host === "booking") {
-    // H-02c / SEC-4 / ARCH-3 (T-123 Finding #3): zero-DB strict no-store + security headers on
-    // every BOOKING_HOST response (HTML, RSC/prefetch, metadata, 404) so suspension/unpublish/revocation
-    // takes effect immediately with zero stale CDN or browser cache.
-    const response = NextResponse.next();
+    // H-02c / SEC-4 / ARCH-3 / PR-39 (T-123 Finding #3, T-127 r2 Finding #3):
+    // Single final CSP + strict no-store + security headers on every BOOKING_HOST response.
+    // Non-eligible routes (/{slug}/cabang directory, /perawatan, /dokter, /booking, /aftercare, /kebijakan-*)
+    // ALWAYS receive strict 'self'-only CSP with zero DB lookup.
+    // Eligible routes (/{slug} home and /{slug}/cabang/{branch} detail) with a valid signed "terima" cookie
+    // re-verify the live pixelConfigFingerprint before unlocking provider origins — failing closed to strict CSP
+    // on pixel ID rotation, unpublish, suspension, or missing DB.
+    const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(18))));
+    const cookieHeader = request.headers.get("cookie");
+    const pre = resolveBookingHostCsp({
+      pathname: request.nextUrl.pathname,
+      cookieHeader,
+      nonce,
+    });
+    let csp = pre.csp;
+    if (pre.consentedProviders) {
+      const target = eligibleTargetFromPath(request.nextUrl.pathname);
+      if (!target || !process.env.APP_DATABASE_URL) {
+        csp = publicBaseCsp(nonce);
+      } else {
+        try {
+          const site = await resolvePublicSiteBySlug(
+            target.slug,
+            await proxyAppPool(process.env.APP_DATABASE_URL),
+          );
+          const routeVisible =
+            site.state === "published" &&
+            (target.kind === "home" ||
+              (site.dto.sections.branches && site.dto.branches.some((b) => b.slug === target.branchSlug)));
+          const liveConfig = routeVisible
+            ? normalizeActivePixelConfig({
+                metaPixelId: site.metaPixelId,
+                gaMeasurementId: site.gaMeasurementId,
+                revision: site.pixelConfigRevision,
+              })
+            : null;
+          csp = resolveBookingHostCsp({
+            pathname: request.nextUrl.pathname,
+            cookieHeader,
+            nonce,
+            liveConfig,
+          }).csp;
+        } catch {
+          csp = publicBaseCsp(nonce);
+        }
+      }
+    }
+    const forwarded = new Headers(request.headers);
+    forwarded.set("content-security-policy", csp);
+    forwarded.set("x-nonce", nonce);
+    const response = NextResponse.next({ request: { headers: forwarded } });
+    response.headers.set("content-security-policy", csp);
     response.headers.set("cache-control", "private, no-store");
+    response.headers.set("cdn-cache-control", "no-store");
+    response.headers.set("vary", "Cookie");
     response.headers.set("x-content-type-options", "nosniff");
     response.headers.set("referrer-policy", "no-referrer");
     return response;

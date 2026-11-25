@@ -62,6 +62,7 @@ export const publicSites = pgTable(
     // Consented marketing pixel config (PR-39, T-127; stored here, gated on home & branch only).
     metaPixelId: text("meta_pixel_id"),
     gaMeasurementId: text("ga_measurement_id"),
+    pixelConfigRevision: integer("pixel_config_revision").notNull().default(1),
     updatedBy: uuid("updated_by").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -99,6 +100,7 @@ export const publicSites = pgTable(
     ),
     check("public_sites_meta_pixel_check", sql`${t.metaPixelId} is null or ${t.metaPixelId} ~ '^[0-9]{8,20}$'`),
     check("public_sites_ga_check", sql`${t.gaMeasurementId} is null or ${t.gaMeasurementId} ~ '^G-[A-Z0-9]{6,16}$'`),
+    check("public_sites_pixel_rev_check", sql`${t.pixelConfigRevision} >= 1`),
   ],
 ).enableRLS();
 

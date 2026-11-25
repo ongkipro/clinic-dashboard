@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { toTreatmentCard } from "../../../modules/public-site";
 import { loadPublicSite, NEUTRAL_NOT_FOUND_META, PublicShell, safeJsonLd } from "./_shared";
+import { PublicPixelGate } from "./_pixel-gate";
 import { bookingHref, whatsappLink } from "./booking/model";
 
 // Blocking dynamic route so unknown/unpublished/revoked tenants return a real HTTP 404 (not streamed 200).
@@ -181,6 +182,15 @@ export default async function ClinicHomePage({
           </div>
         </section>
       )}
+
+      <PublicPixelGate
+        slug={dto.slug}
+        pathname={base}
+        clinicName={dto.brand}
+        metaPixelId={resolved.metaPixelId}
+        gaMeasurementId={resolved.gaMeasurementId}
+        pixelConfigRevision={resolved.pixelConfigRevision}
+      />
     </PublicShell>
   );
 }

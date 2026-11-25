@@ -215,7 +215,7 @@ describe("T-123 public site generator PostgreSQL & proxy integration (PR-64, PR-
     }
   });
 
-  it("Finding #3: BOOKING_HOST proxy enforces Cache-Control: private, no-store & blocks staff routes", () => {
+  it("Finding #3: BOOKING_HOST proxy enforces Cache-Control: private, no-store & blocks staff routes", async () => {
     const prev = { APP_HOST: process.env.APP_HOST, BOOKING_HOST: process.env.BOOKING_HOST, VENDOR_HOST: process.env.VENDOR_HOST };
     process.env.APP_HOST = "app.test.local";
     process.env.BOOKING_HOST = "booking.test.local";
@@ -224,18 +224,18 @@ describe("T-123 public site generator PostgreSQL & proxy integration (PR-64, PR-
       const okReq = new NextRequest("http://booking.test.local/klinik-alpha/perawatan", {
         headers: { host: "booking.test.local" },
       });
-      const okRes = proxy(okReq);
+      const okRes = await proxy(okReq);
       expect(okRes.status).toBe(200);
       expect(okRes.headers.get("cache-control")).toBe("private, no-store");
       expect(okRes.headers.get("x-content-type-options")).toBe("nosniff");
       expect(okRes.headers.get("referrer-policy")).toBe("no-referrer");
 
       // Staff route on BOOKING_HOST -> refused 404
-      const staffOnBooking = proxy(new NextRequest("http://booking.test.local/kasir", { headers: { host: "booking.test.local" } }));
+      const staffOnBooking = await proxy(new NextRequest("http://booking.test.local/kasir", { headers: { host: "booking.test.local" } }));
       expect(staffOnBooking.status).toBe(404);
 
       // Public slug route on APP_HOST -> refused 404
-      const publicOnApp = proxy(new NextRequest("http://app.test.local/klinik-alpha/perawatan", { headers: { host: "app.test.local" } }));
+      const publicOnApp = await proxy(new NextRequest("http://app.test.local/klinik-alpha/perawatan", { headers: { host: "app.test.local" } }));
       expect(publicOnApp.status).toBe(404);
     } finally {
       process.env.APP_HOST = prev.APP_HOST;

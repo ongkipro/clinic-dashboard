@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { loadPublicSite, NEUTRAL_NOT_FOUND_META, PublicShell, safeJsonLd, weekdayLabel } from "../../_shared";
+import { PublicPixelGate } from "../../_pixel-gate";
 import { bookingHref, whatsappLink } from "../../booking/model";
 
 // Blocking dynamic route so unknown/unpublished/revoked tenants return a real HTTP 404 (not streamed 200).
@@ -157,6 +158,15 @@ export default async function BranchDetailPage({
           </section>
         )}
       </article>
+
+      <PublicPixelGate
+        slug={dto.slug}
+        pathname={`${base}/cabang/${item.slug}`}
+        clinicName={dto.brand}
+        metaPixelId={resolved.metaPixelId}
+        gaMeasurementId={resolved.gaMeasurementId}
+        pixelConfigRevision={resolved.pixelConfigRevision}
+      />
     </PublicShell>
   );
 }
