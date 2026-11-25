@@ -97,7 +97,7 @@ async function Body({
         method="get"
         action="/laporan/atribusi"
         aria-label="Filter periode atribusi"
-        className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 min-[700px]:grid-cols-[repeat(3,minmax(0,1fr))_auto] min-[700px]:items-end"
+        className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 @min-[44em]:grid-cols-[repeat(3,minmax(0,1fr))_auto] @min-[44em]:items-end"
       >
         <label className="grid min-w-0 gap-1">
           Dari
@@ -152,7 +152,7 @@ async function Body({
       </div>
 
       <FunnelTable id="h-sumber" title="Per sumber & rujukan" rows={data.bySource} />
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 min-[900px]:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 @min-[56em]:grid-cols-2">
         <FunnelTable id="h-cabang" title="Per cabang" rows={data.byBranch} />
         <FunnelTable id="h-petugas" title="Per petugas" rows={data.byAssignee} />
       </div>

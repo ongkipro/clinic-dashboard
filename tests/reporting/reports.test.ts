@@ -480,13 +480,14 @@ describe("T-116 route mounts: pages, error boundaries and page bodies (no databa
     expect(k.metadata.title).toBe("Kamus KPI — Clinic Dashboard");
   });
 
-  it("the family of routes is exactly the dictionary's: one page and one error boundary per report, a page for the Kamus KPI (static, no boundary) and nothing else under laporan/ (audit and terjadwal are other tasks)", () => {
+  it("the family of routes is exactly the dictionary's plus Kamus KPI and the HYG-NAV-3 routes (atribusi, audit, terjadwal)", () => {
     const dir = join(__dirname, "../../src/app/(app)/laporan");
     const all = readdirSync(dir, { recursive: true }) as string[];
     const folders = (file: string) => all.filter((f) => new RegExp(`(^|/)${file}\\.tsx$`).test(f)).map((f) => f.replace(new RegExp(`/${file}\\.tsx$`), "")).sort();
     const reports = (Object.keys(REPORTS) as ReportId[]).sort();
-    expect(folders("page")).toEqual([...reports, "kamus-kpi"].sort());
-    expect(folders("error")).toEqual(reports);
+    const nav3 = ["atribusi", "audit", "terjadwal"];
+    expect(folders("page")).toEqual([...reports, "kamus-kpi", ...nav3].sort());
+    expect(folders("error")).toEqual([...reports, ...nav3].sort());
     for (const id of reports) expect(REPORTS[id].href, id).toBe(`/laporan/${id}`); // the nav row and the dictionary name the same path as the folder
   });
 

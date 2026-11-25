@@ -112,7 +112,7 @@ async function Body() {
         </Link>
       </section>
 
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 min-[900px]:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 @min-[56em]:grid-cols-2">
         <section aria-labelledby="h-isi-ringkasan" className={panel}>
           <h2 id="h-isi-ringkasan" className="m-0 text-[1.15rem] font-semibold">
             Isi ringkasan agregat

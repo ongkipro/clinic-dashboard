@@ -49,7 +49,7 @@ async function Body({
         method="get"
         action="/laporan/audit"
         aria-label="Filter periode laporan audit"
-        className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 min-[700px]:grid-cols-[repeat(3,minmax(0,1fr))_auto] min-[700px]:items-end"
+        className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 @min-[44em]:grid-cols-[repeat(3,minmax(0,1fr))_auto] @min-[44em]:items-end"
       >
         <label className="grid min-w-0 gap-1">
           Dari
@@ -144,7 +144,7 @@ async function Body({
         </div>
       </section>
 
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 min-[900px]:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 @min-[56em]:grid-cols-2">
         <section aria-labelledby="h-lap-persetujuan" className={panel}>
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
             <h2 id="h-lap-persetujuan" className="m-0 text-[1.15rem] font-semibold">Persetujuan</h2>
