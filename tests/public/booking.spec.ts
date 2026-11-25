@@ -1453,7 +1453,8 @@ describe("T-126 public booking PostgreSQL seam & HTTP routes (PR-67, OD-1 Option
       LOCAL_ENV,
     );
     expect(verifyBookingCookiePayload(signed, LOCAL_ENV)).toMatchObject({ slug: "klinik-a", code: "AABB1122", status: "confirmed" });
-    expect(verifyBookingCookiePayload(`${signed.slice(0, -1)}0`, LOCAL_ENV)).toBeNull();
+    const flippedTail = signed.endsWith("0") ? "1" : "0";
+    expect(verifyBookingCookiePayload(`${signed.slice(0, -1)}${flippedTail}`, LOCAL_ENV)).toBeNull();
     const expired = signBookingCookiePayload(
       { slug: "klinik-a", code: "AABB1122", status: "confirmed", exp: Math.floor(Date.now() / 1000) - 10 },
       LOCAL_ENV,
