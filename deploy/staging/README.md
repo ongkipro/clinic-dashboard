@@ -17,7 +17,7 @@ Not yet included: a pgBackRest sidecar for scheduled off-host backups; live Meta
 
 ## Coolify settings
 
-- Source: GitHub App, repository `ongkipro/clinic-dashboard`, branch `deploy-staging` (until this folder is merged to `main`).
+- Source: GitHub App, repository `ongkipro/clinic-dashboard`, branch `main`.
 - Build pack **Docker Compose**, base directory `/`, compose file `/deploy/staging/compose.yaml`.
 - **Auto-deploy off.** Deploy a commit whose CI is green, by hand.
 - Environment name `staging`.
@@ -70,6 +70,14 @@ docker run --rm -it --network "$APP" -e DATABASE_URL -u node -w /app/migrate --e
 ```
 
 Then sign in at `https://stg-vendor.klinikmu.com/vendor/masuk` and enrol TOTP.
+
+## Synthetic demo seed & reset (`HYG-DEMO-1`)
+
+Staging demo data is seeded exclusively through real application writers (`scripts/demo/seed.ts`) — including vendor tenant provisioning, maker-checker first-owner invitation, onboarding compliance & checklist, PR-59 go-live, Better Auth with production database rate limiting enabled, fresh per-sign StepUp proofs, and event-driven ledger outbox completeness verification — and reset by dropping, recreating, re-migrating, and stamping `platform_environment = 'staging'` (`scripts/demo/reset.ts`), never by deleting clinical or financial rows one by one. Reset must only target a dedicated, disposable staging PostgreSQL instance whose admin endpoint cannot address production.
+
+- Both scripts fail closed unless **`DEPLOY_ENV=staging`**, **`public.platform_environment.deploy_env = 'staging'`**, AND **`public.residency_attestations` exists with zero `production` rows**.
+- `scripts/demo/seed.ts` requires explicit deployed configuration (`DATABASE_URL`, `APP_DATABASE_URL`, `AUTH_DATABASE_URL`, `VENDOR_DATABASE_URL`, `DEMO_CREDENTIALS_FILE`, `APP_URL`, `VENDOR_URL`, `BETTER_AUTH_SECRET`, `DEMO_VENDOR_ALLOWLIST_CIDR`), holds a live `SHARE` fence on the marker tables + `SEED_LOCK_KEY`, verifies every physical connection across all four pools against the fence, and refuses to run twice (`DemoAlreadySeededError`); reset first before re-seeding.
+- Demo passwords and TOTP secrets are generated at runtime and written atomically (Linux POSIX, verified ancestor chain + pinned parent fd + `O_EXCL | O_NOFOLLOW` + `fchmod 0600`) strictly to `DEMO_CREDENTIALS_FILE` **outside the repository** (never printed to stdout/stderr or committed).
 
 ## Verified locally (2026-11-26)
 

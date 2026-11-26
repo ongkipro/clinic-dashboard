@@ -64,8 +64,12 @@ async function assertNoDrift(client: pg.Client, folder: string): Promise<void> {
 }
 
 // `folder`: the migrations to apply (default drizzle/). Tests pass a truncated copy to migrate a
-// database to an earlier point (HYG-008a drift check).
-export async function runMigrations(url: string, opts: { folder?: string } = {}): Promise<void> {
+// database to an earlier point (HYG-008a drift check). `verifyClient`: optional pre-DDL guard
+// invoked on the exact physical pg.Client before any lock or migration query runs.
+export async function runMigrations(
+  url: string,
+  opts: { folder?: string; verifyClient?: (client: pg.Client) => Promise<void> } = {},
+): Promise<void> {
   const folder = opts.folder ?? MIGRATIONS_FOLDER;
   const client = new pg.Client({
     connectionString: url,
@@ -73,6 +77,7 @@ export async function runMigrations(url: string, opts: { folder?: string } = {})
   });
   await client.connect();
   try {
+    if (opts.verifyClient) await opts.verifyClient(client);
     // lock_timeout also applies to advisory locks: wait for a concurrent runner (a long
     // migration on a slow server) without that limit, then restore the DDL limits.
     await client.query("set lock_timeout = 0");

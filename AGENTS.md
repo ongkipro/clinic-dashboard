@@ -23,8 +23,8 @@ Repository rules for AI coding agents. Canonical; `docs/spec/` holds the specifi
 ## Non-negotiable rules
 
 - Tenant isolation: server-resolved tenant; RLS on; tenant in every key; add a cross-tenant negative test for every new endpoint, job and export.
-- Production runs on Vultr Singapore by owner decision (H-02b) and must stay residency-portable: every storage endpoint, backup target and host comes from configuration (ARCH-9); never hard-code a region. Real patient data is gated by ARCH-10. Staging/demo use synthetic data only.
-- Hostnames: never serve staff/clinical routes on the proxied booking host; never enable the Cloudflare proxy on the app host; Meta webhooks go to the app host.
+- Production targets Indonesia infrastructure (Biznet Gio Jakarta via Coolify v4, owner decision OD-I10 / DEC-134, superseding H-02b / DEC-003 Vultr Singapore) and must stay residency-portable: every storage endpoint, backup target and host comes from configuration (ARCH-9); never hard-code a region. Real patient data is gated by ARCH-10. Staging/demo use synthetic data only.
+- Hostnames: never serve staff/clinical routes on the proxied booking host; never enable the Cloudflare proxy on the production app or vendor host (staging-only synthetic proxy exception OD-I9 / DEC-134); Meta webhooks go to the app host.
 - Never reuse the `99ribu-prod` server or any other project's instance (H-03).
 - M0 checks: Coolify v4 remote-server support, pgBackRest sidecar, Node LTS pin, Better Auth version.
 - Revenue only on performance; every settlement goes to a contract liability first (`11`).
