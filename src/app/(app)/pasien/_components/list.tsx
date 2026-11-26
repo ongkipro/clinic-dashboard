@@ -80,8 +80,8 @@ export function PatientList({ ctx, branches, segments }: { ctx: RenderedContext;
           <h2 id="segmen" className="m-0 text-[1.18rem] font-semibold">Segmen tersimpan</h2>
           <ul className="m-0 flex min-w-0 list-none flex-wrap gap-2 p-0">
             {segments.map((g) => (
-              <li key={g.id} className="flex min-w-0 items-center gap-1 rounded-full bg-[var(--surface)] pl-2">
-                <Button type="button" variant="plain" onClick={() => apply(g.filters)}>{g.name}</Button>
+              <li key={g.id} className="flex max-w-full min-w-0 items-center gap-1 rounded-full bg-[var(--surface)] pl-2">
+                <Button type="button" variant="plain" className="min-w-0 shrink text-left whitespace-normal [overflow-wrap:anywhere]" onClick={() => apply(g.filters)}>{g.name}</Button>
                 <DeleteSegment ctx={ctx} id={g.id} name={g.name} />
               </li>
             ))}

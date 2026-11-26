@@ -372,7 +372,7 @@ function TopBar(props: ShellProps & { onSearch: () => void }) {
         <button type="button" data-shell-search className={s.searchSlot} onClick={props.onSearch} aria-label="Cari halaman, pasien atau aksi" aria-keyshortcuts="Control+K Meta+K">
           <Search aria-hidden="true" />
           <span className={s.searchText}>Cari</span>
-          <kbd className={s.kbd}>⌘K</kbd>
+          <kbd className={s.kbd} aria-hidden="true">⌘K</kbd>
         </button>
         {quickActionsFor(props.role).length > 0 && (
           <button type="button" className={s.iconButton} onClick={props.onSearch} aria-label="Aksi cepat">

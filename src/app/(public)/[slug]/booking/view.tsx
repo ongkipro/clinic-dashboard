@@ -69,7 +69,7 @@ function Steps({ step }: { step: Step }) {
             aria-current={n === step ? "step" : undefined}
             className={`rounded-xl px-3 py-2 text-[13px] [overflow-wrap:anywhere] ${
               n === step
-                ? "bg-[#0071E3]/10 font-semibold text-[#0071E3]"
+                ? "bg-[#0071E3]/10 font-semibold text-[#005BBF]"
                 : "bg-white text-[#6E6E73]"
             }`}
           >
@@ -355,7 +355,7 @@ export function BookingView(p: BookingViewProps) {
             <p className="m-0 font-semibold text-[#D70015]">{p.state.message}</p>
             <a
               href={p.state.retryHref}
-              className="inline-flex min-h-[44px] items-center font-semibold text-[#0071E3] no-underline"
+              className="inline-flex min-h-[44px] items-center font-semibold text-[#005BBF] no-underline"
             >
               Ulangi dari awal
             </a>
@@ -381,7 +381,7 @@ export function BookingView(p: BookingViewProps) {
               href={p.wa.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-[44px] items-center font-semibold text-[#0071E3] no-underline"
+              className="inline-flex min-h-[44px] items-center font-semibold text-[#005BBF] no-underline"
             >
               {p.wa.label}
             </a>

@@ -121,16 +121,16 @@ export default async function ClinicHomePage({
               Daftar perawatan belum dipublikasikan.
             </p>
           ) : (
-            <div className="grid gap-4 min-[700px]:grid-cols-2 min-[1024px]:grid-cols-3">
+            <div className="grid min-w-0 gap-4 min-[700px]:grid-cols-2 min-[1024px]:grid-cols-3">
               {cards.map((t) => (
                 <a
                   key={t.slug}
                   href={`${base}/perawatan/${t.slug}`}
-                  className="grid content-between gap-3 rounded-[var(--radius-group)] border border-[var(--separator)] bg-[var(--surface)] p-5 text-[var(--label)] no-underline transition hover:border-[var(--tint)]"
+                  className="grid min-w-0 content-between gap-3 rounded-[var(--radius-group)] border border-[var(--separator)] bg-[var(--surface)] p-5 text-[var(--label)] no-underline transition hover:border-[var(--tint)]"
                 >
-                  <div className="grid gap-1.5">
-                    <h3 className="m-0 text-[1.0625rem] font-semibold leading-snug">{t.name}</h3>
-                    <p className="m-0 text-[0.9375rem] leading-relaxed text-[var(--label-2)]">{t.purpose}</p>
+                  <div className="grid min-w-0 gap-1.5">
+                    <h3 className="m-0 text-[1.0625rem] font-semibold leading-snug [overflow-wrap:anywhere]">{t.name}</h3>
+                    <p className="m-0 text-[0.9375rem] leading-relaxed text-[var(--label-2)] [overflow-wrap:anywhere]">{t.purpose}</p>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--separator)] pt-3 text-[0.875rem]">
                     <span className="font-medium text-[var(--label)]">{t.tariffText}</span>
