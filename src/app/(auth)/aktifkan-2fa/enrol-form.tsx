@@ -1,18 +1,62 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Copy } from "lucide-react";
 import { callAuth } from "../client";
+import { qrToSvgPath, type QrSvg } from "./qr";
 import s from "../auth.module.css";
 
-type Setup = { uri: string; secret: string; backupCodes: string[] };
+type Setup = { uri: string; secret: string; backupCodes: string[]; qr?: QrSvg };
+type CopyKind = "secret" | "codes";
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fall through to legacy selection copy when clipboard permission is unavailable.
+  }
+  try {
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.setAttribute("readonly", "");
+    el.className = s.srOnly;
+    document.body.appendChild(el);
+    el.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(el);
+    return ok;
+  } catch {
+    return false;
+  }
+}
 
 // IAM-1 / PR-3: enrol an authenticator app. Step 1 re-checks the password and returns
-// the otpauth URI and backup codes; step 2 confirms one code, which marks the factor
-// verified. Lazy: no QR image (no extra dependency); the otpauth link opens the
-// authenticator on phones and the secret can be typed on other devices.
+// the otpauth URI and backup codes; step 2 shows a scannable inline SVG QR code plus
+// the copyable manual secret, then confirms one code to mark the factor verified.
 export function EnrolForm({ base, home = "/" }: { base?: string; home?: string }) {
   const [setup, setSetup] = useState<Setup>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState<CopyKind>();
+  const [copyNote, setCopyNote] = useState<string>();
+  const copyTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
+
+  async function handleCopy(kind: CopyKind, text: string) {
+    clearTimeout(copyTimer.current);
+    const ok = await copyText(text);
+    if (!ok) {
+      setCopied(undefined);
+      setCopyNote("Gagal menyalin otomatis. Pilih teks lalu salin secara manual.");
+      return;
+    }
+    setCopied(kind);
+    setCopyNote(kind === "secret" ? "Kunci autentikator disalin." : "Semua kode cadangan disalin.");
+    copyTimer.current = setTimeout(() => setCopied(undefined), 2000);
+  }
 
   async function start(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,6 +73,7 @@ export function EnrolForm({ base, home = "/" }: { base?: string; home?: string }
       uri,
       secret: new URL(uri).searchParams.get("secret") ?? "",
       backupCodes: (r.data.backupCodes as string[]) ?? [],
+      qr: uri ? qrToSvgPath(uri) : undefined,
     });
   }
 
@@ -74,14 +119,40 @@ export function EnrolForm({ base, home = "/" }: { base?: string; home?: string }
     <form className={s.group} onSubmit={confirm}>
       {alert}
       <div className={s.field}>
-        <span className={s.label}>1. Tambahkan ke aplikasi autentikator</span>
+        <span className={s.label}>1. Pindai kode QR atau masukkan kunci manual</span>
+        <p className={s.help}>Pindai dengan Google Authenticator, Apple Passwords, atau aplikasi autentikator lain.</p>
+        {setup.qr && (
+          <div className={s.qrFrame}>
+            <svg
+              className={s.qr}
+              viewBox={`0 0 ${setup.qr.size} ${setup.qr.size}`}
+              role="img"
+              aria-label="Kode QR autentikator"
+              shapeRendering="crispEdges"
+            >
+              <rect width={setup.qr.size} height={setup.qr.size} fill="#fff" />
+              <path d={setup.qr.path} fill="#000" />
+            </svg>
+          </div>
+        )}
         <a className={s.secondary} href={setup.uri}>
           Buka aplikasi autentikator
         </a>
-        <p className={s.help}>Atau ketik kunci ini secara manual:</p>
-        <p className={s.secret} aria-label="Kunci autentikator">
-          {setup.secret}
-        </p>
+        <p className={s.help}>Atau salin dan ketik kunci ini secara manual:</p>
+        <div className={s.secretRow}>
+          <p className={s.secret} aria-label="Kunci autentikator">
+            {setup.secret}
+          </p>
+          <button
+            type="button"
+            className={s.copyButton}
+            aria-label="Salin kunci manual"
+            onClick={() => handleCopy("secret", setup.secret)}
+          >
+            {copied === "secret" ? <Check size={16} strokeWidth={1.75} aria-hidden="true" /> : <Copy size={16} strokeWidth={1.75} aria-hidden="true" />}
+            <span>{copied === "secret" ? "Tersalin" : "Salin"}</span>
+          </button>
+        </div>
       </div>
       <div className={s.field}>
         <span className={s.label}>2. Simpan kode cadangan</span>
@@ -90,6 +161,17 @@ export function EnrolForm({ base, home = "/" }: { base?: string; home?: string }
             <li key={c}>{c}</li>
           ))}
         </ul>
+        {setup.backupCodes.length > 0 && (
+          <button
+            type="button"
+            className={s.copyButton}
+            aria-label="Salin semua kode"
+            onClick={() => handleCopy("codes", setup.backupCodes.join("\n"))}
+          >
+            {copied === "codes" ? <Check size={16} strokeWidth={1.75} aria-hidden="true" /> : <Copy size={16} strokeWidth={1.75} aria-hidden="true" />}
+            <span>{copied === "codes" ? "Kode tersalin" : "Salin semua kode"}</span>
+          </button>
+        )}
         <p className={s.help}>Simpan di tempat aman. Setiap kode hanya bisa dipakai sekali.</p>
       </div>
       <div className={s.field}>
@@ -98,6 +180,9 @@ export function EnrolForm({ base, home = "/" }: { base?: string; home?: string }
         </label>
         <input className={`${s.input} ${s.code}`} id="code" name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" required />
       </div>
+      <span className={s.srOnly} role="status" aria-live="polite">
+        {copyNote ?? ""}
+      </span>
       <button className={s.primary} type="submit" aria-disabled={busy}>
         {busy ? "Memeriksa…" : "Aktifkan"}
       </button>
