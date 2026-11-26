@@ -361,8 +361,9 @@ describe("HYG-DEMO-1 staging demo seed & reset", () => {
         await w.query(
           `insert into public.auth_user (name, email) values ('Uncommitted Writer', 'uncommitted.fence@klinik-estetika.test')`,
         );
-        // Kill the fence backend on PostgreSQL WHILE the writer transaction is open
-        await h.admin.query(`select pg_terminate_backend($1)`, [fencePid]);
+        // Synchronously terminate the fence backend (timeout=5000ms waits until PG releases its locks)
+        // WHILE the writer transaction is open
+        await h.admin.query(`select pg_terminate_backend($1, 5000)`, [fencePid]);
         await expect(w.query(`commit`)).rejects.toMatchObject({ code: "FENCE_LOST" });
         // Subsequent autocommit statement on the same backend is ALSO refused database-side
         await expect(
@@ -399,7 +400,7 @@ describe("HYG-DEMO-1 staging demo seed & reset", () => {
         ...baseSeedOpts(abortedCreds),
         hooks: {
           onFenceAcquired: async ({ fencePid }) => {
-            await h.admin.query(`select pg_terminate_backend($1)`, [fencePid]);
+            await h.admin.query(`select pg_terminate_backend($1, 5000)`, [fencePid]);
             await new Promise((r) => setTimeout(r, 50));
           },
         },
@@ -482,8 +483,8 @@ describe("HYG-DEMO-1 staging demo seed & reset", () => {
               } finally {
                 await lateWriter.end().catch(() => {});
               }
-              // Terminate inspector from a separate maintenance DB connection (thirdDb.admin was drained by quiesce)
-              await otherDb.admin.query(`select pg_terminate_backend($1)`, [inspectPid]);
+              // Terminate inspector synchronously from a separate maintenance DB connection (thirdDb.admin was drained by quiesce)
+              await otherDb.admin.query(`select pg_terminate_backend($1, 5000)`, [inspectPid]);
               await new Promise((r) => setTimeout(r, 50));
             },
           },
