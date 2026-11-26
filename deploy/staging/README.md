@@ -21,6 +21,8 @@ purge) do not run on their own; a pgBackRest sidecar for backups.
 - Build pack **Docker Compose**, base directory `/`, compose file `/deploy/staging/compose.yaml`.
 - **Auto-deploy off.** Deploy a commit whose CI is green, by hand.
 - Environment name `staging`.
+- Coolify > Advanced: **Inject Build Args to Dockerfile off** and every variable **runtime only** (not build time);
+  otherwise Coolify writes the generated passwords into `ARG` lines that stay in the image history.
 - Build paths resolve from the repository root: Coolify runs compose with `--project-directory` at the checkout root,
   and turns relative bind mounts into empty directories, so nothing here is bind-mounted from the repository.
 - Domains, all on service `app`, port 3000:
@@ -51,13 +53,19 @@ unreadable.
 
 ## After the first deploy
 
-First platform owner (DEC-036), once, in the server terminal; the password is typed at a hidden prompt:
+First platform owner (DEC-036), once, in the server terminal (needs a TTY; the password is typed at the script's hidden
+prompt). Run a one-off container from the deployed migrate image on the application's network, with the database owner
+password read from the `postgres` container's environment and passed to `docker run` by variable name only:
 
 ```sh
-docker exec -it <migrate-or-app container built from this image> sh -c \
-  'cd /app/migrate && DATABASE_URL=postgres://clinic_owner:<owner password>@postgres:5432/clinic_dashboard \
-   node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/db/vendor-bootstrap.ts \
-   --email <email> --nama "<nama>" --cidr <your IP>/32 --label "Kantor"'
+APP=<coolify application uuid>
+PG=$(docker ps --format '{{.Names}}' | grep "^postgres-$APP")
+IMG=$(docker inspect -f '{{.Config.Image}}' "$(docker ps -a --format '{{.Names}}' | grep "^migrate-$APP")")
+P=$(docker exec "$PG" printenv POSTGRES_PASSWORD)
+DATABASE_URL="postgres://clinic_owner:$P@postgres:5432/clinic_dashboard"; export DATABASE_URL; unset P
+docker run --rm -it --network "$APP" -e DATABASE_URL -u node -w /app/migrate --entrypoint node "$IMG" \
+  --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/db/vendor-bootstrap.ts \
+  --email <email> --nama "<nama>" --cidr <your IP>/32 --label "Kantor"
 ```
 
 Then sign in at `https://stg-vendor.klinikmu.com/vendor/masuk` and enrol TOTP.
