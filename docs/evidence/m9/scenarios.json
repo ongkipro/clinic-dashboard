@@ -1,0 +1,291 @@
+{
+ "_about": "T-131 M9 exit evidence map on green origin/main 5210d969 (after T-120–T-130 and DEC-117 12-row remediation). All 15 required PRD §8 M9 scenarios are mapped to real passing tests with 0 deferrals. Executable pre-staging evidence (restore drill NFR-3, integrity NFR-5, isolation NFR-6, localization NFR-8, browser sweep, DEC-117 security review, automated m9-flow) is recorded with executed PASS artefacts; deploy-gated / staging-only probes (NFR-1, NFR-2, full-site axe NFR-4, Indonesia migration rehearsal NFR-7, and manual owner staging walkthroughs J9/J11 under DEC-034) remain truthfully PENDING EXECUTION with zero fabricated claims.",
+ "scenarios": [
+  {
+   "scenario": "PR-36 residency",
+   "file": "tests/platform/residency.test.ts",
+   "tests": [
+    "Scenario PR-36 pure evaluator > matches declared vs deployed and reports mismatches, unattested, checksum mismatch, and inconclusive",
+    "T-120 PostgreSQL real_patient_gate, residency_attest, dual env marker & locks > Finding #1: binds attestation to release_digest, runtime RESIDENCY_* locations digest, deploy_env; deploy-only execute"
+   ],
+   "proves": "storage locations are read from configuration only (ARCH-9), attested against release_digest, and checked against declared posture (T-120)",
+   "open": "live Indonesia provider migration rehearsal remains tracked under NFR-7 (DEC-034)"
+  },
+  {
+   "scenario": "PR-36 activation refused without opinion",
+   "file": "tests/platform/residency.test.ts",
+   "tests": [
+    "T-120 PostgreSQL real_patient_gate, residency_attest, dual env marker & locks > Finding #4: positive opinion requires vendor_residency_opinion file_sha256 === vendor_profile.residency_opinion_checksum",
+    "T-120 PostgreSQL real_patient_gate, residency_attest, dual env marker & locks > Finding #7: vendor_go_live_blockers (PR-59 declared posture) names required, negative, inconclusive and clears on all-ID"
+   ],
+   "proves": "real-patient actions and go-live refuse when outside-ID storage lacks an approved positive legal opinion matching file_sha256 (T-120)",
+   "open": "staging/production attestation runs at deployment time (DEC-034)"
+  },
+  {
+   "scenario": "PR-39 no pixel on treatment page",
+   "file": "tests/public/pixels.spec.ts",
+   "tests": [
+    "T-127 r2 public pixel policy (PR-39, R3 Findings #1–#5) > Finding #1: allows pixels ONLY on home and branch detail — NEVER on /{slug}/cabang directory, health-intent, booking, or reserved routes",
+    "T-127 r2 public pixel policy (PR-39, R3 Findings #1–#5) > Finding #3: single CSP authority restricts CSP on /{slug}/cabang, health routes, pixel ID rotation, and missing DB"
+   ],
+   "proves": "marketing pixels are allowed strictly on home and branch detail with valid consent and never on treatment/health-intent pages (T-127)",
+   "open": "live staging network verification runs during J11 walkthrough (DEC-034)"
+  },
+  {
+   "scenario": "PR-39 no replay on booking",
+   "file": "tests/public/pixels.spec.ts",
+   "tests": [
+    "T-127 r2 public pixel policy (PR-39, R3 Findings #1–#5) > Finding #1: allows pixels ONLY on home and branch detail — NEVER on /{slug}/cabang directory, health-intent, booking, or reserved routes",
+    "T-127 r2 public pixel policy (PR-39, R3 Findings #1–#5) > Finding #4 & #5: POST enforces full Origin scheme+host equality (403 on http->https mismatch), Fetch Metadata, and per-tenant Path=/{slug} cookies"
+   ],
+   "proves": "booking, intake, and complaint pages carry strict self-only CSP with zero session replay or ad SDK origins (T-127)",
+   "open": "live staging network verification runs during J11 walkthrough (DEC-034)"
+  },
+  {
+   "scenario": "PR-50 data request",
+   "file": "tests/privacy/requests.test.ts",
+   "tests": [
+    "T-121 pure domain rules > enforces exact 72h deadline boundaries (-1s, =0, +1s) and SLA stop event",
+    "T-121 PostgreSQL data-subject requests (PR-50 + Findings #1–#8) > Scenario PR-50 + Finding #4: full access lifecycle, unverified refusal, handoff_ref & delivery confirmation, attested withdrawal"
+   ],
+   "proves": "access/correction/erasure/restriction/withdrawal requests track exact 3x24h deadlines, verification gates, clinical correction links, and D3 erasure refusal (T-121)",
+   "open": "none in code; manual UI check on staging (DEC-034)"
+  },
+  {
+   "scenario": "PR-52 export",
+   "file": "tests/export/tenant-export.test.ts",
+   "tests": [
+    "T-122 tenant export PostgreSQL integration (PR-52, Findings #1–#9) > Scenario PR-52 + Findings #1, #4, #6, #8, #9: owner requests with HYG-026 StepUp, least-privilege worker builds archive, guarded release verifies manifest/ZIP & cross-tenant isolation",
+    "T-122 tenant export PostgreSQL integration (PR-52, Findings #1–#9) > Finding #2 (generation fencing), #3 (closed tenant), #5 (failed purge), #6 (tamper), and #1 (TEN-19 never)"
+   ],
+   "proves": "owner step-up request, least-privilege worker snapshot, SHA-256 manifest verification, 24h expiry/purge, and pre-allocation pilot ceilings (T-122 + DEC-117)",
+   "open": "scheduled export worker & expiry cron wiring remains open before live PR-52"
+  },
+  {
+   "scenario": "PR-59 go-live gate",
+   "file": "tests/vendor/checklist.test.ts",
+   "tests": [
+    "scenario PR-59 go-live gate > go-live is refused naming the first open checklist item; nothing changes",
+    "scenario PR-59 go-live gate > with every blocker cleared go-live succeeds and the go-live date (billing start) is recorded",
+    "scenario PR-59: the processor agreement is checked again at go-live (HYG-014) > an agreement revoked after onboarding: go-live is refused naming it; nothing changes; approved again, go-live succeeds"
+   ],
+   "proves": "go-live refuses naming the first open blocker, re-checks processor agreement and residency posture, and records go-live date starting billing (T-027, HYG-014, T-120)",
+   "open": "manual owner J9 staging walkthrough deferred under DEC-034"
+  },
+  {
+   "scenario": "PR-64 generated public site",
+   "file": "tests/public/site.test.ts",
+   "tests": [
+    "T-123 public site generator PostgreSQL & proxy integration (PR-64, PR-65, Findings #1–#8) > Scenario PR-64 + PR-2 + Findings #1, #2, #4, #5, #6, #8: Q-15 counsel gate, publish, live closures, revocation, slug immutability & tampered snapshot refusal",
+    "T-123 public site generator PostgreSQL & proxy integration (PR-64, PR-65, Findings #1–#8) > Finding #3: BOOKING_HOST proxy enforces Cache-Control: private, no-store & blocks staff routes"
+   ],
+   "proves": "tenant public site renders branches and treatments from master data behind counsel gate, immutable slug, live branch overlay, and strict BOOKING_HOST isolation (T-123 + DEC-117)",
+   "open": "manual owner J11 staging walkthrough deferred under DEC-034"
+  },
+  {
+   "scenario": "PR-65 unpublished price",
+   "file": "tests/public/rules.test.ts",
+   "tests": [
+    "T-124 public treatment rules (PR-65, Permenkes 1787/2010) > Scenario: PR-65 unpublished price — unpublished, counsel-blocked, or invalid branchPrice emits consultation fallback and strips BOTH amount AND priceNote"
+   ],
+   "proves": "unpublished or counsel-blocked tariffs emit consultation fallback text and strip both amount and priceNote across HTML/meta/JSON-LD (T-124)",
+   "open": "none in code; manual J11 check on staging (DEC-034)"
+  },
+  {
+   "scenario": "PR-65 no advertised discount",
+   "file": "tests/public/rules.test.ts",
+   "tests": [
+    "T-124 public treatment rules (PR-65, Permenkes 1787/2010) > Scenario: PR-65 no advertised discount — active promo, normalPrice, and rating never leak across page, card, meta, or JSON-LD",
+    "T-124 public treatment rules (PR-65, Permenkes 1787/2010) > blocks every forbidden Permenkes 1787/2010 category (ID & EN, zero-width evasion, symbols, strikethrough, prose price)"
+   ],
+   "proves": "promotional discounts, normal prices, superlatives, testimonials, and prose prices are blocked at publish and never projected (T-124 + DEC-117)",
+   "open": "none in code; manual J11 check on staging (DEC-034)"
+  },
+  {
+   "scenario": "PR-66 doctor consent",
+   "file": "tests/public/doctors.test.ts",
+   "tests": [
+    "T-125: Doctor listing with consent & immediate purge (PR-66) > Scenario PR-66 doctor consent: doctor without listing consent does not appear anywhere publicly",
+    "T-125: Doctor listing with consent & immediate purge (PR-66) > immediate purge on withdrawal: removes doctor on next read, blocks mid-flow OTP verify, clears photo_ref, preserves immutable audit history, and serializes with concurrent publish"
+   ],
+   "proves": "doctors without listing consent are excluded from all public reads/JSON-LD/booking; withdrawal immediately purges listing & photo_ref (T-125)",
+   "open": "none in code; manual J11 check on staging (DEC-034)"
+  },
+  {
+   "scenario": "PR-67 booking with context",
+   "file": "tests/public/booking.spec.ts",
+   "tests": [
+    "T-126 pure UX-24 booking model (PR-67) > prefills valid slugs cleanly and drops unknown or mismatched query tokens silently",
+    "T-126 public booking PostgreSQL seam & HTTP routes (PR-67, OD-1 Option B, 0137) > PR-67 happy path: new online_pending patient, existing patient match, DP hold, phone_e164 cleared, idempotent replay, zero UUIDs"
+   ],
+   "proves": "treatment-page booking prefills context, sends neutral WhatsApp ref, verifies OTP atomically into online_pending patient/hold, and respects ARCH-10 (T-126)",
+   "open": "periodic public-booking purge scheduling and live OTP sender wiring remain release-gated (T-126)"
+  },
+  {
+   "scenario": "PR-85 import dry-run",
+   "file": "tests/import/import.test.ts",
+   "tests": [
+    "T-128 opening-data import real-DB contract (PR-85, DATA-58, Option 1A + 2A, R3) > enforces clinic_executor-only stage/read/apply/purge, owner authority, ARCH-10 gate, versioned AEAD envelope, and PII-free date errors",
+    "T-128 opening-data import real-DB contract (PR-85, DATA-58, Option 1A + 2A, R3) > binds approval to SQL-derived manifest, rejects impossible dates without echoing input, reconciles 0121 + 0123 GL, retires patients, and re-imports Option 1A"
+   ],
+   "proves": "synthetic Numa-shaped opening import validates with BigInt arithmetic, stages via clinic_executor, reconciles 0121 sub-ledgers + 0123 Preview GL, and reverses append-only (T-128)",
+   "open": "manual owner J9 staging walkthrough deferred under DEC-034"
+  },
+  {
+   "scenario": "PR-86 role-filtered menu",
+   "file": "tests/ui/nav-sweep.spec.ts",
+   "tests": [
+    "role filtering (PR-86: pages a role cannot use are absent, never disabled) > Scenario PR-86 role-filtered menu: a pharmacist sees Apotek & Inventaris pages, not Keuangan or Aturan Komisi",
+    "route audit: built / owned by a pending task / orphan (base 5cfa0f52) > every unbuilt nav route is owned by a pending task or listed in ORPHANS"
+   ],
+   "proves": "all 16 staff roles match 19 §2 and 07 matrix with zero foreign pages (46/46 structural + 924/924 Chromium checks, T-130)",
+   "open": "only /pengaturan/cabang/integrasi remains tracked in ORPHANS"
+  },
+  {
+   "scenario": "PR-87 vendor console tree",
+   "file": "tests/vendor/tree.spec.ts",
+   "tests": [
+    "scenario PR-87 vendor console tree > each vendor role sees exactly the pages the scenario lists for it, and no other",
+    "scenario PR-87 vendor console tree > the tree is 19 §3: the same pages in the same order, matching the 19 §3 Roles column, each mounted"
+   ],
+   "proves": "all 11 vendor console pages match 19 §3 roles and order, backed by 0140/0143 audited SECURITY DEFINER readers and writers (T-129 + DEC-117)",
+   "open": "manual owner J9 staging walkthrough deferred under DEC-034"
+  }
+ ],
+ "deferred": [],
+ "items": [
+  {
+   "item": "M9 exit: restore drill passed in an isolated environment",
+   "kind": "evidence",
+   "status": "PASSED",
+   "evidence": "docs/evidence/m9/restore-drill.md",
+   "completes_in": "T-131 (executed ops/pgbackrest/restore-drill.sh on isolated throwaway Docker containers)"
+  },
+  {
+   "item": "M9 exit: residency gate blocks real-patient actions while evidence is missing",
+   "kind": "tests",
+   "file": "tests/platform/residency.test.ts",
+   "tests": [
+    "T-120 PostgreSQL real_patient_gate, residency_attest, dual env marker & locks > Finding #5: dual env marker — app.deploy_env='local' cannot bypass production DB or missing marker",
+    "T-120 PostgreSQL real_patient_gate, residency_attest, dual env marker & locks > Finding #6: online booking creation AND online hold confirmation (booking_confirm & deposit_receive) are gated"
+   ],
+   "proves": "production real-patient actions (patients, online booking, deposit confirm, opening import) are refused while residency/DPIA/DPO/opinion evidence is missing (T-120)"
+  },
+  {
+   "item": "M9 exit: browser sweep 390/820/1180/1440 recorded",
+   "kind": "evidence",
+   "status": "PASSED",
+   "evidence": "docs/evidence/m9/browser-sweep.md",
+   "completes_in": "T-130 (924/924 16-role Chromium sweep) + T-129 (20/20 vendor 390/820/1180/1440 sweep) + T-131"
+  },
+  {
+   "item": "M9 exit: security review findings closed",
+   "kind": "evidence",
+   "status": "PASSED",
+   "evidence": "docs/evidence/m9/security-review.md",
+   "completes_in": "T-131 (DEC-117 12-row System Map review on 9router-fantastico/cx/gpt-6.2-sol + r5 APPROVE)"
+  },
+  {
+   "item": "M9 exit: synthetic Numa-shaped import dry-run reconciles",
+   "kind": "tests",
+   "file": "tests/import/parser.test.ts",
+   "tests": [
+    "T-128 synthetic dry-run parser & BigInt arithmetic > validates a synthetic Numa-shaped batch across all 5 entities with exact BigInt reconciliation"
+   ],
+   "proves": "synthetic Numa-shaped opening-data batch across patients, balances, packages, deposits, and receivables validates with exact BigInt totals and zero PII leakage (T-128)"
+  },
+  {
+   "item": "M9 exit: J9 walkthrough passes",
+   "kind": "evidence",
+   "status": "PENDING EXECUTION",
+   "evidence": "docs/evidence/m9/walkthrough-j9.md",
+   "completes_in": "Staging acceptance after M9 under DEC-034 (automated J9 checks pass in m9-flow.test.ts; manual owner sign-off stays BLANK until staging)"
+  },
+  {
+   "item": "M9 exit: J11 walkthrough passes",
+   "kind": "evidence",
+   "status": "PENDING EXECUTION",
+   "evidence": "docs/evidence/m9/walkthrough-j11.md",
+   "completes_in": "Staging acceptance after M9 under DEC-034 (automated J11 checks pass in m9-flow.test.ts; manual owner sign-off stays BLANK until staging)"
+  },
+  {
+   "item": "M9 exit: the m9 flow",
+   "kind": "tests",
+   "file": "docs/evidence/m9/m9-flow.test.ts",
+   "tests": [
+    "M9 map shape and truthful pre-staging accounting (no database) > maps all 15 required M9 scenarios with zero deferred entries",
+    "J9 clinic onboarding (automated contract verification) > J9 residency gate blocks real-patient actions while residency opinion or obligations are missing (PR-36)",
+    "J9 clinic onboarding (automated contract verification) > J9 opening-data import dry-run reconciles synthetic Numa-shaped batch with zero drift (PR-85)",
+    "J11 patient finds the clinic online (automated contract verification) > J11 public site publishes master-data branches/treatments, hides unpublished prices, and builds neutral booking/WA links (PR-64/65/67)",
+    "J11 patient finds the clinic online (automated contract verification) > J11 pixel policy keeps health-intent and booking routes strictly free of third-party pixel/replay hosts (PR-39)"
+   ],
+   "proves": "M9 map shape, NFR arithmetic, J9/J11 automated contracts, and on-disk evidence integrity pass on 5210d969"
+  }
+ ],
+ "nfr": [
+  {
+   "id": "NFR-1",
+   "name": "Availability",
+   "target": ">= 99.5% during clinic hours 08:00-21:00 local",
+   "method": "health probe + incident log (deploy-gated under DEC-034)",
+   "status": "PENDING EXECUTION",
+   "evidence": "docs/evidence/m9/nfr/NFR-1.json"
+  },
+  {
+   "id": "NFR-2",
+   "name": "Performance",
+   "target": "booking reservation p95 < 500 ms; treatment completion p95 < 2 s; dashboard p95 < 2 s",
+   "method": "load probe (nfr-probes.mjs NFR-2; deploy-gated under DEC-034)",
+   "status": "PENDING EXECUTION",
+   "evidence": "docs/evidence/m9/nfr/NFR-2.json"
+  },
+  {
+   "id": "NFR-3",
+   "name": "Recovery",
+   "target": "RPO <= 15 min; RTO <= 2 h; quarterly restore drill",
+   "method": "isolated pgBackRest restore drill (ops/pgbackrest/restore-drill.sh -> nfr-probes.mjs NFR-3)",
+   "status": "PASSED",
+   "evidence": "docs/evidence/m9/nfr/NFR-3.json"
+  },
+  {
+   "id": "NFR-4",
+   "name": "Accessibility",
+   "target": "WCAG 2.2 AA; 44 px targets; text to 200%",
+   "method": "full-site staging browser sweep 390/820/1180/1440 + 200% + axe=0 (deploy-gated under DEC-034; T-130/T-129 sweeps recorded in browser-sweep.md)",
+   "status": "PENDING EXECUTION",
+   "evidence": "docs/evidence/m9/nfr/NFR-4.json"
+  },
+  {
+   "id": "NFR-5",
+   "name": "Integrity",
+   "target": "zero unexplained ledger, stock or commission drift; replays produce no duplicates",
+   "method": "replay, concurrency, accounting, inventory, commission & DB drift suites (nfr-probes.mjs NFR-5)",
+   "status": "PASSED",
+   "evidence": "docs/evidence/m9/nfr/NFR-5.json"
+  },
+  {
+   "id": "NFR-6",
+   "name": "Isolation",
+   "target": "no cross-tenant read or write in any API, job, export or cache",
+   "method": "DEL-2 cross-tenant negative gate tests/isolation/isolation.test.ts (nfr-probes.mjs NFR-6)",
+   "status": "PASSED",
+   "evidence": "docs/evidence/m9/nfr/NFR-6.json"
+  },
+  {
+   "id": "NFR-7",
+   "name": "Residency portability",
+   "target": "all storage, backup and host locations are configuration; migration to an Indonesian provider <= 1 day with a rehearsal",
+   "method": "live Indonesia-provider migration rehearsal (deploy-gated under DEC-034; ARCH-9 code-only config verified in tests/platform/residency.test.ts)",
+   "status": "PENDING EXECUTION",
+   "evidence": "docs/evidence/m9/nfr/NFR-7.json"
+  },
+  {
+   "id": "NFR-8",
+   "name": "Localization",
+   "target": "Indonesian UI, IDR integer rupiah, branch timezone labels",
+   "method": "TEST-LOC-1: docs/evidence/m9/nfr8-locale.test.ts (nfr-probes.mjs NFR-8)",
+   "status": "PASSED",
+   "evidence": "docs/evidence/m9/nfr/NFR-8.json"
+  }
+ ]
+}

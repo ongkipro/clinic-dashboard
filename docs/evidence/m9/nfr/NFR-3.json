@@ -1,0 +1,16 @@
+{
+ "id": "NFR-3",
+ "result": "PASS",
+ "measured": {
+  "rpo_seconds": 0,
+  "rto_seconds": 14,
+  "passed": true
+ },
+ "target": {
+  "rpo_seconds": 900,
+  "rto_seconds": 7200
+ },
+ "at": "2026-11-26T00:35:46.856Z",
+ "method": "NFR-3",
+ "source": "restore drill report"
+}

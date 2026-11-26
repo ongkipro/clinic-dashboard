@@ -1,0 +1,13 @@
+{
+ "id": "NFR-8",
+ "result": "PASS",
+ "measured": {
+  "count": 10,
+  "failed": 0,
+  "passed": true
+ },
+ "target": null,
+ "at": "2026-11-26T00:35:47.093Z",
+ "method": "NFR-8",
+ "source": "JUnit (TEST-LOC-1)"
+}

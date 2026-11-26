@@ -1,0 +1,18 @@
+{
+ "id": "NFR-5",
+ "result": "PASS",
+ "measured": {
+  "count": 518,
+  "passed_count": 514,
+  "failed": 0,
+  "allowed_skipped": 4,
+  "suite_errors": false,
+  "missing_prefixes": [],
+  "missing_required": [],
+  "passed": true
+ },
+ "target": null,
+ "at": "2026-11-26T00:35:46.939Z",
+ "method": "NFR-5",
+ "source": "JUnit (all 6 NFR-5 prefixes verified; 4 file-scoped M8-AMEND-2-GQ4-U1-U4 todos accounted)"
+}

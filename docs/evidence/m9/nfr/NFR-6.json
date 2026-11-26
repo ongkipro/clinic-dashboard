@@ -1,0 +1,18 @@
+{
+ "id": "NFR-6",
+ "result": "PASS",
+ "measured": {
+  "count": 278,
+  "passed_count": 277,
+  "failed": 0,
+  "allowed_skipped": 1,
+  "suite_errors": false,
+  "missing_prefixes": [],
+  "missing_required": [],
+  "passed": true
+ },
+ "target": null,
+ "at": "2026-11-26T00:35:47.015Z",
+ "method": "NFR-6",
+ "source": "JUnit (DEL-2 coverage gate verified; file-scoped M0 empty-suite skipIf sentinel accounted)"
+}
