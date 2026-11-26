@@ -17,7 +17,7 @@ async function HomeGate() {
   await connection();
   if (!process.env.AUTH_DATABASE_URL || !process.env.APP_DATABASE_URL) {
     return (
-      <main style={{ padding: 16, maxWidth: 560, margin: "0 auto" }}>
+      <main className="mx-auto grid w-full max-w-[560px] gap-4 p-4">
         <p>KlinikMu</p>
       </main>
     );
@@ -26,7 +26,7 @@ async function HomeGate() {
   if (data.kind === "redirect") redirect(data.to);
   if (data.kind === "blocked") {
     return (
-      <main style={{ padding: 16, maxWidth: 560, margin: "0 auto" }}>
+      <main className="mx-auto grid w-full max-w-[560px] gap-4 p-4">
         <BlockedState
           reason="Akun Anda belum punya peran atau cabang aktif"
           unblock="Owner atau Admin Pusat klinik Anda dapat menambahkannya"
@@ -42,7 +42,7 @@ export default function Home() {
   return (
     <Suspense
       fallback={
-        <main style={{ padding: 16, maxWidth: 560, margin: "0 auto" }}>
+        <main className="mx-auto grid w-full max-w-[560px] gap-4 p-4">
           <LoadingList rows={4} label="Memuat" />
         </main>
       }

@@ -17,18 +17,24 @@ async function copyText(text: string): Promise<boolean> {
   } catch {
     // Fall through to legacy selection copy when clipboard permission is unavailable.
   }
+  const prevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  let el: HTMLTextAreaElement | null = null;
   try {
-    const el = document.createElement("textarea");
+    el = document.createElement("textarea");
     el.value = text;
     el.setAttribute("readonly", "");
     el.className = s.srOnly;
     document.body.appendChild(el);
     el.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(el);
-    return ok;
+    return document.execCommand("copy");
   } catch {
     return false;
+  } finally {
+    if (el) {
+      el.value = "";
+      el.remove();
+    }
+    prevFocus?.focus();
   }
 }
 
@@ -68,12 +74,26 @@ export function EnrolForm({ base, home = "/" }: { base?: string; home?: string }
     }, base);
     setBusy(false);
     if (!r.ok) return setError(r.message);
-    const uri = String(r.data.totpURI ?? "");
+    const rawUri = String(r.data.totpURI ?? "");
+    let uri = "";
+    let secret = "";
+    try {
+      const parsed = new URL(rawUri);
+      if (parsed.protocol === "otpauth:") {
+        uri = rawUri;
+        secret = parsed.searchParams.get("secret") ?? "";
+      }
+    } catch {
+      // Malformed URI from auth server: fail safely instead of crashing the client.
+    }
+    if (!uri || !secret) {
+      return setError("Gagal membuat kunci autentikator. Coba lagi.");
+    }
     setSetup({
       uri,
-      secret: new URL(uri).searchParams.get("secret") ?? "",
+      secret,
       backupCodes: (r.data.backupCodes as string[]) ?? [],
-      qr: uri ? qrToSvgPath(uri) : undefined,
+      qr: qrToSvgPath(uri),
     });
   }
 

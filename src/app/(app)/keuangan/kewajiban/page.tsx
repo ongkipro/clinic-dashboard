@@ -5,6 +5,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { KpiRow, ListPage } from "../../../../components/templates/templates";
 import { LoadingList } from "../../../../components/ui/states";
@@ -89,6 +90,7 @@ function LedgerCard({ l, d }: { l: Ledger; d: Rollforward }) {
 }
 
 async function Body({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await connection();
   const f = filters(await searchParams);
   const r = await loadKewajiban(f);
   if (r.kind === "redirect") redirect(r.to);

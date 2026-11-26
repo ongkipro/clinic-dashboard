@@ -53,7 +53,7 @@ export function PublicShell({
       className="min-h-dvh bg-[var(--bg)] text-[var(--label)] antialiased"
       style={accentStyle}
     >
-      <header className="sticky top-0 z-20 border-b border-[var(--separator)] bg-[var(--bg)]/90 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-[var(--separator)] bg-[var(--bg)]/92 backdrop-blur-[8px]">
         <div className="mx-auto flex max-w-[1040px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 min-[700px]:px-6">
           {/* Plain <a> full-document links across public pages so T-127 marketing pixels never survive SPA nav onto health routes. */}
           <a

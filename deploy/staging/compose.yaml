@@ -22,7 +22,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "clinic_owner", "-d", "clinic_dashboard", "-t", "2"]
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "clinic_owner", "-d", "clinic_dashboard", "-t", "2"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -115,7 +115,7 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/masuk',{redirect:'manual'}).then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "const h=require('node:http');const req=h.request({host:'127.0.0.1',port:3000,path:'/masuk',headers:{host:process.env.APP_HOST}},r=>{r.resume();process.exit(r.statusCode===200?0:1)});req.on('error',()=>process.exit(1));req.end()"]
       interval: 15s
       timeout: 5s
       retries: 10

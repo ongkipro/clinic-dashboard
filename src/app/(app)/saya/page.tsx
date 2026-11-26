@@ -4,6 +4,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { loadShell } from "../../../components/shell/data";
 import { landingFor, sayaFor } from "../../../components/shell/nav";
@@ -12,6 +13,7 @@ import { BlockedState, LoadingList } from "../../../components/ui/states";
 export const metadata: Metadata = { title: "Saya — Clinic Dashboard" };
 
 async function SayaBody() {
+  await connection();
   const data = await loadShell();
   if (data.kind === "redirect") redirect(data.to);
   if (data.kind === "blocked") {

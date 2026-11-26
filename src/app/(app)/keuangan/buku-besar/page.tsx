@@ -5,6 +5,7 @@
 // Readers: owner, finance, auditor; finance writes.
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { KpiRow, ListPage } from "../../../../components/templates/templates";
 import { LoadingList } from "../../../../components/ui/states";
@@ -59,6 +60,7 @@ function Statements({ r }: { r: Report }) {
 }
 
 async function Body({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await connection();
   const f = filters(await searchParams);
   const x = await loadBukuBesar(f);
   if (x.kind === "redirect") redirect(x.to);

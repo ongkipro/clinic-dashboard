@@ -22,7 +22,7 @@ const c = new pg.Client({ connectionString: env.DATABASE_URL });
 await c.connect();
 try {
   await c.query("begin");
-  const db = (await c.query("select current_database() as d")).rows[0].d;
+  const db = (await c.query("select quote_ident(current_database()) as d")).rows[0].d;
   for (const [login, group, password] of logins) {
     if (!password || password.length < 24) throw new Error(`password for ${login} is missing or too short`);
     const exists = (await c.query("select 1 from pg_roles where rolname = $1", [login])).rowCount === 1;
@@ -31,15 +31,19 @@ try {
     await q(`${exists ? "ALTER" : "CREATE"} ROLE ${login} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD ${lit}`);
     // Exactly one group: revoke any other membership a previous run might have left.
     const others = (await c.query(
-      "select g.rolname from pg_auth_members m join pg_roles g on g.oid = m.roleid join pg_roles u on u.oid = m.member where u.rolname = $1 and g.rolname <> $2",
+      "select quote_ident(g.rolname) as rolname from pg_auth_members m join pg_roles g on g.oid = m.roleid join pg_roles u on u.oid = m.member where u.rolname = $1 and g.rolname <> $2",
       [login, group])).rows;
     for (const o of others) await q(`REVOKE ${o.rolname} FROM ${login}`);
     await q(`GRANT ${group} TO ${login}`);
     await q(`GRANT CONNECT ON DATABASE ${db} TO ${login}`);
     console.log(`  ${login}: member of ${group} only`);
   }
+  const cur = (await c.query("select deploy_env from public.platform_environment where id = 1")).rows[0]?.deploy_env;
+  if (cur && cur !== "staging") {
+    throw new Error(`REFUSED: database platform_environment is ${cur}, refusing to overwrite with staging`);
+  }
   await c.query(
-    "insert into public.platform_environment (id, deploy_env, set_at) values (1, $1, clock_timestamp()) on conflict (id) do update set deploy_env = excluded.deploy_env, set_at = clock_timestamp()",
+    "insert into public.platform_environment (id, deploy_env, set_at) values (1, $1, clock_timestamp()) on conflict (id) do nothing",
     [env.DEPLOY_ENV]);
   console.log(`  platform_environment = ${env.DEPLOY_ENV}`);
   await c.query("commit");

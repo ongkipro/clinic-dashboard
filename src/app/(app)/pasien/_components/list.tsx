@@ -90,6 +90,11 @@ export function PatientList({ ctx, branches, segments }: { ctx: RenderedContext;
         </section>
       )}
 
+      {!searched && !active && !s.error && (
+        <p className={muted}>
+          Untuk menjaga privasi, daftar pasien tidak ditampilkan sekaligus. Ketik nama, No. RM, atau nomor HP — atau pilih filter lalu tekan Cari.
+        </p>
+      )}
       {searched && shown.length === 0 && (
         anyFilter || query
           ? <div className="grid min-w-0 gap-2"><EmptyState message="Tidak ada pasien untuk pencarian atau filter ini." />

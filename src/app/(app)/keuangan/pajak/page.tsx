@@ -5,6 +5,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { KpiRow, ListPage } from "../../../../components/templates/templates";
 import { LoadingList } from "../../../../components/ui/states";
@@ -72,6 +73,7 @@ function Docs({ s, canExport }: { s: CoretaxStatus; canExport: boolean }) {
 }
 
 async function Body({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await connection();
   const p = period(await searchParams);
   const x = await loadPajak(p);
   if (x.kind === "redirect") redirect(x.to);

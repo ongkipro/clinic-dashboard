@@ -60,7 +60,7 @@ export default async function ClinicHomePage({
 
       <section className="grid min-w-0 gap-6 pb-10">
         <div className="grid min-w-0 max-w-[680px] gap-3">
-          <h1 className="m-0 text-[2.25rem] font-bold leading-[1.12] tracking-tight [overflow-wrap:anywhere] min-[700px]:text-[2.75rem]">
+          <h1 className="m-0 text-[2.25rem] font-bold leading-[1.12] tracking-[-0.015em] [overflow-wrap:anywhere] min-[700px]:text-[2.75rem]">
             {dto.brand}
           </h1>
           {dto.oneLine && (
@@ -91,16 +91,6 @@ export default async function ClinicHomePage({
                 Lihat Cabang
               </a>
             )}
-            {primaryWa && (
-              <a
-                href={primaryWa.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-[var(--target)] items-center rounded-full border border-[var(--separator)] bg-[var(--surface)] px-5 text-[0.9375rem] font-semibold text-[var(--label)] no-underline"
-              >
-                {primaryWa.label}
-              </a>
-            )}
           </div>
         </div>
 
@@ -119,7 +109,7 @@ export default async function ClinicHomePage({
       {dto.sections.treatments && (
         <section aria-labelledby="sec-perawatan" className="grid min-w-0 gap-4 border-t border-[var(--separator)] py-10">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h2 id="sec-perawatan" className="m-0 text-[1.5rem] font-bold tracking-tight [overflow-wrap:anywhere]">
+            <h2 id="sec-perawatan" className="m-0 text-[1.5rem] font-bold tracking-[-0.015em] [overflow-wrap:anywhere]">
               Perawatan
             </h2>
             <a href={`${base}/perawatan`} className="text-[0.9375rem] font-medium text-[var(--tint)] no-underline">
@@ -156,7 +146,7 @@ export default async function ClinicHomePage({
       {dto.sections.branches && (
         <section aria-labelledby="sec-cabang" className="grid min-w-0 gap-4 border-t border-[var(--separator)] py-10">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h2 id="sec-cabang" className="m-0 text-[1.5rem] font-bold tracking-tight [overflow-wrap:anywhere]">
+            <h2 id="sec-cabang" className="m-0 text-[1.5rem] font-bold tracking-[-0.015em] [overflow-wrap:anywhere]">
               Cabang
             </h2>
             <a href={`${base}/cabang`} className="text-[0.9375rem] font-medium text-[var(--tint)] no-underline">
@@ -180,6 +170,30 @@ export default async function ClinicHomePage({
               </a>
             ))}
           </div>
+          {primaryWa && (
+            <div className="pt-2">
+              <a
+                href={primaryWa.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-[var(--target)] items-center rounded-full border border-[var(--separator)] bg-[var(--surface)] px-5 text-[0.9375rem] font-semibold text-[var(--label)] no-underline"
+              >
+                {primaryWa.label}
+              </a>
+            </div>
+          )}
+        </section>
+      )}
+      {!dto.sections.branches && primaryWa && (
+        <section aria-label="Kontak klinik" className="border-t border-[var(--separator)] py-8">
+          <a
+            href={primaryWa.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-[var(--target)] items-center rounded-full border border-[var(--separator)] bg-[var(--surface)] px-5 text-[0.9375rem] font-semibold text-[var(--label)] no-underline"
+          >
+            {primaryWa.label}
+          </a>
         </section>
       )}
 

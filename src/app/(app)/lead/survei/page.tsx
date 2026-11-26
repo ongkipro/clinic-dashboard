@@ -25,12 +25,12 @@ const ago = (n: number) => jakarta(new Date(Date.now() - n * 86_400_000));
 const fmtDay = (d: string) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${d.slice(0, 10)}T00:00:00Z`));
 
 async function Body({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const sp = await searchParams;
-  const to = typeof sp.sampai === "string" && DAY.test(sp.sampai) ? sp.sampai : jakarta(new Date());
-  const from = typeof sp.dari === "string" && DAY.test(sp.dari) ? sp.dari : ago(29);
   const rc = await requestContext();
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind !== "ok" || !READERS.includes(rc.active.context.actingRole)) return <ListPage as="section" title={TITLE} state={{ kind: "permission", object: "survei" }} />;
+  const sp = await searchParams;
+  const to = typeof sp.sampai === "string" && DAY.test(sp.sampai) ? sp.sampai : jakarta(new Date());
+  const from = typeof sp.dari === "string" && DAY.test(sp.dari) ? sp.dari : ago(29);
   let sum: SurveySummary[];
   let list: { role: string; rows: SurveyRow[] };
   try {

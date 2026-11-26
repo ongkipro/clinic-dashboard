@@ -1,8 +1,10 @@
-// PR-84 context switching (Saya › Ganti Cabang / Ganti Peran / Ganti Klinik and the
-// switch action). The pages render activeContext() and the action applies
+// PR-84 context switching (root "/", Saya hub, Saya › Ganti Cabang / Ganti Peran / Ganti Klinik
+// and the switch action). The pages resolve activeContext() and the action applies
 // switchContext(); each case runs them as the caller and selects tenant B's clinic and
 // branch: nothing of B (tenant, branch, name) may come back, and the switch is refused.
 import type pg from "pg";
+import { shellFor } from "../../../src/components/shell/context";
+import { landingFor, sayaFor } from "../../../src/components/shell/nav";
 import { activeContext, ContextSwitchError, switchContext } from "../../../src/modules/org/context/context";
 import { assignRole, createMembership } from "../../../src/modules/org/identity";
 import { defineCases, type IsolationEnv } from "../case";
@@ -48,7 +50,32 @@ const page = (id: string) =>
     },
   });
 
+// What the root redirect ("/") and Saya hub ("/saya") compute via loadShell() -> shellFor().
+const shellPage = (id: "/" | "/saya") =>
+  ({
+    kind: "route" as const,
+    id,
+    expect: "filtered" as const,
+    marker: (env: IsolationEnv) => env.victim.branchId,
+    async run(env: IsolationEnv) {
+      const acc = await ownerOf(env, env.actor.tenantId);
+      const res = await shellFor(env.app, acc, { tenantId: env.victim.tenantId, role: "owner", branchId: env.victim.branchId });
+      if (res.kind !== "ok") return { status: 403, body: res };
+      const c = res.context;
+      const landing = landingFor(c.role).href;
+      const items = id === "/saya"
+        ? sayaFor(c.role, { roles: c.canSwitchRole, branches: c.branches.length > 1, clinics: c.canSwitchClinic }).map((p) => p.href)
+        : [];
+      return {
+        status: 200,
+        body: { clinic: c.clinic, activeBranchId: c.activeBranchId, branches: c.branches, landing, items },
+      };
+    },
+  });
+
 export default defineCases(
+  shellPage("/"),
+  shellPage("/saya"),
   page("/saya/cabang"),
   page("/saya/peran"),
   page("/saya/klinik"),

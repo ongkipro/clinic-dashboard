@@ -26,12 +26,12 @@ const shift = (m: string, by: number) => {
 };
 
 async function Body({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const sp = await searchParams;
-  const now = thisMonth();
-  const m = typeof sp.bulan === "string" && MONTH.test(sp.bulan) && sp.bulan <= now ? sp.bulan : now;
   const rc = await requestContext();
   if (rc.kind === "redirect") redirect(rc.to);
   if (rc.kind !== "ok") return <ListPage as="section" title={TITLE} state={{ kind: "permission", object: "komisi" }} />;
+  const sp = await searchParams;
+  const now = thisMonth();
+  const m = typeof sp.bulan === "string" && MONTH.test(sp.bulan) && sp.bulan <= now ? sp.bulan : now;
   let d: Mine;
   try {
     d = await withTenantContext(await appPool(), rc.active.context, (db) => myCommission(db, m));

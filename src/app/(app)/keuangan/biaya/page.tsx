@@ -4,6 +4,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { ListPage, Row, RowList } from "../../../../components/templates/templates";
 import { BlockedState, LoadingList } from "../../../../components/ui/states";
@@ -29,6 +30,7 @@ const q = (f: Filters, over: Partial<Filters> = {}) => {
 const panel = "grid gap-3 rounded-[var(--radius-group)] bg-[var(--surface)] p-4";
 
 async function Body({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await connection();
   const f = filters(await searchParams);
   const d = await loadBiaya(f);
   if (d.kind === "redirect") redirect(d.to);

@@ -26,6 +26,7 @@ async function freePort(): Promise<number> {
 }
 const HOSTS = { app: "app.test", booking: "booking.test", vendor: "vendor.test" };
 let server: ChildProcess;
+let serverStderr = "";
 
 // Full response (headers and body) for the vendor-host header checks.
 async function fetchRaw(
@@ -100,7 +101,10 @@ beforeAll(async () => {
   let output = "";
   const keep = (b: Buffer) => void (output = (output + b.toString()).slice(-8192));
   server.stdout!.on("data", keep);
-  server.stderr!.on("data", keep);
+  server.stderr!.on("data", (b: Buffer) => {
+    keep(b);
+    serverStderr = (serverStderr + b.toString()).slice(-32768);
+  });
   const started = Date.now();
   for (let i = 0; i < 300; i++) {
     if (server.exitCode !== null || server.signalCode !== null) break;
@@ -234,5 +238,26 @@ describe("host isolation over HTTP (ARCH-3, SEC-21)", { timeout: 60_000 }, () =>
     for (const path of ["/", "/saya", "/klinik-a"]) {
       expect(await get("unknown.test", path), path).toEqual({ status: 404, refused: true });
     }
+  });
+
+  it("dynamic date-filtered app routes do not throw cacheComponents prerender errors", async () => {
+    const before = serverStderr.length;
+    for (const path of [
+      "/saya",
+      "/saya/komisi",
+      "/keuangan/kewajiban",
+      "/keuangan/biaya",
+      "/keuangan/buku-besar",
+      "/keuangan/pajak",
+      "/lead/survei",
+    ]) {
+      const res = await fetchRaw(HOSTS.app, path);
+      expect(res.headers["x-host-policy"], path).toBeUndefined();
+      expect(res.status, path).toBe(200);
+      expect(res.body, path).not.toContain("NEXT_HTTP_ERROR_FALLBACK;404");
+    }
+    const delta = serverStderr.slice(before);
+    expect(delta).not.toContain("unstable value `new Date()`");
+    expect(delta).not.toContain("blocking-prerender-current-time");
   });
 });

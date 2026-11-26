@@ -27,6 +27,7 @@ purge) do not run on their own; a pgBackRest sidecar for backups.
   and turns relative bind mounts into empty directories, so nothing here is bind-mounted from the repository.
 - Domains, all on service `app`, port 3000:
   `https://stg-app.klinikmu.com:3000`, `https://stg-vendor.klinikmu.com:3000`, `https://stg.klinikmu.id:3000`.
+- **Staging-only Cloudflare proxy exception (`OD-I9`):** unlike production (where `AGENTS.md` / `H-02c` forbids proxying `APP_HOST` and requires DNS-only), all three synthetic staging hosts sit behind Cloudflare proxy (`TRUSTED_IP_HEADER=cf-connecting-ip`). This exception is strictly staging-only (`MIG-2` synthetic data); origin port 443 IP restriction to Cloudflare ranges remains an open pre-production infra hardening item and production `APP_HOST` must stay DNS-only.
 
 ## Variables
 
