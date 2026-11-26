@@ -113,7 +113,7 @@ const AUTH = "account-level auth (clinic_auth role, no tenant tables; tests/auth
 // vendor host, sessions marked surface = vendor (tests/vendor/host.test.ts).
 const VENDOR_AUTH = "vendor-console account-level auth (clinic_auth role, no tenant tables; tests/vendor/host.test.ts)";
 export const EXEMPT: Exemption[] = [
-  { kind: "route", id: "/", reason: "bootstrap placeholder page; renders no tenant data" },
+  { kind: "route", id: "/", reason: "app root redirect to /masuk, /aktifkan-2fa, /terkunci or landingFor(role); renders no tenant data" },
   { kind: "route", id: "/api/auth/[...all]#route", reason: AUTH },
   { kind: "route", id: "/masuk", reason: AUTH },
   { kind: "route", id: "/verifikasi", reason: AUTH },
@@ -128,6 +128,7 @@ export const EXEMPT: Exemption[] = [
   { kind: "route", id: "/vendor/verifikasi", reason: VENDOR_AUTH },
   { kind: "route", id: "/vendor/aktifkan-2fa", reason: VENDOR_AUTH },
   { kind: "route", id: "/vendor/api/auth/[...all]#route", reason: VENDOR_AUTH },
+  { kind: "route", id: "/saya", reason: "Saya index hub (PR-84/PR-86): renders only own active shell context and nav links from loadShell(); no tenant table queries" },
   { kind: "route", id: "/saya/keamanan", reason: "Profil & Keamanan (DEC-033): only this account's auth rows on this surface, by the request's session (tests/auth/security.test.ts lists and ends only own sessions)" },
   { kind: "action", id: "app/(app)/saya/keamanan/actions", reason: "ends one of this account's own other sessions; another account's session id is refused (tests/auth/security.test.ts)" },
   { kind: "route", id: "/vendor/keamanan", reason: "vendor Keamanan Akun (DEC-033): own auth rows on the vendor surface only (tests/auth/security.test.ts)" },
