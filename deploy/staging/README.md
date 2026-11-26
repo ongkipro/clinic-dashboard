@@ -9,7 +9,7 @@ and AutoLaris; no live provider call. Not a production definition.
 | Service | Image | Job |
 |---|---|---|
 | `postgres` | `postgres:16.15-bookworm` | database, default durability (unlike the local-dev `compose.yaml`, which runs `fsync=off`) |
-| `migrate` | the repository `Dockerfile` | one-shot: `src/db/migrate.ts` as the owner role, then `roles.sh` (four login roles, `platform_environment`) |
+| `migrate` | the app image plus `roles.sh` and `roles-entrypoint.sh` baked in | one-shot: `src/db/migrate.ts` as the owner role, then `roles.sh` (four login roles, `platform_environment`) |
 | `app` | the repository `Dockerfile` | Next.js on port 3000; starts only after `migrate` exits 0 |
 
 Not yet included: a scheduled worker (`src/workers/*` have no scheduler entry), so background jobs (outbox, export, booking
@@ -17,10 +17,12 @@ purge) do not run on their own; a pgBackRest sidecar for backups.
 
 ## Coolify settings
 
-- Source: GitHub App, repository `ongkipro/clinic-dashboard`, branch `main`.
+- Source: GitHub App, repository `ongkipro/clinic-dashboard`, branch `deploy-staging` (until this folder is merged to `main`).
 - Build pack **Docker Compose**, base directory `/`, compose file `/deploy/staging/compose.yaml`.
 - **Auto-deploy off.** Deploy a commit whose CI is green, by hand.
 - Environment name `staging`.
+- Build paths resolve from the repository root: Coolify runs compose with `--project-directory` at the checkout root,
+  and turns relative bind mounts into empty directories, so nothing here is bind-mounted from the repository.
 - Domains, all on service `app`, port 3000:
   `https://stg-app.klinikmu.com:3000`, `https://stg-vendor.klinikmu.com:3000`, `https://stg.klinikmu.id:3000`.
 
@@ -62,7 +64,8 @@ Then sign in at `https://stg-vendor.klinikmu.com/vendor/masuk` and enrol TOTP.
 
 ## Verified locally (2026-11-26)
 
-`docker compose -f deploy/staging/compose.yaml up --build --wait` on a throwaway project with random passwords: postgres
+`docker compose --project-directory . -f deploy/staging/compose.yaml up --build --wait` (as Coolify runs it) on a throwaway
+project with random passwords and a throwaway KEK: postgres
 healthy; migrate applied 144 migrations, created `clinic_app_login`, `clinic_auth_login`, `clinic_vendor_login`,
 `clinic_operator_login` (each a member of one group only) and set `platform_environment = staging`, exit 0; app healthy.
 Host routing: `stg-app` `/masuk` 200; `/masuk` on `stg-vendor`, `stg.klinikmu.id` and an unknown host 404; `stg-vendor`
