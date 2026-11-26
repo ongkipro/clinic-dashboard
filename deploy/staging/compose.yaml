@@ -115,7 +115,7 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "node", "-e", "const h=require('node:http');const req=h.request({host:'127.0.0.1',port:3000,path:'/masuk',headers:{host:process.env.APP_HOST}},r=>{r.resume();process.exit(r.statusCode===200?0:1)});req.on('error',()=>process.exit(1));req.end()"]
+      test: ["CMD", "node", "-e", "const h=require('node:http');const req=h.request({host:'127.0.0.1',port:3000,path:'/api/health/db',headers:{host:process.env.APP_HOST}},r=>{r.resume();process.exit(r.statusCode===200?0:1)});req.on('error',()=>process.exit(1));req.end()"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -124,6 +124,44 @@ services:
       resources:
         limits:
           memory: 2g
+    restart: unless-stopped
+
+  # Background worker scheduler (DEL-4, OBS-3, T-122, T-126): reuses the exact built app image,
+  # runs internal DB jobs only (outbox ledger posting, tenant export + 24h purge, booking PII purge,
+  # and daily scans) as clinic_app_login with zero live external provider calls.
+  worker:
+    build:
+      context: .
+      additional_contexts:
+        app_image: service:app
+      dockerfile_inline: |
+        FROM app_image
+    user: node
+    init: true
+    stop_grace_period: 30s
+    command: ["node", "/app/migrate/worker/workers/runner.js"]
+    environment:
+      NODE_ENV: production
+      DEPLOY_ENV: staging
+      APP_DATABASE_URL: postgres://clinic_app_login:${SERVICE_PASSWORD_APPDB}@postgres:5432/clinic_dashboard
+      KEK_FILE: /run/secrets/kek
+      WORKER_HEARTBEAT_FILE: /tmp/clinic-worker-heartbeat.json
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - /data/klinikmu/staging/kek:/run/secrets/kek:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('node:fs');try{const h=JSON.parse(fs.readFileSync(process.env.WORKER_HEARTBEAT_FILE||'/tmp/clinic-worker-heartbeat.json','utf8'));if(!Number.isInteger(h.pid)||h.pid<=0)process.exit(1);const age=Date.now()-Date.parse(h.at);process.kill(h.pid,0);process.exit(h.ok===true&&Number.isFinite(age)&&age>=-5000&&age<180000?0:1)}catch{process.exit(1)}"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
     restart: unless-stopped
 
 volumes:

@@ -10,10 +10,10 @@ and AutoLaris; no live provider call. Not a production definition.
 |---|---|---|
 | `postgres` | `postgres:16.15-bookworm` | database, default durability (unlike the local-dev `compose.yaml`, which runs `fsync=off`) |
 | `migrate` | the app image plus `roles.sh` and `roles-entrypoint.sh` baked in | one-shot: `src/db/migrate.ts` as the owner role, then `roles.sh` (four login roles, `platform_environment`) |
-| `app` | the repository `Dockerfile` | Next.js on port 3000; starts only after `migrate` exits 0 |
+| `app` | the repository `Dockerfile` | Next.js on port 3000; starts only after `migrate` exits 0; healthchecked via `GET /api/health/db` (`Host: $APP_HOST`) |
+| `worker` | exact same built `app` image (`DEL-4`) | `node /app/migrate/worker/workers/runner.js` as `clinic_app_login` (outbox ledger posting, PR-52 export build + 24h expiry, PR-67 booking PII purge, internal CRM/daily scans; zero live external provider calls); healthchecked via `/tmp/clinic-worker-heartbeat.json` |
 
-Not yet included: a scheduled worker (`src/workers/*` have no scheduler entry), so background jobs (outbox, export, booking
-purge) do not run on their own; a pgBackRest sidecar for backups.
+Not yet included: a pgBackRest sidecar for scheduled off-host backups; live Meta/SATUSEHAT/AutoLaris dispatch stays disabled on staging.
 
 ## Coolify settings
 

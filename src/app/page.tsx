@@ -11,6 +11,7 @@ import { landingFor } from "../components/shell/nav";
 import { SignOut } from "../components/shell/shell";
 import { BlockedState, LoadingList } from "../components/ui/states";
 
+export const instant = false;
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 async function HomeGate() {
@@ -38,7 +39,8 @@ async function HomeGate() {
   redirect(landingFor(data.context.role).href);
 }
 
-export default function Home() {
+export default async function Home() {
+  await connection();
   return (
     <Suspense
       fallback={

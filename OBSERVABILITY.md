@@ -1,6 +1,6 @@
 # Observability Contract — clinic-dashboard
 
-Updated: 2026-11-02
+Updated: 2026-11-27
 Status: REQUIRED
 
 Probe format:
@@ -16,7 +16,11 @@ endpoints only; private-network probes require an explicit local-test override.
 Probe: app|TBD|200-399|TBD|2000
 Probe: health|TBD|200-299|TBD|1000
 
-Probes stay TBD until a deployed host exists. Planned endpoints (`docs/spec/16`): `/api/health` (app), `/api/health/db` (database), `/api/health/worker` (worker heartbeat and outbox age), backup age, and SATUSEHAT and WhatsApp backlog per provider (UX-45).
+Production probes stay TBD until a production host exists (`RELEASE.md`). Implemented endpoints (`docs/spec/16`, `OBS-3`):
+- `GET /api/health` (`APP_HOST` only): HTTP 200 `{ "status": "ok" }` liveness probe (`no-store`, zero DB/tenant access).
+- `GET /api/health/db` (`APP_HOST` only): HTTP 200 `{ "status": "ok", "check": "db" }` / 503 readiness probe via bounded `SELECT 1` on `clinic_app` (`TEN-2`).
+- Worker container heartbeat (`DEL-4`, `src/workers/runner.ts`): atomic JSON liveness heartbeat at `WORKER_HEARTBEAT_FILE` (`/tmp/clinic-worker-heartbeat.json`) verified by Docker healthcheck (live positive PID, `ok === true`, publication age < 180 s). This verifies process liveness only and does **not** replace outbox age monitoring.
+- Remaining planned endpoints (`docs/spec/16`, `OBS-3`): `/api/health/worker` (combined worker heartbeat **and** outbox backlog age), backup age, and SATUSEHAT/WhatsApp provider backlog metrics (outbox age and provider backlogs are currently surfaced per tenant in Konsol Vendor › Kesehatan Platform, `UX-45`, via `vendor_console_health`).
 
 ## Recommended production probes
 

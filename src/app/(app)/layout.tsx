@@ -3,12 +3,14 @@
 // (STATUS carried-forward: checkSession + resolveContext on every clinic page).
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { BlockedState, LoadingList } from "../../components/ui/states";
 import { loadShell } from "../../components/shell/data";
 import { Shell, SignOut } from "../../components/shell/shell";
 import { ApplyTampilan } from "./saya/tampilan/apply";
 
+export const instant = false;
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 async function Gated({ children }: { children: React.ReactNode }) {
@@ -25,7 +27,8 @@ async function Gated({ children }: { children: React.ReactNode }) {
   return <Shell {...data.context}><ApplyTampilan />{children}</Shell>;
 }
 
-export default function AppLayout({ children }: LayoutProps<"/">) {
+export default async function AppLayout({ children }: LayoutProps<"/">) {
+  await connection();
   return (
     // The fallback is static: nothing request-specific renders before the gate passes.
     <Suspense

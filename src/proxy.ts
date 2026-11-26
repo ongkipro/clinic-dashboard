@@ -62,6 +62,27 @@ function config(): HostConfig {
   return cached;
 }
 
+const SANDBOXED_APP_PREFIXES = [
+  "/keuangan/biaya/bukti/",
+  "/privasi/bukti/",
+  "/kepatuhan/berkas/",
+];
+
+export function appCsp(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}'`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
 export function vendorCsp(nonce: string): string {
   return [
     "default-src 'self'",
@@ -161,6 +182,29 @@ export async function proxy(request: NextRequest) {
     response.headers.set("vary", "Cookie");
     response.headers.set("x-content-type-options", "nosniff");
     response.headers.set("referrer-policy", "no-referrer");
+    return response;
+  }
+  if (decision.host === "app") {
+    const pathname = request.nextUrl.pathname;
+    if (pathname.startsWith("/_next/static/") || pathname === "/favicon.ico") {
+      const response = NextResponse.next();
+      response.headers.set("x-content-type-options", "nosniff");
+      return response;
+    }
+    const lowerPath = pathname.toLowerCase();
+    const sandboxed = SANDBOXED_APP_PREFIXES.some((p) => lowerPath.startsWith(p));
+    const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(18))));
+    const csp = sandboxed ? "default-src 'none'; sandbox" : appCsp(nonce);
+    const forwarded = new Headers(request.headers);
+    forwarded.set("content-security-policy", csp);
+    if (!sandboxed) forwarded.set("x-nonce", nonce);
+    const response = NextResponse.next({ request: { headers: forwarded } });
+    response.headers.set("content-security-policy", csp);
+    response.headers.set("x-content-type-options", "nosniff");
+    response.headers.set("referrer-policy", "no-referrer");
+    response.headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
+    response.headers.set("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+    response.headers.set("cache-control", "private, no-store");
     return response;
   }
   if (decision.host !== "vendor") return NextResponse.next();

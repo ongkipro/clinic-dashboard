@@ -465,9 +465,13 @@ describe("proxy on the vendor host (SEC-21)", () => {
     expect(a.headers.get("permissions-policy")).toContain("camera=()");
   });
 
-  it("the app and booking hosts are unchanged; vendor routes stay refused there", async () => {
+  it("the app host carries app CSP (not vendor CSP) and vendor routes stay refused on app and booking hosts", async () => {
     const r = await proxy(req("app.test", "/persetujuan"));
-    expect(r.headers.get("content-security-policy")).toBeNull();
+    const csp = r.headers.get("content-security-policy") ?? "";
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("style-src 'self' 'unsafe-inline'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]{24}'/);
     expect(r.headers.get("x-host-policy")).toBeNull();
     expect((await proxy(req("app.test", "/vendor/tenant"))).headers.get("x-host-policy")).toBe("refused");
     expect((await proxy(req("booking.test", "/vendor/api/auth/get-session"))).headers.get("x-host-policy")).toBe("refused");

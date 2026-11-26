@@ -11,10 +11,10 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 # Explicit copies (and .dockerignore): .env*, host node_modules and research stay out.
-COPY next.config.ts tsconfig.json ./
+COPY next.config.ts tsconfig.json tsconfig.worker.json ./
 COPY src ./src
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm build
+RUN pnpm build && pnpm exec tsc -p tsconfig.worker.json
 
 # Production dependencies only, for the migration runner (the Next.js standalone trace
 # does not include drizzle-orm's migrator).
@@ -40,6 +40,9 @@ COPY src/db/migrate.ts ./migrate/src/db/migrate.ts
 COPY src/db/vendor-bootstrap.ts ./migrate/src/db/vendor-bootstrap.ts
 COPY src/auth/policy.ts ./migrate/src/auth/policy.ts
 COPY drizzle ./migrate/drizzle
+# Compiled background worker scheduler (DEL-4, OBS-3): runs from this same image via
+#   node /app/migrate/worker/workers/runner.js  (APP_DATABASE_URL = clinic_app role)
+COPY --from=build /app/build/worker ./migrate/worker
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]

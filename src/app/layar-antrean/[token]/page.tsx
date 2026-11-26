@@ -9,6 +9,7 @@ import { appPool } from "../../../modules/org/context/store";
 import { displayFeed } from "../../../modules/visits/queue/queue";
 import { Refresh } from "./refresh";
 
+export const instant = false;
 export const metadata: Metadata = { title: "Layar Antrean", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
 async function Screen({ params }: { params: Promise<{ token: string }> }) {
@@ -46,7 +47,8 @@ async function Screen({ params }: { params: Promise<{ token: string }> }) {
   );
 }
 
-export default function Page({ params }: { params: Promise<{ token: string }> }) {
+export default async function Page({ params }: { params: Promise<{ token: string }> }) {
+  await connection();
   return (
     <Suspense fallback={<main className="grid min-h-dvh place-items-center bg-[var(--bg-grouped)]"><p className="m-0 text-[1.5rem]">Memuat antrean</p></main>}>
       <Screen params={params} />

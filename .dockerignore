@@ -6,6 +6,7 @@
 !pnpm-workspace.yaml
 !next.config.ts
 !tsconfig.json
+!tsconfig.worker.json
 !src/**
 !drizzle/**
 # Re-exclude anything sensitive or bulky that may sit inside the allowed trees.

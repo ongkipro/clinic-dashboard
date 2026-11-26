@@ -228,10 +228,58 @@ describe("host isolation over HTTP (ARCH-3, SEC-21)", { timeout: 60_000 }, () =>
     expect(await get(HOSTS.app, "/vendor/api/auth/get-session")).toEqual({ status: 404, refused: true });
   });
 
-  it("app-host pages carry no vendor CSP", async () => {
-    const r = await fetchRaw(HOSTS.app, "/masuk");
-    expect(r.status).toBe(200);
-    expect(r.headers["content-security-policy"]).toBeUndefined();
+  it("app-host pages carry a strict nonce CSP and security headers, and every script carries the nonce (SEC-4)", async () => {
+    const seen = new Set<string>();
+    for (const path of ["/", "/masuk", "/verifikasi", "/aktifkan-2fa", "/saya"]) {
+      const r = await fetchRaw(HOSTS.app, path);
+      expect(r.status, path).toBe(200);
+      const csp = String(r.headers["content-security-policy"] ?? "");
+      const nonce = /script-src 'self' 'nonce-([A-Za-z0-9+/=]+)'/.exec(csp)?.[1];
+      expect(nonce, `${path}: ${csp}`).toBeTruthy();
+      expect(csp).toContain("default-src 'self'");
+      expect(csp).toContain("frame-ancestors 'none'");
+      expect(csp).toContain("object-src 'none'");
+      expect(csp).toContain("base-uri 'none'");
+      expect(csp).toContain("form-action 'self'");
+      expect(csp).not.toMatch(/unsafe-eval/);
+      expect(csp).not.toMatch(/script-src[^;]*unsafe-inline/);
+      expect(seen.has(nonce!), `nonce reused on ${path}`).toBe(false);
+      seen.add(nonce!);
+      const scripts = [...r.body.matchAll(/<script\b([^>]*)>/g)].map((m) => m[1]);
+      expect(scripts.length, path).toBeGreaterThan(0);
+      for (const attrs of scripts) expect(attrs, `${path}: <script${attrs}>`).toContain(`nonce="${nonce}"`);
+      expect(r.headers["x-content-type-options"]).toBe("nosniff");
+      expect(r.headers["referrer-policy"]).toBe("no-referrer");
+      expect(String(r.headers["strict-transport-security"] ?? "")).toContain("max-age=");
+      expect(String(r.headers["permissions-policy"] ?? "")).toContain("camera=()");
+      expect(String(r.headers["cache-control"] ?? "")).toContain("no-store");
+    }
+    // Uploaded-file download/preview routes keep stricter sandboxed CSP rather than being downgraded to appCsp.
+    for (const path of [
+      "/keuangan/biaya/bukti/00000000-0000-0000-0000-000000000000",
+      "/privasi/bukti/00000000-0000-0000-0000-000000000000",
+      "/kepatuhan/berkas/00000000-0000-0000-0000-000000000000",
+    ]) {
+      const r = await fetchRaw(HOSTS.app, path);
+      expect(r.headers["content-security-policy"], path).toBe("default-src 'none'; sandbox");
+    }
+  });
+
+  it("/api/health and /api/health/db serve APP_HOST only and fail closed without DB", async () => {
+    for (const host of [HOSTS.booking, HOSTS.vendor, "unknown.test"]) {
+      for (const path of ["/api/health", "/api/health/db"]) {
+        expect(await get(host, path), `${host}${path}`).toEqual({ status: 404, refused: true });
+      }
+    }
+    const live = await fetchRaw(HOSTS.app, "/api/health");
+    expect(live.status).toBe(200);
+    expect(JSON.parse(live.body)).toEqual({ status: "ok" });
+    expect(String(live.headers["cache-control"] ?? "")).toContain("no-store");
+
+    const dbRes = await fetchRaw(HOSTS.app, "/api/health/db");
+    expect(dbRes.status).toBe(503);
+    expect(JSON.parse(dbRes.body)).toEqual({ status: "error", check: "db" });
+    expect(String(dbRes.headers["cache-control"] ?? "")).toContain("no-store");
   });
 
   it("unknown hosts are refused for every path", async () => {

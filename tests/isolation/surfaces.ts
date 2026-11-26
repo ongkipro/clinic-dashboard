@@ -147,6 +147,8 @@ export const EXEMPT: Exemption[] = [
   { kind: "route", id: "/vendor/tenant", reason: "vendor console platform page (no tenant context): clinic_vendor has no tenant-table privilege; reads only state, legal name and branch count through vendor_console_tenants behind vendor_guard (tests/vendor/host.test.ts)" },
   { kind: "route", id: "/dev/galeri", reason: "development-only component gallery, refused in production (T-012)" },
   { kind: "route", id: "/dev/templat", reason: "development-only page-template gallery with static sample data, refused in production (T-014)" },
+  { kind: "route", id: "/api/health#route", reason: "platform liveness probe (OBS-3, OBSERVABILITY.md): no DB query and no tenant data; APP_HOST only (tests/platform/health.test.ts, tests/platform/hosts.spec.ts)" },
+  { kind: "route", id: "/api/health/db#route", reason: "platform database readiness probe (OBS-3, TEN-2): runs SELECT 1 only on unbound clinic_app pool, touches no tenant tables and leaks no errors; APP_HOST only (tests/platform/health.test.ts, tests/platform/hosts.spec.ts)" },
 ];
 
 const key = (s: SurfaceRef) => `${s.kind}:${s.id}`;
