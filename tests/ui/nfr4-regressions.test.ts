@@ -45,10 +45,12 @@ function loadBuiltCss(): string {
 }
 
 describe("NFR-4 targeted WCAG 2.2 AA regressions", () => {
-  it("shell search slot hides decorative shortcut glyph from accessible name while keeping aria-keyshortcuts", () => {
+  it("shell search slot builds accessible name via sr-only suffix (no aria-label mismatch) while keeping aria-keyshortcuts", () => {
     const src = readFileSync(resolve(ROOT, "src/components/shell/shell.tsx"), "utf8");
     expect(src).toContain(`aria-keyshortcuts="Control+K Meta+K"`);
+    expect(src).toContain(`Cari<span className="sr-only"> halaman, pasien atau aksi</span>`);
     expect(src).toMatch(/<kbd[^>]*aria-hidden="true"[^>]*>⌘K<\/kbd>/);
+    expect(src).not.toContain(`aria-label="Cari halaman, pasien atau aksi"`);
   });
 
   it("public booking accent text uses #005BBF (>= 4.5:1 AA contrast on #F5F5F7 and #0071E3/10 surfaces)", () => {
@@ -98,10 +100,11 @@ describe("NFR-4 targeted WCAG 2.2 AA regressions", () => {
         const longService = "PerawatanSuperPanjangTanpaSpasiUntukUjiReflowDuaRatusPersen2026";
         const longSegment = "SegmenPasienPrioritasDenganLabelSangatPanjangTanpaSpasiDiLayarKecil";
 
-        await page.setContent(`<!doctype html><html lang="id"><head><style>${css}</style></head><body class="bg-white text-[#1D1D1F]">
+        await page.setContent(`<!doctype html><html lang="id"><head><title>NFR-4 Check</title><style>${css}</style></head><body class="bg-white text-[#1D1D1F]">
           <main class="mx-auto max-w-5xl px-4 py-4 space-y-6">
-            <button id="search-btn" type="button" class="searchSlot" aria-label="Cari pasien, jadwal, atau faktur" aria-keyshortcuts="Control+K Meta+K">
-              <span>Cari pasien, jadwal, atau faktur</span>
+            <h1>Uji Aksesibilitas</h1>
+            <button id="search-btn" type="button" data-shell-search aria-keyshortcuts="Control+K Meta+K">
+              <span>Cari<span class="sr-only"> halaman, pasien atau aksi</span></span>
               <kbd aria-hidden="true">⌘K</kbd>
             </button>
 
@@ -125,18 +128,41 @@ describe("NFR-4 targeted WCAG 2.2 AA regressions", () => {
           </main>
         </body></html>`);
 
-        // 1. Accessible name excludes decorative ⌘K
+        // 1. Accessible name matches "Cari halaman, pasien atau aksi" and excludes decorative ⌘K
         const acc = await page.evaluate(() => {
           const btn = document.getElementById("search-btn")!;
           const visibleNonHidden = Array.from(btn.childNodes)
             .filter((n) => !(n instanceof HTMLElement && n.getAttribute("aria-hidden") === "true"))
-            .map((n) => n.textContent?.trim() ?? "")
-            .join(" ")
+            .map((n) => n.textContent ?? "")
+            .join("")
+            .replace(/\s+/g, " ")
             .trim();
-          return { ariaLabel: btn.getAttribute("aria-label"), visibleNonHidden };
+          return { hasAriaLabel: btn.hasAttribute("aria-label"), visibleNonHidden };
         });
-        expect(acc.ariaLabel).toBe(acc.visibleNonHidden);
+        expect(acc.hasAriaLabel).toBe(false);
+        expect(acc.visibleNonHidden).toBe("Cari halaman, pasien atau aksi");
         expect(acc.visibleNonHidden).not.toContain("⌘K");
+
+        // 1b. Run real axe-core WCAG 2.2 AA check (zero violations including label-content-name-mismatch & color-contrast)
+        const { createRequire } = await import("node:module");
+        const req = createRequire(import.meta.url);
+        const axePath = process.env.AXE_CORE_PATH ?? req.resolve("axe-core/axe.min.js");
+        const axeSrc = readFileSync(axePath, "utf8");
+        await page.evaluate((src: string) => {
+          const s = document.createElement("script");
+          s.textContent = src;
+          document.head.appendChild(s);
+        }, axeSrc);
+        const axeViolations = await page.evaluate(async () => {
+          const w = window as unknown as {
+            axe: { run: (ctx: Document, opts: object) => Promise<{ violations: { id: string }[] }> };
+          };
+          const res = await w.axe.run(document, {
+            runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
+          });
+          return res.violations.map((v) => v.id);
+        });
+        expect(axeViolations).toEqual([]);
 
         // 2. Actual composited sRGB pixel contrast on BOTH booking surfaces >= 4.5:1 (handles Tailwind v4 lab/oklab color-mix)
         const colors = await page.evaluate(() => {
